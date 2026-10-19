@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
+#include <future>
 #include <memory>
 #include <optional>
 #include <span>
@@ -94,6 +95,19 @@ class Viewer {
     /// @return Whether eco mode skips rendering this frame: nothing it renders from has changed
     /// for the frames the shell's display asks.
     bool EcoPause();
+    /// @return An image's RGBA8 texels on the host once `drawn` is done.
+    Tensor ReadImage(const DeviceImage& image, const Ticket& drawn);
+    /// @return Where the next capture goes: the Capture panel's folder and name, made unique.
+    std::filesystem::path CapturePath(std::string_view extension, std::int64_t frame) const;
+    /// @brief Saves what the shell asked of the frame `drawn`: a screenshot, a sequence's frame.
+    void Capture(const Ticket& drawn);
+    /// @brief Takes the shell's sequence request, follows the one recording and the one encoding,
+    /// and moves the scene to the frame the recording renders next.
+    void FollowRecording();
+    void StartSequence(const SequenceRequest& request);
+    void RecordFrame(const Ticket& drawn);
+    /// @brief Ends the recording, encoding its frames into video when asked.
+    void FinishSequence();
     /// @brief Adds the pass filling the viewport: traced, or the theme's colour without ray
     /// queries.
     /// @return The viewport, filled.
@@ -129,6 +143,17 @@ class Viewer {
         glm::uvec2 size{0};
         bool operator==(const ViewState&) const = default;
     };
+    /// A sequence being recorded: its frames so far of all, and the time code next.
+    struct Recording {
+        SequenceRequest request;
+        std::filesystem::path folder;
+        double next = 0.0;
+        std::int64_t done = 0;
+        std::int64_t total = 0;
+    };
+    std::optional<Recording> recording_;
+    /// The last sequence's video, encoding: its path once done, empty when ffmpeg failed.
+    std::future<std::filesystem::path> encoding_;
     std::optional<ViewState> lastView_;
     std::uint64_t stillFrames_ = 0;
     bool ecoPaused_ = false;

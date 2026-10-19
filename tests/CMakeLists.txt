@@ -123,8 +123,14 @@ ernie_add_test_suite(
 if(TARGET ernie_viewer)
     ernie_add_test_suite(
         app
-        SOURCES app/orbit_camera_test.cpp app/shell_test.cpp app/view_test.cpp
-        LIBRARIES ernie_viewer
+        SOURCES
+            app/capture_test.cpp
+            app/demo_test.cpp
+            app/orbit_camera_test.cpp
+            app/shell_test.cpp
+            app/timeline_test.cpp
+            app/view_test.cpp
+        LIBRARIES ernie_viewer ernie_demos
     )
     ernie_add_test_suite(app_gpu LABEL gpu SOURCES app/viewer_test.cpp LIBRARIES ernie_viewer)
 endif()

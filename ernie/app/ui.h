@@ -6,6 +6,9 @@
 /// so it runs without a device or a window.
 #pragma once
 
+#include "ernie/app/capture.h"
+#include "ernie/app/demo.h"
+#include "ernie/app/timeline.h"
 #include "ernie/device/image.h"
 #include "ernie/device/queue.h"
 #include "ernie/geometry/bounds.h"
@@ -188,6 +191,16 @@ std::unique_ptr<Panel> MakeDevicePanel(const DeviceContext* device);
 /// @param alwaysRecord Whether zones record while the panel is hidden too.
 std::unique_ptr<Panel> MakeProfilerPanel(MessageLog& log, bool alwaysRecord);
 
+class Shell;
+
+/// @return The Demos panel: the registered demos by category, the running one's controls,
+/// description and options.
+std::unique_ptr<Panel> MakeDemosPanel(Shell& shell);
+
+/// @return The Capture panel: where captures go and how they are named, the screenshot, image
+/// sequences encoded into video, and the recent captures.
+std::unique_ptr<Panel> MakeCapturePanel(Shell& shell);
+
 /// @brief Draws the Keyboard and Mouse window while `open`; its close button clears it.
 void DrawControlsWindow(bool& open);
 
@@ -344,6 +357,25 @@ inline const char* LightingName(Lighting lighting) {
     return "Default Light";
 }
 
+/// @brief How captures are named and where they go, as the Capture panel sets them.
+struct CaptureSettings {
+    std::filesystem::path folder;
+    /// `ExpandCaptureName`'s pattern.
+    std::string name = "{scene}_{camera}_{date}_{time}";
+    VideoFormat video = VideoFormat::Mp4;
+    /// Whether a sequence's frames stay once encoded into video.
+    bool keepFrames = true;
+};
+
+/// @brief A sequence to record: the time codes from `start` to `end`, every `every`th frame.
+struct SequenceRequest {
+    double start = 0.0;
+    double end = 0.0;
+    int every = 1;
+    VideoFormat video = VideoFormat::None;
+    bool keepFrames = true;
+};
+
 /// @brief What the viewport shows over its image, as its eye menu toggles it, and how it is lit.
 struct ViewportDisplay {
     bool toolbar = true;
@@ -354,6 +386,8 @@ struct ViewportDisplay {
     bool hudResolution = true;
     bool hudCamera = false;
     Lighting lighting = Lighting::Camera;
+    /// The timeline strip along the viewport's bottom.
+    bool timeline = true;
     /// Eco mode, after Omniverse's: the viewport stops rendering once nothing has changed for
     /// `ecoFrames` frames, and the UI keeps running over its last image.
     bool eco = true;
@@ -429,6 +463,67 @@ class Shell {
     void SetEcoPaused(bool paused) {
         ecoPaused_ = paused;
     }
+
+    app::Timeline& Timeline() {
+        return timeline_;
+    }
+
+    /// @brief Replaces the scene with a demo's, forgetting the history and the selection.
+    /// @throws what the demo's constructor throws, leaving the scene empty.
+    void LoadDemo(const DemoInfo& demo);
+    /// @return The demo running, or null.
+    Demo* CurrentDemo() const {
+        return demo_.get();
+    }
+    /// @return Its registration, or null.
+    const DemoInfo* CurrentDemoInfo() const {
+        return demo_ ? &demoInfo_ : nullptr;
+    }
+    /// Whether the demo holds still; `StepDemo` moves it a step anyway.
+    bool demoPaused = false;
+    void StepDemo();
+    /// @brief Builds the demo again from scratch.
+    void ResetDemo();
+
+    CaptureSettings& Capture() {
+        return capture_;
+    }
+    /// @return This frame's screenshot request, once.
+    bool TakeScreenshot() {
+        return std::exchange(screenshot_, false);
+    }
+    void RequestScreenshot() {
+        screenshot_ = true;
+    }
+    /// @return This frame's sequence request, once.
+    std::optional<SequenceRequest> TakeSequence() {
+        return std::exchange(sequence_, std::nullopt);
+    }
+    void RequestSequence(const SequenceRequest& sequence) {
+        sequence_ = sequence;
+    }
+    /// @brief Shows a sequence's progress, as the viewer records it: frames done of total, or
+    /// none once it stops; and whether its video is still encoding.
+    void SetRecording(std::optional<std::pair<std::int64_t, std::int64_t>> progress,
+                      bool encoding) {
+        recording_ = progress;
+        encoding_ = encoding;
+    }
+    std::optional<std::pair<std::int64_t, std::int64_t>> Recording() const {
+        return recording_;
+    }
+    bool Encoding() const {
+        return encoding_;
+    }
+    /// Whether the Capture panel's Stop was pressed this frame.
+    bool stopRecording = false;
+    /// @brief Lists a file a capture wrote, for the Capture panel's Recent list.
+    void AddRecentCapture(const std::filesystem::path& path);
+    const std::vector<std::filesystem::path>& RecentCaptures() const {
+        return recentCaptures_;
+    }
+    /// @return What a capture's name pattern names now.
+    CaptureNameFields CaptureFields() const;
     /// @return The heads-up display's lines, as "label: value", as last refreshed.
     const std::vector<std::string>& HudLines() const {
         return hudLines_;
@@ -509,6 +604,8 @@ class Shell {
     void EndPills();
     /// Draws a pill whose menu `items` draws.
     void Pill(const char* id, const std::string& label, const char* tip, void (Shell::*items)());
+    /// Draws the timeline strip along the viewport's bottom.
+    void DrawTimeline();
     /// Draws the heads-up display at the viewport's top right, over its image.
     void DrawHud();
     void RefreshHud();
@@ -540,6 +637,15 @@ class Shell {
     bool dragging_ = false;
     std::optional<Pick> pick_;
     ViewportDisplay display_;
+    app::Timeline timeline_;
+    std::unique_ptr<Demo> demo_;
+    DemoInfo demoInfo_;
+    CaptureSettings capture_;
+    bool screenshot_ = false;
+    std::optional<SequenceRequest> sequence_;
+    std::optional<std::pair<std::int64_t, std::int64_t>> recording_;
+    bool encoding_ = false;
+    std::vector<std::filesystem::path> recentCaptures_;
     /// Whether eco mode paused the viewport this frame, as the viewer reports it.
     bool ecoPaused_ = false;
     Path activeCamera_;

@@ -16,6 +16,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 
 namespace ernie {
@@ -158,6 +159,41 @@ TEST(Viewer, EcoModePausesRenderingUntilSomethingChanges) {
     scene.Set(*scene.Find("/Ball"), "radius", 2.0);
     viewer->Run();
     EXPECT_FALSE(viewer->EcoPaused()) << "an edit renders again";
+    test::ExpectClean(viewer->Context());
+}
+
+TEST(Viewer, CapturesScreenshotsAndSequences) {
+    Scene scene;
+    scene.Define("/Ball", "Sphere");
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 2};
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    const std::filesystem::path folder =
+        std::filesystem::temp_directory_path() / "ernie_viewer_capture_test";
+    std::filesystem::remove_all(folder);
+    app::Shell& shell = viewer->GetShell();
+    shell.Capture().folder = folder;
+    shell.Capture().name = "shot";
+    viewer->Run();
+    shell.RequestScreenshot();
+    viewer->Run();
+    ASSERT_EQ(shell.RecentCaptures().size(), 1u);
+    EXPECT_EQ(shell.RecentCaptures().back(), folder / "shot.png");
+    EXPECT_TRUE(std::filesystem::exists(folder / "shot.png"));
+
+    shell.Capture().name = "sequence";
+    shell.RequestSequence({.start = 10.0, .end = 12.0});
+    for (int frame = 0; frame < 4; ++frame) {
+        viewer->Run();
+    }
+    EXPECT_FALSE(shell.Recording()) << "done after three frames";
+    for (const char* name : {"frame_0000.png", "frame_0001.png", "frame_0002.png"}) {
+        EXPECT_TRUE(std::filesystem::exists(folder / "sequence" / name)) << name;
+    }
+    EXPECT_EQ(scene.Time(), 12.0) << "the sequence stepped the scene's clock";
+    std::filesystem::remove_all(folder);
     test::ExpectClean(viewer->Context());
 }
 

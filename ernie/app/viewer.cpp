@@ -3,10 +3,12 @@
 /// @brief The viewer's set-up and frame loop, and its command line.
 #include "ernie/app/viewer.h"
 
+#include "ernie/app/capture.h"
 #include "ernie/io/image.h"
 #include "ernie/scene/json.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/disk_cache.h"
+#include "ernie/util/process.h"
 #include "ernie/util/profiler.h"
 
 #include <imgui.h>
@@ -121,31 +123,135 @@ void Viewer::Run() {
     }
 }
 
-void Viewer::SaveScreenshot(const std::filesystem::path& path) {
-    const OffscreenPresenter* offscreen = Offscreen();
-    if (offscreen == nullptr) {
-        throw std::logic_error("Screenshots are of offscreen frames");
-    }
-    const glm::uvec2 size(offscreen->Image().Description().extent);
+Tensor Viewer::ReadImage(const DeviceImage& image, const Ticket& drawn) {
+    const glm::uvec2 size(image.Description().extent);
     const std::uint64_t bytes = std::uint64_t{4} * size.x * size.y;
-    const Buffer staging(*context_, bytes, MemoryUse::Readback, "Screenshot");
-    const std::array waits{offscreen->Drawn()};
+    const Buffer staging(*context_, bytes, MemoryUse::Readback, "Image readback");
     context_->Main()
         .Submit(
             [&](VkCommandBuffer commands) {
                 const VkBufferImageCopy region{
                     .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
                     .imageExtent = {size.x, size.y, 1}};
-                vkCmdCopyImageToBuffer(commands, offscreen->Image().Handle(),
-                                       VK_IMAGE_LAYOUT_GENERAL, staging.Handle(), 1, &region);
+                vkCmdCopyImageToBuffer(commands, image.Handle(), VK_IMAGE_LAYOUT_GENERAL,
+                                       staging.Handle(), 1, &region);
             },
-            waits)
+            std::span(&drawn, 1))
         .Wait();
     staging.Invalidate(0, bytes);
     const std::span<const std::byte> texels = staging.Mapped().first(bytes);
-    WritePng(path, Tensor::Copy(std::span(reinterpret_cast<const std::uint8_t*>(texels.data()),
-                                          texels.size()),
-                                {size.y, size.x, 4}));
+    return Tensor::Copy(
+        std::span(reinterpret_cast<const std::uint8_t*>(texels.data()), texels.size()),
+        {size.y, size.x, 4});
+}
+
+void Viewer::SaveScreenshot(const std::filesystem::path& path) {
+    const OffscreenPresenter* offscreen = Offscreen();
+    if (offscreen == nullptr) {
+        throw std::logic_error("Screenshots are of offscreen frames");
+    }
+    WritePng(path, ReadImage(offscreen->Image(), offscreen->Drawn()));
+}
+
+std::filesystem::path Viewer::CapturePath(std::string_view extension, std::int64_t frame) const {
+    CaptureNameFields fields = shell_->CaptureFields();
+    fields.frame = frame;
+    const CaptureSettings& settings = shell_->Capture();
+    std::filesystem::create_directories(settings.folder);
+    return UniquePath(settings.folder /
+                      (ExpandCaptureName(settings.name, fields) + std::string(extension)));
+}
+
+void Viewer::Capture(const Ticket& drawn) {
+    if (shell_->TakeScreenshot()) {
+        try {
+            const std::filesystem::path path = CapturePath(".png", 0);
+            WritePng(path, ReadImage(*viewport_, drawn));
+            shell_->AddRecentCapture(path);
+        } catch (const std::exception& error) {
+            shell_->Log().Error(std::string("Capturing: ") + error.what());
+        }
+    }
+    if (recording_) {
+        RecordFrame(drawn);
+    }
+}
+
+void Viewer::StartSequence(const SequenceRequest& request) {
+    const std::filesystem::path folder = CapturePath("", 0);
+    std::filesystem::create_directories(folder);
+    const auto frames =
+        static_cast<std::int64_t>(std::floor((request.end - request.start) / request.every)) + 1;
+    recording_ = Recording{.request = request,
+                           .folder = folder,
+                           .next = request.start,
+                           .total = std::max<std::int64_t>(frames, 1)};
+    shell_->Timeline().Pause();
+}
+
+void Viewer::RecordFrame(const Ticket& drawn) {
+    Recording& recording = *recording_;
+    std::array<char, 32> name{};
+    std::snprintf(name.data(), name.size(), "frame_%04lld.png",
+                  static_cast<long long>(recording.done));
+    WritePng(recording.folder / name.data(), ReadImage(*viewport_, drawn));
+    ++recording.done;
+    recording.next += recording.request.every;
+    if (recording.done >= recording.total || shell_->stopRecording) {
+        FinishSequence();
+    }
+}
+
+void Viewer::FinishSequence() {
+    const Recording recording = *recording_;
+    recording_.reset();
+    shell_->stopRecording = false;
+    shell_->AddRecentCapture(recording.folder);
+    if (recording.request.video == VideoFormat::None) {
+        return;
+    }
+    const std::filesystem::path video =
+        UniquePath(recording.folder.string() + VideoExtension(recording.request.video));
+    const std::vector<std::string> command =
+        EncodeCommand(FindProgram("ffmpeg"), recording.folder / "frame_%04d.png",
+                      shell_->Timeline().FramesPerSecond() / recording.request.every, video,
+                      recording.request.video);
+    const bool keepFrames = recording.request.keepFrames;
+    // Encoding takes a while: the viewer keeps running meanwhile.
+    encoding_ =
+        std::async(std::launch::async, [command, video, folder = recording.folder, keepFrames] {
+            const bool encoded = RunProcess(command) == 0;
+            if (encoded && !keepFrames) {
+                std::filesystem::remove_all(folder);
+            }
+            return encoded ? video : std::filesystem::path();
+        });
+}
+
+void Viewer::FollowRecording() {
+    if (encoding_.valid() &&
+        encoding_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        const std::filesystem::path video = encoding_.get();
+        if (video.empty()) {
+            shell_->Log().Error("ffmpeg could not encode the sequence");
+        } else {
+            shell_->AddRecentCapture(video);
+        }
+    }
+    if (const std::optional<SequenceRequest> request = shell_->TakeSequence()) {
+        try {
+            StartSequence(*request);
+        } catch (const std::exception& error) {
+            shell_->Log().Error(std::string("Recording: ") + error.what());
+        }
+    }
+    if (recording_) {
+        // Each frame renders the next time code of the sequence.
+        shell_->Timeline().Seek(scene_, recording_->next);
+    }
+    shell_->SetRecording(recording_ ? std::optional(std::pair(recording_->done, recording_->total))
+                                    : std::nullopt,
+                         encoding_.valid());
 }
 
 bool Viewer::Step() {
@@ -168,6 +274,7 @@ bool Viewer::Step() {
         renderer_->NewFrame();
         ImGui::NewFrame();
     }
+    FollowRecording();
     shell_->Draw();
     {
         // The menus' edits resolve before the device scene follows them.
@@ -211,6 +318,10 @@ bool Viewer::Step() {
         if (const std::optional<Shell::Pick> pick = shell_->TakePick()) {
             ERNIE_ZONE("Pick");
             Pick(*pick, drawn);
+        }
+        {
+            ERNIE_ZONE("Capture");
+            Capture(drawn);
         }
         ERNIE_ZONE("Present");
         presenter_->Present(drawn);

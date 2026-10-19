@@ -1656,13 +1656,17 @@ Path SettingsCamera(const Scene& scene) {
 Shell::Shell(Scene& scene, const DeviceContext* device, const ShellOptions& options)
     : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks),
       display_(options.display) {
-    // Stage above Properties on the right; Log, Info, Devices and Profiler tabbed at the bottom.
+    // Stage and Demos above Properties on the right; Log, Capture, Info, Devices and Profiler
+    // tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
+    panels_.push_back(MakeDemosPanel(*this));
     panels_.push_back(MakePropertiesPanel(scene, selection_, history_, log_));
     panels_.push_back(MakeLogPanel(log_, theme_));
+    panels_.push_back(MakeCapturePanel(*this));
     panels_.push_back(MakeInfoPanel(scene, device));
     panels_.push_back(MakeDevicePanel(device));
     panels_.push_back(MakeProfilerPanel(log_, options.profile));
+    capture_.folder = DefaultCaptureFolder();
     if (options.profile) {
         profiler::SetEnabled(true);
     }
@@ -1684,6 +1688,13 @@ std::pair<ImVec2, ImVec2> Shell::Viewport() const {
 void Shell::Draw() {
     ERNIE_ZONE("Draw the UI");
     choices_ = {};
+    {
+        ERNIE_ZONE("Animate");
+        timeline_.Advance(scene_, ImGui::GetIO().DeltaTime);
+        if (demo_ && !demoPaused) {
+            Attempt("Stepping the demo", [&] { demo_->Advance(); });
+        }
+    }
     {
         ERNIE_ZONE("Draw the menus");
         DrawMenuBar();
@@ -1708,6 +1719,7 @@ void Shell::Draw() {
     if (!overlaysHidden_) {
         ERNIE_ZONE("Draw over the viewport");
         DrawToolbar();
+        DrawTimeline();
         DrawHud();
     }
     Apply();
@@ -1970,6 +1982,7 @@ void Shell::DrawShowMenu() {
     }
     ImGui::Separator();
     MenuCheck("Toolbar", display_.toolbar);
+    MenuCheck("Timeline", display_.timeline);
     ImGui::PopItemFlag();
 }
 
@@ -2063,6 +2076,88 @@ void Shell::RefreshHud() {
                       target.z);
         hudLines_.emplace_back(line.data());
     }
+}
+
+void Shell::DrawTimeline() {
+    if (!display_.timeline) {
+        return;
+    }
+    const auto [origin, size] = Viewport();
+    const float pad = 8.0f;
+    ImGui::SetNextWindowPos(ImVec2(origin.x + pad, origin.y + size.y - pad), ImGuiCond_Always,
+                            ImVec2(0.0f, 1.0f));
+    ImGui::SetNextWindowSize(ImVec2(size.x - 2.0f * pad, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(theme_.overlay));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
+    ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay * 1.4f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme_.pillRounding);
+    constexpr ImGuiWindowFlags kStrip =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("##timeline", nullptr, kStrip)) {
+        const auto button = [](const char* icon, const char* tip) {
+            const bool pressed = ImGui::Button(icon);
+            ImGui::SetItemTooltip("%s", tip);
+            ImGui::SameLine();
+            return pressed;
+        };
+        if (button(icons::kSkipBack, "To the start")) {
+            timeline_.Stop(scene_);
+        }
+        if (button(icons::kStepBack, "A frame back")) {
+            timeline_.StepFrames(scene_, -1);
+        }
+        if (button(timeline_.Playing() ? icons::kPause : icons::kPlay, "Play or pause (Space)")) {
+            timeline_.Playing() ? timeline_.Pause() : timeline_.Play();
+        }
+        if (button(icons::kStepForward, "A frame on")) {
+            timeline_.StepFrames(scene_, 1);
+        }
+        if (button(icons::kSkipForward, "To the end")) {
+            timeline_.Pause();
+            timeline_.Seek(scene_, timeline_.End());
+        }
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              timeline_.looping ? ToImVec4(theme_.accent) : ImVec4(0, 0, 0, 0));
+        if (button(icons::kRepeat, "Loop at the end")) {
+            timeline_.looping = !timeline_.looping;
+        }
+        ImGui::PopStyleColor();
+        const float field = 4.0f * ImGui::GetFontSize();
+        const float fields =
+            3.0f * field + 6.0f * ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("fps").x;
+        ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - fields, field));
+        double now = scene_.Time();
+        const double start = timeline_.Start();
+        const double end = timeline_.End();
+        if (ImGui::SliderScalar("##time", ImGuiDataType_Double, &now, &start, &end, "%.1f")) {
+            timeline_.Pause();
+            timeline_.Seek(scene_, now);
+        }
+        double range[2] = {start, end};
+        for (int i = 0; i < 2; ++i) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(field);
+            ImGui::PushID(i);
+            if (ImGui::InputDouble("##range", &range[i], 0.0, 0.0, "%g",
+                                   ImGuiInputTextFlags_EnterReturnsTrue)) {
+                timeline_.SetRange(range[0], range[1]);
+            }
+            ImGui::SetItemTooltip(i == 0 ? "The first time code" : "The last time code");
+            ImGui::PopID();
+        }
+        ImGui::SameLine();
+        double fps = timeline_.FramesPerSecond();
+        ImGui::SetNextItemWidth(field);
+        if (ImGui::InputDouble("fps", &fps, 0.0, 0.0, "%g", ImGuiInputTextFlags_EnterReturnsTrue)) {
+            timeline_.SetFramesPerSecond(fps);
+        }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(5);
 }
 
 void Shell::DrawHud() {
@@ -2250,6 +2345,10 @@ void Shell::TakeShortcuts() {
     choices_.duplicate |= io.KeyCtrl && pressed(ImGuiKey_D);
     choices_.remove |= plain && pressed(ImGuiKey_Delete);
     overlaysHidden_ ^= plain && pressed(ImGuiKey_H);
+    screenshot_ |= pressed(ImGuiKey_F10);
+    if (plain && pressed(ImGuiKey_Space)) {
+        timeline_.Playing() ? timeline_.Pause() : timeline_.Play();
+    }
     windows_.open |= io.KeyCtrl && pressed(ImGuiKey_O);
     windows_.save |= io.KeyCtrl && io.KeyShift && pressed(ImGuiKey_S);
 }
@@ -2440,6 +2539,273 @@ void Shell::Picked(const std::optional<Path>& path, bool toggle) {
 void Shell::SaveScene(const std::filesystem::path& path) {
     SaveSceneFile(scene_, path);
     log_.Info("Saved " + path.string());
+}
+
+void Shell::LoadDemo(const DemoInfo& demo) {
+    demo_.reset();
+    for (const Path& root : scene_.Children(Path::Root())) {
+        scene_.Remove(root);
+    }
+    history_.Reset();
+    selection_.Clear();
+    activeCamera_ = Path();
+    demoInfo_ = demo;
+    demo_ = demo.create(scene_);
+    scene_.Update();
+    log_.Info("Running " + demo.Label());
+    Frame();
+}
+
+void Shell::StepDemo() {
+    if (demo_) {
+        Attempt("Stepping the demo", [&] { demo_->Advance(); });
+    }
+}
+
+void Shell::ResetDemo() {
+    if (demo_) {
+        const DemoInfo demo = demoInfo_;
+        Attempt("Resetting the demo", [&] { LoadDemo(demo); });
+    }
+}
+
+void Shell::AddRecentCapture(const std::filesystem::path& path) {
+    recentCaptures_.push_back(path);
+    // The newest dozen.
+    if (recentCaptures_.size() > 12) {
+        recentCaptures_.erase(recentCaptures_.begin());
+    }
+    log_.Info("Captured " + path.string());
+}
+
+CaptureNameFields Shell::CaptureFields() const {
+    return {.scene = demo_ ? demoInfo_.Id() : std::string("ernie"),
+            .camera = activeCamera_.IsEmpty() ? "Perspective" : std::string(activeCamera_.Name())};
+}
+
+namespace {
+
+/// After Ernie 1's Demos panel: a header a category, a row a demo, then the running demo's
+/// controls, description and options.
+class DemosPanel final : public Panel {
+  public:
+    explicit DemosPanel(Shell& shell)
+        : Panel("Demos", Dock::Right), shell_(shell), demos_(RegisteredDemos()) {}
+
+    void Draw() override {
+        const DemoInfo* running = shell_.CurrentDemoInfo();
+        std::string_view category;
+        bool open = false;
+        for (const DemoInfo& demo : demos_) {
+            if (demo.category != category) {
+                category = demo.category;
+                if (running != nullptr && running->category == category) {
+                    ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
+                }
+                open = ImGui::CollapsingHeader(demo.category.c_str());
+            }
+            if (!open) {
+                continue;
+            }
+            ImGui::Indent();
+            const bool current = running != nullptr && running->Id() == demo.Id();
+            if (ImGui::Selectable(demo.name.c_str(), current)) {
+                Load(demo);
+            }
+            ImGui::SetItemTooltip("%s", demo.description.c_str());
+            ImGui::Unindent();
+        }
+        Demo* demo = shell_.CurrentDemo();
+        ImGui::SeparatorText(running != nullptr ? running->Label().c_str() : "No demo");
+        if (demo == nullptr) {
+            ImGui::TextDisabled(demos_.empty() ? "No demos are registered." : "Pick a demo above.");
+            return;
+        }
+        ImGui::Checkbox("Paused", &shell_.demoPaused);
+        ImGui::SameLine();
+        if (ImGui::Button("Step")) {
+            shell_.StepDemo();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            shell_.ResetDemo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("frame %llu, %.2f s", static_cast<unsigned long long>(demo->Frame()),
+                            demo->Time());
+        ImGui::TextWrapped("%s", demo->description.c_str());
+        ImGui::SeparatorText("Options");
+        demo->Gui();
+    }
+
+  private:
+    void Load(const DemoInfo& demo) {
+        try {
+            shell_.LoadDemo(demo);
+        } catch (const std::exception& error) {
+            shell_.Log().Error("Loading " + demo.Label() + ": " + error.what());
+        }
+    }
+
+    Shell& shell_;
+    std::vector<DemoInfo> demos_;
+};
+
+/// After Ernie 1's Capture panel: where captures go and how they are named, the viewport's
+/// screenshot, sequences of the timeline's frames encoded into video, and the recent captures.
+class CapturePanel final : public Panel {
+  public:
+    explicit CapturePanel(Shell& shell) : Panel("Capture", Dock::Bottom), shell_(shell) {}
+
+    void Draw() override {
+        CaptureSettings& settings = shell_.Capture();
+        if (ImGui::BeginTable("##capture", 2, ImGuiTableFlags_SizingFixedFit)) {
+            ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed,
+                                    8.0f * ImGui::GetFontSize());
+            ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+            DrawOutput(settings);
+            Row("Screenshot");
+            if (ImGui::Button((std::string(icons::kDownload) + "  Capture (F10)").c_str())) {
+                shell_.RequestScreenshot();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("the viewport's image as rendered");
+            DrawSequence(settings);
+            ImGui::EndTable();
+        }
+        DrawRecent();
+    }
+
+  private:
+    static void Row(const char* label) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label);
+        ImGui::TableSetColumnIndex(1);
+    }
+
+    static void DrawOutput(CaptureSettings& settings) {
+        Row("Folder");
+        std::string folder = settings.folder.string();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputText("##folder", &folder)) {
+            settings.folder = folder;
+        }
+        Row("Name");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputText("##name", &settings.name);
+        ImGui::SetItemTooltip("{scene}, {camera}, {date}, {time} and {frame} fill in; a capture "
+                              "never overwrites another");
+    }
+
+    void DrawSequence(CaptureSettings& settings) {
+        const app::Timeline& timeline = shell_.Timeline();
+        if (!rangeSet_) {
+            start_ = timeline.Start();
+            end_ = timeline.End();
+        }
+        Row("Frames");
+        const float field = 5.0f * ImGui::GetFontSize();
+        ImGui::SetNextItemWidth(field);
+        rangeSet_ |= ImGui::InputDouble("##from", &start_, 0.0, 0.0, "%g");
+        ImGui::SameLine();
+        ImGui::TextUnformatted("to");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(field);
+        rangeSet_ |= ImGui::InputDouble("##to", &end_, 0.0, 0.0, "%g");
+        ImGui::SameLine();
+        if (ImGui::Button("Timeline Range")) {
+            rangeSet_ = false;
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted("every");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(field);
+        ImGui::InputInt("##every", &every_);
+        every_ = std::max(every_, 1);
+        ImGui::SameLine();
+        ImGui::TextDisabled("at %g fps", timeline.FramesPerSecond() / every_);
+
+        Row("Video");
+        static const bool ffmpeg = !FindProgram("ffmpeg").empty();
+        constexpr std::array kFormats{"Frames only", "MP4 (H.264)", "ProRes 422 HQ (.mov)"};
+        int format = static_cast<int>(settings.video);
+        ImGui::BeginDisabled(!ffmpeg);
+        ImGui::SetNextItemWidth(14.0f * ImGui::GetFontSize());
+        if (ImGui::Combo("##video", &format, kFormats.data(), static_cast<int>(kFormats.size()))) {
+            settings.video = static_cast<VideoFormat>(format);
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(settings.video == VideoFormat::None);
+        ImGui::Checkbox("Keep frames", &settings.keepFrames);
+        ImGui::EndDisabled();
+        ImGui::EndDisabled();
+        if (!ffmpeg) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("ffmpeg is not on the PATH: frames only");
+        }
+
+        Row("");
+        if (const auto progress = shell_.Recording()) {
+            if (ImGui::Button((std::string(icons::kSquare) + "  Stop").c_str())) {
+                shell_.stopRecording = true;
+            }
+            ImGui::SameLine();
+            const auto [done, total] = *progress;
+            const std::string label = std::to_string(done) + " / " + std::to_string(total);
+            ImGui::ProgressBar(total > 0 ? static_cast<float>(done) / static_cast<float>(total)
+                                         : 0.0f,
+                               ImVec2(-1.0f, 0.0f), label.c_str());
+            return;
+        }
+        ImGui::BeginDisabled(shell_.Encoding());
+        if (ImGui::Button((std::string(icons::kVideo) + "  Record").c_str())) {
+            shell_.RequestSequence({.start = start_,
+                                    .end = end_,
+                                    .every = every_,
+                                    .video = ffmpeg ? settings.video : VideoFormat::None,
+                                    .keepFrames = settings.keepFrames});
+        }
+        ImGui::EndDisabled();
+        if (shell_.Encoding()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("Encoding the last video...");
+        }
+    }
+
+    void DrawRecent() {
+        const std::vector<std::filesystem::path>& recent = shell_.RecentCaptures();
+        if (recent.empty()) {
+            return;
+        }
+        ImGui::SeparatorText("Recent");
+        // Newest first; a click copies the path.
+        for (auto it = recent.rbegin(); it != recent.rend(); ++it) {
+            const std::string path = it->string();
+            if (ImGui::Selectable(path.c_str())) {
+                ImGui::SetClipboardText(path.c_str());
+            }
+            ImGui::SetItemTooltip("Click to copy the path");
+        }
+    }
+
+    Shell& shell_;
+    double start_ = 0.0;
+    double end_ = 0.0;
+    /// Whether the range was chosen apart from the timeline's.
+    bool rangeSet_ = false;
+    int every_ = 1;
+};
+
+}  // namespace
+
+std::unique_ptr<Panel> MakeDemosPanel(Shell& shell) {
+    return std::make_unique<DemosPanel>(shell);
+}
+
+std::unique_ptr<Panel> MakeCapturePanel(Shell& shell) {
+    return std::make_unique<CapturePanel>(shell);
 }
 
 // Presenters
