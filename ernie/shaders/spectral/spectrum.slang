@@ -23,12 +23,16 @@ static const uint kBands = 3;
 }  // namespace ernie::shaders
 #else
 
-/// What every spectrum offers the code that carries light.
-interface ISpectrum {
+/// What every spectrum offers the code that carries light. Spectra are differentiable, so the
+/// models written with them give gradients from the compiler.
+interface ISpectrum : IDifferentiable {
     /// The same value in every band or at every wavelength.
     __init(float value);
+    [Differentiable]
     This Scaled(float factor);
+    [Differentiable]
     This Times(This other);
+    [Differentiable]
     This Plus(This other);
 }
 
@@ -42,24 +46,30 @@ struct Banded<let N : int> : ISpectrum {
         }
     }
 
+    [Differentiable]
     Banded<N> Scaled(float factor) {
         Banded<N> result = this;
+        [ForceUnroll]
         for (int i = 0; i < N; ++i) {
             result.values[i] *= factor;
         }
         return result;
     }
 
+    [Differentiable]
     Banded<N> Times(Banded<N> other) {
         Banded<N> result = this;
+        [ForceUnroll]
         for (int i = 0; i < N; ++i) {
             result.values[i] *= other.values[i];
         }
         return result;
     }
 
+    [Differentiable]
     Banded<N> Plus(Banded<N> other) {
         Banded<N> result = this;
+        [ForceUnroll]
         for (int i = 0; i < N; ++i) {
             result.values[i] += other.values[i];
         }

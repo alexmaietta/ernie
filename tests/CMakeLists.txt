@@ -111,6 +111,7 @@ ernie_add_test_suite(
         render/camera_pass_test.cpp
         render/device_scene_test.cpp
         render/geometry_test.cpp
+        render/gradients_test.cpp
         render/ray_tracer_test.cpp
         render/renderer_test.cpp
         render/scene_columns_test.cpp

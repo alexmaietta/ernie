@@ -56,8 +56,10 @@ struct CameraParameters {
 /// The light a surface facing away from the eye still gets, of what one facing it gets.
 static const float kAmbient = 0.15;
 
-/// @return The light a pixel sees: the surface's albedo lit from the eye.
-Spectrum Shade(Spectrum albedo, float3 normal, float3 direction) {
+/// @return The light a pixel sees: the surface's albedo lit from the eye; differentiable in the
+/// albedo and the normal.
+[Differentiable]
+Spectrum Shade(Spectrum albedo, float3 normal, no_diff float3 direction) {
     float lit = abs(dot(normal, direction));
     return albedo.Scaled(lerp(kAmbient, 1.0, lit));
 }
