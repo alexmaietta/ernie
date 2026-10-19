@@ -1678,11 +1678,24 @@ Panel* Shell::FindPanel(std::string_view title) const {
 }
 
 std::pair<ImVec2, ImVec2> Shell::Viewport() const {
+    ImVec2 origin;
+    ImVec2 size;
     if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(kDockSpace)) {
-        return {centre->Pos, centre->Size};
+        origin = centre->Pos;
+        size = centre->Size;
+    } else {
+        const ImGuiViewport* main = ImGui::GetMainViewport();
+        origin = main->WorkPos;
+        size = main->WorkSize;
     }
-    const ImGuiViewport* main = ImGui::GetMainViewport();
-    return {main->WorkPos, main->WorkSize};
+    size.y = std::max(size.y - TimelineHeight(), 1.0f);
+    return {origin, size};
+}
+
+float Shell::TimelineHeight() const {
+    return display_.timeline && !overlaysHidden_
+               ? ImGui::GetFrameHeight() + 2.0f * ImGui::GetStyle().WindowPadding.y
+               : 0.0f;
 }
 
 void Shell::Draw() {
@@ -1860,20 +1873,23 @@ bool Shell::BeginPills(const char* id, ImVec2 at, ImVec2 pivot) {
         ImGui::End();
         return false;
     }
-    // Kit's pills: dark, translucent, a thin lighter edge.
+    // Kit's pills: the panels' grey, with a thin darker edge.
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme_.overlay * 1.25f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme_.fieldHovered));
+    ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(theme_.overlay));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ToImVec4(theme_.fieldHovered));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ToImVec4(glm::vec4(glm::vec3(theme_.overlay), 1.0f)));
     ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
-    ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme_.pillRounding);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.0f, 4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(5.0f, 4.0f));
     return true;
 }
 
 void Shell::EndPills() {
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleVar(4);
+    ImGui::PopStyleColor(6);
     ImGui::End();
 }
 
@@ -1884,10 +1900,7 @@ void Shell::Pill(const char* id, const std::string& label, const char* tip,
     ImGui::SetNextWindowSizeConstraints(ImVec2(16.0f * ImGui::GetFontSize(), 0.0f),
                                         ImVec2(FLT_MAX, FLT_MAX));
     if (ImGui::BeginCombo(id, label.c_str(), kPill)) {
-        // Menu text in the panels' colours.
-        ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.text));
         (this->*items)();
-        ImGui::PopStyleColor();
         ImGui::EndCombo();
     }
     ImGui::SetItemTooltip("%s", tip);
@@ -1900,7 +1913,19 @@ void Shell::DrawToolbar() {
     const auto [origin, size] = Viewport();
     const float pad = 8.0f;
     if (BeginPills("##viewport toolbar", ImVec2(origin.x + pad, origin.y + pad), {0.0f, 0.0f})) {
-        Pill("##settings", icons::kSettings, "Viewport settings", &Shell::DrawSettingsMenu);
+        // The settings pill, drawn with Kit's three bars where its spaces leave room.
+        const ImVec2 corner = ImGui::GetCursorScreenPos();
+        Pill("##settings", "   ", "Viewport settings", &Shell::DrawSettingsMenu);
+        const float height = ImGui::GetFrameHeight();
+        const float half = 0.22f * height;
+        const ImVec2 centre(corner.x + 0.5f * (ImGui::CalcTextSize("   ").x +
+                                               2.0f * ImGui::GetStyle().FramePadding.x),
+                            corner.y + 0.5f * height);
+        for (const float dy : {-0.6f, 0.0f, 0.6f}) {
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(centre.x - half, centre.y + dy * half),
+                                                ImVec2(centre.x + half, centre.y + dy * half),
+                                                ImGui::GetColorU32(ImGuiCol_Text), 1.5f);
+        }
         ImGui::SameLine();
         Pill("##show", icons::kEye, "What the viewport shows", &Shell::DrawShowMenu);
         ImGui::SameLine();
@@ -1918,6 +1943,11 @@ void Shell::DrawToolbar() {
             ImGui::SetItemTooltip("Eco mode: rendering paused until something changes");
             ImGui::SameLine();
         }
+        if (ImGui::Button((std::string(icons::kDownload) + "  Capture##screenshot").c_str())) {
+            RequestScreenshot();
+        }
+        ImGui::SetItemTooltip("Save a screenshot of the viewport (F10)");
+        ImGui::SameLine();
         Pill("##lighting", std::string(icons::kSun) + "  " + LightingName(display_.lighting),
              "Lighting", &Shell::DrawLightingMenu);
         EndPills();
@@ -2082,82 +2112,194 @@ void Shell::DrawTimeline() {
     if (!display_.timeline) {
         return;
     }
+    // Under the viewport's image, in the panels' grey, so the docks around resize freely.
     const auto [origin, size] = Viewport();
-    const float pad = 8.0f;
-    ImGui::SetNextWindowPos(ImVec2(origin.x + pad, origin.y + size.y - pad), ImGuiCond_Always,
-                            ImVec2(0.0f, 1.0f));
-    ImGui::SetNextWindowSize(ImVec2(size.x - 2.0f * pad, 0.0f));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(theme_.overlay));
-    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
-    ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay * 1.4f));
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme_.pillRounding);
+    ImGui::SetNextWindowPos(ImVec2(origin.x, origin.y + size.y));
+    ImGui::SetNextWindowSize(ImVec2(size.x, TimelineHeight()));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ToImVec4(theme_.panel));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     constexpr ImGuiWindowFlags kStrip =
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoScrollWithMouse;
     if (ImGui::Begin("##timeline", nullptr, kStrip)) {
-        const auto button = [](const char* icon, const char* tip) {
-            const bool pressed = ImGui::Button(icon);
-            ImGui::SetItemTooltip("%s", tip);
-            ImGui::SameLine();
-            return pressed;
-        };
-        if (button(icons::kSkipBack, "To the start")) {
-            timeline_.Stop(scene_);
+        const float unit = ImGui::GetFontSize();
+        const float field = 4.0f * unit;
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        // An icon button: the widest icon and the frame's padding.
+        float icon = 0.0f;
+        for (const char* glyph : {icons::kSkipBack, icons::kStepBack, icons::kPlay, icons::kSquare,
+                                  icons::kRepeat, icons::kSettings}) {
+            icon = std::max(icon, ImGui::CalcTextSize(glyph).x);
         }
-        if (button(icons::kStepBack, "A frame back")) {
-            timeline_.StepFrames(scene_, -1);
-        }
-        if (button(timeline_.Playing() ? icons::kPause : icons::kPlay, "Play or pause (Space)")) {
-            timeline_.Playing() ? timeline_.Pause() : timeline_.Play();
-        }
-        if (button(icons::kStepForward, "A frame on")) {
-            timeline_.StepFrames(scene_, 1);
-        }
-        if (button(icons::kSkipForward, "To the end")) {
-            timeline_.Pause();
-            timeline_.Seek(scene_, timeline_.End());
-        }
-        ImGui::PushStyleColor(ImGuiCol_Button,
-                              timeline_.looping ? ToImVec4(theme_.accent) : ImVec4(0, 0, 0, 0));
-        if (button(icons::kRepeat, "Loop at the end")) {
-            timeline_.looping = !timeline_.looping;
-        }
-        ImGui::PopStyleColor();
-        const float field = 4.0f * ImGui::GetFontSize();
-        const float fields =
-            3.0f * field + 6.0f * ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("fps").x;
-        ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - fields, field));
-        double now = scene_.Time();
-        const double start = timeline_.Start();
-        const double end = timeline_.End();
-        if (ImGui::SliderScalar("##time", ImGuiDataType_Double, &now, &start, &end, "%.1f")) {
-            timeline_.Pause();
-            timeline_.Seek(scene_, now);
-        }
-        double range[2] = {start, end};
-        for (int i = 0; i < 2; ++i) {
-            ImGui::SameLine();
+        const float button = icon + 2.0f * ImGui::GetStyle().FramePadding.x;
+        const auto timeField = [&](const char* id, double value, const char* tip) {
             ImGui::SetNextItemWidth(field);
-            ImGui::PushID(i);
-            if (ImGui::InputDouble("##range", &range[i], 0.0, 0.0, "%g",
-                                   ImGuiInputTextFlags_EnterReturnsTrue)) {
-                timeline_.SetRange(range[0], range[1]);
-            }
-            ImGui::SetItemTooltip(i == 0 ? "The first time code" : "The last time code");
-            ImGui::PopID();
+            ImGui::InputDouble(id, &value, 0.0, 0.0, "%g");
+            ImGui::SetItemTooltip("%s", tip);
+            return ImGui::IsItemDeactivatedAfterEdit() ? std::optional(value) : std::nullopt;
+        };
+        if (const std::optional<double> start =
+                timeField("##start", timeline_.Start(), "Start time code")) {
+            timeline_.SetRange(*start, timeline_.End());
         }
         ImGui::SameLine();
-        double fps = timeline_.FramesPerSecond();
+        const float right = 2.0f * field + 8.0f * button + 10.0f * spacing;
+        DrawRuler(std::max(ImGui::GetContentRegionAvail().x - right, 4.0f * unit));
+        ImGui::SameLine();
+        if (const std::optional<double> end =
+                timeField("##end", timeline_.End(), "End time code")) {
+            timeline_.SetRange(timeline_.Start(), *end);
+        }
+        ImGui::SameLine();
+        double now = scene_.Time();
         ImGui::SetNextItemWidth(field);
-        if (ImGui::InputDouble("fps", &fps, 0.0, 0.0, "%g", ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputDouble("##now", &now, 0.0, 0.0, "%g")) {
+            timeline_.Seek(scene_, now);
+        }
+        ImGui::SetItemTooltip("Current time code");
+        ImGui::SameLine();
+        DrawTransport();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+}
+
+void Shell::DrawRuler(float width) {
+    const double start = timeline_.Start();
+    const double end = timeline_.End();
+    const float height = ImGui::GetFrameHeight();
+    const ImVec2 low = ImGui::GetCursorScreenPos();
+    const ImVec2 high(low.x + width, low.y + height);
+    ImGui::InvisibleButton("##ruler", ImVec2(width, height));
+    const double perCode = static_cast<double>(width) / std::max(end - start, 1e-9);
+    if (ImGui::IsItemActive()) {
+        timeline_.Pause();
+        const double at = start + static_cast<double>(ImGui::GetIO().MousePos.x - low.x) / perCode;
+        timeline_.Seek(scene_, std::clamp(start + std::round(at - start), start, end));
+    }
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(low, high, ImGui::GetColorU32(ToImVec4(theme_.field)),
+                        ImGui::GetStyle().FrameRounding);
+    // Labelled ticks at least five characters apart, at 1, 2 or 5 times a power of ten, and
+    // unlabelled fifths between them where they fit.
+    const double least = (ImGui::CalcTextSize("00000").x + 8.0f) / perCode;
+    const double decade = std::pow(10.0, std::floor(std::log10(least)));
+    double major = 10.0 * decade;
+    for (const double factor : {1.0, 2.0, 5.0}) {
+        if (factor * decade >= least) {
+            major = factor * decade;
+            break;
+        }
+    }
+    const double minor = major / 5.0;
+    const bool minors = minor * perCode >= 5.0;
+    const ImU32 tick = ImGui::GetColorU32(ToImVec4(theme_.textMuted));
+    for (double t = std::ceil(start / minor) * minor; t <= end; t += minor) {
+        const float x = low.x + static_cast<float>((t - start) * perCode);
+        const bool labelled = std::fabs(t / major - std::round(t / major)) < 1e-6;
+        if (!labelled && !minors) {
+            continue;
+        }
+        draw->AddLine(ImVec2(x, high.y - (labelled ? 0.45f : 0.2f) * height), ImVec2(x, high.y),
+                      tick);
+        if (labelled) {
+            std::array<char, 32> label{};
+            std::snprintf(label.data(), label.size(), "%g", t);
+            draw->AddText(ImVec2(x + 2.0f, low.y), tick, label.data());
+        }
+    }
+    // The current time code's line, with a notch at its top.
+    const double now = scene_.Time();
+    if (now >= start && now <= end) {
+        const float x = low.x + static_cast<float>((now - start) * perCode);
+        const ImU32 accent = ImGui::GetColorU32(ToImVec4(theme_.accent));
+        draw->AddLine(ImVec2(x, low.y), ImVec2(x, high.y), accent, 2.0f);
+        const float half = 0.2f * height;
+        draw->AddTriangleFilled(ImVec2(x - half, low.y), ImVec2(x + half, low.y),
+                                ImVec2(x, low.y + half), accent);
+    }
+    if (ImGui::IsItemHovered() && !ImGui::IsItemActive()) {
+        ImGui::SetTooltip("Click or drag to scrub");
+    }
+}
+
+void Shell::DrawTransport() {
+    const auto button = [](const char* glyph, const char* id, const char* tip) {
+        const bool clicked = ImGui::Button((std::string(glyph) + id).c_str());
+        ImGui::SetItemTooltip("%s", tip);
+        ImGui::SameLine();
+        return clicked;
+    };
+    if (button(icons::kSkipBack, "##first", "First frame")) {
+        timeline_.Pause();
+        timeline_.Seek(scene_, timeline_.Start());
+    }
+    if (button(icons::kStepBack, "##back", "Previous frame")) {
+        timeline_.StepFrames(scene_, -1);
+    }
+    if (timeline_.Playing()) {
+        if (button(icons::kPause, "##play", "Pause (Space)")) {
+            timeline_.Pause();
+        }
+    } else if (button(icons::kPlay, "##play", "Play (Space)")) {
+        timeline_.Play();
+    }
+    if (button(icons::kSquare, "##stop", "Stop: back to the start")) {
+        timeline_.Stop(scene_);
+    }
+    if (button(icons::kStepForward, "##forward", "Next frame")) {
+        timeline_.StepFrames(scene_, 1);
+    }
+    if (button(icons::kSkipForward, "##last", "Last frame")) {
+        timeline_.Pause();
+        timeline_.Seek(scene_, timeline_.End());
+    }
+    // Loop lit while on.
+    const bool looping = timeline_.looping;
+    if (looping) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    }
+    const bool loop = ImGui::Button((std::string(icons::kRepeat) + "##loop").c_str());
+    if (looping) {
+        ImGui::PopStyleColor();
+    }
+    ImGui::SetItemTooltip(looping ? "Looping: on" : "Looping: off");
+    if (loop) {
+        timeline_.looping = !looping;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button((std::string(icons::kSettings) + "##settings").c_str())) {
+        ImGui::OpenPopup("##timeline settings");
+    }
+    ImGui::SetItemTooltip("Timeline settings");
+    ImGui::SetNextWindowSizeConstraints(ImVec2(16.0f * ImGui::GetFontSize(), 0.0f),
+                                        ImVec2(FLT_MAX, FLT_MAX));
+    if (ImGui::BeginPopup("##timeline settings")) {
+        DrawTimelineSettings();
+        ImGui::EndPopup();
+    }
+}
+
+void Shell::DrawTimelineSettings() {
+    // Time codes and frames a second alike, so a time code is a frame.
+    MenuSection("Frame Rate");
+    for (const double fps : {24.0, 25.0, 30.0, 48.0, 50.0, 60.0, 120.0}) {
+        std::array<char, 32> label{};
+        std::snprintf(label.data(), label.size(), "%g fps", fps);
+        bool chosen = timeline_.FramesPerSecond() == fps;
+        MenuCheck(label.data(), chosen);
+        if (chosen && timeline_.FramesPerSecond() != fps) {
             timeline_.SetFramesPerSecond(fps);
         }
     }
-    ImGui::End();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(5);
+    ImGui::Separator();
+    MenuSection("Playback");
+    MenuCheck("Play Every Frame", timeline_.everyFrame);
+    ImGui::SetItemTooltip("A frame each step however long it takes, rather than real time");
+    MenuCheck("Loop", timeline_.looping);
 }
 
 void Shell::DrawHud() {
@@ -2182,20 +2324,22 @@ void Shell::DrawHud() {
     // Over the viewport's image, which the background list holds, and under every window.
     ImDrawList* draw = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
     draw->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y));
+    ImVec4 box = ToImVec4(theme_.overlay);
+    box.w *= 0.85f;
     draw->AddRectFilled(
         corner,
         ImVec2(topRight.x,
                corner.y + lineHeight * static_cast<float>(hudLines_.size()) + 2.0f * pad),
-        ImGui::GetColorU32(ToImVec4(theme_.overlay)), 4.0f);
+        ImGui::GetColorU32(box), 4.0f);
     // Right-aligned, as Kit's: the label muted, its value bright.
     float y = corner.y + pad;
     for (const std::string& text : hudLines_) {
         const std::size_t colon = text.find(": ");
         const std::string label = text.substr(0, colon == std::string::npos ? 0 : colon + 2);
         const float x = topRight.x - pad - ImGui::CalcTextSize(text.c_str()).x;
-        draw->AddText(ImVec2(x, y), ImGui::GetColorU32(ToImVec4(theme_.hudMuted)), label.c_str());
+        draw->AddText(ImVec2(x, y), ImGui::GetColorU32(ToImVec4(theme_.textMuted)), label.c_str());
         draw->AddText(ImVec2(x + ImGui::CalcTextSize(label.c_str()).x, y),
-                      ImGui::GetColorU32(ToImVec4(theme_.hud)), text.c_str() + label.size());
+                      ImGui::GetColorU32(ToImVec4(theme_.text)), text.c_str() + label.size());
         y += lineHeight;
     }
     draw->PopClipRect();

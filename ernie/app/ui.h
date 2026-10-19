@@ -245,14 +245,11 @@ struct Theme {
     glm::vec4 checkMark{0.0f, 0.0f, 0.0f, 1.0f};
     /// The viewport's colour where nothing is rendered.
     glm::vec4 viewport{0.18f, 0.19f, 0.20f, 1.0f};
-    /// The heads-up display's values, over the viewport, and its labels.
-    glm::vec4 hud{0.902f, 0.910f, 0.894f, 1.0f};
-    glm::vec4 hudMuted{0.62f, 0.64f, 0.66f, 1.0f};
     /// The viewport's toolbar pills and heads-up box, over the image, and their edges.
-    glm::vec4 overlay{0.12f, 0.13f, 0.14f, 0.78f};
-    glm::vec4 overlayBorder{1.0f, 1.0f, 1.0f, 0.16f};
+    glm::vec4 overlay{0.831f, 0.843f, 0.816f, 0.92f};
+    glm::vec4 overlayBorder{0.553f, 0.565f, 0.537f, 1.0f};
     /// The pills' corner radius, in pixels at a content scale of 1.
-    float pillRounding = 10.0f;
+    float pillRounding = 0.0f;
     /// Text size, in pixels at a content scale of 1.
     float fontSize = 14.0f;
     /// Corner radius of frames, tabs and popups, in pixels.
@@ -429,7 +426,8 @@ class Shell {
     /// @brief Aims the camera at the selection, or at the whole scene when nothing is selected.
     void Frame();
 
-    /// @return The viewport's position and size on the screen: the dock space's central node.
+    /// @return The viewport's position and size on the screen: the dock space's central node, less
+    /// the timeline's strip along its bottom while it shows.
     std::pair<ImVec2, ImVec2> Viewport() const;
     /// @return The panel titled `title`, or null.
     Panel* FindPanel(std::string_view title) const;
@@ -604,8 +602,17 @@ class Shell {
     void EndPills();
     /// Draws a pill whose menu `items` draws.
     void Pill(const char* id, const std::string& label, const char* tip, void (Shell::*items)());
-    /// Draws the timeline strip along the viewport's bottom.
+    /// Draws the timeline strip under the viewport, as Kit lays it out: the range's start, the
+    /// ruler, its end, the current time code, then the transport.
     void DrawTimeline();
+    /// @return The timeline strip's height; 0 while it is hidden.
+    float TimelineHeight() const;
+    /// Draws the ruler across the range, which a click or drag scrubs, to whole time codes.
+    void DrawRuler(float width);
+    /// Draws the transport: first frame, a frame back, play, stop, a frame on, last frame, loop
+    /// and the timeline's settings.
+    void DrawTransport();
+    void DrawTimelineSettings();
     /// Draws the heads-up display at the viewport's top right, over its image.
     void DrawHud();
     void RefreshHud();
