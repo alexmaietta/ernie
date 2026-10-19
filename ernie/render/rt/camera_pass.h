@@ -49,6 +49,10 @@ struct CameraView {
     std::uint32_t world = 0;
     /// Metres along the view axis to the near and far clipping planes.
     glm::vec2 clipping{0.0f, 1e30f};
+    /// Three rows of four floats, camera to world relative to the render origin, which the pass
+    /// reads on the device in place of `cameraToWorld` when there is no node: a pose uploaded
+    /// each frame, so recorded commands replay as it moves.
+    std::optional<graph::Buffer> pose;
 };
 
 /// @brief What a camera pass writes; each left out is not written. The views' pixels are stacked

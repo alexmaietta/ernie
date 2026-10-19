@@ -105,6 +105,9 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
         if (deviceScene_->Tracer() != nullptr) {
             heap_ = std::make_unique<BindlessHeap>(*context_);
             camera_ = std::make_unique<CameraPass>(*context_, compiler, *heap_);
+            pose_ = std::make_unique<DeviceColumn>(*arenas_, "viewport pose", DType::Float32,
+                                                   std::vector<std::int64_t>{4}, 3);
+            poseUploader_ = std::make_unique<Uploader>(*context_, context_->Main());
         }
         sampler_ = std::make_unique<Sampler>(
             *context_, SamplerDescription{.filter = Filter::Nearest, .address = Address::Clamp},
@@ -173,7 +176,7 @@ void Viewer::Capture(const Ticket& drawn) {
     if (shell_->TakeScreenshot()) {
         try {
             const std::filesystem::path path = CapturePath(".png", 0);
-            WritePng(path, ReadImage(*viewport_, drawn));
+            WritePng(path, ReadImage(*slots_[shown_].image, drawn));
             shell_->AddRecentCapture(path);
         } catch (const std::exception& error) {
             shell_->Log().Error(std::string("Capturing: ") + error.what());
@@ -201,7 +204,7 @@ void Viewer::RecordFrame(const Ticket& drawn) {
     std::array<char, 32> name{};
     std::snprintf(name.data(), name.size(), "frame_%04lld.png",
                   static_cast<long long>(recording.done));
-    WritePng(recording.folder / name.data(), ReadImage(*viewport_, drawn));
+    WritePng(recording.folder / name.data(), ReadImage(*slots_[shown_].image, drawn));
     ++recording.done;
     recording.next += recording.request.every;
     if (recording.done >= recording.total || shell_->stopRecording) {
@@ -314,12 +317,11 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Run the frame");
-            ecoPaused_ = EcoPause();
-            shell_->SetEcoPaused(ecoPaused_);
-            deviceScene_->Follow(shell_->Camera().Eye());
-            drawn =
-                deviceScene_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
-                                      {}, target->semaphores);
+            if (!ecoPaused_) {
+                deviceScene_->Follow(shell_->Camera().Eye());
+                TraceViewport();
+            }
+            drawn = DrawUi(data, *target);
         }
         inFlight_.push_back(drawn);
         if (const std::optional<Shell::Pick> pick = shell_->TakePick()) {
@@ -342,47 +344,59 @@ void Viewer::ShowViewport() {
     const auto [position, size] = shell_->Viewport();
     const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
     const glm::uvec2 pixels(std::max(1.0f, size.x * scale.x), std::max(1.0f, size.y * scale.y));
-    if (!viewport_ || glm::uvec2(viewport_->Description().extent) != pixels) {
+    if (!slots_[0].image || glm::uvec2(slots_[0].image->Description().extent) != pixels) {
         ResizeViewport(pixels);
     }
-    ImGui::GetBackgroundDrawList()->AddImage(viewportTexture_, position,
+    ecoPaused_ = EcoPause();
+    shell_->SetEcoPaused(ecoPaused_);
+    // A traced frame takes the other slot, so the last one's image stays whole while it renders.
+    if (!ecoPaused_ && camera_) {
+        shown_ = (shown_ + 1) % kSlots;
+    }
+    ImGui::GetBackgroundDrawList()->AddImage(slots_[shown_].texture, position,
                                              {position.x + size.x, position.y + size.y});
 }
 
 void Viewer::ResizeViewport(glm::uvec2 pixels) {
     ERNIE_ZONE("Resize the viewport");
-    // Frames in flight may still sample the old image.
+    // Frames in flight may still sample the old images.
     context_->Main().Last().Wait();
-    if (viewport_) {
-        renderer_->RemoveTexture(viewportTexture_);
+    for (ViewportSlot& slot : slots_) {
+        if (slot.image) {
+            renderer_->RemoveTexture(slot.texture);
+            if (heap_) {
+                heap_->RemoveStorageImage(slot.storage);
+            }
+        }
+        slot.image = std::make_unique<DeviceImage>(
+            *context_,
+            ImageDescription{.format = ImageFormat::Rgba8Unorm,
+                             .extent = {pixels, 1},
+                             .usage = ImageUsage::Sampled | ImageUsage::Storage},
+            "Viewport");
+        slot.texture = renderer_->AddTexture(slot.image->View(), sampler_->Handle());
         if (heap_) {
-            heap_->RemoveStorageImage(viewportImage_);
+            slot.storage = heap_->AddStorageImage(*slot.image);
+            slot.prims = std::make_unique<DeviceColumn>(*arenas_, "viewport prims", DType::UInt32,
+                                                        std::vector<std::int64_t>{},
+                                                        std::uint64_t{pixels.x} * pixels.y);
         }
     }
-    viewport_ = std::make_unique<DeviceImage>(
-        *context_,
-        ImageDescription{.format = ImageFormat::Rgba8Unorm,
-                         .extent = {pixels, 1},
-                         .usage = ImageUsage::Sampled | ImageUsage::Storage},
-        "Viewport");
-    viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
-    if (heap_) {
-        viewportImage_ = heap_->AddStorageImage(*viewport_);
-        prims_ = std::make_unique<DeviceColumn>(*arenas_, "viewport prims", DType::UInt32,
-                                                std::vector<std::int64_t>{},
-                                                std::uint64_t{pixels.x} * pixels.y);
-    }
+    // The recorded frames name the old images.
+    ++recorded_;
 }
 
 void Viewer::Pick(const Shell::Pick& pick, const Ticket& drawn) {
-    if (!prims_) {
+    const ViewportSlot& shown = slots_[shown_];
+    if (!shown.prims) {
         return;
     }
-    const glm::uvec2 size(viewport_->Description().extent);
+    const DeviceColumn& prims = *shown.prims;
+    const glm::uvec2 size(shown.image->Description().extent);
     const glm::uvec2 pixel = glm::min(glm::uvec2(pick.at * glm::vec2(size)), size - 1u);
     const std::uint64_t at = std::uint64_t{pixel.y} * size.x + pixel.x;
-    Readback readback(*context_, context_->Main(), prims_->Storage(),
-                      prims_->Range().offset + at * sizeof(std::uint32_t), sizeof(std::uint32_t),
+    Readback readback(*context_, context_->Main(), prims.Storage(),
+                      prims.Range().offset + at * sizeof(std::uint32_t), sizeof(std::uint32_t),
                       std::span(&drawn, 1));
     const std::uint32_t slot = readback.Values<std::uint32_t>().front();
     const std::optional<PrimId> prim = scene_.Store().PrimAtSlot(slot);
@@ -394,7 +408,7 @@ bool Viewer::EcoPause() {
     const ViewState now{.version = scene_.Store().Version(),
                         .camera = orbit.Transform(),
                         .fov = orbit.verticalFov,
-                        .size = glm::uvec2(viewport_->Description().extent)};
+                        .size = glm::uvec2(slots_[0].image->Description().extent)};
     stillFrames_ = lastView_ == now ? stillFrames_ + 1 : 0;
     lastView_ = now;
     const ViewportDisplay& display = shell_->Display();
@@ -402,37 +416,62 @@ bool Viewer::EcoPause() {
            stillFrames_ >= static_cast<std::uint64_t>(std::max(display.ecoFrames, 1));
 }
 
-graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
-    graph::Image viewport = graph.Import(*viewport_, "viewport");
-    if (ecoPaused_) {
-        // Still: the last frame's image stands.
-        return viewport;
+Ticket Viewer::TraceViewport() {
+    if (!camera_) {
+        // The device scene still follows the scene, with nothing to trace.
+        return deviceScene_->Step([](graph::Graph&) {}, recorded_);
     }
-    if (camera_) {
-        const OrbitCamera& orbit = shell_->Camera();
-        CameraOutputs outputs{.colour = viewport,
-                              .colourIndex = viewportImage_,
-                              .background = glm::vec3(shell_->GetTheme().viewport),
-                              .prims = graph.Import(*prims_)};
-        const glm::uvec2 size(viewport_->Description().extent);
-        camera_->Add(graph,
-                     {.cameraToWorld = orbit.Transform(),
-                      .size = size,
-                      .lens = MakePinhole(orbit.verticalFov, size)},
-                     outputs);
-        return *outputs.colour;
+    const OrbitCamera& orbit = shell_->Camera();
+    const ViewportSlot& slot = slots_[shown_];
+    const glm::uvec2 size(slot.image->Description().extent);
+    const RecordedView view{.size = size,
+                            .fov = orbit.verticalFov,
+                            .background = glm::vec3(shell_->GetTheme().viewport)};
+    if (recordedView_ != view) {
+        recordedView_ = view;
+        ++recorded_;
     }
-    graph.Add(
-        "Viewport", graph::Kind::Copy,
-        [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
-        [this, viewport](graph::PassContext& pass) {
-            pass.Clear(viewport, shell_->GetTheme().viewport);
-        });
-    return viewport;
+    {
+        // Its own submission, before the trace's recorded commands read it.
+        ERNIE_ZONE("Upload the viewport pose");
+        const glm::dmat4 relative =
+            glm::translate(glm::dmat4(1.0), -deviceScene_->Transforms().Origin()) *
+            orbit.Transform();
+        const std::array<glm::vec4, 3> rows = ToAffineRows(relative);
+        poseUploader_->Write(pose_->Storage(), pose_->Range().offset,
+                             std::span<const glm::vec4>(rows));
+        graph::Graph graph(*context_, deviceScene_->Pool());
+        std::array buffers{graph.Import(*pose_)};
+        graph::AddUploadPass(graph, "Upload the viewport pose", *poseUploader_, buffers);
+        graph.Execute(context_->Main());
+    }
+    return deviceScene_->Step(
+        [&](graph::Graph& graph) {
+            CameraOutputs outputs{.colour = graph.Import(*slot.image, "viewport"),
+                                  .colourIndex = slot.storage,
+                                  .background = view.background,
+                                  .prims = graph.Import(*slot.prims)};
+            camera_->Add(graph,
+                         {.cameraToWorld = orbit.Transform(),
+                          .size = size,
+                          .lens = MakePinhole(orbit.verticalFov, size),
+                          .pose = graph.Import(*pose_)},
+                         outputs);
+        },
+        recorded_ * kSlots + shown_);
 }
 
-void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target) {
-    const graph::Image viewport = AddViewportPass(graph);
+Ticket Viewer::DrawUi(ImDrawData& data, const FrameTarget& target) {
+    graph::Graph graph(*context_, deviceScene_->Pool());
+    graph::Image viewport = graph.Import(*slots_[shown_].image, "viewport");
+    if (!camera_) {
+        graph.Add(
+            "Viewport", graph::Kind::Copy,
+            [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
+            [this, viewport](graph::PassContext& pass) {
+                pass.Clear(viewport, shell_->GetTheme().viewport);
+            });
+    }
     graph.Add(
         "UI", graph::Kind::Raster,
         [&](graph::PassBuilder& pass) {
@@ -446,6 +485,7 @@ void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget&
             renderer_->Record(pass.commands.Handle(), data, target,
                               glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         });
+    return graph.Execute(context_->Main(), {}, target.semaphores);
 }
 
 std::string_view ViewUsage() {

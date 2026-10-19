@@ -111,6 +111,34 @@ TEST(Viewer, TracesTheSceneIntoTheViewport) {
     test::ExpectClean(viewer->Context());
 }
 
+TEST(Viewer, ReplaysItsTraceAsTheCameraMoves) {
+    Scene scene;
+    const PrimId ball = scene.Define("/Ball", "Sphere");
+    scene.Set(ball, "radius", 2.0);
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 6, .validation = true};
+    options.shell.display.eco = false;
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    if (!viewer->Context().Capabilities().rayQuery) {
+        GTEST_SKIP() << viewer->Context().Info().name << " has no ray queries";
+    }
+    viewer->Run();
+    EXPECT_TRUE(viewer->Replayed()) << "a still scene's frames replay, a slot each";
+    // Aimed 8 m to the side, the ball leaves the middle; the recorded commands read the new pose.
+    viewer->GetShell().Camera().target += glm::dvec3(8.0, 0.0, 0.0);
+    viewer->RunFrames(2);
+    EXPECT_TRUE(viewer->Replayed()) << "a camera move records nothing new";
+    const auto [origin, size] = viewer->GetShell().Viewport();
+    const glm::uvec2 middle(static_cast<std::uint32_t>(origin.x + 0.5f * size.x),
+                            static_cast<std::uint32_t>(origin.y + 0.5f * size.y));
+    const std::array<std::uint8_t, 4> texel = ReadTexel(*viewer, middle);
+    const glm::vec4 clear = viewer->GetShell().GetTheme().viewport;
+    EXPECT_NEAR(texel[0], std::round(clear.r * 255.0f), 2.0) << "the background, past the ball";
+    test::ExpectClean(viewer->Context());
+}
+
 TEST(Viewer, ClickingTheViewportSelectsWhatItShows) {
     Scene scene;
     const PrimId ball = scene.Define("/Ball", "Sphere");

@@ -89,9 +89,11 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
         return;
     }
     std::vector<View> records;
+    std::vector<std::optional<graph::Buffer>> poses;
     glm::uvec2 largest{0};
     std::uint64_t pixels = 0;
     for (const CameraView& view : views) {
+        poses.push_back(view.pose);
         if (view.world >= scene->worlds) {
             throw std::invalid_argument("A view of world " + std::to_string(view.world) +
                                         ", of a scene of " + std::to_string(scene->worlds));
@@ -109,6 +111,11 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
         "Camera", graph::Kind::Compute,
         [&](graph::PassBuilder& pass) {
             scene->Read(pass);
+            for (const CameraView& view : views) {
+                if (view.pose) {
+                    pass.ReadAddress(*view.pose);
+                }
+            }
             // Written by the pass itself before its dispatch reads it.
             staged = pass.WriteAddress(staged, graph::Use::StorageWrite);
             if (outputs.colour) {
@@ -122,7 +129,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
                 }
             }
         },
-        [this, staged, largest, records = std::move(records), outputs,
+        [this, staged, largest, records = std::move(records), poses = std::move(poses), outputs,
          scene = *scene](graph::PassContext& pass) mutable {
             View written{.distances = BufferRefOrNull<float>(pass, outputs.distances),
                          .normals = BufferRefOrNull<float>(pass, outputs.normals),
@@ -130,6 +137,9 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
                          .prims = BufferRefOrNull<shaders::uint>(pass, outputs.prims),
                          .albedos = BufferRefOrNull<float>(pass, outputs.albedos),
                          .ldr = BufferRefOrNull<shaders::uint>(pass, outputs.ldr)};
+            for (std::size_t i = 0; i < records.size(); ++i) {
+                records[i].pose = BufferRefOrNull<glm::vec4>(pass, poses[i]);
+            }
             for (View& record : records) {
                 record.distances = written.distances;
                 record.normals = written.normals;

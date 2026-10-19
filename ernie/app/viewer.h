@@ -12,6 +12,7 @@
 
 #include <glm/vec2.hpp>
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -71,6 +72,11 @@ class Viewer {
     bool EcoPaused() const {
         return ecoPaused_;
     }
+    /// @return Whether the last frame's trace submitted commands recorded for an earlier frame
+    /// again, as it does while only the camera's pose and device columns change.
+    bool Replayed() const {
+        return deviceScene_->Replayed();
+    }
     Shell& GetShell() {
         return *shell_;
     }
@@ -111,12 +117,15 @@ class Viewer {
     void RecordFrame(const Ticket& drawn);
     /// @brief Ends the recording, encoding its frames into video when asked.
     void FinishSequence();
-    /// @brief Adds the pass filling the viewport: traced, or the theme's colour without ray
-    /// queries.
-    /// @return The viewport, filled.
-    graph::Image AddViewportPass(graph::Graph& graph);
-    /// @brief Adds the frame's own passes: rendering the viewport, then the UI over the target.
-    void AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target);
+    /// @brief Uploads the orbit camera's pose, then traces the shown slot through the device
+    /// scene's steps: replayed while the scene, the origin and the view's size, lens and
+    /// background stand, so only the pose and device columns change.
+    /// @return The trace's ticket.
+    Ticket TraceViewport();
+    /// @brief Submits the UI over the target, sampling the shown slot, which it clears to the
+    /// theme's colour without ray queries.
+    /// @return The frame's ticket.
+    Ticket DrawUi(ImDrawData& data, const FrameTarget& target);
 
     ViewerOptions options_;
     Scene& scene_;
@@ -131,13 +140,32 @@ class Viewer {
     /// The heap and pass tracing the viewport; null without ray queries.
     std::unique_ptr<BindlessHeap> heap_;
     std::unique_ptr<CameraPass> camera_;
-    /// The image the viewport is rendered into, the UI's texture of it, and its storage slot.
     std::unique_ptr<Sampler> sampler_;
-    std::unique_ptr<DeviceImage> viewport_;
-    ImTextureID viewportTexture_ = 0;
-    BindlessIndex viewportImage_;
-    /// Each viewport pixel's prim slot, which picking reads; null without ray queries.
-    std::unique_ptr<DeviceColumn> prims_;
+    /// An image the viewport is rendered into, the UI's texture of it, its storage slot, and each
+    /// pixel's prim slot, which picking reads (null without ray queries).
+    struct ViewportSlot {
+        std::unique_ptr<DeviceImage> image;
+        ImTextureID texture = 0;
+        BindlessIndex storage;
+        std::unique_ptr<DeviceColumn> prims;
+    };
+    /// Frames take turns tracing into the slots, each with a recorded frame of its own to replay.
+    static constexpr std::size_t kSlots = 2;
+    std::array<ViewportSlot, kSlots> slots_;
+    /// The slot the UI shows: the one traced this frame, or the last while eco mode pauses.
+    std::size_t shown_ = 0;
+    /// The orbit camera's pose, three rows relative to the render origin, uploaded each frame.
+    std::unique_ptr<DeviceColumn> pose_;
+    std::unique_ptr<Uploader> poseUploader_;
+    /// What the trace records besides the pose; a change, or new slots, records anew.
+    struct RecordedView {
+        glm::uvec2 size{0};
+        double fov = 0.0;
+        glm::vec3 background{0.0f};
+        bool operator==(const RecordedView&) const = default;
+    };
+    std::optional<RecordedView> recordedView_;
+    std::uint64_t recorded_ = 0;
     /// What a frame renders from; eco mode counts the frames it stays the same.
     struct ViewState {
         std::uint64_t version = 0;

@@ -54,6 +54,10 @@ struct View {
     BufferRef<uint> prims;
     BufferRef<float> albedos;
     BufferRef<uint> ldr;
+    /// Camera to world as three rows relative to the render origin, read in place of `rows`
+    /// when `node` is `kNone`: a pose written each frame, so recorded commands replay as it
+    /// moves; or null.
+    BufferRef<float4> pose;
 };
 
 struct CameraParameters {
@@ -91,12 +95,14 @@ RayDesc PixelRay(View view, float3x4 toWorld, uint2 pixel) {
              normalize(mul(toWorld, float4(ray.direction, 0))), view.far / along };
 }
 
-/// @return A view's camera to world: its node's world, or its own rows.
+/// @return A view's camera to world: its node's world, its pose buffer's rows, or its own rows.
 float3x4 ViewPose(View view, BufferRef<float4> worlds) {
     Affine pose;
     pose.rows = view.rows;
     if (view.node != kNone) {
         pose = LoadWorld(worlds, view.node);
+    } else if (!view.pose.IsNull()) {
+        pose.rows = { view.pose[0], view.pose[1], view.pose[2] };
     }
     return float3x4(pose.rows[0], pose.rows[1], pose.rows[2]);
 }
