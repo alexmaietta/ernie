@@ -9,6 +9,8 @@ import textwrap
 
 import pytest
 
+import ernie
+
 np = pytest.importorskip("numpy")
 torch = pytest.importorskip("torch")
 
@@ -79,3 +81,28 @@ def test_exportable_tensors_are_wrapped_in_place(context, mode, allocator_config
         [sys.executable, "-c", WRAP, mode], env=env, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_pytorch_reads_a_render_in_place(context):
+    scene = ernie.Scene()
+    scene.define("/World/Ball", ernie.Sphere, translate=(0, 5, 0))
+    scene.define("/World/Camera", ernie.Camera).set(
+        ernie.tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (0, 1, 0))
+    )
+    scene.define("/Render/Product/Depth", ernie.RenderVar, sourceName="DistanceToCamera")
+    scene.define(
+        "/Render/Product",
+        ernie.RenderProduct,
+        camera="/World/Camera",
+        resolution=(33, 33),
+        orderedVars=["/Render/Product/Depth"],
+    )
+    scene.define("/Render/Settings", ernie.RenderSettings, products=["/Render/Product"])
+    try:
+        renderer = ernie.Renderer(device=context.uuid)
+    except RuntimeError as error:
+        pytest.skip(str(error))
+    (batch,) = renderer.step(scene)
+    depth = torch.from_dlpack(batch["DistanceToCamera"])
+    assert depth.shape == (1, 33, 33) and depth.device.index == context.cuda_ordinal
+    assert depth[0, 16, 16].item() == pytest.approx(4.0, abs=1e-4)

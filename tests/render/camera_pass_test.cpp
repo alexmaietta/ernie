@@ -13,6 +13,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -69,10 +70,10 @@ class CameraPassTest : public test::RayTracingTest {
     Outputs Frame(const glm::dvec3& eye, const glm::dvec3& target) {
         // As the viewer does, keeping the origin near the eye.
         Device().Follow(eye);
-        const PinholeView view{.cameraToWorld =
-                                   glm::inverse(glm::lookAtRH(eye, target, glm::dvec3(0, 0, 1))),
-                               .verticalFov = 0.5,
-                               .size = kSize};
+        const CameraView view{.cameraToWorld =
+                                  glm::inverse(glm::lookAtRH(eye, target, glm::dvec3(0, 0, 1))),
+                              .size = kSize,
+                              .lens = MakePinhole(0.5, kSize)};
         const Ticket ready = colour_->Ready();
         const Ticket done = Device().Execute(
             [&](graph::Graph& graph) {
@@ -170,31 +171,55 @@ TEST_F(CameraPassTest, AlbedoFollowsTheDisplayColourWithoutRebuilding) {
     EXPECT_EQ(totals.refitted, 0u);
 }
 
-TEST_F(CameraPassTest, TracesViewsOfDifferentSizesInOneDispatch) {
+TEST_F(CameraPassTest, StacksViewsOfDifferentSizesFromOneDispatch) {
     const PrimId sphere = Sphere({0, 5, 0});
     const glm::uvec2 small{17, 9};
-    const DeviceColumn behind(*arenas_, "behind", DType::Float32, {}, small.x * small.y);
+    const std::size_t smallPixels = std::size_t{small.x} * small.y;
+    const DeviceColumn distances(*arenas_, "distances", DType::Float32, {}, kPixels + smallPixels);
+    const DeviceColumn prims(*arenas_, "prims", DType::UInt32, {}, kPixels + smallPixels);
     const auto looking = [](const glm::dvec3& target) {
         return glm::inverse(glm::lookAtRH(glm::dvec3(0), target, glm::dvec3(0, 0, 1)));
     };
+    const std::array views{
+        CameraView{
+            .cameraToWorld = looking({0, 1, 0}), .size = kSize, .lens = MakePinhole(0.5, kSize)},
+        CameraView{
+            .cameraToWorld = looking({0, -1, 0}), .size = small, .lens = MakePinhole(0.8, small)},
+    };
     const Ticket done = Device().Execute([&](graph::Graph& graph) {
-        std::array views{
-            CameraView{
-                .view = {.cameraToWorld = looking({0, 1, 0}), .verticalFov = 0.5, .size = kSize},
-                .outputs = {.distances = graph.Import(*distances_),
-                            .instances = graph.Import(*instances_)}},
-            CameraView{.view = {.cameraToWorld = looking({0, -1, 0}), .size = small},
-                       .outputs = {.distances = graph.Import(behind)}},
-        };
-        camera_->Add(graph, views);
+        CameraOutputs outputs{.distances = graph.Import(distances), .prims = graph.Import(prims)};
+        camera_->Add(graph, views, outputs);
     });
-    const std::vector<float> ahead = Read<float>(*distances_, kPixels, done);
-    EXPECT_NEAR(ahead[kMiddle], 4.0f, 1e-4f);
-    EXPECT_EQ(Read<std::uint32_t>(*instances_, kPixels, done)[kMiddle],
-              *Device().Instances().Row(sphere));
-    for (const float distance : Read<float>(behind, std::size_t{small.x} * small.y, done)) {
-        ASSERT_EQ(distance, std::numeric_limits<float>::infinity()) << "nothing behind";
+    const std::vector<float> seen = Read<float>(distances, kPixels + smallPixels, done);
+    EXPECT_NEAR(seen[kMiddle], 4.0f, 1e-4f);
+    EXPECT_EQ(Read<std::uint32_t>(prims, kPixels, done)[kMiddle], sphere.slot);
+    for (std::size_t pixel = kPixels; pixel < seen.size(); ++pixel) {
+        ASSERT_EQ(seen[pixel], std::numeric_limits<float>::infinity()) << "nothing behind";
     }
+}
+
+TEST_F(CameraPassTest, OrthographicRaysRunParallel) {
+    Sphere({0, 5, 0});
+    // 4 m across 33 pixels: the 2 m sphere covers the middle half, at the same depth everywhere
+    // a straight-on ray would see it.
+    const auto density = static_cast<float>(kSize.x) / 4.0f;
+    const CameraView view{.cameraToWorld = glm::inverse(glm::lookAtRH(
+                              glm::dvec3(0), glm::dvec3(0, 1, 0), glm::dvec3(0, 0, 1))),
+                          .size = kSize,
+                          .lens = {.kind = shaders::kOrthographic,
+                                   .focal = glm::vec2(density),
+                                   .principal = 0.5f * glm::vec2(kSize)}};
+    const Ticket done = Device().Execute([&](graph::Graph& graph) {
+        CameraOutputs outputs{.distances = graph.Import(*distances_)};
+        camera_->Add(graph, view, outputs);
+    });
+    const std::vector<float> distances = Read<float>(*distances_, kPixels, done);
+    EXPECT_NEAR(distances[kMiddle], 4.0f, 1e-4f);
+    // Four pixels right of the axis the ray runs x metres off it, meeting the sphere sqrt(1 - x^2)
+    // nearer than its centre.
+    const float x = 4.0f / density;
+    EXPECT_NEAR(distances[kMiddle + 4], 5.0f - std::sqrt(1.0f - x * x), 1e-4f);
+    EXPECT_EQ(distances[0], std::numeric_limits<float>::infinity()) << "the corner, off the sphere";
 }
 
 }  // namespace

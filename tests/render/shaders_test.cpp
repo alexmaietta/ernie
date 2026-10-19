@@ -26,6 +26,7 @@ namespace {
 const ShaderModule kSizes{"sizes", R"(
 import camera;
 import geometry;
+import lens;
 import ray_tracer;
 import buffer_ref;
 import transform;
@@ -35,7 +36,7 @@ import write_instances;
 void main(uniform BufferRef<uint> sizes) {
     uint values[] = { sizeof(GeometryRecord), sizeof(TracerParameters), sizeof(SplitRows),
                       sizeof(Op), sizeof(LocalParameters), sizeof(ComposeParameters),
-                      sizeof(Instance), sizeof(WriteParameters), sizeof(View),
+                      sizeof(Instance), sizeof(WriteParameters), sizeof(Lens), sizeof(View),
                       sizeof(CameraParameters) };
     for (uint i = 0; i < values.getCount(); ++i) {
         sizes[i] = values[i];
@@ -55,18 +56,15 @@ const std::vector<std::uint32_t> kExpected{
     kUsedBytes<shaders::ComposeParameters>,
     sizeof(shaders::Instance),
     kUsedBytes<shaders::WriteParameters>,
+    sizeof(shaders::Lens),
     sizeof(shaders::View),
     kUsedBytes<shaders::CameraParameters>,
 };
 
 /// @return Every module a kernel importing the camera and the instance writer needs, in order.
 std::vector<ShaderModule> SharedModules() {
-    std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
-    for (const ShaderModule& module : TransformGraph::WorldModules().subspan(1)) {
-        modules.push_back(module);
-    }
-    modules.insert(modules.end(), {shaders::kBindless, shaders::kSpectrum, shaders::kCamera,
-                                   shaders::kWriteInstances});
+    std::vector<ShaderModule> modules(CameraPass::Modules().begin(), CameraPass::Modules().end());
+    modules.push_back(shaders::kWriteInstances);
     return modules;
 }
 

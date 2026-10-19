@@ -3,12 +3,14 @@
 /// @brief DLPack capsules, versioned and not, per the DLPack Python specification.
 #include "ernie/python/dlpack.h"
 
+#include <nanobind/ndarray.h>
 #include <nanobind/stl/tuple.h>
 
 #include <Python.h>
 
 #include <cstdint>
 #include <tuple>
+#include <vector>
 
 namespace nb = nanobind;
 
@@ -93,6 +95,18 @@ Tensor TakeTensor(const nb::object& source, const nb::object& given) {
         capsule = source.attr("__dlpack__")(nb::arg("stream") = stream);
     }
     return FromCapsule(capsule);
+}
+
+nb::object ToNumpy(Tensor tensor) {
+    DLManagedTensorVersioned* managed = tensor.ToDlpack();
+    const DLDataType type = managed->dl_tensor.dtype;
+    managed->deleter(managed);
+    auto* owned = new Tensor(tensor.Contiguous());
+    const nb::capsule owner(owned, [](void* held) noexcept { delete static_cast<Tensor*>(held); });
+    std::vector<std::size_t> shape(owned->Shape().begin(), owned->Shape().end());
+    return nb::cast(nb::ndarray<nb::numpy>(owned->Data(), shape.size(), shape.data(), owner,
+                                           nullptr,
+                                           nb::dlpack::dtype{type.code, type.bits, type.lanes}));
 }
 
 }  // namespace ernie::python

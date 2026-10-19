@@ -34,17 +34,20 @@ struct TraceScene {
     graph::Acceleration top;
     graph::Buffer records;
     std::uint32_t instances = 0;
-    /// Each instance row's albedo, three linear RGB floats, and kernels' handle of them.
+    /// Each instance row's albedo, three linear RGB floats, and its prim's slot.
     graph::Buffer colours;
-    shaders::BufferRef<float> colourBuffer;
+    graph::Buffer prims;
+    /// The transform graph's worlds, for poses read on the device.
+    graph::Buffer worlds;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 
     /// @brief Declares a pass's reads of everything tracing touches.
     void Read(graph::PassBuilder& pass) const {
         pass.Read(top);
-        pass.ReadAddress(records);
-        pass.ReadAddress(colours);
+        for (const graph::Buffer& buffer : {records, colours, prims, worlds}) {
+            pass.ReadAddress(buffer);
+        }
     }
 };
 

@@ -104,6 +104,20 @@
 
 namespace ernie {
 
+/// The outputs a RenderVar's `sourceName` names, after Omniverse's where it has the quantity.
+namespace render_vars {
+/// uint8 (rows, cols, 4): display-encoded RGBA.
+inline constexpr std::string_view kLdrColor = "LdrColor";
+/// float32: metres along the ray to what it hits, infinity for nothing.
+inline constexpr std::string_view kDistanceToCamera = "DistanceToCamera";
+/// float32 (rows, cols, 3): the world normal hit, zero for nothing.
+inline constexpr std::string_view kNormal = "Normal";
+/// int32: the slot of the prim hit (its `PrimId::slot`), -1 for nothing.
+inline constexpr std::string_view kPrimId = "PrimId";
+/// float32 (rows, cols, bands): the albedo hit per spectral band, zero for nothing.
+inline constexpr std::string_view kAlbedo = "Albedo";
+}  // namespace render_vars
+
 ERNIE_SCHEMA(RenderSettingsBase, SchemaView, ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES,
              "What settings and products share: the camera, image and Ernie's settings.");
 ERNIE_CONCRETE_SCHEMA(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ATTRIBUTES,

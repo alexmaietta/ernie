@@ -82,11 +82,8 @@ struct Context {
         context->WaitIdle();
     }
 
-    CudaInterop& Cuda() const {
-        if (!cuda) {
-            throw nb::buffer_error(("No CUDA device pairs with " + context->Info().name).c_str());
-        }
-        return *cuda;
+    Interop Pair() {
+        return {context.get(), cuda.get()};
     }
     Arenas& Shared() const {
         if (!shared) {
@@ -96,43 +93,55 @@ struct Context {
     }
 };
 
-/// A column, and the ticket of CUDA's writes Ernie has yet to see.
-struct Column {
-    Context& owner;
-    std::unique_ptr<DeviceColumn> column;
-    /// The tensor a wrapped column shares, which `__dlpack__` hands back as it is.
-    std::optional<Tensor> wrapped;
-    Ticket written;
+}  // namespace
 
-    Column(Context& context, std::unique_ptr<DeviceColumn> device,
-           std::optional<Tensor> tensor = std::nullopt)
-        : owner(context), column(std::move(device)), wrapped(std::move(tensor)) {}
+CudaInterop& Interop::Cuda() const {
+    if (cuda == nullptr) {
+        throw nb::buffer_error(("No CUDA device pairs with " + context->Info().name).c_str());
+    }
+    return *cuda;
+}
 
-    nb::object Dlpack(const nb::object& stream, const nb::object& maxVersion) {
-        CudaInterop& cuda = owner.Cuda();
-        // -1 asks for no synchronization.
-        if (stream.is_none() || nb::cast<std::intptr_t>(stream) != -1) {
-            for (const Queue* queue : owner.context->Queues()) {
-                cuda.Wait(ToStream(stream), queue->Last());
-            }
+Column::Column(Interop interop, std::unique_ptr<DeviceColumn> device, std::optional<Tensor> tensor)
+    : owner(interop), owned(std::move(device)), column(owned.get()), wrapped(std::move(tensor)) {}
+
+Column::Column(Interop interop, const DeviceColumn& device, std::vector<std::int64_t> view,
+               Ticket ready)
+    : owner(interop), column(&device), shape(std::move(view)), written(ready) {}
+
+std::vector<std::int64_t> Column::Shape() const {
+    return shape.empty() ? column->Shape() : shape;
+}
+
+nb::object Column::Dlpack(const nb::object& stream, const nb::object& maxVersion) {
+    CudaInterop& cuda = owner.Cuda();
+    // -1 asks for no synchronization.
+    if (stream.is_none() || nb::cast<std::intptr_t>(stream) != -1) {
+        for (const Queue* queue : owner.context->Queues()) {
+            cuda.Wait(ToStream(stream), queue->Last());
         }
-        const bool versioned =
-            !maxVersion.is_none() && nb::cast<std::tuple<int, int>>(maxVersion) >=
-                                         std::tuple<int, int>(DLPACK_MAJOR_VERSION, 0);
-        return Capsule((wrapped ? *wrapped : cuda.View(*column)).ToDlpack(), versioned);
     }
+    const bool versioned =
+        !maxVersion.is_none() &&
+        nb::cast<std::tuple<int, int>>(maxVersion) >= std::tuple<int, int>(DLPACK_MAJOR_VERSION, 0);
+    const Tensor view = wrapped ? *wrapped : cuda.View(*column).Reshaped(Shape());
+    return Capsule(view.ToDlpack(), versioned);
+}
 
-    void Assign(const nb::object& source, const nb::object& stream) {
-        written = owner.Cuda().Assign(*column, TakeTensor(source, stream), ToStream(stream));
-    }
+void Column::Assign(const nb::object& source, const nb::object& stream) {
+    written = owner.Cuda().Assign(*column, TakeTensor(source, stream), ToStream(stream));
+}
 
-    nb::bytes Read() {
-        Readback readback(*owner.context, owner.context->Main(), column->Storage(),
-                          column->Range().offset, column->Bytes(), std::span(&written, 1));
-        const std::span<const std::byte> bytes = readback.Bytes();
-        return nb::bytes(reinterpret_cast<const char*>(bytes.data()), column->Bytes());
-    }
-};
+Tensor Column::Read() const {
+    Readback readback(*owner.context, owner.context->Main(), column->Storage(),
+                      column->Range().offset, column->Bytes(), std::span(&written, 1));
+    Tensor tensor = Tensor::Zeros(column->Type(), Shape());
+    std::ranges::copy(readback.Bytes().first(column->Bytes()),
+                      static_cast<std::byte*>(tensor.Data()));
+    return tensor;
+}
+
+namespace {
 
 /// @return The allocations `ernie_cuda_malloc` made, or none without a CUDA driver: PyTorch's
 /// allocator hook is process-wide, so they are too.
@@ -175,7 +184,7 @@ void BindDevice(nb::module_& module) {
                 if (shape.empty() || shape.front() < 0) {
                     throw nb::value_error("A column's shape starts with its row count");
                 }
-                return new Column(self,
+                return new Column(self.Pair(),
                                   std::make_unique<DeviceColumn>(
                                       self.Shared(), name, ParseType(dtype),
                                       std::vector<std::int64_t>(shape.begin() + 1, shape.end()),
@@ -187,7 +196,7 @@ void BindDevice(nb::module_& module) {
             "wrap",
             [](Context& self, const nb::object& tensor, const std::string& name,
                const nb::object& stream) {
-                CudaInterop& cuda = self.Cuda();
+                CudaInterop& cuda = self.Pair().Cuda();
                 Tensor source = TakeTensor(tensor, stream);
                 std::unique_ptr<DeviceColumn> column = cuda.Wrap(source, name);
                 if (!column) {
@@ -195,7 +204,7 @@ void BindDevice(nb::module_& module) {
                         "The tensor's memory cannot be shared: allocate it with "
                         "ernie.cuda_allocator(), or copy it into a column with assign()");
                 }
-                auto* wrapped = new Column(self, std::move(column), std::move(source));
+                auto* wrapped = new Column(self.Pair(), std::move(column), std::move(source));
                 wrapped->written = cuda.Signal(ToStream(stream));
                 return wrapped;
             },
@@ -206,7 +215,7 @@ void BindDevice(nb::module_& module) {
     nb::class_<Column>(module, "DeviceColumn",
                        "Rows on the device that CUDA, PyTorch and Warp read and write in place.")
         .def_prop_ro("name", [](const Column& self) { return self.column->Name(); })
-        .def_prop_ro("shape", [](const Column& self) { return self.column->Shape(); })
+        .def_prop_ro("shape", &Column::Shape)
         .def_prop_ro("dtype", [](const Column& self) { return TypeName(self.column->Type()); })
         .def(
             "__dlpack__",
@@ -234,7 +243,9 @@ void BindDevice(nb::module_& module) {
         .def("assign", &Column::Assign, nb::arg("tensor"), nb::arg("stream") = nb::none(),
              "Takes a DLPack tensor's values: in place for this column's own view, else by one "
              "copy on the device.")
-        .def("read", &Column::Read, "Copies the rows to the host, after CUDA's writes.");
+        .def(
+            "read", [](const Column& self) { return ToNumpy(self.Read()); },
+            "Copies the rows to the host as a NumPy array of its shape, after pending writes.");
 }
 
 }  // namespace ernie::python

@@ -22,4 +22,7 @@ nanobind::object Capsule(DLManagedTensorVersioned* managed, bool versioned);
 /// @return The tensor, sharing the producer's memory.
 Tensor TakeTensor(const nanobind::object& source, const nanobind::object& stream);
 
+/// @return A host tensor as a NumPy array that owns it.
+nanobind::object ToNumpy(Tensor tensor);
+
 }  // namespace ernie::python

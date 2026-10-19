@@ -221,10 +221,11 @@ graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
         CameraOutputs outputs{.colour = viewport,
                               .colourIndex = viewportImage_,
                               .background = glm::vec3(shell_->GetTheme().viewport)};
+        const glm::uvec2 size(viewport_->Description().extent);
         camera_->Add(graph,
                      {.cameraToWorld = orbit.Transform(),
-                      .verticalFov = orbit.verticalFov,
-                      .size = glm::uvec2(viewport_->Description().extent)},
+                      .size = size,
+                      .lens = MakePinhole(orbit.verticalFov, size)},
                      outputs);
         return *outputs.colour;
     }

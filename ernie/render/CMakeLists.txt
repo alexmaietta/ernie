@@ -6,6 +6,7 @@ add_library(
     geometry.cpp
     instances.cpp
     prim_rows.cpp
+    products.cpp
     renderer.cpp
     rt/bottom_levels.cpp
     rt/camera_pass.cpp

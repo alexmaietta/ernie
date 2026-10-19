@@ -2,6 +2,7 @@
 /// @file renderer_test.cpp
 /// @brief The README's first render, as written there: a rock on the ground under the sun, seen
 /// by a camera the render settings name.
+#include "ernie/render/products.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/geom.h"
@@ -76,6 +77,96 @@ TEST(Renderer, RendersTheReadmesFirstScene) {
     const std::array<std::uint8_t, 4> moved = Pixel(renderer->Render(scene), 320, 240);
     EXPECT_NE(moved, rock) << "the ground behind where the rock was";
     test::ExpectClean(renderer->Context());
+}
+
+/// @brief Defines a unit sphere 5 m ahead of cameras at the origin looking along +y.
+void DefineSphereAhead(Scene& scene) {
+    Sphere::Define(scene, "/World/Ball");
+    SetXform(scene, "/World/Ball", {.translate = glm::dvec3(0.0, 5.0, 0.0)});
+}
+
+/// @brief Defines a camera at `eye` looking along +y, its film `aperture` metres across and down.
+void DefineCamera(Scene& scene, const Path& path, const glm::dvec3& eye,
+                  glm::dvec2 aperture = {0.02, 0.02}) {
+    Camera::Define(scene, path).SetHorizontalAperture(aperture.x).SetVerticalAperture(aperture.y);
+    scene.Set(path, tokens::kTransform,
+              LookAtTransform(eye, eye + glm::dvec3(0.0, 1.0, 0.0), {0.0, 0.0, 1.0}));
+}
+
+/// @brief Defines a product through `camera` holding `vars`, each a RenderVar under it.
+void DefineProduct(Scene& scene, const Path& path, const Path& camera, glm::dvec2 resolution,
+                   const std::vector<std::string>& vars) {
+    std::vector<Path> ordered;
+    for (const std::string& var : vars) {
+        ordered.emplace_back(path.String() + "/" + var);
+        RenderVar::Define(scene, ordered.back()).SetSourceName(var);
+    }
+    RenderProduct::Define(scene, path)
+        .SetCamera(camera)
+        .SetResolution(resolution)
+        .SetOrderedVars(ordered);
+}
+
+TEST(Renderer, StepsProductsAlikeInOneBatchAndOthersApart) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    Scene scene;
+    DefineSphereAhead(scene);
+    DefineCamera(scene, "/World/Near", {0.0, 0.0, 0.0});
+    DefineCamera(scene, "/World/Far", {0.0, -5.0, 0.0});
+    const std::vector<std::string> vars{std::string(render_vars::kDistanceToCamera),
+                                        std::string(render_vars::kPrimId)};
+    DefineProduct(scene, "/Render/Near", "/World/Near", {33, 33}, vars);
+    DefineProduct(scene, "/Render/Far", "/World/Far", {33, 33}, vars);
+    DefineProduct(scene, "/Render/Small", "/World/Near", {9, 9},
+                  {std::string(render_vars::kNormal)});
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetProducts({Path("/Render/Near"), Path("/Render/Far"), Path("/Render/Small")});
+
+    const std::span<const RenderBatch> batches = renderer->Step(scene);
+    ASSERT_EQ(batches.size(), 2u);
+    EXPECT_EQ(batches[0].products, (std::vector<Path>{Path("/Render/Near"), Path("/Render/Far")}));
+    const RenderVarOutput* distances = batches[0].Find(render_vars::kDistanceToCamera);
+    ASSERT_NE(distances, nullptr);
+    EXPECT_EQ(distances->shape, (std::vector<std::int64_t>{2, 33, 33}));
+    const Tensor depth = renderer->Read(*distances);
+    const float* values = depth.As<float>();
+    const std::size_t middle = 33 * 16 + 16;
+    EXPECT_NEAR(values[middle], 4.0f, 1e-4f) << "the near view";
+    EXPECT_NEAR(values[33 * 33 + middle], 9.0f, 1e-4f) << "the far view, stacked after it";
+    const Tensor prims = renderer->Read(*batches[0].Find(render_vars::kPrimId));
+    EXPECT_EQ(prims.Type(), DType::Int32);
+    EXPECT_EQ(static_cast<std::uint32_t>(prims.As<std::int32_t>()[middle]),
+              scene.Find("/World/Ball")->slot);
+    EXPECT_EQ(prims.As<std::int32_t>()[0], -1) << "a corner sees nothing";
+    const Tensor normals = renderer->Read(*batches[1].Find(render_vars::kNormal));
+    EXPECT_EQ(normals.Shape(), (std::vector<std::int64_t>{1, 9, 9, 3}));
+    EXPECT_NEAR(normals.As<float>()[3 * (9 * 4 + 4) + 1], -1.0f, 1e-4f) << "facing the camera";
+    test::ExpectClean(renderer->Context());
+}
+
+TEST(Products, ConformTheFilmToTheImage) {
+    Scene scene;
+    DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0}, {0.02, 0.01});
+    const PrimId camera = *scene.Find("/World/Camera");
+    // A 2:1 film on a square image: expanding keeps the width and grows the height to match.
+    const Lens expanded = ReadLens(scene, camera, {100, 100}, 1.0, "expandAperture");
+    EXPECT_FLOAT_EQ(expanded.focal.x, 0.05f * 100.0f / 0.02f);
+    EXPECT_FLOAT_EQ(expanded.focal.y, expanded.focal.x);
+    const Lens cropped = ReadLens(scene, camera, {100, 100}, 1.0, "cropAperture");
+    EXPECT_FLOAT_EQ(cropped.focal.x, 0.05f * 100.0f / 0.01f);
+    const Lens stretched = ReadLens(scene, camera, {100, 100}, 1.0, "adjustPixelAspectRatio");
+    EXPECT_FLOAT_EQ(stretched.focal.y, 2.0f * stretched.focal.x);
+    EXPECT_EQ(expanded.principal, glm::vec2(50.0f));
+    // A film shifted right moves what the middle pixel sees right, so the principal point left.
+    scene.Set(camera, Camera::kHorizontalApertureOffset, 0.002);
+    EXPECT_FLOAT_EQ(ReadLens(scene, camera, {100, 100}, 1.0, "expandAperture").principal.x,
+                    50.0f - 0.002f * 100.0f / 0.02f);
+    ErnieLensAPI::Apply(scene, "/World/Camera").SetLensProjection("fisheye");
+    EXPECT_THROW(ReadLens(scene, camera, {100, 100}, 1.0, "expandAperture"), std::invalid_argument)
+        << "no silent pinhole for a fisheye";
 }
 
 TEST(Renderer, AsksForRenderSettingsWithACamera) {

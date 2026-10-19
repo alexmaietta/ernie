@@ -1,55 +1,147 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file renderer.cpp
-/// @brief Rendering a scene's render settings: the device scene brought up to date, the camera
-/// traced into a column, and the column read back.
+/// @brief Rendering a scene's products: the device scene brought up to date, products alike in
+/// size and vars traced together into stacked columns, and the columns read back on request.
 #include "ernie/render/renderer.h"
 
 #include "ernie/device/bindless.h"
 #include "ernie/device/context.h"
 #include "ernie/device/staging.h"
 #include "ernie/render/device_scene.h"
+#include "ernie/render/products.h"
 #include "ernie/render/rt/camera_pass.h"
-#include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/render.h"
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
-#include <cmath>
-#include <cstring>
+#include <array>
 #include <stdexcept>
 #include <vector>
 
 namespace ernie {
 namespace {
 
-/// @return The camera a render setting names, as a pinhole view of `size` pixels. The vertical
-/// field of view widens until the aperture's width fits too, as `expandAperture` conforms it.
-PinholeView ReadPinholeView(const Scene& scene, const Path& path, glm::uvec2 size) {
-    const Camera camera(scene, path);
-    const double focal = camera.GetFocalLength();
-    const double aspect = static_cast<double>(size.x) / static_cast<double>(size.y);
-    const double tangent = std::max(0.5 * camera.GetVerticalAperture() / focal,
-                                    0.5 * camera.GetHorizontalAperture() / focal / aspect);
-    const std::optional<PrimId> prim = scene.Find(path);
-    return {.cameraToWorld = scene.WorldTransform(*prim),
-            .verticalFov = 2.0 * std::atan(tangent),
-            .size = size};
+/// How a var is stored, and the camera output that writes it.
+struct VarFormat {
+    std::string_view name;
+    DType type;
+    std::vector<std::int64_t> channels;
+    std::optional<graph::Buffer> CameraOutputs::* output;
+};
+
+const std::array<VarFormat, 5>& VarFormats() {
+    static const std::array<VarFormat, 5> formats{{
+        {render_vars::kLdrColor, DType::UInt8, {4}, &CameraOutputs::ldr},
+        {render_vars::kDistanceToCamera, DType::Float32, {}, &CameraOutputs::distances},
+        {render_vars::kNormal, DType::Float32, {3}, &CameraOutputs::normals},
+        // kNoInstance reads as -1.
+        {render_vars::kPrimId, DType::Int32, {}, &CameraOutputs::prims},
+        {render_vars::kAlbedo, DType::Float32, {CameraPass::kBands}, &CameraOutputs::albedos},
+    }};
+    return formats;
+}
+
+const VarFormat& FindFormat(std::string_view name) {
+    return *std::ranges::find(VarFormats(), name, &VarFormat::name);
+}
+
+/// A batch and the views and columns it renders.
+struct Batch {
+    RenderBatch outputs;
+    std::vector<CameraView> views;
+    std::vector<std::unique_ptr<DeviceColumn>> columns;
+};
+
+/// @return The products grouped into batches of one size and vars, in order of first appearance.
+std::vector<std::vector<const ProductSpec*>> GroupProducts(const std::vector<ProductSpec>& specs) {
+    std::vector<std::vector<const ProductSpec*>> groups;
+    for (const ProductSpec& spec : specs) {
+        const auto alike = std::ranges::find_if(groups, [&](const auto& group) {
+            return group.front()->size == spec.size && group.front()->vars == spec.vars;
+        });
+        if (alike != groups.end()) {
+            alike->push_back(&spec);
+        } else {
+            groups.push_back({&spec});
+        }
+    }
+    return groups;
 }
 
 }  // namespace
+
+const RenderVarOutput* RenderBatch::Find(std::string_view name) const {
+    const auto found = std::ranges::find(vars, name, &RenderVarOutput::name);
+    return found != vars.end() ? &*found : nullptr;
+}
 
 /// What a renderer keeps on its device.
 struct Renderer::Device {
     ShaderCompiler compiler;
     std::unique_ptr<DeviceContext> context;
     std::unique_ptr<Arenas> arenas;
+    /// Where outputs live: shared with CUDA where the device can export memory.
+    std::unique_ptr<Arenas> outputs;
     std::unique_ptr<BindlessHeap> heap;
     std::unique_ptr<CameraPass> camera;
     /// The scene `deviceScene` follows, by `Scene::Id`: an address can be a new scene's.
     std::uint64_t sceneId = 0;
     std::unique_ptr<DeviceScene> deviceScene;
-    std::unique_ptr<DeviceColumn> ldr;
+    std::vector<Batch> batches;
+    std::vector<RenderBatch> rendered;
+
+    /// Makes the batches for `specs`, keeping last step's columns where their vars match.
+    void Plan(const Scene& scene, const std::vector<ProductSpec>& specs);
+    /// Sizes a batch's columns for its views, making them when there are none.
+    void Allocate(Batch& batch, const std::vector<std::string>& vars);
 };
+
+void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& specs) {
+    const std::vector<std::vector<const ProductSpec*>> groups = GroupProducts(specs);
+    std::vector<Batch> planned(groups.size());
+    for (std::size_t i = 0; i < groups.size(); ++i) {
+        Batch& batch = planned[i];
+        batch.outputs.size = groups[i].front()->size;
+        for (const ProductSpec* spec : groups[i]) {
+            batch.outputs.products.push_back(spec->product);
+            batch.views.push_back({.cameraToWorld = scene.WorldTransform(spec->camera),
+                                   .size = spec->size,
+                                   .lens = spec->lens,
+                                   .node = spec->camera.slot});
+        }
+        if (i < batches.size()) {
+            batch.columns = std::move(batches[i].columns);
+        }
+        Allocate(batch, groups[i].front()->vars);
+    }
+    batches = std::move(planned);
+    rendered.clear();
+    for (const Batch& batch : batches) {
+        rendered.push_back(batch.outputs);
+    }
+}
+
+void Renderer::Device::Allocate(Batch& batch, const std::vector<std::string>& vars) {
+    const glm::uvec2 size = batch.outputs.size;
+    const std::uint64_t pixels = batch.views.size() * std::uint64_t{size.x} * size.y;
+    const auto views = static_cast<std::int64_t>(batch.views.size());
+    batch.columns.resize(vars.size());
+    for (std::size_t i = 0; i < vars.size(); ++i) {
+        const VarFormat& format = FindFormat(vars[i]);
+        std::unique_ptr<DeviceColumn>& column = batch.columns[i];
+        if (!column || column->Name() != format.name) {
+            column = std::make_unique<DeviceColumn>(*outputs, format.name, format.type,
+                                                    format.channels, 0);
+        }
+        column->Resize(pixels, context->Main());
+        std::vector<std::int64_t> shape{views, size.y, size.x};
+        shape.insert(shape.end(), format.channels.begin(), format.channels.end());
+        batch.outputs.vars.push_back({.name = std::string(format.name),
+                                      .type = format.type,
+                                      .shape = std::move(shape),
+                                      .column = column.get()});
+    }
+}
 
 Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<Device>()) {
     Device& device = *device_;
@@ -61,10 +153,12 @@ Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<De
     }
     device.arenas = std::make_unique<Arenas>(*device.context, MemoryUse::Device, "renderer",
                                              std::uint64_t{16} << 20);
+    device.outputs = std::make_unique<Arenas>(
+        *device.context,
+        device.context->Capabilities().externalMemory ? MemoryUse::Shared : MemoryUse::Device,
+        "render outputs", std::uint64_t{16} << 20);
     device.heap = std::make_unique<BindlessHeap>(*device.context);
     device.camera = std::make_unique<CameraPass>(*device.context, device.compiler, *device.heap);
-    device.ldr = std::make_unique<DeviceColumn>(*device.arenas, "ldr colour", DType::UInt8,
-                                                std::vector<std::int64_t>{4}, 0);
 }
 
 Renderer::~Renderer() {
@@ -75,21 +169,10 @@ DeviceContext& Renderer::Context() {
     return *device_->context;
 }
 
-Tensor Renderer::Render(const Scene& scene) {
-    ERNIE_ZONE("Render");
-    const std::vector<Path> settings = scene.Prims(RenderSettings::kName);
-    if (settings.empty()) {
-        throw std::invalid_argument("The scene has no RenderSettings to render");
-    }
-    const RenderSettings render(scene, settings.front());
-    const Path camera = render.GetCamera();
-    if (camera.IsEmpty() || !scene.Find(camera)) {
-        throw std::invalid_argument("'" + settings.front().String() + "' names no camera");
-    }
-    const glm::dvec2 resolution = render.GetResolution();
-    const glm::uvec2 size(std::max(1.0, resolution.x), std::max(1.0, resolution.y));
-    const PinholeView view = ReadPinholeView(scene, camera, size);
-
+std::span<const RenderBatch> Renderer::Step(Scene& scene) {
+    ERNIE_ZONE("Render step");
+    scene.Update();
+    const std::vector<ProductSpec> specs = ReadProducts(scene);
     Device& device = *device_;
     if (scene.Id() != device.sceneId) {
         device.context->WaitIdle();
@@ -97,19 +180,39 @@ Tensor Renderer::Render(const Scene& scene) {
             std::make_unique<DeviceScene>(*device.context, *device.arenas, scene, device.compiler);
         device.sceneId = scene.Id();
     }
-    const std::size_t pixels = std::size_t{size.x} * size.y;
-    device.ldr->Resize(pixels, device.context->Main());
-    device.deviceScene->Follow(glm::dvec3(view.cameraToWorld[3]));
-    const Ticket done = device.deviceScene->Execute([&](graph::Graph& graph) {
-        CameraOutputs outputs{.ldr = graph.Import(*device.ldr, device.ldr->Name())};
-        device.camera->Add(graph, view, outputs);
+    device.Plan(scene, specs);
+    device.deviceScene->Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
+    device.deviceScene->Execute([&](graph::Graph& graph) {
+        for (const Batch& batch : device.batches) {
+            CameraOutputs outputs;
+            for (std::size_t i = 0; i < batch.columns.size(); ++i) {
+                outputs.*FindFormat(batch.outputs.vars[i].name).output =
+                    graph.Import(*batch.columns[i]);
+            }
+            device.camera->Add(graph, batch.views, outputs);
+        }
     });
-    Readback readback(*device.context, device.context->Main(), device.ldr->Storage(),
-                      device.ldr->Range().offset, pixels * 4, std::span(&done, 1));
-    return Tensor::Copy(
-        std::span<const std::uint8_t>(
-            reinterpret_cast<const std::uint8_t*>(readback.Bytes().data()), pixels * 4),
-        {size.y, size.x, 4});
+    return device.rendered;
+}
+
+Tensor Renderer::Read(const RenderVarOutput& var) {
+    DeviceContext& context = *device_->context;
+    const Ticket done = context.Main().Last();
+    Readback readback(context, context.Main(), var.column->Storage(), var.column->Range().offset,
+                      var.column->Bytes(), std::span(&done, 1));
+    Tensor tensor = Tensor::Zeros(var.type, var.shape);
+    std::ranges::copy(readback.Bytes().first(var.column->Bytes()),
+                      static_cast<std::byte*>(tensor.Data()));
+    return tensor;
+}
+
+Tensor Renderer::Render(Scene& scene) {
+    const RenderBatch& first = Step(scene).front();
+    const RenderVarOutput* ldr = first.Find(render_vars::kLdrColor);
+    if (ldr == nullptr) {
+        throw std::invalid_argument("'" + first.products.front().String() + "' holds no LdrColor");
+    }
+    return Read(*ldr).Row(0);
 }
 
 }  // namespace ernie

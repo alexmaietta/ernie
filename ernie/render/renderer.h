@@ -1,20 +1,31 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file renderer.h
-/// @brief Rendering a scene's render settings to an image in one call.
+/// @brief Rendering a scene's render products: to a host image in one call, or a step at a time
+/// into device columns CUDA and PyTorch read in place.
 ///
 ///     Renderer renderer;
 ///     Tensor image = renderer.Render(scene);  // height x width x 4 bytes of LdrColor
+///     for (const RenderBatch& batch : renderer.Step(scene)) {
+///         Tensor depth = renderer.Read(*batch.Find(render_vars::kDistanceToCamera));
+///     }
 #pragma once
 
 #include "ernie/export.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/tensor.h"
 
+#include <glm/vec2.hpp>
+
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace ernie {
 
+class DeviceColumn;
 class DeviceContext;
 
 struct RendererOptions {
@@ -22,6 +33,28 @@ struct RendererOptions {
     std::string device;
     /// The Khronos validation layer with synchronization validation, when installed.
     bool validation = false;
+};
+
+/// @brief One var of a batch: every view's pixels, stacked on the device.
+struct RenderVarOutput {
+    /// Its source name, one of `render_vars`.
+    std::string name;
+    DType type = DType::UInt8;
+    /// (views, rows, cols), then the pixel's channels when it has several.
+    std::vector<std::int64_t> shape;
+    /// Its rows, a pixel each, in shared memory where the device can export it.
+    const DeviceColumn* column = nullptr;
+};
+
+/// @brief Products of one size and vars, rendered in one dispatch: its views, one a product, in
+/// the settings' order.
+struct RenderBatch {
+    std::vector<Path> products;
+    glm::uvec2 size{1};
+    std::vector<RenderVarOutput> vars;
+
+    /// @return The var with this source name, or null.
+    const RenderVarOutput* Find(std::string_view name) const;
 };
 
 /// @brief A device and what it keeps of the scene it last rendered, so rendering the same scene
@@ -34,11 +67,22 @@ class ERNIE_API Renderer {
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    /// @brief Renders the camera of the scene's first `RenderSettings` at its resolution, as
-    /// Minimal sees it: albedo lit from the eye.
+    /// @brief Renders the products of the scene's first `RenderSettings` (`ReadProducts`) as
+    /// Minimal sees them: albedo lit from the eye. It updates the scene first. Products alike in
+    /// size and vars render in one dispatch, and the step in one submission; it returns once that
+    /// is submitted. Cameras take their poses from the device's transforms, so poses CUDA writes
+    /// move them.
+    /// @return The batches, valid until the next step.
+    /// @throws std::invalid_argument as `ReadProducts`.
+    std::span<const RenderBatch> Step(Scene& scene);
+
+    /// @return A var's pixels copied to the host once the last step has rendered them.
+    Tensor Read(const RenderVarOutput& var);
+
+    /// @brief Steps and reads the first product's LdrColor.
     /// @return LdrColor, height x width x 4 bytes (RGBA8, display encoded) on the host.
-    /// @throws std::invalid_argument when the scene has no render settings or they name no camera.
-    Tensor Render(const Scene& scene);
+    /// @throws std::invalid_argument as `Step`, or when that product holds no LdrColor.
+    Tensor Render(Scene& scene);
 
     /// @return Its device, for Ernie's own tests and tools.
     DeviceContext& Context();

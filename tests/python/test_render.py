@@ -54,6 +54,37 @@ def test_the_readmes_first_render_runs_as_written(monkeypatch, tmp_path):
     assert (image[..., 3] == 255).all()
 
 
+def test_a_step_returns_every_products_vars_stacked_by_view():
+    skip_without_ray_tracing()
+    scene = ernie.Scene()
+    scene.define("/World/Ball", ernie.Sphere, translate=(0, 5, 0))
+    for name, y in (("Near", 0), ("Far", -5)):
+        scene.define(f"/World/{name}", ernie.Camera).set(
+            ernie.tokens.TRANSFORM, ernie.look_at_transform((0, y, 0), (0, y + 1, 0))
+        )
+        for var in ("DistanceToCamera", "PrimId"):
+            scene.define(f"/Render/{name}/{var}", ernie.RenderVar, sourceName=var)
+        scene.define(
+            f"/Render/{name}",
+            ernie.RenderProduct,
+            camera=f"/World/{name}",
+            resolution=(33, 33),
+            orderedVars=[f"/Render/{name}/DistanceToCamera", f"/Render/{name}/PrimId"],
+        )
+    scene.define("/Render/Settings", ernie.RenderSettings, products=["/Render/Near", "/Render/Far"])
+
+    (batch,) = ernie.Renderer().step(scene)
+    assert batch.products == ["/Render/Near", "/Render/Far"]
+    assert batch.size == (33, 33)
+    assert sorted(batch.keys()) == ["DistanceToCamera", "PrimId"]
+    depth = batch["DistanceToCamera"].read()
+    assert depth.shape == (2, 33, 33) and depth.dtype == np.float32
+    assert depth[0, 16, 16] == pytest.approx(4.0, abs=1e-4)
+    assert depth[1, 16, 16] == pytest.approx(9.0, abs=1e-4)
+    prims = batch["PrimId"].read()
+    assert prims.dtype == np.int32 and prims[0, 0, 0] == -1
+
+
 def test_define_authors_transform_ops_and_attributes():
     scene = ernie.Scene()
     rock = scene.define("/Rock", ernie.Sphere, translate=(1, 2, 3), radius=2.0)
