@@ -44,9 +44,18 @@ class BottomLevels {
     const DeviceColumn& Addresses() const {
         return *addresses_;
     }
+    /// @return A built level's address, which instances whose own level is not built point at
+    /// while switched off, as some drivers fault on a top level with null references; 0 while
+    /// none is built.
+    std::uint64_t Placeholder() const {
+        return placeholder_;
+    }
     /// @return The pool the levels live in, which top-level builds import to read.
     const AccelerationPool& Pool() const {
         return pool_;
+    }
+    void SetScratchBudget(std::uint64_t bytes) {
+        scratchBudget_ = bytes;
     }
     /// @return Builds and refits not run yet, as over the budget.
     std::size_t Pending() const {
@@ -98,6 +107,8 @@ class BottomLevels {
     Level& At(GeometryId geometry);
     void Queue(GeometryId geometry, bool refit);
     void SetAddress(GeometryId geometry, std::uint64_t address);
+    /// Takes the first built level as the placeholder, when the last one went.
+    void FindPlaceholder();
     /// @return The triangles or box a geometry's level is built over.
     BottomBuild Build(GeometryId geometry, bool refit, std::vector<TriangleGeometry>& triangles,
                       std::vector<BoxGeometry>& boxes) const;
@@ -122,6 +133,8 @@ class BottomLevels {
     std::vector<std::uint64_t> hostAddresses_;
     std::vector<std::uint32_t> dirtyAddresses_;
     std::unique_ptr<DeviceColumn> addresses_;
+    std::uint64_t placeholder_ = 0;
+    GeometryId placeholderGeometry_ = 0;
     Statistics totals_;
 };
 

@@ -34,6 +34,8 @@ struct WriteParameters {
     /// Each geometry's bottom-level address, 0 until it is built.
     BufferRef<uint64_t> bottoms;
     BufferRef<Instance> instances;
+    /// A built bottom level, which instances whose own is not built point at, switched off.
+    uint64_t placeholder;
     uint count;
 };
 
@@ -54,10 +56,11 @@ void main(uint3 id : SV_DispatchThreadID, uniform WriteParameters parameters) {
     uint64_t bottom = parameters.bottoms[geometry];
     Instance instance;
     instance.rows = m.rows;
-    // An instance whose bottom level is not built yet is switched off.
+    // An instance whose bottom level is not built yet is switched off: lavapipe faults on a null
+    // reference even then, so it points at another level.
     instance.indexAndMask = (bottom == 0 ? 0u : 0xff000000u) | (geometry & 0xffffffu);
     instance.offsetAndFlags = 0;
-    instance.bottom = bottom;
+    instance.bottom = bottom == 0 ? parameters.placeholder : bottom;
     parameters.instances[row] = instance;
 }
 

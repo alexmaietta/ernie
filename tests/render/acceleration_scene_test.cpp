@@ -55,6 +55,18 @@ TEST_F(AccelerationScene, TracesMeshesAndSpheresWhereTheSceneHasThem) {
     EXPECT_EQ(Device().Tracer()->Bottoms().Pending(), 0u);
 }
 
+TEST_F(AccelerationScene, TracesWhatIsBuiltWhileTheBudgetDefersTheRest) {
+    // One build a frame, the ground's first: the ball's instance waits, switched off.
+    Device().Tracer()->Bottoms().SetScratchBudget(1);
+    const std::vector<float> first = Frame({{0, 0}, {3, 0}});
+    EXPECT_EQ(Device().Tracer()->Bottoms().Pending(), 1u);
+    EXPECT_NEAR(first[0], 100.0f, 1e-4f);
+    EXPECT_NEAR(first[1], 100.0f, 1e-4f) << "the ground under the ball not built yet";
+    const std::vector<float> second = Frame({{0, 0}, {3, 0}});
+    EXPECT_NEAR(second[0], 100.0f, 1e-4f);
+    EXPECT_NEAR(second[1], 94.0f, 1e-4f);
+}
+
 TEST_F(AccelerationScene, FollowsPrimsMovingComingAndGoing) {
     Frame({{0, 0}});
     // Frames pass while the ground's compacted size comes back and it moves into its compact copy.

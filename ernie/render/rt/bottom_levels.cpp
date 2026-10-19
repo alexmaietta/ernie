@@ -31,6 +31,18 @@ void BottomLevels::SetAddress(GeometryId geometry, std::uint64_t address) {
         hostAddresses_[geometry] = address;
         dirtyAddresses_.push_back(geometry);
     }
+    if (placeholder_ == 0 || geometry == placeholderGeometry_) {
+        placeholder_ = address;
+        placeholderGeometry_ = geometry;
+    }
+}
+
+void BottomLevels::FindPlaceholder() {
+    const auto built = std::ranges::find_if(hostAddresses_, [](std::uint64_t a) { return a != 0; });
+    if (built != hostAddresses_.end()) {
+        placeholder_ = *built;
+        placeholderGeometry_ = static_cast<GeometryId>(built - hostAddresses_.begin());
+    }
 }
 
 void BottomLevels::Queue(GeometryId geometry, bool refit) {
@@ -91,6 +103,9 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
     Moves moves = TakeCompactedSizes();
     FrameBuilds builds = PlanBuilds();
     Compaction compaction = StartCompactionQuery(builds.built);
+    if (placeholder_ == 0) {
+        FindPlaceholder();
+    }
     AddAddressUpload(graph);
     if (!builds.builds.empty() || !moves.empty()) {
         AddBuildPass(graph, std::move(builds), std::move(moves), compaction);

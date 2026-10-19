@@ -76,7 +76,8 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
             }
             records = pass.WriteAddress(records, graph::Use::StorageWrite);
         },
-        [this, reads, records, count](graph::PassContext& pass) {
+        [this, reads, records, count,
+         placeholder = bottoms.Placeholder()](graph::PassContext& pass) {
             const auto address = [&](std::size_t read) { return pass.Get(reads[read]).Address(); };
             writer_.Dispatch(pass.commands, {DivideRoundUp(count, 64u), 1, 1},
                              WriteParameters{{address(0)},
@@ -85,6 +86,7 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
                                              {address(3)},
                                              {address(4)},
                                              pass.Get(records).BufferRef<shaders::Instance>(),
+                                             placeholder,
                                              count});
         });
 }
