@@ -111,7 +111,9 @@ void InstanceTable::LayOutWorlds() {
                                 std::to_string(capacities_.worlds) + " declared");
     }
     const std::size_t count = capacities_.worlds > 0 ? capacities_.worlds : needed;
-    std::vector<std::uint32_t> records(count, shared);
+    // With one world, a top level of their own would only add an empty one to trace.
+    const bool ownTop = capacities_.sharedPrims == SharedPrims::SharedTopLevel && count > 1;
+    std::vector<std::uint32_t> records(count, ownTop ? 0u : shared);
     for (const std::int32_t world : hostWorlds_) {
         if (world >= 0) {
             ++records[static_cast<std::size_t>(world)];
@@ -131,6 +133,11 @@ void InstanceTable::LayOutWorlds() {
         worlds_[world] = {.first = static_cast<std::uint32_t>(world) * stride_,
                           .count = records[world]};
     }
+    shared_.reset();
+    if (ownTop && shared > 0) {
+        shared_ =
+            WorldRecords{.first = static_cast<std::uint32_t>(count) * stride_, .count = shared};
+    }
 }
 
 void InstanceTable::AddLayoutPasses(graph::Graph& graph, graph::Buffer rowWorlds,
@@ -144,7 +151,9 @@ void InstanceTable::AddLayoutPasses(graph::Graph& graph, graph::Buffer rowWorlds
                                            .rows = Count(),
                                            .worldCount = static_cast<std::uint32_t>(worlds_.size()),
                                            .stride = stride_,
-                                           .sharedCount = sharedCount_};
+                                           .sharedCount = sharedCount_,
+                                           .sharedFirst =
+                                               shared_ ? shared_->first : shaders::kNoSource};
     const auto add = [&](const char* name, const ComputeKernel& kernel, std::uint32_t items,
                          const auto& declare) {
         if (items == 0) {
@@ -174,7 +183,8 @@ void InstanceTable::AddLayoutPasses(graph::Graph& graph, graph::Buffer rowWorlds
         cursors = pass.WriteAddress(cursors);
         shared = pass.WriteAddress(shared);
     });
-    add("Share records", sharer_, layout.worldCount * sharedCount_, [&](graph::PassBuilder& pass) {
+    const std::uint32_t copies = shared_ ? sharedCount_ : layout.worldCount * sharedCount_;
+    add("Share records", sharer_, copies, [&](graph::PassBuilder& pass) {
         pass.ReadAddress(shared);
         sources = pass.WriteAddress(sources);
     });

@@ -90,6 +90,7 @@ struct Renderer::Device {
     std::uint64_t sceneId = 0;
     std::unique_ptr<DeviceScene> deviceScene;
     std::uint32_t outputSets = 1;
+    SharedPrims sharedPrims = SharedPrims::SharedTopLevel;
     std::vector<Batch> batches;
     /// Each output set's batches.
     std::vector<std::vector<RenderBatch>> rendered;
@@ -180,6 +181,7 @@ Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<De
         throw std::invalid_argument("A renderer needs at least one output set");
     }
     device.outputSets = options.outputSets;
+    device.sharedPrims = options.sharedPrims;
     device.context = std::make_unique<DeviceContext>(
         DeviceContextOptions{.validation = options.validation, .device = options.device});
     if (!device.context->Capabilities().rayQuery) {
@@ -208,7 +210,8 @@ DeviceScene& Renderer::Device::Follow(const Scene& scene) {
         deviceScene = std::make_unique<DeviceScene>(
             *context, *arenas, scene, compiler,
             WorldCapacities{.worlds = capacities.worlds,
-                            .instancesPerWorld = capacities.instancesPerWorld});
+                            .instancesPerWorld = capacities.instancesPerWorld,
+                            .sharedPrims = sharedPrims});
         sceneId = scene.Id();
         batches.clear();
         rendered.clear();

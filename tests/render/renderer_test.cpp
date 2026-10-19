@@ -27,13 +27,16 @@ namespace {
 /// @return A renderer, or none without a device that ray traces; no Vulkan at all fails where CI
 /// requires it.
 std::unique_ptr<Renderer> MakeRenderer(RenderCapacities capacities = {},
-                                       std::uint32_t outputSets = 1) {
+                                       std::uint32_t outputSets = 1,
+                                       SharedPrims sharedPrims = SharedPrims::Duplicated) {
     const std::unique_ptr<DeviceContext> probe = test::MakeContext();
     if (!probe || !probe->Capabilities().rayQuery) {
         return nullptr;
     }
-    return std::make_unique<Renderer>(
-        RendererOptions{.validation = true, .capacities = capacities, .outputSets = outputSets});
+    return std::make_unique<Renderer>(RendererOptions{.validation = true,
+                                                      .capacities = capacities,
+                                                      .outputSets = outputSets,
+                                                      .sharedPrims = sharedPrims});
 }
 
 /// @return The RGBA bytes at a pixel of an image `width` pixels across.
@@ -155,13 +158,13 @@ TEST(Renderer, StepsProductsAlikeInOneBatchAndOthersApart) {
     test::ExpectClean(renderer->Context());
 }
 
-TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
-    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+/// Three worlds at the same place, each with a ball nearer than the last, before a shared wall
+/// 10 m out; each world's camera is under the world's root, as its ball is.
+void ExpectEachViewSeesItsWorldAndTheSharedPrims(SharedPrims sharedPrims) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer({}, 1, sharedPrims);
     if (!renderer) {
         GTEST_SKIP() << "No Vulkan device that ray traces";
     }
-    // Three worlds at the same place, each with a ball nearer than the last, before a shared wall
-    // 10 m out; each world's camera is under the world's root, as its ball is.
     Scene scene;
     Cube::Define(scene, "/Wall").SetSize(1.0);
     SetXform(scene, "/Wall",
@@ -200,7 +203,22 @@ TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
     const std::vector<float> moved = middles();
     EXPECT_NEAR(moved[1], 10.0f, 1e-4f) << "the shared wall";
     EXPECT_NEAR(moved[2], 1.0f, 1e-4f) << "nearer than world 1's ball, now in world 2";
+
+    // A shared ball nearer than every world's own is what every view sees.
+    Sphere::Define(scene, "/Near").SetRadius(0.25);
+    SetXform(scene, "/Near", {.translate = glm::dvec3(0.0, 1.0, 0.0)});
+    for (const float distance : middles()) {
+        EXPECT_NEAR(distance, 0.75f, 1e-4f) << "the shared ball";
+    }
     test::ExpectClean(renderer->Context());
+}
+
+TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
+    ExpectEachViewSeesItsWorldAndTheSharedPrims(SharedPrims::Duplicated);
+}
+
+TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrimsInTheirOwnTopLevel) {
+    ExpectEachViewSeesItsWorldAndTheSharedPrims(SharedPrims::SharedTopLevel);
 }
 
 TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {

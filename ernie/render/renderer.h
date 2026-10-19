@@ -40,6 +40,17 @@ struct RenderCapacities {
     std::uint32_t views = 0;
 };
 
+/// @brief How batch worlds trace the prims in every world, such as a shared ground and room. A
+/// scene of one world keeps them in its top level either way.
+enum class SharedPrims : std::uint8_t {
+    /// In every world's top level, beside its own prims.
+    Duplicated,
+    /// In one top level of their own, traced after each world's: a world's top level holds only
+    /// its own prims, however many shared ones there are. Measured faster from 64 to 16,384
+    /// worlds, by up to 40% with 64 shared prims (`render.shared_prims` in ernie_benchmarks).
+    SharedTopLevel,
+};
+
 struct RendererOptions {
     /// The device: its UUID in hex, or part of its name; empty for the best scoring one.
     std::string device;
@@ -49,6 +60,8 @@ struct RendererOptions {
     /// The sets of outputs steps take turns rendering into: with 2, a learner reads one step's
     /// outputs while the next step renders into the other set.
     std::uint32_t outputSets = 1;
+    /// How worlds trace their shared prims; the default is the faster one as measured.
+    SharedPrims sharedPrims = SharedPrims::SharedTopLevel;
 };
 
 /// @brief One var of a batch: every view's pixels, stacked on the device.

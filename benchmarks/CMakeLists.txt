@@ -6,6 +6,7 @@ add_executable(
     device/pose_step.cpp
     render/batch_step.cpp
     render/hide_seek.cpp
+    render/shared_prims.cpp
     render/transform_graph.cpp
     scene/extents.cpp
     scene/storage.cpp

@@ -197,14 +197,23 @@ void ExpectSources(DeviceContext& context, DeviceScene& frame, const Scene& scen
         return part;
     };
     ASSERT_EQ(instances.Worlds().size(), own.size());
-    const std::size_t stride = instances.Records() / own.size();
+    // The shared rows lead each world's records, or have their own after every world's.
+    const std::optional<InstanceTable::WorldRecords> sharedTop = instances.Shared();
+    const std::size_t ahead = sharedTop ? 0 : shared.size();
+    const std::size_t stride =
+        (instances.Records() - (sharedTop ? sharedTop->count : 0)) / own.size();
+    if (sharedTop) {
+        EXPECT_EQ(sharedTop->first, own.size() * stride);
+        EXPECT_EQ(sharedTop->count, shared.size());
+        EXPECT_EQ(sorted(sharedTop->first, sharedTop->first + sharedTop->count), rows(shared));
+    }
     for (std::size_t world = 0; world < own.size(); ++world) {
         const InstanceTable::WorldRecords records = instances.Worlds()[world];
         EXPECT_EQ(records.first, world * stride);
-        EXPECT_EQ(records.count, shared.size() + own[world].size()) << "world " << world;
-        EXPECT_EQ(sorted(records.first, records.first + shared.size()), rows(shared));
-        EXPECT_EQ(sorted(records.first + shared.size(), records.first + records.count),
-                  rows(own[world]))
+        EXPECT_EQ(records.count, ahead + own[world].size()) << "world " << world;
+        EXPECT_EQ(sorted(records.first, records.first + ahead),
+                  sharedTop ? std::vector<std::uint32_t>{} : rows(shared));
+        EXPECT_EQ(sorted(records.first + ahead, records.first + records.count), rows(own[world]))
             << "world " << world;
         for (std::size_t spare = records.first + records.count; spare < (world + 1) * stride;
              ++spare) {
@@ -216,8 +225,14 @@ void ExpectSources(DeviceContext& context, DeviceScene& frame, const Scene& scen
 TEST(DeviceScene, SortsInstancesByWorldOnTheDevice) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;
-    for (const WorldCapacities capacities : {WorldCapacities{}, WorldCapacities{4, 6}}) {
-        SCOPED_TRACE(capacities.worlds);
+    for (const WorldCapacities capacities :
+         {WorldCapacities{.sharedPrims = SharedPrims::Duplicated},
+          WorldCapacities{4, 6, SharedPrims::Duplicated},
+          WorldCapacities{.sharedPrims = SharedPrims::SharedTopLevel},
+          WorldCapacities{4, 6, SharedPrims::SharedTopLevel}}) {
+        SCOPED_TRACE(
+            std::to_string(capacities.worlds) +
+            (capacities.sharedPrims == SharedPrims::Duplicated ? " duplicated" : " own top level"));
         // Two walls in every world; world 0 has a ball, world 1 none and world 2 three.
         Scene scene;
         Cube::Define(scene, "/Wall0");

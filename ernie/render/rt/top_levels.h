@@ -25,7 +25,8 @@ namespace ernie {
 /// instance records, laid out by the instance table, from their world transforms, shape transforms
 /// and geometries' bottom levels, and one call builds them all. Instances whose bottom level is not
 /// built are switched off. An instance's custom index is its geometry; its row in the instance
-/// table is `InstanceIndex()`. Shared prims are in every world's top level. A world's capacity
+/// table is `InstanceIndex()`. Shared prims are in every world's top level, or in one of their own
+/// after the worlds', as the instance table lays them out. A world's capacity
 /// grows by doubling and shrinks once it is four times what is needed, so instance counts that
 /// wobble do not reallocate.
 class TopLevels {
@@ -47,15 +48,21 @@ class TopLevels {
     const DeviceColumn& Tops() const {
         return *tops_;
     }
+    /// @return The batch worlds' top levels: `Tops`' first entries.
     std::uint32_t Worlds() const {
-        return static_cast<std::uint32_t>(structures_.size());
+        return worlds_;
+    }
+    /// @return The shared prims' own top level's index in `Tops`, after the worlds'; none when
+    /// each world's holds them.
+    std::optional<std::uint32_t> SharedTop() const {
+        return structures_.size() > worlds_ ? std::optional(worlds_) : std::nullopt;
     }
 
   private:
-    /// Remakes the top levels whose worlds outgrow them or use under a quarter of them; with a
-    /// `declared` capacity a world, makes each once at that size.
-    void EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds,
-                        std::uint32_t declared);
+    /// Remakes the top levels whose records outgrow them or use under a quarter of them; with a
+    /// `declared` capacity a world, makes each of the first `worlds` once at that size.
+    void EnsureCapacity(std::span<const InstanceTable::WorldRecords> tops, std::uint32_t declared,
+                        std::size_t worlds);
     /// Adds the pass writing each record from its instance's world and shape transforms.
     void AddWritePass(graph::Graph& graph, const TransformGraph& transforms,
                       const InstanceTable& instances, const BottomLevels& bottoms,
@@ -70,6 +77,7 @@ class TopLevels {
     Uploader uploader_;
     std::vector<std::unique_ptr<AccelerationStructure>> structures_;
     std::vector<shaders::TopLevel> hostTops_;
+    std::uint32_t worlds_ = 0;
     std::unique_ptr<DeviceColumn> tops_;
 };
 

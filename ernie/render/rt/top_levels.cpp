@@ -46,8 +46,14 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
                                         const InstanceTable& instances, const BottomLevels& bottoms,
                                         bool rebuild) {
     ERNIE_ZONE("Prepare the top levels");
-    const std::span<const InstanceTable::WorldRecords> worlds = instances.Worlds();
-    EnsureCapacity(worlds, instances.Capacities().instancesPerWorld);
+    // Each world's top level, then the shared prims' own, if any.
+    std::vector<InstanceTable::WorldRecords> tops(instances.Worlds().begin(),
+                                                  instances.Worlds().end());
+    worlds_ = static_cast<std::uint32_t>(tops.size());
+    if (const std::optional<InstanceTable::WorldRecords> shared = instances.Shared()) {
+        tops.push_back(*shared);
+    }
+    EnsureCapacity(tops, instances.Capacities().instancesPerWorld, worlds_);
     if (uploader_.Staged()) {
         std::array buffers{graph.Import(*tops_)};
         graph::AddUploadPass(graph, "Upload top levels", uploader_, buffers);
@@ -61,30 +67,31 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
     if (instances.Records() > 0) {
         AddWritePass(graph, transforms, instances, bottoms, records);
     }
-    return AddBuildPass(graph, bottoms, worlds, records);
+    return AddBuildPass(graph, bottoms, tops, records);
 }
 
-void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds,
-                               std::uint32_t declared) {
+void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> tops,
+                               std::uint32_t declared, std::size_t worlds) {
     // Frames in flight keep the old ones: destroying them retires them.
-    structures_.resize(worlds.size());
-    hostTops_.resize(worlds.size());
+    structures_.resize(tops.size());
+    hostTops_.resize(tops.size());
     bool changed = false;
-    for (std::size_t world = 0; world < worlds.size(); ++world) {
-        std::unique_ptr<AccelerationStructure>& top = structures_[world];
-        const std::uint32_t count = worlds[world].count;
+    for (std::size_t index = 0; index < tops.size(); ++index) {
+        std::unique_ptr<AccelerationStructure>& top = structures_[index];
+        const std::uint32_t count = tops[index].count;
         const std::uint32_t capacity = top ? top->Sizes().primitives[0] : 0;
-        const bool resize = declared > 0
-                                ? capacity != declared
-                                : count > capacity || (capacity > 4 && count < capacity / 4);
+        // The shared top level, after the worlds', grows with its prims.
+        const std::uint32_t fixed = index < worlds ? declared : 0;
+        const bool resize = fixed > 0 ? capacity != fixed
+                                      : count > capacity || (capacity > 4 && count < capacity / 4);
         if (!top || resize) {
             top = std::make_unique<AccelerationStructure>(
-                pool_, Sizes(context_, declared > 0 ? declared : RoundUpCapacity(count), kRebuilt),
-                "world " + std::to_string(world));
+                pool_, Sizes(context_, fixed > 0 ? fixed : RoundUpCapacity(count), kRebuilt),
+                index < worlds ? "world " + std::to_string(index) : std::string("shared"));
         }
         const shaders::TopLevel next{
-            .address = top->Address(), .first = worlds[world].first, .count = count};
-        shaders::TopLevel& last = hostTops_[world];
+            .address = top->Address(), .first = tops[index].first, .count = count};
+        shaders::TopLevel& last = hostTops_[index];
         if (last.address != next.address || last.first != next.first || last.count != count) {
             last = next;
             changed = true;

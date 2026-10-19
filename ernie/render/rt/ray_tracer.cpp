@@ -36,7 +36,9 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
     graph.Board().Put(
         TraceScene{.parameters = {.tops = ToBufferRef<shaders::TopLevel>(tops_.Tops()),
                                   .sources = ToBufferRef<shaders::uint>(instances.Sources()),
-                                  .records = ToBufferRef<shaders::GeometryRecord>(records)},
+                                  .records = ToBufferRef<shaders::GeometryRecord>(records),
+                                  .worlds = tops_.Worlds(),
+                                  .shared = tops_.SharedTop().value_or(shaders::kNoSharedTop)},
                    .top = top,
                    .tables = {graph.Import(tops_.Tops()), graph.Import(instances.Sources()),
                               graph.Import(records)},

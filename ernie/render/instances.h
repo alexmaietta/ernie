@@ -10,6 +10,7 @@
 #include "ernie/device/staging.h"
 #include "ernie/graph/graph.h"
 #include "ernie/render/geometry.h"
+#include "ernie/render/renderer.h"
 #include "ernie/util/glm.h"
 
 #include <algorithm>
@@ -35,8 +36,11 @@ namespace ernie {
 /// so nothing is laid out again or reallocated as counts move; 0 for as many as there are.
 struct WorldCapacities {
     std::uint32_t worlds = 0;
-    /// Each world's records: its own instances and the shared ones.
+    /// Each world's records: its own instances, and the shared ones when duplicated.
     std::uint32_t instancesPerWorld = 0;
+    /// How the shared rows are traced: in every world's records, or in their own top level's
+    /// when there is more than one world.
+    SharedPrims sharedPrims = SharedPrims::SharedTopLevel;
 };
 
 class InstanceTable {
@@ -96,6 +100,11 @@ class InstanceTable {
     std::span<const WorldRecords> Worlds() const {
         return worlds_;
     }
+    /// @return The records of the shared rows' own top level, after every world's; none when
+    /// they are duplicated into each world's, or there are none.
+    std::optional<WorldRecords> Shared() const {
+        return shared_;
+    }
     /// @return Each top-level record's instance row, a uint32 a record, world after world, each
     /// world's own rows in no fixed order; `kNoRow` for a record no instance fills.
     const DeviceColumn& Sources() const {
@@ -104,10 +113,11 @@ class InstanceTable {
     const WorldCapacities& Capacities() const {
         return capacities_;
     }
-    /// @return The records of every world: as many a world as the declared capacity, or as the
-    /// largest world's.
+    /// @return Every top level's records: as many a world as the declared capacity, or as the
+    /// largest world's, then the shared ones' own.
     std::uint32_t Records() const {
-        return static_cast<std::uint32_t>(worlds_.size()) * stride_;
+        return static_cast<std::uint32_t>(worlds_.size()) * stride_ +
+               (shared_ ? shared_->count : 0);
     }
 
   private:
@@ -168,6 +178,7 @@ class InstanceTable {
     /// Records from one world's first to the next's.
     std::uint32_t stride_ = 0;
     std::uint32_t sharedCount_ = 0;
+    std::optional<WorldRecords> shared_;
     std::unique_ptr<DeviceColumn> sources_;
     std::unique_ptr<DeviceColumn> rowWorlds_;
     /// The layout kernels' scratch.

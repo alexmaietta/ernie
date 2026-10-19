@@ -26,13 +26,21 @@ struct TopLevel {
     uint count;
 };
 
+/// `TracerParameters::shared` without a shared top level.
+static const uint kNoSharedTop = 0xffffffff;
+
 /// What a pass hands its tracer.
 struct TracerParameters {
-    /// Each world's top level.
+    /// Each world's top level, then the shared one, if any.
     BufferRef<TopLevel> tops;
     /// Each top-level record's instance row, world after world.
     BufferRef<uint> sources;
     BufferRef<GeometryRecord> records;
+    /// The batch worlds' top levels, the first of `tops`.
+    uint worlds;
+    /// The top level of the prims every world sees, traced after each world's own; or
+    /// `kNoSharedTop` when every world's top level holds them.
+    uint shared;
 };
 
 #ifdef __cplusplus
@@ -69,11 +77,33 @@ struct RayTracer {
         this.top = parameters.tops[world];
     }
 
-    /// @return The nearest hit along the ray among instances in `mask`.
+    /// @return The nearest hit along the ray among instances in `mask`: the world's own, then
+    /// the shared prims nearer than it.
     Hit TraceClosest(RayDesc ray, uint mask) {
+        Hit hit = TraceTop(top, ray, mask);
+        if (parameters.shared != kNoSharedTop) {
+            RayDesc nearer = ray;
+            nearer.TMax = hit.found ? hit.t : ray.TMax;
+            Hit shared = TraceTop(parameters.tops[parameters.shared], nearer, mask);
+            if (shared.found) {
+                hit = shared;
+            }
+        }
+        return hit;
+    }
+
+    /// @return Whether anything in `mask` blocks the ray, for visibility.
+    bool TraceAny(RayDesc ray, uint mask) {
+        return Blocks(top, ray, mask) ||
+               (parameters.shared != kNoSharedTop &&
+                Blocks(parameters.tops[parameters.shared], ray, mask));
+    }
+
+    /// @return The nearest hit along the ray in one top level.
+    Hit TraceTop(TopLevel traced, RayDesc ray, uint mask) {
         RayQuery<RAY_FLAG_NONE> query;
         ShapeHit nearest;
-        Run(query, ray, mask, nearest);
+        Run(query, traced, ray, mask, nearest);
         Hit hit = {};
         uint status = query.CommittedStatus();
         hit.found = status != COMMITTED_NOTHING;
@@ -81,7 +111,7 @@ struct RayTracer {
         // A committed instance's values are read only once there is one: lavapipe faults on them
         // after a miss.
         if (hit.found) {
-            hit.instance = parameters.sources[top.first + query.CommittedInstanceIndex()];
+            hit.instance = parameters.sources[traced.first + query.CommittedInstanceIndex()];
             hit.primitive = query.CommittedPrimitiveIndex();
             hit.geometry = query.CommittedInstanceID();
             if (status == COMMITTED_TRIANGLE_HIT) {
@@ -93,11 +123,11 @@ struct RayTracer {
         return hit;
     }
 
-    /// @return Whether anything in `mask` blocks the ray, for visibility.
-    bool TraceAny(RayDesc ray, uint mask) {
+    /// @return Whether anything in `mask` in one top level blocks the ray.
+    bool Blocks(TopLevel traced, RayDesc ray, uint mask) {
         RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
         ShapeHit nearest;
-        Run(query, ray, mask, nearest);
+        Run(query, traced, ray, mask, nearest);
         return query.CommittedStatus() != COMMITTED_NOTHING;
     }
 
@@ -117,9 +147,9 @@ struct RayTracer {
 
     /// Runs the query; `Flags` may end it at the first hit. NVIDIA's compiler fails on
     /// `CandidateObjectRay*`: the object ray comes from the candidate's matrix instead.
-    void Run<let Flags : int>(inout RayQuery<Flags> query, RayDesc ray, uint mask,
-                              out ShapeHit nearest) {
-        query.TraceRayInline(RaytracingAccelerationStructure(top.address), RAY_FLAG_NONE,
+    void Run<let Flags : int>(inout RayQuery<Flags> query, TopLevel traced, RayDesc ray,
+                              uint mask, out ShapeHit nearest) {
+        query.TraceRayInline(RaytracingAccelerationStructure(traced.address), RAY_FLAG_NONE,
                              mask, ray);
         nearest.t = ray.TMax;
         nearest.normal = float3(0, 0, 1);
