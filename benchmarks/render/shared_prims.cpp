@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file shared_prims.cpp
-/// @brief How batch worlds best trace the prims they share (RT-044), as Isaac Lab's scenes have
+/// @brief How batch worlds best trace the prims they share, as Isaac Lab's scenes have
 /// them: a shared ground and room, with furniture, and a few small objects a world whose poses
 /// device columns hold, so every step rebuilds the top levels as a learning step does. Each world
 /// renders colour and depth at 64 x 64. Reports a step's time with the shared prims duplicated
