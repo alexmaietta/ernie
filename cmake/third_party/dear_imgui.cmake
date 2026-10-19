@@ -19,13 +19,18 @@ add_library(
     "${dear_imgui_SOURCE_DIR}/imgui_draw.cpp"
     "${dear_imgui_SOURCE_DIR}/imgui_tables.cpp"
     "${dear_imgui_SOURCE_DIR}/imgui_widgets.cpp"
+    # Text fields over std::string.
+    "${dear_imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp"
     # Vulkan functions come from volk, as in the device layer.
     "${dear_imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp"
 )
 target_include_directories(
     ernie_imgui
     SYSTEM
-    PUBLIC "${dear_imgui_SOURCE_DIR}" "${dear_imgui_SOURCE_DIR}/backends"
+    PUBLIC
+        "${dear_imgui_SOURCE_DIR}"
+        "${dear_imgui_SOURCE_DIR}/backends"
+        "${dear_imgui_SOURCE_DIR}/misc/cpp"
 )
 target_compile_definitions(ernie_imgui PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK)
 target_link_libraries(ernie_imgui PUBLIC ernie_volk)

@@ -5,6 +5,8 @@
 #include "ernie/app/imgui_backend.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/lux.h"
+#include "ernie/scene/schema/render.h"
 #include "ernie/scene/xform.h"
 
 #include <gtest/gtest.h>
@@ -12,6 +14,7 @@
 #include <imgui_internal.h>
 
 #include <cmath>
+#include <filesystem>
 
 namespace ernie {
 namespace {
@@ -163,6 +166,61 @@ TEST(Shell, ZoomsWithTheWheelOverTheViewport) {
     io.AddMouseWheelEvent(0.0f, 1.0f);
     frames.Draw(shell);
     EXPECT_LT(shell.Camera().distance, before);
+}
+
+TEST(Shell, CreatesUnderTheSelectedGroupAndUndoesAsOneStep) {
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    shell.Selected().Set("/World");
+    const Path sphere = shell.Create(Sphere::kName);
+    EXPECT_EQ(sphere, Path("/World/Sphere"));
+    EXPECT_EQ(shell.Selected().Paths(), std::vector<Path>{sphere});
+    EXPECT_EQ(shell.Create(Sphere::kName), Path("/World/Sphere1")) << "numbered when taken";
+    // Into a fresh scene, its default parent made too: undone in one step.
+    shell.Selected().Clear();
+    const Path light = shell.Create(DistantLight::kName);
+    EXPECT_EQ(light, Path("/World/Sun"));
+    shell.Selected().Clear();
+    const Path settings = shell.Create(RenderSettings::kName);
+    EXPECT_TRUE(scene.Has("/Render"));
+    shell.History().Undo(scene);
+    EXPECT_FALSE(scene.Has(settings));
+    EXPECT_FALSE(scene.Has("/Render")) << "the parent it made, in the same step";
+    EXPECT_THROW(shell.Create("Mystery"), std::invalid_argument);
+}
+
+TEST(Shell, DuplicatesAndDeletesTheSelection) {
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    shell.Selected().Set("/World/Rover");
+    shell.DuplicateSelection();
+    EXPECT_TRUE(scene.Has("/World/Rover1/Wheel")) << "with its descendants";
+    EXPECT_EQ(shell.Selected().Paths(), std::vector<Path>{Path("/World/Rover1")});
+    shell.DeleteSelection();
+    EXPECT_FALSE(scene.Has("/World/Rover1"));
+    EXPECT_TRUE(shell.Selected().Empty());
+    shell.History().Undo(scene);
+    EXPECT_TRUE(scene.Has("/World/Rover1/Wheel"));
+}
+
+TEST(Shell, OpensAndSavesSceneFiles) {
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() / "ernie_shell_test_scene.json";
+    shell.SaveScene(file);
+    shell.Selected().Set("/World/Lamp");
+    shell.History().Remove(scene, "/World/Lamp");
+    shell.OpenScene(file);
+    EXPECT_TRUE(scene.Has("/World/Lamp"));
+    EXPECT_FALSE(shell.History().CanUndo()) << "a new scene starts its own history";
+    EXPECT_TRUE(shell.Selected().Empty());
+    EXPECT_THROW(shell.OpenScene(file.string() + ".missing"), std::exception);
+    EXPECT_TRUE(scene.Has("/World/Lamp")) << "a bad file leaves the scene as it was";
+    std::filesystem::remove(file);
 }
 
 TEST(StagePanel, SearchKeepsMatchesAndTheirAncestors) {

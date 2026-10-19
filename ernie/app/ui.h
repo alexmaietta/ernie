@@ -9,6 +9,7 @@
 #include "ernie/device/image.h"
 #include "ernie/device/queue.h"
 #include "ernie/geometry/bounds.h"
+#include "ernie/scene/edit_history.h"
 #include "ernie/scene/path.h"
 
 #include <glm/mat4x4.hpp>
@@ -22,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <initializer_list>
 #include <map>
 #include <memory>
@@ -322,8 +324,12 @@ struct ShellOptions {
     bool profile = false;
 };
 
-/// @brief The panels and controls over a scene. Panels read the scene; its owner keeps it updated
-/// (`Scene::Update`) between frames.
+/// @brief The panels and controls over a scene. Panels read the scene and the menus edit it
+/// through an undo history; its owner keeps it updated (`Scene::Update`) between frames.
+///
+/// The menus: File opens and saves scene files; Edit undoes, redoes, duplicates, deletes and
+/// frames; Create defines new prims with defaults that show, under the selected Xform or Scope;
+/// Window shows panels; Help links to the documentation and shows the controls and About.
 ///
 /// Panels dock around the dock space's central node, which the viewport shows through. The default
 /// layout is built on the first frame and after Window > Reset Layout; panels shown later dock
@@ -333,7 +339,7 @@ struct ShellOptions {
 class Shell {
   public:
     /// @param device The device in use, for the Devices panel; null for none.
-    Shell(const Scene& scene, const DeviceContext* device, const ShellOptions& options = {});
+    Shell(Scene& scene, const DeviceContext* device, const ShellOptions& options = {});
 
     /// @brief Draws this frame's UI, between `ImGui::NewFrame` and `ImGui::Render`.
     void Draw();
@@ -360,20 +366,57 @@ class Shell {
     const Theme& GetTheme() const {
         return theme_;
     }
+    EditHistory& History() {
+        return history_;
+    }
+
+    /// @brief Defines a prim of a type the Create menu lists, with its defaults, under the selected
+    /// Xform or Scope or else its default parent, as one undo step, and selects it.
+    /// @return Its path.
+    /// @throws std::invalid_argument for a type the menu does not list.
+    Path Create(std::string_view type);
+    /// @brief Copies each selected prim beside itself, as one undo step, selecting the copies.
+    void DuplicateSelection();
+    /// @brief Removes the selected prims, as one undo step.
+    void DeleteSelection();
+    /// @brief Replaces the scene with a scene file's, forgetting the history and the selection.
+    /// @throws std::runtime_error as `LoadSceneFile`, leaving the scene as it was.
+    void OpenScene(const std::filesystem::path& path);
+    /// @throws std::runtime_error as `SaveSceneFile`.
+    void SaveScene(const std::filesystem::path& path);
 
   private:
-    /// @brief What the menus ask for this frame, and the windows they show.
+    /// @brief What the menus and shortcuts ask for this frame.
     struct MenuChoices {
         bool quit = false;
         bool resetLayout = false;
         bool frame = false;
         bool clearSelection = false;
-        bool controlsShown = false;
-        bool aboutShown = false;
-        bool demoShown = false;
+        bool undo = false;
+        bool redo = false;
+        bool duplicate = false;
+        bool remove = false;
+        /// A type to create, from the Create menu.
+        std::string_view create;
+    };
+    /// @brief The windows the menus show, until closed.
+    struct Windows {
+        bool controls = false;
+        bool about = false;
+        bool demo = false;
+        /// Asking for a scene file to open or to save to.
+        bool open = false;
+        bool save = false;
     };
 
     void DrawMenuBar();
+    void DrawCreateMenu();
+    void DrawHelpMenu();
+    /// Draws the window asking for the path of a scene file to open or save, while one is asked.
+    void DrawFileWindow();
+    void TakeShortcuts();
+    /// Runs an edit, logging what it throws instead.
+    template <typename Edit> void Attempt(const char* what, Edit&& edit);
     void DrawDockSpace();
     void BuildLayout();
     void DrawPanels();
@@ -382,14 +425,18 @@ class Shell {
     void DrawHud();
     void Apply();
 
-    const Scene& scene_;
+    Scene& scene_;
     const DeviceContext* device_;
     Theme theme_;
     DockSizes sizes_;
     MessageLog log_;
     Selection selection_;
+    EditHistory history_;
     OrbitCamera camera_;
-    MenuChoices menu_;
+    MenuChoices choices_;
+    Windows windows_;
+    /// The path the file window edits.
+    std::string filePath_ = "scene.json";
     std::vector<std::unique_ptr<Panel>> panels_;
     /// The default layout's nodes; empty until it is built.
     std::map<Dock, ImGuiID> docks_;

@@ -25,7 +25,7 @@ using app::Viewer;
 using app::ViewerOptions;
 
 /// @return The viewer, or none when there is no Vulkan and it is not required.
-std::unique_ptr<Viewer> MakeViewer(const Scene& scene, const ViewerOptions& options) {
+std::unique_ptr<Viewer> MakeViewer(Scene& scene, const ViewerOptions& options) {
     try {
         return std::make_unique<Viewer>(scene, options);
     } catch (const DeviceError&) {
@@ -62,7 +62,7 @@ std::array<std::uint8_t, 4> ReadTexel(Viewer& viewer, glm::uvec2 pixel) {
 }
 
 TEST(Viewer, ShowsTheFramesViewportImageOffscreen) {
-    const Scene scene;
+    Scene scene;
     ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 3, .validation = true};
     const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
     if (!viewer) {
@@ -109,7 +109,7 @@ TEST(Viewer, TracesTheSceneIntoTheViewport) {
 
 #if ERNIE_VIEWER_WINDOW
 TEST(Viewer, OpensOnTheLogTab) {
-    const Scene scene;
+    Scene scene;
     ViewerOptions options{.size = {640, 480}, .offscreen = true, .frames = 5};
     const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
     if (!viewer) {
@@ -128,7 +128,7 @@ TEST(Viewer, PresentsToAWindow) {
     if (!app::Window::Available()) {
         GTEST_SKIP() << "No display";
     }
-    const Scene scene;
+    Scene scene;
     ViewerOptions options{.size = {320, 240}, .frames = 3, .validation = true, .vsync = false};
     std::unique_ptr<Viewer> viewer;
     try {

@@ -46,10 +46,11 @@ struct ViewerOptions {
 /// draws the UI over it and presents it. Drive it on the thread that made it.
 class Viewer {
   public:
-    /// @param scene Read by the panels; must outlive the viewer.
+    /// @param scene Shown by the panels and edited through the menus, updated every frame; must
+    /// outlive the viewer.
     /// @throws std::runtime_error without a display unless offscreen, DeviceError without a
     /// device.
-    Viewer(const Scene& scene, const ViewerOptions& options = {});
+    Viewer(Scene& scene, const ViewerOptions& options = {});
     ~Viewer();
     Viewer(const Viewer&) = delete;
     Viewer& operator=(const Viewer&) = delete;
@@ -87,6 +88,7 @@ class Viewer {
     void AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target);
 
     ViewerOptions options_;
+    Scene& scene_;
     // Made in this order, destroyed in reverse.
     ImGuiSession imgui_;
     std::unique_ptr<DeviceContext> context_;

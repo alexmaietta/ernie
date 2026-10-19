@@ -75,8 +75,8 @@ glm::uvec2 ParseSize(std::string_view text) {
 
 }  // namespace
 
-Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
-    : options_(options), imgui_(options.shell.theme) {
+Viewer::Viewer(Scene& scene, const ViewerOptions& options)
+    : options_(options), scene_(scene), imgui_(options.shell.theme) {
     if (options.size.x == 0 || options.size.y == 0) {
         throw std::invalid_argument("The viewer needs a positive size");
     }
@@ -141,6 +141,11 @@ bool Viewer::Step() {
         ImGui::NewFrame();
     }
     shell_->Draw();
+    {
+        // The menus' edits resolve before the device scene follows them.
+        ERNIE_ZONE("Update the scene");
+        scene_.Update();
+    }
     ShowViewport();
     {
         ERNIE_ZONE("Build the UI's draw data");

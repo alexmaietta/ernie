@@ -6,6 +6,7 @@
 /// their swapchains and their input through ImGui's GLFW backend.
 #include "ernie/app/ui.h"
 
+#include "ernie/app/menu.h"
 #include "ernie/device/context.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/file.h"
@@ -1143,47 +1144,9 @@ constexpr double kHudRefresh = 0.25;
 constexpr std::array kMouseButtons{ImGuiMouseButton_Left, ImGuiMouseButton_Right,
                                    ImGuiMouseButton_Middle};
 
-// Menu items as Omniverse Kit draws them: a left gutter holds a check on toggles in the accent
-// colour (`ImGuiCol_TextLink`), shortcuts sit muted at the right, and menus open at least 17 lines
-// wide.
-
-/// Spaces before every label, where the markers go.
-constexpr const char* kGutter = "    ";
-
-/// @return Whether the plain item was clicked.
-bool MenuAction(const char* label, const char* shortcut = nullptr, bool enabled = true) {
-    return ImGui::MenuItem((std::string(kGutter) + label).c_str(), shortcut, false, enabled);
-}
-
-/// @brief A toggle, checked in the gutter when on; a click flips `on`.
-void MenuCheck(const char* label, bool& on) {
-    if (MenuAction(label)) {
-        on = !on;
-    }
-    if (on) {
-        const ImVec2 low = ImGui::GetItemRectMin();
-        const ImVec2 high = ImGui::GetItemRectMax();
-        const float size = 0.7f * ImGui::GetTextLineHeight();
-        const ImVec2 centre(low.x + 0.5f * ImGui::CalcTextSize(kGutter).x, 0.5f * (low.y + high.y));
-        ImGui::RenderCheckMark(ImGui::GetWindowDrawList(),
-                               ImVec2(centre.x - 0.5f * size, centre.y - 0.5f * size),
-                               ImGui::GetColorU32(ImGuiCol_TextLink), size);
-    }
-}
-
-template <typename Items> void Menu(const char* name, Items&& items) {
-    // A menu that stays closed leaves the constraint unused.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(17.0f * ImGui::GetFontSize(), 0.0f),
-                                        ImVec2(FLT_MAX, FLT_MAX));
-    if (ImGui::BeginMenu(name)) {
-        items();
-        ImGui::EndMenu();
-    }
-}
-
 }  // namespace
 
-Shell::Shell(const Scene& scene, const DeviceContext* device, const ShellOptions& options)
+Shell::Shell(Scene& scene, const DeviceContext* device, const ShellOptions& options)
     : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks) {
     // Stage above Properties on the right; Log, Info, Devices and Profiler tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
@@ -1212,7 +1175,7 @@ std::pair<ImVec2, ImVec2> Shell::Viewport() const {
 
 void Shell::Draw() {
     ERNIE_ZONE("Draw the UI");
-    menu_.quit = menu_.resetLayout = menu_.frame = menu_.clearSelection = false;
+    choices_ = {};
     {
         ERNIE_ZONE("Draw the menus");
         DrawMenuBar();
@@ -1223,18 +1186,15 @@ void Shell::Draw() {
     }
     DrawPanels();
     {
-        ERNIE_ZONE("Draw the help windows");
-        DrawControlsWindow(menu_.controlsShown);
-        DrawAboutWindow(menu_.aboutShown, device_ != nullptr ? device_->Info().name : "");
-        if (menu_.demoShown) {
-            ImGui::ShowDemoWindow(&menu_.demoShown);
+        ERNIE_ZONE("Draw the windows");
+        DrawControlsWindow(windows_.controls);
+        DrawAboutWindow(windows_.about, device_ != nullptr ? device_->Info().name : "");
+        if (windows_.demo) {
+            ImGui::ShowDemoWindow(&windows_.demo);
         }
+        DrawFileWindow();
     }
-    const ImGuiIO& io = ImGui::GetIO();
-    if (!io.WantTextInput) {
-        menu_.quit |= io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false);
-        menu_.frame |= !io.KeyCtrl && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_F, false);
-    }
+    TakeShortcuts();
     {
         ERNIE_ZONE("Move the camera");
         Navigate();
@@ -1244,33 +1204,6 @@ void Shell::Draw() {
         DrawHud();
     }
     Apply();
-}
-
-void Shell::DrawMenuBar() {
-    if (!ImGui::BeginMainMenuBar()) {
-        return;
-    }
-    const bool selected = !selection_.Empty();
-    Menu("File", [&] { menu_.quit |= MenuAction("Quit", "Ctrl+Q"); });
-    Menu("Edit", [&] {
-        menu_.frame |= MenuAction(selected ? "Frame Selection" : "Frame Scene", "F");
-        menu_.clearSelection |= MenuAction("Clear Selection", nullptr, selected);
-    });
-    Menu("Window", [&] {
-        for (const std::unique_ptr<Panel>& panel : panels_) {
-            bool visible = panel->Visible();
-            MenuCheck(panel->Title().c_str(), visible);
-            panel->SetVisible(visible);
-        }
-        ImGui::Separator();
-        menu_.resetLayout |= MenuAction("Reset Layout");
-        MenuCheck("ImGui Demo", menu_.demoShown);
-    });
-    Menu("Help", [&] {
-        MenuCheck("Keyboard and Mouse", menu_.controlsShown);
-        MenuCheck("About Ernie", menu_.aboutShown);
-    });
-    ImGui::EndMainMenuBar();
 }
 
 void Shell::DrawDockSpace() {
@@ -1412,21 +1345,6 @@ void Shell::DrawHud() {
     const ImVec2 padding = ImGui::GetStyle().WindowPadding;
     ImGui::GetBackgroundDrawList()->AddText(ImVec2(origin.x + padding.x, origin.y + padding.y),
                                             ImGui::GetColorU32(ToImVec4(theme_.hud)), hud_.c_str());
-}
-
-void Shell::Apply() {
-    if (menu_.quit) {
-        open_ = false;
-    }
-    if (menu_.resetLayout) {
-        layoutBuilt_ = false;
-    }
-    if (menu_.clearSelection) {
-        selection_.Clear();
-    }
-    if (menu_.frame) {
-        Frame();
-    }
 }
 
 void Shell::Frame() {

@@ -50,6 +50,11 @@ class EditHistory {
     /// prims authored in a scratch scene first; undoing removes them.
     /// @throws std::invalid_argument if `source` has no prim at `path` or `scene` has one.
     void Add(Scene& scene, const Scene& source, const Path& path);
+    /// @brief Copies a prim and its descendants to `to`, as Duplicate does; undoing removes the
+    /// copy. Relationships keep their targets.
+    /// @throws std::invalid_argument without a prim at `from`, with one at `to`, or for `to`
+    /// inside `from`.
+    void Copy(Scene& scene, const Path& from, const Path& to);
 
     /// Groups the edits until `EndGroup` into one step. Groups nest; the outermost counts.
     void BeginGroup();

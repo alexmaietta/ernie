@@ -77,6 +77,21 @@ void EditHistory::Add(Scene& scene, const Scene& source, const Path& path) {
     Push(std::move(step));
 }
 
+void EditHistory::Copy(Scene& scene, const Path& from, const Path& to) {
+    if (!scene.Has(from) || scene.Has(to) || to.HasPrefix(from)) {
+        throw std::invalid_argument("Cannot copy '" + from.String() + "' to '" + to.String() +
+                                    "': no prim there, one at the copy, or the copy inside it");
+    }
+    std::vector<PrimSnapshot> prims = Snapshot(scene, from);
+    const std::size_t prefix = from.String().size();
+    for (PrimSnapshot& prim : prims) {
+        prim.path = Path(to.String() + prim.path.String().substr(prefix));
+    }
+    Step step{.path = to, .after = std::move(prims), .structural = true};
+    Restore(scene, step.after);
+    Push(std::move(step));
+}
+
 void EditHistory::BeginGroup() {
     if (groupDepth_++ == 0) {
         group_ = nextGroup_++;
