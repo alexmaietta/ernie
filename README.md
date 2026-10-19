@@ -70,67 +70,54 @@ Future work:
 - Benchmark against RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality
 - Validation with real-world sensors and scenes.
 
+## Quick Start
+
+We recommend starting with the Python package. Install it and open the Ernie Viewer:
+
+```sh
+pip install ernie-renderer
+python -m ernie
+```
+
+Ernie ships with built-in demos covering cameras and sensors, lighting, atmospheres, terrain, lasers and batched rendering. Open the Demos panel in the viewer and explore. Each demo is written in both C++ and Python, and the two versions render the same image.
+
+From the command line, `python -m ernie --list` names every demo, `python -m ernie --demo demo_atmosphere_earth` runs one, and `--help` lists every option.
+
 ## Installation
 
-The Python package is on PyPI as `ernie-renderer` (Python 3.10 or later, with a Vulkan 1.3 driver). It bundles everything else, the viewer and the native `ernie` program included:
+Ernie needs a Vulkan 1.3 driver: your GPU vendor's, or Mesa's (`mesa-vulkan-drivers`), which includes the lavapipe software driver for machines without a GPU.
+
+### Python
+
+Python 3.10 or later. `pip` installs `ernie-renderer` from [PyPI](https://pypi.org/project/ernie-renderer/); the package bundles everything else, the viewer included.
 
 ```sh
 pip install ernie-renderer
 ```
 
-Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it in C++. Download it from the [latest release](https://github.com/alexmaietta/ernie/releases/latest) and install it with a Vulkan driver: Mesa's below, which includes the lavapipe software driver for machines without a GPU, or your GPU vendor's.
+### C++
+
+Each [GitHub release](https://github.com/alexmaietta/ernie/releases/latest) has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions) with the library, the viewer, the headers and the CMake package.
 
 ```sh
-# Debian, Ubuntu
-sudo apt install mesa-vulkan-drivers
-sudo apt install ./ernie_*.deb
-
-# RHEL, Rocky, Fedora
-sudo dnf install mesa-vulkan-drivers
-sudo dnf install ./ernie-*.rpm
+sudo apt install ./ernie_*.deb   # Debian, Ubuntu
+sudo dnf install ./ernie-*.rpm   # RHEL, Rocky, Fedora
 ```
 
-### Docker
-
-The `ernie` program is also published as a Docker image.
-
-```sh
-docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie --demo demo_atmosphere_earth --viewer null --output /out/earth.png
-```
+The viewer is also a Docker image: `docker run --rm --gpus all ghcr.io/alexmaietta/ernie --help`.
 
 ### Build from source
 
-Ernie needs CMake 3.24+, a C++20 compiler, Python 3.10+ with its development headers (or `-DERNIE_BUILD_PYTHON=OFF`) and a Vulkan 1.3 driver. Small dependencies are vendored; Slang and OpenEXR are fetched on first configure (see [third_party/README.md](third_party/README.md)).
+CMake 3.24+, a C++20 compiler and Python 3.10+ with its development headers (or `-DERNIE_BUILD_PYTHON=OFF`). Small dependencies are vendored; Slang and OpenEXR are fetched on first configure.
 
 ```sh
 cmake -S . -B build -DERNIE_BUILD_TESTS=ON
 cmake --build build
-ctest --test-dir build -j4              # C++, GPU and Python tests
-build/bin/ernie                         # the viewer
-cmake --install build --prefix ~/.local # libernie, headers and the CMake package
+ctest --test-dir build -j4                # C++, GPU and Python tests
+cmake --install build --prefix ~/.local   # libernie, headers and the CMake package
 ```
 
-To build the Python wheel instead, run `uv build --wheel --out-dir dist .` and `uv pip install dist/ernie_renderer-*.whl`; for the Linux packages, `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a GPU on lavapipe, and benchmarks.
-
-## Quick Start
-
-Run `ernie` to open the Ernie Viewer. Its Demos panel runs any of the built-in demos, each written in both C++ and Python, covering cameras and sensors, lighting, atmospheres, terrain, lasers, batched rendering and the viewer; the two versions of a demo render the same image.
-
-```sh
-ernie                               # the viewer, with the Demos panel
-ernie --list                        # every demo's name
-ernie --demo demo_atmosphere_earth  # run one demo
-ernie --help                        # every option
-```
-
-`python -m ernie` opens the same viewer and takes the same options, and `python -m ernie.demos` runs the Python version of a demo:
-
-```sh
-python -m ernie.demos --list
-python -m ernie.demos demo_atmosphere_earth
-```
-
-Every demo takes common options, such as `--viewer null` to render without a window and `--output frame.png` to save the last frame; `--help` lists them.
+For the Python wheel, `uv build --wheel --out-dir dist .`; for Linux packages, `cmake --preset package-deb` (or `package-rpm`), then `cmake --build --preset package-deb` and `cpack --preset package-deb`.
 
 ## Your First Render
 
@@ -170,10 +157,14 @@ target_link_libraries(my_app PRIVATE Ernie::ernie)
 ```
 
 ```cpp
-#include <ernie/scene/schemas.h>
+#include <ernie/render/renderer.h>
+#include <ernie/scene/schema/camera.h>
+#include <ernie/scene/schema/geom.h>
+#include <ernie/scene/schema/lux.h>
+#include <ernie/scene/schema/planet.h>
+#include <ernie/scene/schema/render.h>
 #include <ernie/scene/tokens.h>
 #include <ernie/scene/xform.h>
-#include <ernie/render/renderer.h>
 
 int main() {
     using namespace ernie;
@@ -213,3 +204,34 @@ If you use Ernie in your research, please cite it. GitHub's "Cite this repositor
 ## License
 
 Ernie is licensed under the [BSD 3-Clause License](LICENSE). The third-party libraries it bundles keep their own licenses, listed in [third_party/README.md](third_party/README.md).
+
+## Acknowledgements
+
+Ernie is built on these open-source projects. Versions and licenses are in [third_party/README.md](third_party/README.md).
+
+- [Vulkan Headers](https://github.com/KhronosGroup/Vulkan-Headers), [volk](https://github.com/zeux/volk) and [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) for the GPU layer
+- [Slang](https://github.com/shader-slang/slang) for shaders
+- [DLPack](https://github.com/dmlc/dlpack) for sharing tensors with PyTorch, JAX, Warp and NumPy
+- [nanobind](https://github.com/wjakob/nanobind) for the Python bindings
+- [GLM](https://github.com/g-truc/glm) for math
+- [OpenEXR and Imath](https://github.com/AcademySoftwareFoundation/openexr), [stb](https://github.com/nothings/stb), [Basis Universal](https://github.com/BinomialLLC/basis_universal) and [bc7enc_rdo](https://github.com/richgel999/bc7enc_rdo) for images and textures
+- [NanoVDB](https://github.com/AcademySoftwareFoundation/openvdb) for volumes
+- [nlohmann/json](https://github.com/nlohmann/json) for JSON
+- [OpenUSD](https://openusd.org/) for scene interchange, with Ernie's schemas published as a USD schema plugin
+- [Dear ImGui](https://github.com/ocornut/imgui) and [GLFW](https://github.com/glfw/glfw) for the viewer
+- [Tracy](https://github.com/wolfpld/tracy) for profiling
+- [GoogleTest](https://github.com/google/googletest) for tests
+
+Ernie also leverages ideas from these renderers and projects:
+
+- [Madrona](https://madrona-engine.github.io/) for batch rendering across many worlds
+- [Chrono::Sensor](https://api.projectchrono.org/group__sensor.html) for sensor simulation inside Chrono
+- [Cycles](https://www.cycles-renderer.org/), [Mitsuba 3](https://www.mitsuba-renderer.org/) and [PBRT](https://pbrt.org/) for physically based and spectral rendering
+- [Unreal Engine](https://www.unrealengine.com/)'s Render Dependency Graph and Frostbite's FrameGraph for the frame graph
+- [OpenUSD](https://openusd.org/) and Omniverse Fabric for the schema-based, columnar scene
+- [nvpro-samples](https://github.com/nvpro-samples) for Vulkan ray tracing and cluster LOD
+- [PANGU](https://pangu.software/) for planetary and asteroid surface simulation
+- [IRIS](https://dartslab.jpl.nasa.gov/References/pdf/IRIS_aiaa2022SciTech.pdf) for real-time, closed-loop rendering of space sensors
+- [CosmoScout VR](https://github.com/cosmoscout/cosmoscout-vr) for planet-scale scenes and solar-system visualization
+- [three-geospatial](https://github.com/takram-design-engineering/three-geospatial) for atmospheres and clouds
+- [Isaac Lab](https://github.com/isaac-sim/IsaacLab) and [Newton](https://github.com/newton-physics/newton) for tiled cameras in robot learning

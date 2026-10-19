@@ -26,7 +26,28 @@ target_link_libraries(headers PRIVATE Ernie::ernie)
 add_executable(consumer main.cpp)
 target_link_libraries(consumer PRIVATE Ernie::ernie)
 
+# The README's first C++ render as users copy it, its `main` run inside first_render's.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../../README.md" readme)
+string(FIND "${readme}" "## Your First Render" section)
+string(SUBSTRING "${readme}" ${section} -1 readme)
+string(FIND "${readme}" "```cpp\n" begin)
+if(section EQUAL -1 OR begin EQUAL -1)
+    message(FATAL_ERROR "README.md has no first render in C++")
+endif()
+math(EXPR begin "${begin} + 7")
+string(SUBSTRING "${readme}" ${begin} -1 readme)
+string(FIND "${readme}" "```" end)
+string(SUBSTRING "${readme}" 0 ${end} example)
+string(REPLACE "int main() {" "void ReadmeMain() {" example "${example}")
+file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/readme/first_render.inl" CONTENT "${example}" @ONLY)
+set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../../README.md"
+)
+
 add_executable(first_render first_render.cpp)
+target_include_directories(first_render PRIVATE "${CMAKE_BINARY_DIR}/readme")
 target_link_libraries(first_render PRIVATE Ernie::ernie)
 
 enable_testing()
