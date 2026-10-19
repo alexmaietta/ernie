@@ -15,7 +15,7 @@ namespace ernie {
 
 RayTracer::RayTracer(DeviceContext& context, Arenas& arenas, const ShaderCompiler& compiler,
                      const GeometryPool& geometry)
-    : geometry_(geometry), bottoms_(context, arenas, geometry), tops_(context, compiler) {}
+    : geometry_(geometry), bottoms_(context, arenas, geometry), tops_(context, arenas, compiler) {}
 
 std::span<const ShaderModule> RayTracer::Modules() {
     static const std::array modules{shaders::kBufferRef, shaders::kGeometry, shaders::kShapes,
@@ -32,14 +32,17 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
     const graph::Acceleration top = tops_.AddBuild(graph, transforms, instances, bottoms_);
     const DeviceColumn& records = geometry_.Records();
     graph.Board().Put(
-        TraceScene{.parameters = {.scene = tops_.Structure()->Address(),
+        TraceScene{.parameters = {.tops = ToBufferRef<shaders::TopLevel>(tops_.Tops()),
+                                  .sources = ToBufferRef<shaders::uint>(instances.Sources()),
                                   .records = ToBufferRef<shaders::GeometryRecord>(records)},
                    .top = top,
-                   .records = graph.Import(records),
+                   .tables = {graph.Import(tops_.Tops()), graph.Import(instances.Sources()),
+                              graph.Import(records)},
                    .instances = instances.Count(),
+                   .worlds = tops_.Worlds(),
                    .colours = graph.Import(instances.Colours()),
                    .prims = graph.Import(instances.Nodes()),
-                   .worlds = graph.Import(transforms.Worlds()),
+                   .transforms = graph.Import(transforms.Worlds()),
                    .origin = transforms.Origin()});
 }
 

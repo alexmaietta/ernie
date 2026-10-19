@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file ray_tracer.slang
-/// @brief `RayTracer`, what every pass traces the scene through: inline ray queries against the
-/// top level, each procedural candidate solved exactly as its unit shape.
+/// @brief `RayTracer`, what every pass traces the scene through: inline ray queries against a
+/// batch world's top level, each procedural candidate solved exactly as its unit shape.
 ///
 ///     import ray_tracer;
-///     RayTracer tracer = RayTracer(parameters.tracer);
+///     RayTracer tracer = RayTracer(parameters.tracer, view.world);
 ///     Hit hit = tracer.TraceClosest(ray, 0xff);
 ///     if (hit.found) { float3 n = tracer.WorldNormal(hit); }
 ///
@@ -19,10 +19,19 @@ import buffer_ref;
 import shapes;
 #endif
 
+/// A batch world's top level, and where its records start among every world's.
+struct TopLevel {
+    uint64_t address;
+    uint first;
+    uint count;
+};
+
 /// What a pass hands its tracer.
 struct TracerParameters {
-    /// The top level's device address.
-    uint64_t scene;
+    /// Each world's top level.
+    BufferRef<TopLevel> tops;
+    /// Each top-level record's instance row, world after world.
+    BufferRef<uint> sources;
     BufferRef<GeometryRecord> records;
 };
 
@@ -35,7 +44,7 @@ struct TracerParameters {
 struct Hit {
     bool found;
     float t;
-    /// The instance's row: `InstanceIndex()`.
+    /// The instance's row in the instance table.
     uint instance;
     uint primitive;
     uint geometry;
@@ -47,9 +56,17 @@ struct Hit {
 
 struct RayTracer {
     TracerParameters parameters;
+    /// The world traced.
+    TopLevel top;
 
+    /// A tracer of the first world: every prim when the scene has no batch worlds.
     __init(TracerParameters parameters) {
+        this = RayTracer(parameters, 0);
+    }
+
+    __init(TracerParameters parameters, uint world) {
         this.parameters = parameters;
+        this.top = parameters.tops[world];
     }
 
     /// @return The nearest hit along the ray among instances in `mask`.
@@ -64,7 +81,7 @@ struct RayTracer {
         // A committed instance's values are read only once there is one: lavapipe faults on them
         // after a miss.
         if (hit.found) {
-            hit.instance = query.CommittedInstanceIndex();
+            hit.instance = parameters.sources[top.first + query.CommittedInstanceIndex()];
             hit.primitive = query.CommittedPrimitiveIndex();
             hit.geometry = query.CommittedInstanceID();
             if (status == COMMITTED_TRIANGLE_HIT) {
@@ -102,7 +119,7 @@ struct RayTracer {
     /// `CandidateObjectRay*`: the object ray comes from the candidate's matrix instead.
     void Run<let Flags : int>(inout RayQuery<Flags> query, RayDesc ray, uint mask,
                               out ShapeHit nearest) {
-        query.TraceRayInline(RaytracingAccelerationStructure(parameters.scene), RAY_FLAG_NONE,
+        query.TraceRayInline(RaytracingAccelerationStructure(top.address), RAY_FLAG_NONE,
                              mask, ray);
         nearest.t = ray.TMax;
         nearest.normal = float3(0, 0, 1);

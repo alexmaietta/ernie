@@ -4,6 +4,7 @@
 #include "ernie/render/products.h"
 
 #include "ernie/scene/schema/camera.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/render.h"
 
 #include <algorithm>
@@ -74,6 +75,7 @@ ProductSpec ReadProduct(const Scene& scene, const RenderSettingsBase& settings,
     const glm::uvec2 size(std::max(1.0, resolution.x), std::max(1.0, resolution.y));
     return {.product = path,
             .camera = *prim,
+            .world = static_cast<std::uint32_t>(std::max(0, ReadWorld(scene, *prim))),
             .size = size,
             .lens =
                 ReadLens(scene, *prim, size, pick(own.HasPixelAspectRatio()).GetPixelAspectRatio(),

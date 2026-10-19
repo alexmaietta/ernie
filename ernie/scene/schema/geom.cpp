@@ -3,7 +3,16 @@
 /// @brief UsdGeom's registry entries and the implicit shapes' extents, as UsdGeom computes them.
 #include "ernie/scene/schema/geom.h"
 
+#include "ernie/scene/convert.h"
+
 namespace ernie {
+
+std::int32_t ReadWorld(const Scene& scene, PrimId prim) {
+    const std::optional<Value> value = scene.GetResolved(prim, Imageable::kWorld);
+    const std::optional<double> number = value ? ToNumber(*value) : std::nullopt;
+    return number ? static_cast<std::int32_t>(*number) : -1;
+}
+
 namespace {
 
 /// @return The axis index (0, 1, 2) of an `axis` token.

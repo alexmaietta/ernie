@@ -61,6 +61,8 @@ struct PrimGeometry {
     glm::dmat4 shape{1.0};
     /// Its albedo in linear RGB, from `primvars:displayColor`, until materials bind one.
     glm::vec3 colour{0.5f};
+    /// The batch world it is in, from its resolved `ernie:world`; -1 for every world.
+    std::int32_t world = -1;
 };
 
 /// @brief The scene's gprims as device geometry. Implicit shapes share one unit geometry a kind

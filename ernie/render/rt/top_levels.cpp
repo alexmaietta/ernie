@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file top_levels.cpp
-/// @brief Writing instance records on the device and building the top level over them.
+/// @brief Writing every world's instance records on the device and building the top levels over
+/// them.
 #include "ernie/render/rt/top_levels.h"
 
 #include "ernie/shaders/rt/write_instances.h"
@@ -25,38 +26,66 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     return compiler.Spirv(modules, "main");
 }
 
-/// @return The capacity for `count` instances: doubling, and at least 64.
+/// @return The capacity for `count` instances: doubling, and at least 4.
 std::uint32_t RoundUpCapacity(std::uint32_t count) {
-    return std::max<std::uint32_t>(64, std::bit_ceil(count));
+    return std::max<std::uint32_t>(4, std::bit_ceil(count));
 }
 
 }  // namespace
 
-TopLevels::TopLevels(DeviceContext& context, const ShaderCompiler& compiler)
+TopLevels::TopLevels(DeviceContext& context, Arenas& arenas, const ShaderCompiler& compiler)
     : context_(context), writer_(context, Compile(compiler), "write instances",
                                  std::uint32_t{sizeof(WriteParameters)}),
-      pool_(context, "top levels") {}
+      pool_(context, "top levels"), uploader_(context, context.Main()),
+      tops_(std::make_unique<DeviceColumn>(
+          arenas, "top levels", DType::UInt32,
+          std::vector<std::int64_t>{sizeof(shaders::TopLevel) / sizeof(std::uint32_t)}, 0)) {}
 
 graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGraph& transforms,
                                         const InstanceTable& instances,
                                         const BottomLevels& bottoms) {
-    ERNIE_ZONE("Prepare the top level");
-    const std::uint32_t count = instances.Count();
-    EnsureCapacity(count);
-    graph::Buffer records = graph.Create(
-        std::max<std::uint64_t>(count, 1) * sizeof(AccelerationInstance), "instance records");
-    if (count > 0) {
+    ERNIE_ZONE("Prepare the top levels");
+    const std::span<const InstanceTable::WorldRecords> worlds = instances.Worlds();
+    EnsureCapacity(worlds);
+    if (uploader_.Staged()) {
+        std::array buffers{graph.Import(*tops_)};
+        graph::AddUploadPass(graph, "Upload top levels", uploader_, buffers);
+    }
+    graph::Buffer records =
+        graph.Create(std::max<std::uint64_t>(instances.Records(), 1) * sizeof(AccelerationInstance),
+                     "instance records");
+    if (instances.Records() > 0) {
         AddWritePass(graph, transforms, instances, bottoms, records);
     }
-    return AddBuildPass(graph, bottoms, records, count);
+    return AddBuildPass(graph, bottoms, worlds, records);
 }
 
-void TopLevels::EnsureCapacity(std::uint32_t count) {
-    const std::uint32_t capacity = top_ ? top_->Sizes().primitives[0] : 0;
-    if (!top_ || count > capacity || (capacity > 64 && count < capacity / 4)) {
-        // Frames in flight keep the old one: destroying it retires it.
-        top_ = std::make_unique<AccelerationStructure>(
-            pool_, Sizes(context_, RoundUpCapacity(count), kRebuilt), "scene");
+void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds) {
+    // Frames in flight keep the old ones: destroying them retires them.
+    structures_.resize(worlds.size());
+    hostTops_.resize(worlds.size());
+    bool changed = false;
+    for (std::size_t world = 0; world < worlds.size(); ++world) {
+        std::unique_ptr<AccelerationStructure>& top = structures_[world];
+        const std::uint32_t count = worlds[world].count;
+        const std::uint32_t capacity = top ? top->Sizes().primitives[0] : 0;
+        if (!top || count > capacity || (capacity > 4 && count < capacity / 4)) {
+            top = std::make_unique<AccelerationStructure>(
+                pool_, Sizes(context_, RoundUpCapacity(count), kRebuilt),
+                "world " + std::to_string(world));
+        }
+        const shaders::TopLevel next{
+            .address = top->Address(), .first = worlds[world].first, .count = count};
+        shaders::TopLevel& last = hostTops_[world];
+        if (last.address != next.address || last.first != next.first || last.count != count) {
+            last = next;
+            changed = true;
+        }
+    }
+    if (changed) {
+        tops_->Resize(hostTops_.size(), context_.Main());
+        uploader_.Write(tops_->Storage(), tops_->Range().offset,
+                        std::span<const shaders::TopLevel>(hostTops_));
     }
 }
 
@@ -64,10 +93,10 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
                              const InstanceTable& instances, const BottomLevels& bottoms,
                              graph::Buffer& records) const {
     // In `WriteParameters`' order.
-    const std::array reads{graph.Import(transforms.Worlds()), graph.Import(instances.Nodes()),
+    const std::array reads{graph.Import(transforms.Worlds()),    graph.Import(instances.Nodes()),
                            graph.Import(instances.Geometries()), graph.Import(instances.Shapes()),
-                           graph.Import(bottoms.Addresses())};
-    const std::uint32_t count = instances.Count();
+                           graph.Import(bottoms.Addresses()),    graph.Import(instances.Sources())};
+    const std::uint32_t count = instances.Records();
     graph.Add(
         "Write instances", graph::Kind::Compute,
         [&](graph::PassBuilder& pass) {
@@ -85,6 +114,7 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
                                              {address(2)},
                                              {address(3)},
                                              {address(4)},
+                                             {address(5)},
                                              pass.Get(records).BufferRef<shaders::Instance>(),
                                              placeholder,
                                              count});
@@ -92,32 +122,41 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
 }
 
 graph::Acceleration TopLevels::AddBuildPass(graph::Graph& graph, const BottomLevels& bottoms,
-                                            graph::Buffer records, std::uint32_t count) const {
-    graph::Acceleration top = graph.Import(*top_);
+                                            std::span<const InstanceTable::WorldRecords> worlds,
+                                            graph::Buffer records) const {
+    graph::Acceleration tops = graph.Import(pool_);
     const graph::Acceleration levels = graph.Import(bottoms.Pool());
-    const TopBuild build{.target = top_.get(), .count = count};
-    graph::Buffer scratch =
-        graph.Create(ScratchBytes({}, std::span(&build, 1)), "top-level scratch");
+    std::vector<TopBuild> builds;
+    bool written = false;
+    for (std::size_t world = 0; world < worlds.size(); ++world) {
+        builds.push_back({.target = structures_[world].get(), .count = worlds[world].count});
+        written = written || worlds[world].count > 0;
+    }
+    graph::Buffer scratch = graph.Create(ScratchBytes({}, builds), "top-level scratch");
     graph.Add(
-        "Build the top level", graph::Kind::Build,
+        "Build the top levels", graph::Kind::Build,
         [&](graph::PassBuilder& pass) {
             pass.Read(levels, graph::Use::BuildInput);
-            if (count > 0) {
+            if (written) {
                 pass.Read(records, graph::Use::BuildInput);
             }
             scratch = pass.Write(scratch, graph::Use::BuildScratch);
-            top = pass.Build(top);
+            tops = pass.Build(tops);
         },
-        [build, records, scratch, count](graph::PassContext& pass) {
-            TopBuild recorded = build;
-            if (count > 0) {
+        [builds = std::move(builds), worlds = std::vector(worlds.begin(), worlds.end()), records,
+         scratch, written](graph::PassContext& pass) mutable {
+            if (written) {
                 const graph::BufferSlice slice = pass.Get(records);
-                recorded.instances = {slice.buffer, slice.offset};
+                for (std::size_t world = 0; world < builds.size(); ++world) {
+                    builds[world].instances = {slice.buffer,
+                                               slice.offset + worlds[world].first *
+                                                                  sizeof(AccelerationInstance)};
+                }
             }
             const graph::BufferSlice space = pass.Get(scratch);
-            RecordBuilds(pass.commands, {}, std::span(&recorded, 1), {space.buffer, space.offset});
+            RecordBuilds(pass.commands, {}, builds, {space.buffer, space.offset});
         });
-    return top;
+    return tops;
 }
 
 }  // namespace ernie

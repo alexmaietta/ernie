@@ -169,4 +169,8 @@ ERNIE_CONCRETE_SCHEMA(Capsule, Gprim, ERNIE_CAPSULE_ATTRIBUTES,
 ERNIE_CONCRETE_SCHEMA(Plane, Gprim, ERNIE_PLANE_ATTRIBUTES,
                       "A one-sided rectangle facing along its axis.");
 
+/// @return The batch world a prim is in, its `ernie:world` as its ancestors resolve it at the
+/// scene's last `Update`; -1 for every world.
+ERNIE_API std::int32_t ReadWorld(const Scene& scene, PrimId prim);
+
 }  // namespace ernie

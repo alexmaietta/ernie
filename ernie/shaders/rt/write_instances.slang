@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file write_instances.slang
-/// @brief The top level's instance records from the transform graph's worlds, one thread a row.
+/// @brief Every batch world's top-level records from the transform graph's worlds, one thread a
+/// record; shared instances have one in every world.
 /// The records and parameters are shared with C++ (rt/top_levels.cpp).
 #ifdef __cplusplus
 #pragma once
@@ -33,6 +34,8 @@ struct WriteParameters {
     BufferRef<float4> shapes;
     /// Each geometry's bottom-level address, 0 until it is built.
     BufferRef<uint64_t> bottoms;
+    /// Each record's instance row, and the records, every world's.
+    BufferRef<uint> sources;
     BufferRef<Instance> instances;
     /// A built bottom level, which instances whose own is not built point at, switched off.
     uint64_t placeholder;
@@ -46,10 +49,11 @@ struct WriteParameters {
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 id : SV_DispatchThreadID, uniform WriteParameters parameters) {
-    uint row = id.x;
-    if (row >= parameters.count) {
+    uint record = id.x;
+    if (record >= parameters.count) {
         return;
     }
+    uint row = parameters.sources[record];
     uint geometry = parameters.geometries[row];
     Affine m = Mul(LoadWorld(parameters.worlds, parameters.nodes[row]),
                    Load(parameters.shapes, row));
@@ -61,7 +65,7 @@ void main(uint3 id : SV_DispatchThreadID, uniform WriteParameters parameters) {
     instance.indexAndMask = (bottom == 0 ? 0u : 0xff000000u) | (geometry & 0xffffffu);
     instance.offsetAndFlags = 0;
     instance.bottom = bottom == 0 ? parameters.placeholder : bottom;
-    parameters.instances[row] = instance;
+    parameters.instances[record] = instance;
 }
 
 #endif

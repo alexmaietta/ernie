@@ -20,6 +20,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <array>
 #include <cstdint>
 #include <span>
 
@@ -31,21 +32,28 @@ using TracerParameters = shaders::TracerParameters;
 /// @brief What a frame's passes trace, left on the graph's blackboard by `RayTracer::AddBuild`.
 struct TraceScene {
     TracerParameters parameters;
+    /// Every batch world's top level, in one pool.
     graph::Acceleration top;
-    graph::Buffer records;
+    /// What the parameters point at: the top levels, the records' instance rows and the geometry.
+    std::array<graph::Buffer, 3> tables;
     std::uint32_t instances = 0;
+    /// The batch worlds, each with a top level; views pick theirs by index.
+    std::uint32_t worlds = 1;
     /// Each instance row's albedo, three linear RGB floats, and its prim's slot.
     graph::Buffer colours;
     graph::Buffer prims;
     /// The transform graph's worlds, for poses read on the device.
-    graph::Buffer worlds;
+    graph::Buffer transforms;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 
     /// @brief Declares a pass's reads of everything tracing touches.
     void Read(graph::PassBuilder& pass) const {
         pass.Read(top);
-        for (const graph::Buffer& buffer : {records, colours, prims, worlds}) {
+        for (const graph::Buffer& buffer : tables) {
+            pass.ReadAddress(buffer);
+        }
+        for (const graph::Buffer& buffer : {colours, prims, transforms}) {
             pass.ReadAddress(buffer);
         }
     }

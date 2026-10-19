@@ -45,6 +45,8 @@ struct CameraView {
     /// The camera prim's transform-graph node, whose world the pass reads on the device in place
     /// of `cameraToWorld`, so poses CUDA or kernels write move the view; or `kNone`.
     std::uint32_t node = shaders::kNone;
+    /// The batch world it sees: its prims and every world's shared ones.
+    std::uint32_t world = 0;
 };
 
 /// @brief What a camera pass writes; each left out is not written. The views' pixels are stacked
@@ -85,7 +87,8 @@ class CameraPass {
     static std::span<const ShaderModule> Modules();
 
     /// @brief Adds the pass tracing every view in one dispatch, after the ray tracer's builds.
-    /// @throws std::invalid_argument when the graph has no `TraceScene`.
+    /// @throws std::invalid_argument when the graph has no `TraceScene`, or a view's world is not
+    /// one of its worlds.
     void Add(graph::Graph& graph, std::span<const CameraView> views, CameraOutputs& outputs) const;
     void Add(graph::Graph& graph, const CameraView& view, CameraOutputs& outputs) const;
 

@@ -120,21 +120,26 @@ glm::dmat4 ShapeTransform(const Scene& scene, PrimId prim, GeometryKind kind) {
 }
 
 /// What a changed attribute does to a gprim: reshapes it, moves a mesh's points, remakes its
-/// topology, or recolours it.
+/// topology, recolours it, or moves it to another world.
 struct Touched {
     bool shape = false;
     bool points = false;
     bool topology = false;
     bool colour = false;
+    bool world = false;
 
     bool Any() const {
-        return shape || points || topology || colour;
+        return shape || points || topology || colour || world;
     }
 };
 
 Touched ClassifyAttribute(std::string_view attribute) {
     if (attribute == Gprim::kDisplayColor) {
         return {.colour = true};
+    }
+    // Inherited: an ancestor's change reaches the gprim as its resolved value's.
+    if (attribute == ResolvedName(Imageable::kWorld)) {
+        return {.world = true};
     }
     if (attribute == Mesh::kPoints) {
         return {.points = true};
@@ -302,12 +307,13 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
     }
     next.shape = ShapeTransform(scene_, prim, *kind);
     next.colour = DisplayColour(scene_, prim);
+    next.world = ReadWorld(scene_, prim);
     if (!draws(next.geometry)) {
         if (drew) {
             changes.removed.push_back(prim);
         }
     } else if (!drew || placed->geometry != next.geometry || placed->shape != next.shape ||
-               placed->colour != next.colour) {
+               placed->colour != next.colour || placed->world != next.world) {
         changes.placed.push_back(next);
     }
     placed = next;

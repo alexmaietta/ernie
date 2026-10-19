@@ -39,6 +39,8 @@ struct View {
     uint node;
     /// The pixels of the outputs before the view's own: views stack in shared outputs.
     uint first;
+    /// The batch world it sees: its prims and every world's shared ones.
+    uint world;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
     /// z, the instance row, the prim's slot, `kBands` albedo bands, and the colour image's RGBA8
     /// bytes; each null for no output.
@@ -121,7 +123,7 @@ void main(uint3 id : SV_DispatchThreadID, uniform CameraParameters parameters) {
         return;
     }
     RayDesc ray = PixelRay(view, ViewPose(view, parameters.worlds), pixel);
-    RayTracer tracer = RayTracer(parameters.tracer);
+    RayTracer tracer = RayTracer(parameters.tracer, view.world);
     Hit hit = tracer.TraceClosest(ray, 0xff);
     float3 normal = float3(0);
     Spectrum albedo = Spectrum(0);

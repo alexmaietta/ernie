@@ -147,6 +147,54 @@ TEST(Renderer, StepsProductsAlikeInOneBatchAndOthersApart) {
     test::ExpectClean(renderer->Context());
 }
 
+TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    // Three worlds at the same place, each with a ball nearer than the last, before a shared wall
+    // 10 m out; each world's camera is under the world's root, as its ball is.
+    Scene scene;
+    Cube::Define(scene, "/Wall").SetSize(1.0);
+    SetXform(scene, "/Wall",
+             {.translate = glm::dvec3(0.0, 10.5, 0.0), .scale = glm::dvec3(20.0, 1.0, 20.0)});
+    std::vector<Path> products;
+    for (int world = 0; world < 3; ++world) {
+        const std::string root = "/World" + std::to_string(world);
+        Xform::Define(scene, root).SetWorld(world);
+        Sphere::Define(scene, root + "/Ball");
+        SetXform(scene, root + "/Ball", {.translate = glm::dvec3(0.0, 4.0 - world, 0.0)});
+        DefineCamera(scene, root + "/Camera", {0.0, 0.0, 0.0});
+        products.emplace_back("/Render/View" + std::to_string(world));
+        DefineProduct(scene, products.back(), root + "/Camera", {9, 9},
+                      {std::string(render_vars::kDistanceToCamera)});
+    }
+    RenderSettings::Define(scene, "/Render/Settings").SetProducts(products);
+
+    const auto middles = [&] {
+        const RenderBatch& batch = renderer->Step(scene).front();
+        const Tensor depth = renderer->Read(*batch.Find(render_vars::kDistanceToCamera));
+        std::vector<float> seen;
+        for (std::int64_t view = 0; view < 3; ++view) {
+            seen.push_back(depth.As<float>()[view * 81 + 40]);
+        }
+        return seen;
+    };
+    const std::vector<float> seen = middles();
+    EXPECT_NEAR(seen[0], 3.0f, 1e-4f) << "world 0's ball, 4 m out";
+    EXPECT_NEAR(seen[1], 2.0f, 1e-4f) << "world 1's, 3 m out";
+    EXPECT_NEAR(seen[2], 1.0f, 1e-4f) << "world 2's, 2 m out";
+
+    // World 1 moves into world 2 by its root, so its view sees past where its ball was to the
+    // shared wall, and world 2's sees its own ball still.
+    Xform(scene, "/World1").SetWorld(2);
+    scene.Set("/World1/Camera", Imageable::kWorld, 1);
+    const std::vector<float> moved = middles();
+    EXPECT_NEAR(moved[1], 10.0f, 1e-4f) << "the shared wall";
+    EXPECT_NEAR(moved[2], 1.0f, 1e-4f) << "nearer than world 1's ball, now in world 2";
+    test::ExpectClean(renderer->Context());
+}
+
 TEST(Products, ConformTheFilmToTheImage) {
     Scene scene;
     DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0}, {0.02, 0.01});

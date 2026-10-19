@@ -107,7 +107,8 @@ void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& 
             batch.views.push_back({.cameraToWorld = scene.WorldTransform(spec->camera),
                                    .size = spec->size,
                                    .lens = spec->lens,
-                                   .node = spec->camera.slot});
+                                   .node = spec->camera.slot,
+                                   .world = spec->world});
         }
         if (i < batches.size()) {
             batch.columns = std::move(batches[i].columns);
@@ -181,6 +182,8 @@ std::span<const RenderBatch> Renderer::Step(Scene& scene) {
         device.sceneId = scene.Id();
     }
     device.Plan(scene, specs);
+    const auto highest = std::ranges::max(specs, {}, &ProductSpec::world).world;
+    device.deviceScene->Instances().ReserveWorlds(highest + 1);
     device.deviceScene->Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
     device.deviceScene->Execute([&](graph::Graph& graph) {
         for (const Batch& batch : device.batches) {

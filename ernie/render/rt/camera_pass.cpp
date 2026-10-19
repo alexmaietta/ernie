@@ -42,7 +42,8 @@ View ToView(const CameraView& view, const glm::dvec3& origin, std::uint32_t firs
             .size = view.size,
             .colour = shaders::kNoImage,
             .node = view.node,
-            .first = first};
+            .first = first,
+            .world = view.world};
 }
 
 }  // namespace
@@ -89,6 +90,10 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
     glm::uvec2 largest{0};
     std::uint64_t pixels = 0;
     for (const CameraView& view : views) {
+        if (view.world >= scene->worlds) {
+            throw std::invalid_argument("A view of world " + std::to_string(view.world) +
+                                        ", of a scene of " + std::to_string(scene->worlds));
+        }
         records.push_back(ToView(view, scene->origin, static_cast<std::uint32_t>(pixels)));
         largest = glm::max(largest, view.size);
         pixels += std::uint64_t{view.size.x} * view.size.y;
@@ -138,7 +143,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
             const CameraParameters parameters{
                 .tracer = scene.parameters,
                 .views = slice.BufferRef<View>(),
-                .worlds = pass.Get(scene.worlds).BufferRef<glm::vec4>(),
+                .worlds = pass.Get(scene.transforms).BufferRef<glm::vec4>(),
                 .colours = pass.Get(scene.colours).BufferRef<float>(),
                 .instancePrims = pass.Get(scene.prims).BufferRef<shaders::uint>(),
                 .count = static_cast<std::uint32_t>(records.size())};

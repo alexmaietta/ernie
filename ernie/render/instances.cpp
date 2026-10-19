@@ -24,6 +24,7 @@ InstanceTable::InstanceTable(DeviceContext& context, Arenas& arenas)
     geometries_ = column("instance geometries", DType::UInt32, {});
     shapes_ = column("instance shapes", DType::Float32, {3, 4});
     colours_ = column("instance colours", DType::Float32, {3});
+    sources_ = column("top-level sources", DType::UInt32, {});
 }
 
 std::optional<std::uint32_t> InstanceTable::Row(PrimId prim) const {
@@ -40,6 +41,8 @@ void InstanceTable::Set(std::uint32_t row, const PrimGeometry& placed) {
     hostGeometries_[row] = placed.geometry;
     hostShapes_[row] = ToAffineRows(placed.shape);
     hostColours_[row] = placed.colour;
+    relayout_ = relayout_ || hostWorlds_[row] != placed.world;
+    hostWorlds_[row] = placed.world;
     rows_[placed.prim.slot] = row;
     dirty_.push_back(row);
 }
@@ -58,6 +61,34 @@ void InstanceTable::Remove(PrimId prim) {
     }
     rows_[prim.slot] = kNoRow;
     ForEachHostColumn([](auto& column) { column.pop_back(); });
+    relayout_ = true;
+}
+
+void InstanceTable::LayOutWorlds() {
+    std::int32_t highest = 0;
+    std::vector<std::uint32_t> shared;
+    for (std::uint32_t row = 0; row < hostWorlds_.size(); ++row) {
+        highest = std::max(highest, hostWorlds_[row]);
+        if (hostWorlds_[row] < 0) {
+            shared.push_back(row);
+        }
+    }
+    const std::size_t count =
+        std::max<std::size_t>(static_cast<std::size_t>(highest) + 1, reserved_);
+    std::vector<std::vector<std::uint32_t>> own(count);
+    for (std::uint32_t row = 0; row < hostWorlds_.size(); ++row) {
+        if (hostWorlds_[row] >= 0) {
+            own[static_cast<std::size_t>(hostWorlds_[row])].push_back(row);
+        }
+    }
+    worlds_.assign(count, {});
+    hostSources_.clear();
+    for (std::size_t world = 0; world < count; ++world) {
+        worlds_[world] = {.first = static_cast<std::uint32_t>(hostSources_.size()),
+                          .count = static_cast<std::uint32_t>(shared.size() + own[world].size())};
+        hostSources_.insert(hostSources_.end(), shared.begin(), shared.end());
+        hostSources_.insert(hostSources_.end(), own[world].begin(), own[world].end());
+    }
 }
 
 void InstanceTable::Apply(const GeometryPool::Changes& changes) {
@@ -75,6 +106,7 @@ void InstanceTable::Apply(const GeometryPool::Changes& changes) {
             continue;
         }
         ForEachHostColumn([](auto& column) { column.emplace_back(); });
+        relayout_ = true;
         Set(static_cast<std::uint32_t>(prims_.size() - 1), placed);
     }
 }
@@ -89,8 +121,15 @@ void InstanceTable::AddUploads(graph::Graph& graph) {
     StageRows(uploader_, *shapes_, hostShapes_, dirty_);
     StageRows(uploader_, *colours_, hostColours_, dirty_);
     dirty_.clear();
+    if (relayout_) {
+        LayOutWorlds();
+        sources_->Resize(hostSources_.size(), context_.Main());
+        uploader_.Write(sources_->Storage(), sources_->Range().offset,
+                        std::span<const std::uint32_t>(hostSources_));
+        relayout_ = false;
+    }
     std::array columns{graph.Import(*nodes_), graph.Import(*geometries_), graph.Import(*shapes_),
-                       graph.Import(*colours_)};
+                       graph.Import(*colours_), graph.Import(*sources_)};
     graph::AddUploadPass(graph, "Upload instances", uploader_, columns);
 }
 

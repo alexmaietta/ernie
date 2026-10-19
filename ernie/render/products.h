@@ -19,6 +19,8 @@ struct ProductSpec {
     /// The RenderProduct prim, or the settings' own path for their default product.
     Path product;
     PrimId camera;
+    /// The batch world its camera is in; a camera in every world sees the first.
+    std::uint32_t world = 0;
     glm::uvec2 size{1};
     Lens lens;
     /// Its vars' source names, in order.
