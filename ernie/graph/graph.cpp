@@ -610,6 +610,14 @@ std::vector<std::string> Graph::ExecutedPasses() const {
     return names;
 }
 
+std::vector<std::string> Graph::PassNames() const {
+    std::vector<std::string> names;
+    for (const Pass& pass : passes_) {
+        names.push_back(pass.name);
+    }
+    return names;
+}
+
 std::string Graph::Dot() const {
     std::vector<bool> live(passes_.size(), !compiled_);
     for (const std::uint32_t p : live_) {

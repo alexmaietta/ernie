@@ -564,7 +564,7 @@ struct TransformGraph::GraphColumns {
     }
 };
 
-void TransformGraph::AddUpdate(graph::Graph& graph) {
+void TransformGraph::AddUpdate(graph::Graph& graph, bool compose) {
     ERNIE_ZONE("Update transforms");
     Prepare();
     if (nodes_.empty()) {
@@ -573,8 +573,10 @@ void TransformGraph::AddUpdate(graph::Graph& graph) {
     GraphColumns columns = ImportColumns(graph);
     const graph::Graph::ScopeGuard scope = graph.Scope("Transforms");
     graph::AddUploadPass(graph, "Upload transforms", uploader_, columns.uploaded);
-    AddLocalPass(graph, columns);
-    AddLevelPasses(graph, columns);
+    if (compose) {
+        AddLocalPass(graph, columns);
+        AddLevelPasses(graph, columns);
+    }
 }
 
 TransformGraph::GraphColumns TransformGraph::ImportColumns(graph::Graph& graph) const {

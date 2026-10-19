@@ -36,9 +36,12 @@ class TopLevels {
 
     /// @brief Adds the passes that write the records and build every world's top level, after the
     /// transforms, the instance uploads and the bottom levels' builds.
+    /// @param rebuild Whether to build; without, the last frame's top levels stand, for frames
+    /// where nothing can have moved an instance.
     /// @return The top levels' pool, for passes to read with `Use::Trace`.
     graph::Acceleration AddBuild(graph::Graph& graph, const TransformGraph& transforms,
-                                 const InstanceTable& instances, const BottomLevels& bottoms);
+                                 const InstanceTable& instances, const BottomLevels& bottoms,
+                                 bool rebuild = true);
 
     /// @return Each world's `TopLevel`, its address and records, which kernels select by view.
     const DeviceColumn& Tops() const {

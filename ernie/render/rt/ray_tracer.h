@@ -76,8 +76,10 @@ class RayTracer {
     /// @brief Adds the passes that bring the structures up to date with the frame's geometry
     /// changes, after the transforms and the geometry's and instances' uploads, and puts a
     /// `TraceScene` on the graph's blackboard.
+    /// @param rebuildTops Whether to build the top levels, as `TopLevels::AddBuild` takes it.
     void AddBuild(graph::Graph& graph, const GeometryPool::Changes& changes,
-                  const TransformGraph& transforms, const InstanceTable& instances);
+                  const TransformGraph& transforms, const InstanceTable& instances,
+                  bool rebuildTops = true);
 
     BottomLevels& Bottoms() {
         return bottoms_;

@@ -125,6 +125,54 @@ TEST(DeviceScene, FollowsTheDeviceAndTheHostFrameByFrame) {
     ExpectClean(*context);
 }
 
+TEST(DeviceScene, RemakesWorldsAndTopLevelsOnlyWhenSomethingCanMove) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    Scene scene;
+    const PrimId env = scene.Define("/Env", "Xform");
+    SetXform(scene, "/Env", {.translate = glm::dvec3(1, 0, 0)});
+    Sphere::Define(scene, "/Env/Ball");
+    scene.Update();
+    Arenas arenas(*context, MemoryUse::Device, "frame", 1 << 20);
+    DeviceScene frame(*context, arenas, scene, compiler);
+    const auto run = [&] {
+        std::vector<std::string> names;
+        frame.Execute([&](graph::Graph& graph) { names = graph.PassNames(); }).Wait();
+        return names;
+    };
+    // Whether a frame composed the worlds and, with a ray tracer, built the top levels.
+    const auto remade = [&](const std::vector<std::string>& names) {
+        const auto has = [&](std::string_view name) {
+            return std::ranges::find(names, name) != names.end();
+        };
+        return has("World transforms") &&
+               (frame.Tracer() == nullptr || has("Build the top levels"));
+    };
+    const auto skipped = [&](const std::vector<std::string>& names) {
+        return std::ranges::find(names, "World transforms") == names.end() &&
+               std::ranges::find(names, "Build the top levels") == names.end();
+    };
+    EXPECT_TRUE(remade(run())) << "the first frame";
+    // Compacting the bottom levels moves them, so top levels build until they settle.
+    for (int frames = 0; frame.Tracer() != nullptr && !frame.Tracer()->Bottoms().Idle(); ++frames) {
+        ASSERT_LT(frames, 4) << "the bottom levels settle";
+        EXPECT_TRUE(remade(run())) << "while the bottom levels compact";
+    }
+    EXPECT_TRUE(skipped(run())) << "nothing changed";
+    SetXform(scene, "/Env", {.translate = glm::dvec3(2, 0, 0)});
+    scene.Update();
+    EXPECT_TRUE(remade(run())) << "a host edit";
+    EXPECT_TRUE(skipped(run())) << "still again";
+
+    // Bound columns move worlds on the device unseen, so every frame remakes them.
+    const BucketId bucket = scene.Store().PrimBucket(env);
+    frame.Transforms().Bind(bucket, "xformOp:translate",
+                            frame.Columns().Bind(bucket, "xformOp:translate"));
+    EXPECT_TRUE(remade(run()));
+    EXPECT_TRUE(remade(run())) << "bound: every frame";
+    ExpectClean(*context);
+}
+
 /// Expects each world's records to hold the shared rows, then its own, then none, in any order
 /// within the shared rows and within its own.
 void ExpectSources(DeviceContext& context, DeviceScene& frame, const Scene& scene,

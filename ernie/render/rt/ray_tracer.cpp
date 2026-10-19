@@ -24,12 +24,14 @@ std::span<const ShaderModule> RayTracer::Modules() {
 }
 
 void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& changes,
-                         const TransformGraph& transforms, const InstanceTable& instances) {
+                         const TransformGraph& transforms, const InstanceTable& instances,
+                         bool rebuildTops) {
     ERNIE_ZONE("Update the ray tracer");
     const graph::Graph::ScopeGuard scope = graph.Scope("Ray tracer");
     bottoms_.Apply(changes);
     bottoms_.AddBuilds(graph);
-    const graph::Acceleration top = tops_.AddBuild(graph, transforms, instances, bottoms_);
+    const graph::Acceleration top =
+        tops_.AddBuild(graph, transforms, instances, bottoms_, rebuildTops);
     const DeviceColumn& records = geometry_.Records();
     graph.Board().Put(
         TraceScene{.parameters = {.tops = ToBufferRef<shaders::TopLevel>(tops_.Tops()),

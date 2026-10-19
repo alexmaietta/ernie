@@ -43,14 +43,17 @@ TopLevels::TopLevels(DeviceContext& context, Arenas& arenas, const ShaderCompile
           std::vector<std::int64_t>{sizeof(shaders::TopLevel) / sizeof(std::uint32_t)}, 0)) {}
 
 graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGraph& transforms,
-                                        const InstanceTable& instances,
-                                        const BottomLevels& bottoms) {
+                                        const InstanceTable& instances, const BottomLevels& bottoms,
+                                        bool rebuild) {
     ERNIE_ZONE("Prepare the top levels");
     const std::span<const InstanceTable::WorldRecords> worlds = instances.Worlds();
     EnsureCapacity(worlds, instances.Capacities().instancesPerWorld);
     if (uploader_.Staged()) {
         std::array buffers{graph.Import(*tops_)};
         graph::AddUploadPass(graph, "Upload top levels", uploader_, buffers);
+    }
+    if (!rebuild) {
+        return graph.Import(pool_);
     }
     graph::Buffer records =
         graph.Create(std::max<std::uint64_t>(instances.Records(), 1) * sizeof(AccelerationInstance),

@@ -271,6 +271,8 @@ class Graph {
     }
     /// @return The names of the passes `Compile` kept, in order.
     std::vector<std::string> ExecutedPasses() const;
+    /// @return The names of every pass added so far, in order.
+    std::vector<std::string> PassNames() const;
     /// @return The graph in Graphviz's dot language.
     std::string Dot() const;
 

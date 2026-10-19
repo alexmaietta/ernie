@@ -22,6 +22,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -121,6 +122,13 @@ class DeviceScene {
     std::unique_ptr<RayTracer> tracer_;
     std::vector<Captured> captured_;
     bool replayed_ = false;
+    /// The scene's version and the origin the worlds and top levels were last made at.
+    struct MovedKey {
+        std::uint64_t version = 0;
+        glm::dvec3 origin{0.0};
+        bool operator==(const MovedKey&) const = default;
+    };
+    std::optional<MovedKey> moved_;
 };
 
 }  // namespace ernie

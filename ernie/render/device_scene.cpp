@@ -72,14 +72,20 @@ bool DeviceScene::Settled() const {
 }
 
 void DeviceScene::AddFrame(graph::Graph& graph, const std::function<void(graph::Graph&)>& passes) {
+    // Instances move only with the host's edits, a rebase, bottom levels still building, or
+    // bound columns written on the device unseen; otherwise the last frame's worlds and top
+    // levels stand.
+    const MovedKey now{scene_.Store().Version(), transforms_.Origin()};
+    const bool moved = !moved_ || *moved_ != now || !Settled() || transforms_.Bound();
+    moved_ = now;
     columns_.AddSync(graph);
-    transforms_.AddUpdate(graph);
+    transforms_.AddUpdate(graph, moved);
     const GeometryPool::Changes changes = geometry_.Update();
     instances_.Apply(changes);
     geometry_.AddUploads(graph);
     instances_.AddUploads(graph);
     if (tracer_) {
-        tracer_->AddBuild(graph, changes, transforms_, instances_);
+        tracer_->AddBuild(graph, changes, transforms_, instances_, moved);
     }
     if (passes) {
         passes(graph);

@@ -82,8 +82,14 @@ class TransformGraph {
     /// uploads, the programs and one pass a level. Bound columns are imported and read after the
     /// passes that write them; later passes import `Worlds` to read it. The graph executes before
     /// the next update.
+    /// @param compose Whether to compose the worlds; without, only the host's changes upload, for
+    /// frames where nothing can have moved them.
     /// @throws std::invalid_argument as `Update`.
-    void AddUpdate(graph::Graph& graph);
+    void AddUpdate(graph::Graph& graph, bool compose = true);
+    /// @return Whether columns are bound, which move worlds on the device unseen by the host.
+    bool Bound() const {
+        return !bindings_.empty();
+    }
 
     /// @brief Moves the render origin the worlds are relative to. Only roots change: a rebase
     /// costs their uploads and the next update's composition, never a bottom level's rebuild.
