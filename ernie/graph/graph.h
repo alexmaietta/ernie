@@ -31,10 +31,13 @@
 
 #include "ernie/device/acceleration.h"
 #include "ernie/device/column.h"
+#include "ernie/device/commands.h"
 #include "ernie/device/image.h"
 #include "ernie/graph/blackboard.h"
 #include "ernie/graph/dependencies.h"
 #include "ernie/graph/pool.h"
+
+#include <glm/vec4.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -141,7 +144,7 @@ class PassBuilder {
 /// @brief What a pass's run callback records with.
 class PassContext {
   public:
-    VkCommandBuffer commands = VK_NULL_HANDLE;
+    CommandList commands{VK_NULL_HANDLE};
 
     /// @throws std::logic_error unless the pass declared it, or for a pool's structure.
     DeviceImage& Get(Image image) const;
@@ -149,6 +152,8 @@ class PassContext {
     const AccelerationStructure& Get(Acceleration structure) const;
     /// @return The image's layout during the pass, for attachments.
     VkImageLayout Layout(Image image) const;
+    /// @brief Clears a colour image the pass writes as `Use::CopyDst`.
+    void Clear(Image image, const glm::vec4& colour) const;
     DeviceContext& Context() const;
     /// @brief Keeps an object, such as the staging a copy reads, until the graph's work is done.
     void Keep(std::shared_ptr<const void> object) const;

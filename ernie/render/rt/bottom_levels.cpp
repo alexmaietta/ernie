@@ -241,11 +241,6 @@ void BottomLevels::AddBuildPass(graph::Graph& graph, FrameBuilds frame, Moves mo
                 RecordBuilds(pass.commands, frame.builds, {}, {space.buffer, space.offset});
             }
             if (query != nullptr) {
-                // Sizes are written once the builds are done.
-                Barrier(pass.commands, VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                        VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-                        VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                        VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 query->Record(pass.commands, queried);
             }
         });

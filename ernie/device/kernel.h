@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ernie/device/bindless.h"
+#include "ernie/device/commands.h"
 #include "ernie/device/context.h"
 
 #include <glm/vec3.hpp>
@@ -34,10 +35,10 @@ class ComputeKernel {
     ComputeKernel& operator=(const ComputeKernel&) = delete;
 
     /// @brief Records a dispatch of `groups` workgroups, passing `parameters`.
-    void Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
+    void Dispatch(CommandList commands, glm::uvec3 groups,
                   std::span<const std::byte> parameters = {}) const;
     template <typename T>
-    void Dispatch(VkCommandBuffer commands, glm::uvec3 groups, const T& parameters) const {
+    void Dispatch(CommandList commands, glm::uvec3 groups, const T& parameters) const {
         Dispatch(commands, groups, std::as_bytes(std::span(&parameters, 1)));
     }
 
@@ -56,6 +57,6 @@ class ComputeKernel {
 
 /// @brief Records a barrier ordering earlier dispatches' writes before later dispatches' reads
 /// and writes. The frame graph places these between passes; this is for work recorded by hand.
-void ComputeBarrier(VkCommandBuffer commands);
+void ComputeBarrier(CommandList commands);
 
 }  // namespace ernie

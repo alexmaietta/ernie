@@ -29,8 +29,8 @@ namespace ernie {
 
 /// @brief The scene's transform hierarchy on the device. A prim's node is its id's slot, so the
 /// stable id finds its transform with no table: `Worlds` holds a 3x4 row-major matrix a slot
-/// (VkTransformMatrixKHR's layout) relative to the render origin. Each node keeps its parent's
-/// slot, none at a root or under `!resetXformStack!`.
+/// (as acceleration structures' instances lay transforms out) relative to the render origin. Each
+/// node keeps its parent's slot, none at a root or under `!resetXformStack!`.
 ///
 /// Worlds are exact to about 48 bits from the Sun to a wheel nut, with no 64-bit floats on the
 /// device: roots subtract the origin on the host in double, so values near the views stay small,
@@ -114,7 +114,7 @@ class TransformGraph {
         AttributeId attribute = 0;
         const DeviceColumn* column = nullptr;
         /// The column's address its programs point into; a column that moves rewrites them.
-        VkDeviceAddress address = 0;
+        std::uint64_t address = 0;
     };
     struct NodeState {
         PrimId prim;
@@ -194,8 +194,8 @@ class TransformGraph {
     void UploadDirty();
     /// Follows the scene's changes on the host and stages their uploads.
     void Prepare();
-    void DispatchLocals(VkCommandBuffer commands) const;
-    void DispatchLevel(VkCommandBuffer commands, const SlotList& level) const;
+    void DispatchLocals(CommandList commands) const;
+    void DispatchLevel(CommandList commands, const SlotList& level) const;
     /// The graph's handles of what an update reads and writes.
     struct GraphColumns;
     GraphColumns ImportColumns(graph::Graph& graph) const;

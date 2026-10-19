@@ -6,6 +6,7 @@ add_library(
     arena.cpp
     bindless.cpp
     buffer.cpp
+    commands.cpp
     column.cpp
     context.cpp
     profile.cpp

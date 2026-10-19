@@ -13,6 +13,7 @@
 ///   https://github.com/wolfpld/tracy
 #pragma once
 
+#include "ernie/device/commands.h"
 #include "ernie/device/vulkan.h"
 #include "ernie/util/profiler.h"
 
@@ -67,7 +68,7 @@ class GpuProfiler {
 /// @brief A debug label and timestamps around the rest of the scope's commands.
 class GpuZone {
   public:
-    GpuZone(const DeviceContext& context, VkCommandBuffer commands, const char* name);
+    GpuZone(const DeviceContext& context, CommandList commands, const char* name);
     ~GpuZone();
     GpuZone(const GpuZone&) = delete;
     GpuZone& operator=(const GpuZone&) = delete;

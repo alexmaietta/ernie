@@ -95,8 +95,8 @@ class SceneColumns {
     static std::uint32_t Origin(const Origins& origins, std::uint32_t row);
     /// @return The device copies that move the kept rows to their new places, moving the shadow
     /// alike; rows new from the host are added to `hostRows`.
-    std::vector<VkBufferCopy> MoveRows(Binding& binding, const Origins& origins, std::uint32_t rows,
-                                       std::vector<std::uint32_t>& hostRows);
+    std::vector<CopyRegion> MoveRows(Binding& binding, const Origins& origins, std::uint32_t rows,
+                                     std::vector<std::uint32_t>& hostRows);
     /// Adds the rows whose host values were authored anew to `hostRows`, taking their values
     /// into the shadow.
     void FindAuthoredRows(const ChangeSet& changes, Binding& binding, const Origins& origins,
@@ -108,8 +108,7 @@ class SceneColumns {
     /// @return What the moves and uploads wait on.
     std::vector<Ticket> Prepare(std::span<const Ticket> waits);
     /// Records the planned moves, then the staged uploads.
-    void Record(VkCommandBuffer commands,
-                const std::function<void(std::shared_ptr<const void>)>& keep);
+    void Record(CommandList commands, const std::function<void(std::shared_ptr<const void>)>& keep);
     const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
 
     DeviceContext& context_;
@@ -120,7 +119,7 @@ class SceneColumns {
     /// Authored ranges' device bytes, compared with the shadow.
     std::vector<std::byte> scratch_;
     /// Each column's row copies, from the rows before the sync to the rows after it.
-    std::vector<std::pair<const DeviceColumn*, std::vector<VkBufferCopy>>> moves_;
+    std::vector<std::pair<const DeviceColumn*, std::vector<CopyRegion>>> moves_;
 };
 
 }  // namespace ernie

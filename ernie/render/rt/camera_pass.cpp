@@ -3,7 +3,6 @@
 /// @brief Tracing pinhole cameras as a frame-graph pass.
 #include "ernie/render/rt/camera_pass.h"
 
-#include "ernie/device/vulkan.h"
 #include "ernie/render/rt/ray_tracer.h"
 #include "ernie/shaders/device/bindless.h"
 #include "ernie/shaders/sensors/camera.h"
@@ -22,9 +21,6 @@ namespace {
 
 using shaders::CameraParameters;
 using shaders::View;
-
-/// The most `vkCmdUpdateBuffer` writes at once.
-constexpr std::size_t kUpdateBytes = 65536;
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
@@ -120,14 +116,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
             // The records hold the outputs' addresses, known only now, so the pass writes them
             // itself before it reads them.
             const graph::BufferSlice slice = pass.Get(staged);
-            const auto* bytes = reinterpret_cast<const std::byte*>(records.data());
-            const std::size_t size = records.size() * sizeof(View);
-            for (std::size_t at = 0; at < size; at += kUpdateBytes) {
-                vkCmdUpdateBuffer(pass.commands, slice.buffer->Handle(), slice.offset + at,
-                                  std::min(kUpdateBytes, size - at), bytes + at);
-            }
-            Barrier(pass.commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+            pass.commands.Update(*slice.buffer, slice.offset, std::as_bytes(std::span(records)));
             parameters.views = slice.BufferRef<View>();
             parameters.count = static_cast<std::uint32_t>(records.size());
             kernel_.Dispatch(

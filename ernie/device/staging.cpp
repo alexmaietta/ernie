@@ -91,10 +91,11 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
     return ticket;
 }
 
-std::vector<std::shared_ptr<const Buffer>> Uploader::Record(VkCommandBuffer commands) {
+std::vector<std::shared_ptr<const Buffer>> Uploader::Record(CommandList list) {
     if (copies_.empty()) {
         return {};
     }
+    const VkCommandBuffer commands = list.Handle();
     ERNIE_PLOT("Uploaded bytes", pending_);
     FlushStaging();
     BeforeCopies(commands);

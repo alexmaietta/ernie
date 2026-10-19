@@ -276,8 +276,9 @@ void GpuProfiler::End(VkCommandBuffer commands, std::uint32_t zone) {
     timer_->End(commands, zone);
 }
 
-GpuZone::GpuZone(const DeviceContext& context, VkCommandBuffer commands, const char* name)
-    : context_(context), commands_(commands) {
+GpuZone::GpuZone(const DeviceContext& context, CommandList list, const char* name)
+    : context_(context), commands_(list.Handle()) {
+    const VkCommandBuffer commands = commands_;
     context.BeginLabel(commands, name);
     GpuProfiler* profiler = context.Profiler();
     if (profiler == nullptr) {

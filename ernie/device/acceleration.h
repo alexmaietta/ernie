@@ -20,6 +20,7 @@
 #pragma once
 
 #include "ernie/device/arena.h"
+#include "ernie/device/commands.h"
 
 #include <cstdint>
 #include <optional>
@@ -216,7 +217,7 @@ std::uint64_t ScratchBytes(std::span<const BottomBuild> bottoms, std::span<const
 /// @param scratch At least `ScratchBytes`, used only by these builds until they finish.
 /// @throws std::invalid_argument for a build larger than its target was sized for, an update of
 /// a structure not built updatable, or a target of the wrong kind.
-void RecordBuilds(VkCommandBuffer commands, std::span<const BottomBuild> bottoms,
+void RecordBuilds(CommandList commands, std::span<const BottomBuild> bottoms,
                   std::span<const TopBuild> tops, BufferView scratch);
 
 /// @brief The sizes structures compact to, written after their builds and read back without
@@ -230,7 +231,7 @@ class CompactionQuery {
 
     /// @brief Records writing the compacted sizes of `built`, after a barrier from their builds.
     /// @throws std::invalid_argument for more than the capacity, or a structure not compactable.
-    void Record(VkCommandBuffer commands, std::span<const AccelerationStructure* const> built);
+    void Record(CommandList commands, std::span<const AccelerationStructure* const> built);
     /// @return The sizes in `Record`'s order once the device has written them; none before.
     std::optional<std::vector<std::uint64_t>> Sizes() const;
 
@@ -242,7 +243,7 @@ class CompactionQuery {
 };
 
 /// @brief Records copying `source` into `compacted`, sized from a `CompactionQuery`.
-void RecordCompaction(VkCommandBuffer commands, const AccelerationStructure& source,
+void RecordCompaction(CommandList commands, const AccelerationStructure& source,
                       const AccelerationStructure& compacted);
 
 }  // namespace ernie

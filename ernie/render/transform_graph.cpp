@@ -509,7 +509,7 @@ void TransformGraph::UploadDirty() {
     }
 }
 
-void TransformGraph::DispatchLocals(VkCommandBuffer commands) const {
+void TransformGraph::DispatchLocals(CommandList commands) const {
     local_.Dispatch(commands, Groups(programmed_.slots.size()),
                     LocalParameters{ToBufferRef<shaders::uint>(*programmed_.device),
                                     ToBufferRef<DeviceOp>(*programColumn_),
@@ -518,7 +518,7 @@ void TransformGraph::DispatchLocals(VkCommandBuffer commands) const {
                                     static_cast<std::uint32_t>(programmed_.slots.size())});
 }
 
-void TransformGraph::DispatchLevel(VkCommandBuffer commands, const SlotList& level) const {
+void TransformGraph::DispatchLevel(CommandList commands, const SlotList& level) const {
     compose_.Dispatch(commands, Groups(level.slots.size()),
                       ComposeParameters{ToBufferRef<shaders::uint>(*level.device),
                                         ToBufferRef<shaders::uint>(*parentColumn_),
@@ -533,7 +533,7 @@ Ticket TransformGraph::Update(std::span<const Ticket> waits) {
     std::vector<Ticket> after(waits.begin(), waits.end());
     after.push_back(uploader_.Flush(waits));
     return context_.Main().Submit(
-        [&](VkCommandBuffer commands) {
+        [&](CommandList commands) {
             ERNIE_GPU_ZONE(context_, commands, "Transforms");
             // After earlier readers of the worlds and writers of the bound columns.
             ComputeBarrier(commands);
@@ -650,7 +650,7 @@ void TransformGraph::Prepare() {
             throw std::logic_error("Sync " + binding.column->Name() +
                                    " with its bucket before updating transforms");
         }
-        if (const VkDeviceAddress address = binding.column->Address(); address != binding.address) {
+        if (const std::uint64_t address = binding.column->Address(); address != binding.address) {
             binding.address = address;
             moved.push_back(binding.bucket);
         }

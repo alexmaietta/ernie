@@ -232,12 +232,7 @@ graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
         "Viewport", graph::Kind::Copy,
         [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
         [this, viewport](graph::PassContext& pass) {
-            const glm::vec4 colour = shell_->GetTheme().viewport;
-            const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
-            const VkImageSubresourceRange all{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
-            vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(), pass.Layout(viewport),
-                                 &clear, 1, &all);
+            pass.Clear(viewport, shell_->GetTheme().viewport);
         });
     return viewport;
 }
@@ -254,7 +249,8 @@ void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget&
         [&](graph::PassContext& pass) {
             ERNIE_ZONE("Record the UI");
             // Panels and the viewport's image cover every pixel.
-            renderer_->Record(pass.commands, data, target, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            renderer_->Record(pass.commands.Handle(), data, target,
+                              glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         });
 }
 

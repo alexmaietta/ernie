@@ -297,11 +297,12 @@ std::uint64_t ScratchBytes(std::span<const BottomBuild> bottoms, std::span<const
     return bytes;
 }
 
-void RecordBuilds(VkCommandBuffer commands, std::span<const BottomBuild> bottoms,
+void RecordBuilds(CommandList list, std::span<const BottomBuild> bottoms,
                   std::span<const TopBuild> tops, BufferView scratch) {
     if (bottoms.empty() && tops.empty()) {
         return;
     }
+    const VkCommandBuffer commands = list.Handle();
     const AccelerationPool& pool = BuildPool(bottoms, tops);
     const std::uint64_t alignment = pool.ScratchAlignment();
     VkDeviceAddress next = AlignUp(DeviceAddress(scratch), alignment);
@@ -365,8 +366,9 @@ CompactionQuery::~CompactionQuery() {
     vkDestroyQueryPool(device_, pool_, nullptr);
 }
 
-void CompactionQuery::Record(VkCommandBuffer commands,
+void CompactionQuery::Record(CommandList list,
                              std::span<const AccelerationStructure* const> built) {
+    const VkCommandBuffer commands = list.Handle();
     if (built.size() > capacity_) {
         throw std::invalid_argument("A compaction query holds " + std::to_string(capacity_) +
                                     " sizes, not " + std::to_string(built.size()));
@@ -379,6 +381,11 @@ void CompactionQuery::Record(VkCommandBuffer commands,
         handles.push_back(structure->Handle());
     }
     count_ = static_cast<std::uint32_t>(handles.size());
+    // Sizes are written once the builds before are done.
+    Barrier(commands, VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
     vkCmdResetQueryPool(commands, pool_, 0, capacity_);
     if (count_ > 0) {
         vkCmdWriteAccelerationStructuresPropertiesKHR(
@@ -410,14 +417,14 @@ std::optional<std::vector<std::uint64_t>> CompactionQuery::Sizes() const {
     return sizes;
 }
 
-void RecordCompaction(VkCommandBuffer commands, const AccelerationStructure& source,
+void RecordCompaction(CommandList commands, const AccelerationStructure& source,
                       const AccelerationStructure& compacted) {
     const VkCopyAccelerationStructureInfoKHR copy{
         .sType = VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR,
         .src = source.Handle(),
         .dst = compacted.Handle(),
         .mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR};
-    vkCmdCopyAccelerationStructureKHR(commands, &copy);
+    vkCmdCopyAccelerationStructureKHR(commands.Handle(), &copy);
 }
 
 }  // namespace ernie

@@ -61,8 +61,9 @@ ComputeKernel::~ComputeKernel() {
     vkDestroyPipelineLayout(device_, layout_, nullptr);
 }
 
-void ComputeKernel::Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
+void ComputeKernel::Dispatch(CommandList list, glm::uvec3 groups,
                              std::span<const std::byte> parameters) const {
+    const VkCommandBuffer commands = list.Handle();
     if (parameters.size() != parameterBytes_) {
         throw std::invalid_argument(name_ + " takes " + std::to_string(parameterBytes_) +
                                     " bytes per dispatch, not " +
@@ -80,8 +81,8 @@ void ComputeKernel::Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
     vkCmdDispatch(commands, groups.x, groups.y, groups.z);
 }
 
-void ComputeBarrier(VkCommandBuffer commands) {
-    Barrier(commands, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
+void ComputeBarrier(CommandList commands) {
+    Barrier(commands.Handle(), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 }

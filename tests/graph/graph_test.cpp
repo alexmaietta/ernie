@@ -125,13 +125,7 @@ TEST_F(FrameGraph, ClearsAndCopiesImagesInTheirLayouts) {
     const Buffer out = graph.Import(texels, "texels");
     graph.Add(
         "Clear", Kind::Copy, [&](PassBuilder& pass) { image = pass.Write(image, Use::CopyDst); },
-        [image](PassContext& pass) {
-            const VkClearColorValue color{.float32 = {0.25f, 0.5f, 0.75f, 1.0f}};
-            const VkImageSubresourceRange all{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
-            vkCmdClearColorImage(pass.commands, pass.Get(image).Handle(), pass.Layout(image),
-                                 &color, 1, &all);
-        });
+        [image](PassContext& pass) { pass.Clear(image, {0.25f, 0.5f, 0.75f, 1.0f}); });
     Buffer copied = out;
     graph.Add(
         "Copy", Kind::Copy,
@@ -145,8 +139,8 @@ TEST_F(FrameGraph, ClearsAndCopiesImagesInTheirLayouts) {
                 .bufferOffset = slice.offset,
                 .imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
                 .imageExtent = {8, 8, 1}};
-            vkCmdCopyImageToBuffer(pass.commands, pass.Get(image).Handle(), pass.Layout(image),
-                                   slice.buffer->Handle(), 1, &region);
+            vkCmdCopyImageToBuffer(pass.commands.Handle(), pass.Get(image).Handle(),
+                                   pass.Layout(image), slice.buffer->Handle(), 1, &region);
         });
     const Ticket done = graph.Execute(context_->Main());
     Readback readback(*context_, context_->Main(), texels.Storage(), texels.Range().offset,
@@ -168,13 +162,7 @@ TEST_F(FrameGraph, PoolsTransientImagesAcrossGraphs) {
         graph.Add(
             "Clear", Kind::Copy,
             [&](PassBuilder& pass) { image = pass.Write(image, Use::CopyDst); },
-            [image](PassContext& pass) {
-                const VkClearColorValue color{};
-                const VkImageSubresourceRange all{
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
-                vkCmdClearColorImage(pass.commands, pass.Get(image).Handle(), pass.Layout(image),
-                                     &color, 1, &all);
-            });
+            [image](PassContext& pass) { pass.Clear(image, glm::vec4(0.0f)); });
         graph.Add(
             "Copy", Kind::Copy,
             [&](PassBuilder& pass) {
@@ -187,8 +175,8 @@ TEST_F(FrameGraph, PoolsTransientImagesAcrossGraphs) {
                     .bufferOffset = slice.offset,
                     .imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
                     .imageExtent = {8, 8, 1}};
-                vkCmdCopyImageToBuffer(pass.commands, pass.Get(image).Handle(), pass.Layout(image),
-                                       slice.buffer->Handle(), 1, &region);
+                vkCmdCopyImageToBuffer(pass.commands.Handle(), pass.Get(image).Handle(),
+                                       pass.Layout(image), slice.buffer->Handle(), 1, &region);
             });
         graph.Execute(context_->Main());
     }

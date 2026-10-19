@@ -196,6 +196,13 @@ VkImageLayout PassContext::Layout(Image image) const {
     return ToState(pass.kind, access->use, true).layout;
 }
 
+void PassContext::Clear(Image image, const glm::vec4& colour) const {
+    const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
+    const VkImageSubresourceRange all{
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
+    vkCmdClearColorImage(commands.Handle(), Get(image).Handle(), Layout(image), &clear, 1, &all);
+}
+
 DeviceContext& PassContext::Context() const {
     return graph_.context_;
 }

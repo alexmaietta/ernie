@@ -201,11 +201,11 @@ std::uint32_t SceneColumns::Origin(const Origins& origins, std::uint32_t row) {
     return found == origins.end() ? row : found->second;
 }
 
-std::vector<VkBufferCopy> SceneColumns::MoveRows(Binding& binding, const Origins& origins,
-                                                 std::uint32_t rows,
-                                                 std::vector<std::uint32_t>& hostRows) {
+std::vector<CopyRegion> SceneColumns::MoveRows(Binding& binding, const Origins& origins,
+                                               std::uint32_t rows,
+                                               std::vector<std::uint32_t>& hostRows) {
     const std::uint64_t rowBytes = binding.column->RowBytes();
-    std::vector<VkBufferCopy> copies;
+    std::vector<CopyRegion> copies;
     binding.shadow.resize(std::max<std::uint64_t>(binding.shadow.size(), rows * rowBytes));
     for (const auto& [row, source] : origins) {
         if (row >= rows) {
@@ -264,7 +264,7 @@ Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
     }
     std::vector<std::shared_ptr<const void>> kept;
     const Ticket synced = context_.Main().Submit(
-        [&](VkCommandBuffer commands) {
+        [&](CommandList commands) {
             Record(commands,
                    [&](std::shared_ptr<const void> object) { kept.push_back(std::move(object)); });
         },
@@ -300,19 +300,18 @@ void SceneColumns::AddSync(graph::Graph& graph) {
         });
 }
 
-void SceneColumns::Record(VkCommandBuffer commands,
+void SceneColumns::Record(CommandList commands,
                           const std::function<void(std::shared_ptr<const void>)>& keep) {
     if (!moves_.empty()) {
-        std::vector<BufferCopies> copies;
+        std::vector<BufferRegions> copies;
         for (auto& [column, regions] : moves_) {
-            for (VkBufferCopy& region : regions) {
-                region.srcOffset += column->Range().offset;
-                region.dstOffset += column->Range().offset;
+            for (CopyRegion& region : regions) {
+                region.from += column->Range().offset;
+                region.to += column->Range().offset;
             }
-            const VkBuffer buffer = column->Storage().Handle();
-            copies.push_back({buffer, buffer, regions});
+            copies.push_back({&column->Storage(), &column->Storage(), regions});
         }
-        CopyBuffers(commands, copies);
+        commands.Copy(copies);
         moves_.clear();
     }
     for (std::shared_ptr<const Buffer>& staging : uploader_.Record(commands)) {
@@ -338,7 +337,7 @@ std::vector<Ticket> SceneColumns::Prepare(std::span<const Ticket> waits) {
         const Origins origins = RowOrigins(*changes, binding.bucket);
         const std::uint32_t rows = store.GetBucket(binding.bucket).Rows();
         std::vector<std::uint32_t> hostRows;
-        std::vector<VkBufferCopy> copies = MoveRows(binding, origins, rows, hostRows);
+        std::vector<CopyRegion> copies = MoveRows(binding, origins, rows, hostRows);
         if (!copies.empty()) {
             moves_.emplace_back(binding.column.get(), std::move(copies));
         }
