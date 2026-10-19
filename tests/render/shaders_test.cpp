@@ -102,7 +102,8 @@ void main(uint3 id : SV_DispatchThreadID, uniform BufferRef<uint> out, uniform u
     if (id.x >= count) {
         return;
     }
-    SampleKey key = { 0x9e3779b9u * (id.x / 64u), id.x % 3u, id.x * 7919u, id.x % 64u };
+    SampleKey key = { FrameSeed(id.x, id.x * 31u, id.x / 64u), id.x % 3u, id.x * 7919u,
+                      id.x % 64u };
     for (uint dimension = 0; dimension < 8; ++dimension) {
         out[(id.x * 8 + dimension) * 2] = SampleBits(key, dimension);
         out[(id.x * 8 + dimension) * 2 + 1] = asuint(SampleSobol(key, dimension));
@@ -114,7 +115,7 @@ void main(uint3 id : SV_DispatchThreadID, uniform BufferRef<uint> out, uniform u
 std::vector<std::uint32_t> ExpectedSamples(std::uint32_t count) {
     std::vector<std::uint32_t> values;
     for (std::uint32_t i = 0; i < count; ++i) {
-        const SampleKey key{0x9e3779b9u * (i / 64u), i % 3u, i * 7919u, i % 64u};
+        const SampleKey key{FrameSeed(i, i * 31u, i / 64u), i % 3u, i * 7919u, i % 64u};
         for (std::uint32_t dimension = 0; dimension < 8; ++dimension) {
             values.push_back(SampleBits(key, dimension));
             values.push_back(std::bit_cast<std::uint32_t>(SampleSobol(key, dimension)));

@@ -19,7 +19,9 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstring>
 #include <memory>
+#include <set>
 
 namespace ernie {
 namespace {
@@ -219,6 +221,77 @@ TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
 
 TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrimsInTheirOwnTopLevel) {
     ExpectEachViewSeesItsWorldAndTheSharedPrims(SharedPrims::SharedTopLevel);
+}
+
+TEST(Renderer, SamplesJitterAcrossPixelsKeyedBySeedAndFrame) {
+    // A cube face-on 4.5 m out, its sides 0.44 pixels into columns 3 and 12 of 16, lit flat:
+    // a pixel shows the background or the face, or with samples what of each it covers.
+    const auto render = [](int samples) {
+        const std::unique_ptr<Renderer> renderer = MakeRenderer();
+        Scene scene;
+        Cube::Define(scene, "/World/Box").SetSize(1.0);
+        SetXform(scene, "/World/Box", {.translate = glm::dvec3(0.0, 5.0, 0.0)});
+        DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0});
+        DefineProduct(
+            scene, "/Render/Product", "/World/Camera", {16, 16},
+            {std::string(render_vars::kLdrColor), std::string(render_vars::kDistanceToCamera)});
+        RenderSettings::Define(scene, "/Render/Settings")
+            .SetProducts({Path("/Render/Product")})
+            .SetSamples(samples);
+        const RenderBatch& batch = renderer->Step(scene).front();
+        return std::pair(renderer->Read(*batch.Find(render_vars::kLdrColor)),
+                         renderer->Read(*batch.Find(render_vars::kDistanceToCamera)));
+    };
+    if (!MakeRenderer()) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    const auto [sharp, centres] = render(1);
+    const auto [smooth, distances] = render(64);
+    const auto red = [](const Tensor& image, std::int64_t x) {
+        return static_cast<const std::uint8_t*>(image.Data())[4 * (8 * 16 + x)];
+    };
+    const std::uint8_t background = red(sharp, 0);
+    const std::uint8_t face = red(sharp, 8);
+    ASSERT_GT(face, background + 20);
+    for (std::int64_t x = 0; x < 16; ++x) {
+        EXPECT_TRUE(red(sharp, x) == background || red(sharp, x) == face) << "column " << x;
+    }
+    for (const std::int64_t edge : {3, 12}) {
+        EXPECT_GT(red(smooth, edge), background + 5) << "column " << edge << ", partly covered";
+        EXPECT_LT(red(smooth, edge), face - 5) << "column " << edge << ", partly covered";
+    }
+    EXPECT_EQ(red(smooth, 8), face) << "inside the face";
+    EXPECT_EQ(std::memcmp(centres.Data(), distances.Data(), centres.Bytes()), 0)
+        << "distances from the pixels' middles";
+    const auto [again, unused] = render(64);
+    EXPECT_EQ(std::memcmp(smooth.Data(), again.Data(), smooth.Bytes()), 0)
+        << "the same seed and frame give the same samples";
+}
+
+TEST(Renderer, ReplayedStepsCountFramesForFreshSamples) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    Scene scene;
+    Cube::Define(scene, "/World/Box").SetSize(1.0);
+    SetXform(scene, "/World/Box", {.translate = glm::dvec3(0.0, 5.0, 0.0)});
+    DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0});
+    DefineProduct(scene, "/Render/Product", "/World/Camera", {16, 16},
+                  {std::string(render_vars::kLdrColor)});
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetProducts({Path("/Render/Product")})
+        .SetSamples(2);
+    // The partly covered edge pixel's two samples land elsewhere each frame.
+    std::set<std::uint8_t> seen;
+    for (int step = 0; step < 12; ++step) {
+        const RenderBatch& batch = renderer->Step(scene).front();
+        const Tensor image = renderer->Read(*batch.Find(render_vars::kLdrColor));
+        seen.insert(static_cast<const std::uint8_t*>(image.Data())[4 * (8 * 16 + 12)]);
+    }
+    EXPECT_TRUE(renderer->Replayed());
+    EXPECT_GT(seen.size(), 1u) << "replayed frames key new samples";
+    test::ExpectClean(renderer->Context());
 }
 
 TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {

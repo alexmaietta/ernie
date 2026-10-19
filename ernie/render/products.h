@@ -27,6 +27,11 @@ struct ProductSpec {
     glm::vec2 clipping{0.0f, 1e30f};
     /// Its vars' source names, in order.
     std::vector<std::string> vars;
+    /// Samples a pixel per frame: `ernie:samples`, or the Minimal tier's one for 0.
+    std::uint32_t samples = 1;
+    /// `ernie:seed`, and its path hashed, which its random numbers are keyed by.
+    std::uint32_t seed = 0;
+    std::uint32_t stream = 0;
 };
 
 /// @return The products of the scene's first RenderSettings: its `products`, or one default

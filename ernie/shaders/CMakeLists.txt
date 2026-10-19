@@ -5,6 +5,7 @@ ernie_add_shaders(
     device/buffer_ref.slang
     math/affine.slang
     math/double_float.slang
+    rt/frame_count.slang
     rt/ray_tracer.slang
     rt/write_instances.slang
     sampling/random.slang

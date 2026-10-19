@@ -126,7 +126,10 @@ void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& 
                                    .lens = spec->lens,
                                    .node = spec->camera.slot,
                                    .world = spec->world,
-                                   .clipping = spec->clipping});
+                                   .clipping = spec->clipping,
+                                   .samples = spec->samples,
+                                   .seed = spec->seed,
+                                   .stream = spec->stream});
         }
         if (i < batches.size()) {
             batch.columns = std::move(batches[i].columns);

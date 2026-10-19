@@ -49,6 +49,12 @@ struct CameraView {
     std::uint32_t world = 0;
     /// Metres along the view axis to the near and far clipping planes.
     glm::vec2 clipping{0.0f, 1e30f};
+    /// Jittered rays a pixel's colour and albedo average; 1 for one through its middle.
+    std::uint32_t samples = 1;
+    /// What its random numbers are keyed by, with the device's frame number: the settings'
+    /// seed and its render product's path, hashed (`HashStream`).
+    std::uint32_t seed = 0;
+    std::uint32_t stream = 0;
     /// Three rows of four floats, camera to world relative to the render origin, which the pass
     /// reads on the device in place of `cameraToWorld` when there is no node: a pose uploaded
     /// each frame, so recorded commands replay as it moves.

@@ -59,6 +59,13 @@ uint4 Pcg4d(uint4 v) {
     return v;
 }
 
+/// @return The seed of frame `frame` of stream `stream` (a render product's path hashed) under
+/// the authored `seed`, as the host's `FrameSeed` gives it for frames below 2^32.
+uint FrameSeed(uint seed, uint stream, uint frame) {
+    uint3 h = Pcg3d(uint3(seed, stream, frame));
+    return h.x ^ h.y ^ h.z;
+}
+
 /// @return 32 random bits for dimension `dimension` of a sample.
 uint SampleBits(SampleKey key, uint dimension) {
     uint4 h = Pcg4d(uint4(key.pixel, key.sample, dimension, key.view ^ key.frameSeed));

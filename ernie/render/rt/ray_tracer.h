@@ -44,6 +44,8 @@ struct TraceScene {
     graph::Buffer prims;
     /// The transform graph's worlds, for poses read on the device.
     graph::Buffer transforms;
+    /// The frame's number, a uint counted on the device, which random numbers are keyed by.
+    graph::Buffer frame;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 
@@ -53,7 +55,7 @@ struct TraceScene {
         for (const graph::Buffer& buffer : tables) {
             pass.ReadAddress(buffer);
         }
-        for (const graph::Buffer& buffer : {colours, prims, transforms}) {
+        for (const graph::Buffer& buffer : {colours, prims, transforms, frame}) {
             pass.ReadAddress(buffer);
         }
     }
@@ -75,7 +77,7 @@ class RayTracer {
 
     /// @brief Adds the passes that bring the structures up to date with the frame's geometry
     /// changes, after the transforms and the geometry's and instances' uploads, and puts a
-    /// `TraceScene` on the graph's blackboard.
+    /// `TraceScene` on the graph's blackboard, after a pass counting the frame on the device.
     /// @param rebuildTops Whether to build the top levels, as `TopLevels::AddBuild` takes it.
     void AddBuild(graph::Graph& graph, const GeometryPool::Changes& changes,
                   const TransformGraph& transforms, const InstanceTable& instances,
@@ -92,6 +94,10 @@ class RayTracer {
     const GeometryPool& geometry_;
     BottomLevels bottoms_;
     TopLevels tops_;
+    ComputeKernel counter_;
+    /// The frame's number, counted on the device from zero once started.
+    std::unique_ptr<DeviceColumn> frame_;
+    bool counting_ = false;
 };
 
 }  // namespace ernie

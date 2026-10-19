@@ -6,6 +6,7 @@
 #include "ernie/render/rt/ray_tracer.h"
 #include "ernie/render/transform_graph.h"
 #include "ernie/shaders/device/bindless.h"
+#include "ernie/shaders/sampling/random.h"
 #include "ernie/shaders/sensors/camera.h"
 #include "ernie/shaders/sensors/lens.h"
 #include "ernie/shaders/spectral/spectrum.h"
@@ -45,7 +46,10 @@ View ToView(const CameraView& view, const glm::dvec3& origin, std::uint32_t firs
             .first = first,
             .world = view.world,
             .near = view.clipping.x,
-            .far = view.clipping.y};
+            .far = view.clipping.y,
+            .samples = std::max(view.samples, 1u),
+            .seed = view.seed,
+            .stream = view.stream};
 }
 
 }  // namespace
@@ -68,8 +72,8 @@ std::span<const ShaderModule> CameraPass::Modules() {
         for (const ShaderModule& module : TransformGraph::WorldModules().subspan(1)) {
             list.push_back(module);
         }
-        list.insert(list.end(),
-                    {shaders::kBindless, shaders::kSpectrum, shaders::kLens, shaders::kCamera});
+        list.insert(list.end(), {shaders::kBindless, shaders::kSpectrum, shaders::kLens,
+                                 shaders::kRandom, shaders::kCamera});
         return list;
     }();
     return modules;
@@ -158,6 +162,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<const CameraView> views,
                 .worlds = pass.Get(scene.transforms).BufferRef<glm::vec4>(),
                 .colours = pass.Get(scene.colours).BufferRef<float>(),
                 .instancePrims = pass.Get(scene.prims).BufferRef<shaders::uint>(),
+                .frame = pass.Get(scene.frame).BufferRef<shaders::uint>(),
                 .count = static_cast<std::uint32_t>(records.size())};
             kernel_.Dispatch(
                 pass.commands,

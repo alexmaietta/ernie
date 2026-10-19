@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file camera.slang
-/// @brief Cameras traced one ray a pixel through their lenses, every view in one dispatch: a
-/// headlit colour into a bindless image, and each pixel's distance, world normal, instance, prim,
-/// albedo and RGBA8 colour into buffers kernels, CUDA or PyTorch read. The views and parameters
-/// are shared with C++ (rt/camera_pass.cpp).
+/// @brief Cameras traced through their lenses, every view in one dispatch: a headlit colour into
+/// a bindless image, and each pixel's distance, world normal, instance, prim, albedo and RGBA8
+/// colour into buffers kernels, CUDA or PyTorch read. One ray through a pixel's middle gives its
+/// geometry; with more samples, its colour and albedo average rays jittered across it by keyed
+/// Sobol samples. The views and parameters are shared with C++ (rt/camera_pass.cpp).
 #ifdef __cplusplus
 #pragma once
 #include "ernie/shaders/rt/ray_tracer.slang"
@@ -15,6 +16,7 @@ import bindless;
 import ray_tracer;
 import buffer_ref;
 import lens;
+import random;
 import spectrum;
 import transform;
 #endif
@@ -45,6 +47,12 @@ struct View {
     /// `clippingRange`: nothing nearer or farther is seen.
     float near;
     float far;
+    /// Jittered rays a pixel's colour and albedo average; 1 for one through its middle.
+    uint samples;
+    /// What its random numbers are keyed by, with the frame: the settings' seed and its render
+    /// product's path, hashed.
+    uint seed;
+    uint stream;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
     /// z, the instance row, the prim's slot, `kBands` albedo bands, and the colour image's RGBA8
     /// bytes; each null for no output.
@@ -68,6 +76,8 @@ struct CameraParameters {
     /// Each instance row's albedo, three linear RGB floats, and its prim's slot.
     BufferRef<float> colours;
     BufferRef<uint> instancePrims;
+    /// The frame's number, counted on the device.
+    BufferRef<uint> frame;
     uint count;
 };
 
@@ -86,9 +96,10 @@ Spectrum Shade(Spectrum albedo, float3 normal, no_diff float3 direction) {
     return albedo.Scaled(lerp(kAmbient, 1.0, lit));
 }
 
-/// @return A view's ray through the middle of a pixel, from the camera's pose `toWorld`.
-RayDesc PixelRay(View view, float3x4 toWorld, uint2 pixel) {
-    LensRay ray = Unproject(view.lens, float2(pixel) + 0.5);
+/// @return A view's ray through a pixel at `offset` across it, its middle by default, from the
+/// camera's pose `toWorld`.
+RayDesc PixelRay(View view, float3x4 toWorld, uint2 pixel, float2 offset = float2(0.5)) {
+    LensRay ray = Unproject(view.lens, float2(pixel) + offset);
     // The clipping planes are across the view axis: a ray off axis reaches them farther along.
     float along = max(-ray.direction.z, 1e-6);
     return { mul(toWorld, float4(ray.origin, 1)), view.near / along,
@@ -107,13 +118,28 @@ float3x4 ViewPose(View view, BufferRef<float4> worlds) {
     return float3x4(pose.rows[0], pose.rows[1], pose.rows[2]);
 }
 
-/// @brief Writes the colour a pixel shows to the view's image and RGBA8 buffer, as it asks.
-void WriteColour(View view, uint2 pixel, uint at, Hit hit, Spectrum light) {
-    float3 shown = view.background;
-    if (hit.found) {
-        // Stored as UNORM: encoded for display roughly as sRGB would.
-        shown = pow(saturate(ToLinearSrgb(light)), 1 / 2.2);
+/// @return An instance's albedo.
+Spectrum InstanceAlbedo(CameraParameters parameters, uint instance) {
+    uint colour = 3 * instance;
+    return Uplift(float3(parameters.colours[colour], parameters.colours[colour + 1],
+                         parameters.colours[colour + 2]));
+}
+
+/// @return What a ray shows, in linear sRGB: its hit lit from the eye, or the background.
+float3 RayColour(View view, RayTracer tracer, CameraParameters parameters, RayDesc ray,
+                 out Spectrum albedo) {
+    Hit hit = tracer.TraceClosest(ray, 0xff);
+    albedo = Spectrum(0);
+    if (!hit.found) {
+        return pow(view.background, 2.2);
     }
+    albedo = InstanceAlbedo(parameters, hit.instance);
+    return saturate(ToLinearSrgb(Shade(albedo, tracer.WorldNormal(hit), ray.Direction)));
+}
+
+/// @brief Writes the colour a pixel shows, as stored, to the view's image and RGBA8 buffer, as
+/// it asks.
+void WriteColour(View view, uint2 pixel, uint at, float3 shown) {
     if (view.colour != kNoImage) {
         images[NonUniformResourceIndex(view.colour)][pixel] = float4(shown, 1);
     }
@@ -134,21 +160,45 @@ void main(uint3 id : SV_DispatchThreadID, uniform CameraParameters parameters) {
     if (any(pixel >= view.size)) {
         return;
     }
-    RayDesc ray = PixelRay(view, ViewPose(view, parameters.worlds), pixel);
+    float3x4 toWorld = ViewPose(view, parameters.worlds);
+    RayDesc ray = PixelRay(view, toWorld, pixel);
     RayTracer tracer = RayTracer(parameters.tracer, view.world);
     Hit hit = tracer.TraceClosest(ray, 0xff);
     float3 normal = float3(0);
     Spectrum albedo = Spectrum(0);
+    // Stored as UNORM: encoded for display roughly as sRGB would.
+    float3 shown = view.background;
     if (hit.found) {
         normal = tracer.WorldNormal(hit);
-        uint colour = 3 * hit.instance;
-        albedo = Uplift(float3(parameters.colours[colour], parameters.colours[colour + 1],
-                               parameters.colours[colour + 2]));
+        albedo = InstanceAlbedo(parameters, hit.instance);
+        shown = pow(saturate(ToLinearSrgb(Shade(albedo, normal, ray.Direction))), 1 / 2.2);
     }
 
-    uint at = view.first + pixel.y * view.size.x + pixel.x;
+    uint pixelIndex = pixel.y * view.size.x + pixel.x;
+    uint at = view.first + pixelIndex;
+    bool coloured = view.colour != kNoImage || !view.ldr.IsNull() || !view.albedos.IsNull();
+    if (view.samples > 1 && coloured) {
+        // Colour and albedo integrate the pixel's area; the frame number keys each frame's own
+        // samples, as replayed frames count it.
+        SampleKey key = { FrameSeed(view.seed, view.stream,
+                                    parameters.frame.IsNull() ? 0 : parameters.frame[0]),
+                          0, pixelIndex, 0 };
+        float3 linear = float3(0);
+        Spectrum albedos = Spectrum(0);
+        for (uint sample = 0; sample < view.samples; ++sample) {
+            key.sample = sample;
+            float2 offset = float2(SampleSobol(key, kPixelDimension),
+                                   SampleSobol(key, kPixelDimension + 1));
+            Spectrum sampled;
+            linear += RayColour(view, tracer, parameters, PixelRay(view, toWorld, pixel, offset),
+                                sampled);
+            albedos = albedos.Plus(sampled);
+        }
+        shown = pow(linear / float(view.samples), 1 / 2.2);
+        albedo = albedos.Scaled(1.0 / float(view.samples));
+    }
     if (view.colour != kNoImage || !view.ldr.IsNull()) {
-        WriteColour(view, pixel, at, hit, Shade(albedo, normal, ray.Direction));
+        WriteColour(view, pixel, at, shown);
     }
     if (!view.distances.IsNull()) {
         view.distances[at] = hit.found ? hit.t : 1.0 / 0.0;

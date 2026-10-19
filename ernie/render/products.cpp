@@ -6,6 +6,7 @@
 #include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/render.h"
+#include "ernie/util/random.h"
 
 #include <algorithm>
 #include <array>
@@ -81,7 +82,10 @@ ProductSpec ReadProduct(const Scene& scene, const RenderSettingsBase& settings,
                 ReadLens(scene, *prim, size, pick(own.HasPixelAspectRatio()).GetPixelAspectRatio(),
                          pick(own.HasAspectRatioConformPolicy()).GetAspectRatioConformPolicy()),
             .clipping = glm::vec2(Camera(scene, camera).GetClippingRange()),
-            .vars = ReadVars(scene, vars)};
+            .vars = ReadVars(scene, vars),
+            .samples = static_cast<std::uint32_t>(std::max(1, pick(own.HasSamples()).GetSamples())),
+            .seed = static_cast<std::uint32_t>(pick(own.HasSeed()).GetSeed()),
+            .stream = HashStream(path.String())};
 }
 
 }  // namespace
