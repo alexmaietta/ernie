@@ -3,6 +3,7 @@
 /// @brief The viewer's set-up and frame loop, and its command line.
 #include "ernie/app/viewer.h"
 
+#include "ernie/io/image.h"
 #include "ernie/scene/json.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/disk_cache.h"
@@ -118,6 +119,33 @@ Viewer::~Viewer() {
 void Viewer::Run() {
     while (Step()) {
     }
+}
+
+void Viewer::SaveScreenshot(const std::filesystem::path& path) {
+    const OffscreenPresenter* offscreen = Offscreen();
+    if (offscreen == nullptr) {
+        throw std::logic_error("Screenshots are of offscreen frames");
+    }
+    const glm::uvec2 size(offscreen->Image().Description().extent);
+    const std::uint64_t bytes = std::uint64_t{4} * size.x * size.y;
+    const Buffer staging(*context_, bytes, MemoryUse::Readback, "Screenshot");
+    const std::array waits{offscreen->Drawn()};
+    context_->Main()
+        .Submit(
+            [&](VkCommandBuffer commands) {
+                const VkBufferImageCopy region{
+                    .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                    .imageExtent = {size.x, size.y, 1}};
+                vkCmdCopyImageToBuffer(commands, offscreen->Image().Handle(),
+                                       VK_IMAGE_LAYOUT_GENERAL, staging.Handle(), 1, &region);
+            },
+            waits)
+        .Wait();
+    staging.Invalidate(0, bytes);
+    const std::span<const std::byte> texels = staging.Mapped().first(bytes);
+    WritePng(path, Tensor::Copy(std::span(reinterpret_cast<const std::uint8_t*>(texels.data()),
+                                          texels.size()),
+                                {size.y, size.x, 4}));
 }
 
 bool Viewer::Step() {
@@ -285,7 +313,7 @@ void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget&
 
 std::string_view ViewUsage() {
     return "ernie [view] [SCENE.json] [--offscreen] [--frames N] [--size WxH] [--device NAME]\n"
-           "             [--validation] [--vsync] [--profile]";
+           "             [--validation] [--vsync] [--profile] [--screenshot FILE.png]";
 }
 
 ViewCommand ParseViewCommand(std::span<const std::string_view> arguments) {
@@ -313,6 +341,9 @@ ViewCommand ParseViewCommand(std::span<const std::string_view> arguments) {
             viewer.vsync = true;
         } else if (argument == "--profile") {
             viewer.shell.profile = true;
+        } else if (argument == "--screenshot") {
+            viewer.screenshot = value();
+            viewer.offscreen = true;
         } else if (argument.starts_with("-")) {
             throw std::invalid_argument("Unknown option " + std::string(argument));
         } else if (command.scene) {
@@ -341,6 +372,9 @@ int RunView(const ViewCommand& command) {
         viewer.GetShell().Log().Info("Opened " + command.scene->string());
     }
     viewer.Run();
+    if (!command.viewer.screenshot.empty()) {
+        viewer.SaveScreenshot(command.viewer.screenshot);
+    }
     return 0;
 }
 

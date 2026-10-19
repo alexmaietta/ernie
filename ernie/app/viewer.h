@@ -38,6 +38,8 @@ struct ViewerOptions {
     bool validation = false;
     /// Wait for the display's refresh; off by default, so frames show what they cost.
     bool vsync = false;
+    /// Where `RunView` saves the last frame drawn offscreen as a PNG; empty for nowhere.
+    std::filesystem::path screenshot;
     ShellOptions shell;
 };
 
@@ -71,6 +73,9 @@ class Viewer {
     const OffscreenPresenter* Offscreen() const {
         return dynamic_cast<const OffscreenPresenter*>(presenter_.get());
     }
+    /// @brief Saves the last frame drawn offscreen as a PNG.
+    /// @throws std::logic_error when presenting to a window; std::runtime_error as `WritePng`.
+    void SaveScreenshot(const std::filesystem::path& path);
 
   private:
     /// @return Whether to keep going.

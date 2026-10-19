@@ -12,6 +12,7 @@
 #include <ImfOutputFile.h>
 #include <ImfRgbaFile.h>
 #include <stb_image.h>
+#include <stb_image_write.h>
 
 #include <algorithm>
 #include <array>
@@ -97,6 +98,21 @@ glm::vec4 Image::Mean() const {
         sum += glm::dvec4(p);
     }
     return pixels.empty() ? glm::vec4(0.0f) : glm::vec4(sum / static_cast<double>(pixels.size()));
+}
+
+void WritePng(const std::filesystem::path& path, const Tensor& image) {
+    if (image.Rank() != 3 || image.Type() != DType::UInt8 || image.Shape()[2] < 1 ||
+        image.Shape()[2] > 4 || image.Location().kind != DeviceKind::Cpu) {
+        throw std::invalid_argument("PNG images are uint8 (rows, cols, 1 to 4) on the CPU");
+    }
+    const Tensor packed = image.Contiguous();
+    const auto rows = static_cast<int>(packed.Shape()[0]);
+    const auto cols = static_cast<int>(packed.Shape()[1]);
+    const auto channels = static_cast<int>(packed.Shape()[2]);
+    if (stbi_write_png(path.string().c_str(), cols, rows, channels, packed.Data(),
+                       cols * channels) == 0) {
+        throw std::runtime_error("Cannot write " + path.string());
+    }
 }
 
 void WriteExr(const std::filesystem::path& path, const Tensor& image) {

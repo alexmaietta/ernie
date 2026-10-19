@@ -3,10 +3,22 @@
 /// @brief Creating the ImGui context, setting up its Vulkan backend and recording its draws.
 #include "ernie/app/imgui_backend.h"
 
+#include "ernie/app/icons.h"
 #include "ernie/util/profiler.h"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
+
+#include <cstddef>
+#include <cstdio>
+
+// The typefaces compiled in by cmake/third_party/fonts.cmake.
+extern "C" {
+extern const unsigned char kErnieFont_inter[];
+extern const std::size_t kErnieFont_inter_size;
+extern const unsigned char kErnieFont_lucide[];
+extern const std::size_t kErnieFont_lucide_size;
+}
 
 namespace ernie::app {
 namespace {
@@ -43,8 +55,30 @@ ImGuiSession::ImGuiSession(const Theme& theme) {
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NavEnableKeyboard;
-    io.Fonts->AddFontDefaultVector();
+    LoadFonts(theme);
     ApplyTheme(theme);
+}
+
+void ImGuiSession::LoadFonts(const Theme& theme) {
+    ImGuiIO& io = ImGui::GetIO();
+    static const ImWchar kIcons[] = {static_cast<ImWchar>(icons::kFirst),
+                                     static_cast<ImWchar>(icons::kLast), 0};
+    ImFontConfig text;
+    text.FontDataOwnedByAtlas = false;
+    // Inter has glyphs of its own in the private use area, which would hide the icons'.
+    text.GlyphExcludeRanges = kIcons;
+    std::snprintf(text.Name, sizeof(text.Name), "Inter");
+    io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(kErnieFont_inter),
+                                   static_cast<int>(kErnieFont_inter_size), theme.fontSize, &text);
+    ImFontConfig icon;
+    icon.FontDataOwnedByAtlas = false;
+    icon.MergeMode = true;
+    icon.GlyphMinAdvanceX = theme.fontSize;
+    icon.GlyphOffset = ImVec2(0.0f, 0.15f * theme.fontSize);
+    std::snprintf(icon.Name, sizeof(icon.Name), "Lucide");
+    io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(kErnieFont_lucide),
+                                   static_cast<int>(kErnieFont_lucide_size), theme.fontSize, &icon,
+                                   kIcons);
 }
 
 ImGuiSession::~ImGuiSession() {

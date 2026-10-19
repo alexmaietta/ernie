@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 include("${PROJECT_SOURCE_DIR}/cmake/third_party/glfw.cmake")
 include("${PROJECT_SOURCE_DIR}/cmake/third_party/dear_imgui.cmake")
+include("${PROJECT_SOURCE_DIR}/cmake/third_party/fonts.cmake")
 
 # The viewer: its window, panels and frame loop, a library so tests drive it without a window.
 add_library(ernie_viewer STATIC create.cpp imgui_backend.cpp ui.cpp viewer.cpp)
 target_link_libraries(
     ernie_viewer
     PUBLIC ernie_static ernie_imgui ernie_volk ernie_vma
-    PRIVATE ernie_build_options
+    PRIVATE ernie_fonts ernie_build_options
 )
 if(TARGET ernie_glfw)
     target_link_libraries(ernie_viewer PRIVATE ernie_imgui_glfw)
@@ -20,7 +21,7 @@ target_link_libraries(ernie_app PRIVATE ernie_viewer ernie_build_options)
 install(TARGETS ernie_app RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT app)
 
 # The licences of what the program carries.
-set(ernie_app_notices "dear_imgui|${dear_imgui_SOURCE_DIR}/LICENSE.txt")
+set(ernie_app_notices "dear_imgui|${dear_imgui_SOURCE_DIR}/LICENSE.txt" ${ernie_font_notices})
 if(glfw_SOURCE_DIR)
     list(APPEND ernie_app_notices "glfw|${glfw_SOURCE_DIR}/LICENSE.md")
 endif()

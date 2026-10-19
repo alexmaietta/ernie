@@ -7,6 +7,7 @@
 #include "ernie/app/ui.h"
 
 #include "ernie/app/create.h"
+#include "ernie/app/icons.h"
 #include "ernie/device/context.h"
 #include "ernie/scene/json.h"
 #include "ernie/scene/scene.h"
@@ -15,6 +16,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/util/file.h"
 #include "ernie/util/on_failure.h"
+#include "ernie/util/process.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 #include "ernie/util/version.h"
@@ -1092,7 +1094,12 @@ void DrawControlsWindow(bool& open) {
         {"Middle drag", "Pan across the view"},
         {"Wheel", "Zoom towards the target"},
         {"F", "Frame the selection, or the whole scene"},
+        {"Click", "Select what the viewport shows there, or nothing; Ctrl adds or removes it"},
         {"Click in Stage", "Select a prim; Ctrl adds or removes it"},
+        {"H", "Hide or show the toolbar and heads-up display"},
+        {"Ctrl+Z, Ctrl+Shift+Z", "Undo, redo"},
+        {"Ctrl+D, Del", "Duplicate, delete the selection"},
+        {"Ctrl+O, Ctrl+Shift+S", "Open a scene, save it as"},
         {"Ctrl+Q", "Quit"},
     };
     HelpWindow("Keyboard and Mouse", open, [&] {
@@ -1470,8 +1477,9 @@ void Shell::Draw() {
         ERNIE_ZONE("Move the camera");
         Navigate();
     }
-    {
-        ERNIE_ZONE("Draw the HUD");
+    if (!overlaysHidden_) {
+        ERNIE_ZONE("Draw over the viewport");
+        DrawToolbar();
         DrawHud();
     }
     Apply();
@@ -1601,27 +1609,201 @@ void Shell::Navigate() {
     }
 }
 
-void Shell::DrawHud() {
-    const auto [origin, size] = Viewport();
-    const double now = ImGui::GetTime();
-    if (hudRefreshed_ < 0.0 || now - hudRefreshed_ >= kHudRefresh) {
-        const double fps = ImGui::GetIO().Framerate;
-        const glm::dvec3 eye = camera_.Eye();
-        const glm::dvec3& target = camera_.target;
-        std::array<char, 256> text{};
-        std::snprintf(text.data(), text.size(),
-                      "%.0f fps, %.2f ms\n%.0f x %.0f\nEye %.3g, %.3g, %.3g m\n"
-                      "Target %.3g, %.3g, %.3g m",
-                      fps, fps > 0.0 ? 1000.0 / fps : 0.0, static_cast<double>(size.x),
-                      static_cast<double>(size.y), eye.x, eye.y, eye.z, target.x, target.y,
-                      target.z);
-        hud_ = text.data();
-        hudRefreshed_ = now;
+void Shell::DrawToolbar() {
+    if (!display_.toolbar) {
+        return;
     }
-    // Behind every window.
-    const ImVec2 padding = ImGui::GetStyle().WindowPadding;
-    ImGui::GetBackgroundDrawList()->AddText(ImVec2(origin.x + padding.x, origin.y + padding.y),
-                                            ImGui::GetColorU32(ToImVec4(theme_.hud)), hud_.c_str());
+    const auto [origin, size] = Viewport();
+    const float pad = 8.0f;
+    ImGui::SetNextWindowPos(ImVec2(origin.x + pad, origin.y + pad));
+    constexpr ImGuiWindowFlags kBar =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("##viewport toolbar", nullptr, kBar)) {
+        // Kit's pills: dark, translucent, a thin lighter edge, menus of the overlay's colour.
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme_.overlay * 1.25f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
+        ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme_.pillRounding);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.0f, 4.0f));
+        const auto pill = [&](const char* id, const std::string& label, const char* tip,
+                              void (Shell::*items)()) {
+            constexpr ImGuiComboFlags kPill =
+                ImGuiComboFlags_WidthFitPreview | ImGuiComboFlags_NoArrowButton;
+            ImGui::SetNextWindowSizeConstraints(ImVec2(16.0f * ImGui::GetFontSize(), 0.0f),
+                                                ImVec2(FLT_MAX, FLT_MAX));
+            if (ImGui::BeginCombo(id, label.c_str(), kPill | ImGuiComboFlags_HeightLargest)) {
+                // Menu text in the panels' colours.
+                ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.text));
+                (this->*items)();
+                ImGui::PopStyleColor();
+                ImGui::EndCombo();
+            }
+            ImGui::SetItemTooltip("%s", tip);
+            ImGui::SameLine();
+        };
+        pill("##settings", icons::kSettings, "Viewport settings", &Shell::DrawSettingsMenu);
+        pill("##show", icons::kEye, "What the viewport shows", &Shell::DrawShowMenu);
+        pill("##camera", std::string(icons::kCamera) + "  Perspective", "Camera and views",
+             &Shell::DrawCameraMenu);
+        ImGui::NewLine();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(4);
+    }
+    ImGui::End();
+}
+
+void Shell::DrawSettingsMenu() {
+    MenuSection("Navigation");
+    float fov = static_cast<float>(glm::degrees(camera_.verticalFov));
+    ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
+    if (ImGui::SliderFloat("Field of view", &fov, 10.0f, 120.0f, "%.0f°")) {
+        camera_.verticalFov = glm::radians(static_cast<double>(fov));
+    }
+    ImGui::Separator();
+    if (MenuAction("Reset Camera")) {
+        const double fovKept = camera_.verticalFov;
+        camera_ = OrbitCamera{.verticalFov = fovKept};
+        Frame();
+    }
+}
+
+void Shell::DrawShowMenu() {
+    // Toggles keep the menu open, so several switch at once.
+    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
+    if (ImGui::BeginMenu("    Heads Up Display")) {
+        MenuCheck("Show", display_.hud);
+        ImGui::Separator();
+        ImGui::BeginDisabled(!display_.hud);
+        MenuCheck("FPS", display_.hudFps);
+        MenuCheck("Device Memory", display_.hudDeviceMemory);
+        MenuCheck("Host Memory", display_.hudHostMemory);
+        MenuCheck("Resolution", display_.hudResolution);
+        MenuCheck("Camera", display_.hudCamera);
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
+    ImGui::Separator();
+    MenuCheck("Toolbar", display_.toolbar);
+    ImGui::PopItemFlag();
+    ImGui::TextDisabled("    H hides everything over the viewport");
+}
+
+void Shell::DrawCameraMenu() {
+    MenuSection("Views");
+    // Kit's views: the orbit from the side, or square on from the top, front or right.
+    struct View {
+        const char* name;
+        double yaw;
+        double pitch;
+    };
+    constexpr std::array<View, 4> kViews{{{"Perspective", 0.6, 0.45},
+                                          {"Top", 0.0, OrbitCamera::kMaxPitch},
+                                          {"Front", 0.0, 0.0},
+                                          {"Right", 1.5707963267948966, 0.0}}};
+    for (const View& view : kViews) {
+        if (MenuAction(view.name)) {
+            camera_.yaw = view.yaw;
+            camera_.pitch = view.pitch;
+        }
+    }
+    ImGui::Separator();
+    choices_.frame |= MenuAction(selection_.Empty() ? "Frame Scene" : "Frame Selection", "F");
+}
+
+void Shell::RefreshHud() {
+    const double now = ImGui::GetTime();
+    if (hudRefreshed_ >= 0.0 && now - hudRefreshed_ < kHudRefresh) {
+        return;
+    }
+    hudRefreshed_ = now;
+    hudLines_.clear();
+    std::array<char, 192> line{};
+    if (display_.hudFps) {
+        const double fps = std::max(static_cast<double>(ImGui::GetIO().Framerate), 1e-3);
+        std::snprintf(line.data(), line.size(), "FPS: %.1f, Frame time: %.2f ms", fps,
+                      1000.0 / fps);
+        hudLines_.emplace_back(line.data());
+    }
+    if (display_.hudDeviceMemory && device_ != nullptr) {
+        // The device-local heaps: what the process uses where the driver reports budgets.
+        const VkPhysicalDeviceMemoryProperties* memory = nullptr;
+        vmaGetMemoryProperties(device_->Allocator(), &memory);
+        std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+        vmaGetHeapBudgets(device_->Allocator(), budgets.data());
+        std::uint64_t used = 0;
+        std::uint64_t total = 0;
+        for (std::uint32_t heap = 0; heap < memory->memoryHeapCount; ++heap) {
+            if ((memory->memoryHeaps[heap].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0) {
+                used += budgets[heap].usage;
+                total += memory->memoryHeaps[heap].size;
+            }
+        }
+        hudLines_.push_back("Device Memory: " + FormatBytes(used) + " / " + FormatBytes(total));
+    }
+    if (display_.hudHostMemory) {
+        const std::optional<std::uint64_t> resident = ReadResidentBytes();
+        hudLines_.push_back("Host Memory: " + (resident ? FormatBytes(*resident) : "unknown"));
+    }
+    if (display_.hudResolution) {
+        const auto [origin, size] = Viewport();
+        const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
+        std::snprintf(line.data(), line.size(), "Resolution: %.0f x %.0f",
+                      static_cast<double>(size.x * scale.x), static_cast<double>(size.y * scale.y));
+        hudLines_.emplace_back(line.data());
+    }
+    if (display_.hudCamera) {
+        const glm::dvec3 eye = camera_.Eye();
+        std::snprintf(line.data(), line.size(), "Eye: %.3g, %.3g, %.3g m", eye.x, eye.y, eye.z);
+        hudLines_.emplace_back(line.data());
+        const glm::dvec3& target = camera_.target;
+        std::snprintf(line.data(), line.size(), "Target: %.3g, %.3g, %.3g m", target.x, target.y,
+                      target.z);
+        hudLines_.emplace_back(line.data());
+    }
+}
+
+void Shell::DrawHud() {
+    if (!display_.hud) {
+        return;
+    }
+    RefreshHud();
+    if (hudLines_.empty()) {
+        return;
+    }
+    const auto [origin, size] = Viewport();
+    const float pad = 6.0f;
+    const float lineHeight = ImGui::GetTextLineHeight();
+    float width = 0.0f;
+    for (const std::string& text : hudLines_) {
+        width = std::max(width, ImGui::CalcTextSize(text.c_str()).x);
+    }
+    const ImVec2 topRight(origin.x + size.x - 8.0f, origin.y + 8.0f);
+    const ImVec2 corner(topRight.x - width - 2.0f * pad, topRight.y);
+    // Over the viewport's image, which the background list holds, and under every window.
+    ImDrawList* draw = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
+    draw->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y));
+    draw->AddRectFilled(
+        corner,
+        ImVec2(topRight.x,
+               corner.y + lineHeight * static_cast<float>(hudLines_.size()) + 2.0f * pad),
+        ImGui::GetColorU32(ToImVec4(theme_.overlay)), 4.0f);
+    // Right-aligned, as Kit's: the label muted, its value bright.
+    float y = corner.y + pad;
+    for (const std::string& text : hudLines_) {
+        const std::size_t colon = text.find(": ");
+        const std::string label = text.substr(0, colon == std::string::npos ? 0 : colon + 2);
+        const float x = topRight.x - pad - ImGui::CalcTextSize(text.c_str()).x;
+        draw->AddText(ImVec2(x, y), ImGui::GetColorU32(ToImVec4(theme_.hudMuted)), label.c_str());
+        draw->AddText(ImVec2(x + ImGui::CalcTextSize(label.c_str()).x, y),
+                      ImGui::GetColorU32(ToImVec4(theme_.hud)), text.c_str() + label.size());
+        y += lineHeight;
+    }
+    draw->PopClipRect();
 }
 
 void Shell::Frame() {
@@ -1767,6 +1949,7 @@ void Shell::TakeShortcuts() {
     choices_.redo |= io.KeyCtrl && ((io.KeyShift && pressed(ImGuiKey_Z)) || pressed(ImGuiKey_Y));
     choices_.duplicate |= io.KeyCtrl && pressed(ImGuiKey_D);
     choices_.remove |= plain && pressed(ImGuiKey_Delete);
+    overlaysHidden_ ^= plain && pressed(ImGuiKey_H);
     windows_.open |= io.KeyCtrl && pressed(ImGuiKey_O);
     windows_.save |= io.KeyCtrl && io.KeyShift && pressed(ImGuiKey_S);
 }

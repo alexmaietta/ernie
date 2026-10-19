@@ -7,6 +7,7 @@ add_library(
     library.cpp
     log.cpp
     noise.cpp
+    process.cpp
     profiler.cpp
     tensor.cpp
     version.cpp
@@ -23,6 +24,10 @@ target_link_libraries(
 )
 find_package(Threads REQUIRED)
 target_link_libraries(ernie_util PUBLIC Threads::Threads PRIVATE ${CMAKE_DL_LIBS})
+if(WIN32)
+    # The process's memory counters.
+    target_link_libraries(ernie_util PRIVATE psapi)
+endif()
 set_source_files_properties(
     version.cpp
     PROPERTIES

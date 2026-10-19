@@ -106,6 +106,12 @@ ERNIE_API bool IsPngOrJpeg(const std::filesystem::path& path);
 /// @throws std::runtime_error If the file cannot be written.
 ERNIE_API void WriteExr(const std::filesystem::path& path, const Tensor& image);
 
+/// @brief Writes a CPU tensor of bytes as a PNG file, as screenshots and LdrColor are saved.
+/// @param image uint8 (rows, cols, channels) of 1 to 4 channels, rows top to bottom.
+/// @throws std::invalid_argument For another shape or type.
+/// @throws std::runtime_error If the file cannot be written.
+ERNIE_API void WritePng(const std::filesystem::path& path, const Tensor& image);
+
 /// @brief Decodes one sRGB channel to linear (IEC 61966-2-1).
 /// @param value The encoded value in [0, 1].
 /// @return The linear value.

@@ -242,6 +242,29 @@ TEST(Shell, PicksOnAStillClickAndSelectsWhatItFinds) {
     EXPECT_TRUE(shell.Selected().Empty()) << "a click on nothing clears";
 }
 
+TEST(Shell, ShowsTheHudLinesItsEyeMenuChooses) {
+    const UiFrames frames;
+    Scene scene;
+    Shell shell(scene, nullptr);
+    frames.Draw(shell);
+    const auto has = [&](std::string_view label) {
+        return std::ranges::any_of(
+            shell.HudLines(), [&](const std::string& line) { return line.starts_with(label); });
+    };
+    EXPECT_TRUE(has("FPS: "));
+    EXPECT_TRUE(has("Resolution: "));
+    EXPECT_FALSE(has("Device Memory: ")) << "no device";
+    EXPECT_FALSE(has("Eye: ")) << "off by default";
+    shell.Display().hudCamera = true;
+    shell.Display().hudFps = false;
+    // The lines refresh a few times a second.
+    for (int frame = 0; frame < 30; ++frame) {
+        frames.Draw(shell);
+    }
+    EXPECT_TRUE(has("Eye: "));
+    EXPECT_FALSE(has("FPS: "));
+}
+
 TEST(Shell, OpensAndSavesSceneFiles) {
     Scene scene;
     Build(scene);

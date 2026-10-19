@@ -232,8 +232,14 @@ struct Theme {
     glm::vec4 checkMark{0.0f, 0.0f, 0.0f, 1.0f};
     /// The viewport's colour where nothing is rendered.
     glm::vec4 viewport{0.18f, 0.19f, 0.20f, 1.0f};
-    /// The heads-up display's text, over the viewport.
+    /// The heads-up display's values, over the viewport, and its labels.
     glm::vec4 hud{0.902f, 0.910f, 0.894f, 1.0f};
+    glm::vec4 hudMuted{0.62f, 0.64f, 0.66f, 1.0f};
+    /// The viewport's toolbar pills and heads-up box, over the image, and their edges.
+    glm::vec4 overlay{0.12f, 0.13f, 0.14f, 0.78f};
+    glm::vec4 overlayBorder{1.0f, 1.0f, 1.0f, 0.16f};
+    /// The pills' corner radius, in pixels at a content scale of 1.
+    float pillRounding = 10.0f;
     /// Text size, in pixels at a content scale of 1.
     float fontSize = 14.0f;
     /// Corner radius of frames, tabs and popups, in pixels.
@@ -318,6 +324,17 @@ struct DockSizes {
     float bottom = 0.25f;
 };
 
+/// @brief What the viewport shows over its image, as its eye menu toggles it.
+struct ViewportDisplay {
+    bool toolbar = true;
+    bool hud = true;
+    bool hudFps = true;
+    bool hudDeviceMemory = true;
+    bool hudHostMemory = true;
+    bool hudResolution = true;
+    bool hudCamera = false;
+};
+
 struct ShellOptions {
     Theme theme;
     DockSizes docks;
@@ -369,6 +386,13 @@ class Shell {
     }
     EditHistory& History() {
         return history_;
+    }
+    ViewportDisplay& Display() {
+        return display_;
+    }
+    /// @return The heads-up display's lines, as "label: value", as last refreshed.
+    const std::vector<std::string>& HudLines() const {
+        return hudLines_;
     }
 
     /// @brief Defines a prim of a type the Create menu lists, with its defaults, under the selected
@@ -435,7 +459,14 @@ class Shell {
     void DrawPanels();
     void SelectLogTab();
     void Navigate();
+    /// Draws the toolbar's pills at the viewport's top left: settings, what shows, the camera.
+    void DrawToolbar();
+    void DrawSettingsMenu();
+    void DrawShowMenu();
+    void DrawCameraMenu();
+    /// Draws the heads-up display at the viewport's top right, over its image.
     void DrawHud();
+    void RefreshHud();
     void Apply();
 
     Scene& scene_;
@@ -459,8 +490,11 @@ class Shell {
     /// Whether a mouse drag that started over the viewport moves the camera.
     bool dragging_ = false;
     std::optional<Pick> pick_;
+    ViewportDisplay display_;
+    /// Whether H hid everything drawn over the viewport.
+    bool overlaysHidden_ = false;
     /// The heads-up display's lines, refreshed a few times a second so they stay readable.
-    std::string hud_;
+    std::vector<std::string> hudLines_;
     double hudRefreshed_ = -1.0;
     bool open_ = true;
 };

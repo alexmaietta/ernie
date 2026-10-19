@@ -25,6 +25,9 @@ class ImGuiSession {
     ImGuiSession& operator=(const ImGuiSession&) = delete;
 
   private:
+    /// Loads Inter for text with Lucide's icons merged in, at the theme's size.
+    static void LoadFonts(const Theme& theme);
+
     ImGuiContext* context_;
 };
 
