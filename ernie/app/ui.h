@@ -193,6 +193,10 @@ std::unique_ptr<Panel> MakeProfilerPanel(MessageLog& log, bool alwaysRecord);
 
 class Shell;
 
+/// @return The Settings panel: a Render tab editing the scene's render settings, and a Viewer tab
+/// of the viewport's own settings.
+std::unique_ptr<Panel> MakeSettingsPanel(Scene& scene, Shell& shell);
+
 /// @return The Demos panel: the registered demos by category, the running one's controls,
 /// description and options.
 std::unique_ptr<Panel> MakeDemosPanel(Shell& shell);
@@ -644,6 +648,8 @@ class Shell {
     bool dragging_ = false;
     std::optional<Pick> pick_;
     ViewportDisplay display_;
+    /// What the viewport showed to begin with, which Reset To Defaults goes back to.
+    ViewportDisplay initialDisplay_;
     app::Timeline timeline_;
     std::unique_ptr<Demo> demo_;
     DemoInfo demoInfo_;

@@ -603,29 +603,18 @@ std::optional<Value> EditValue(const AttributeDef& def, const Value& value) {
     }
 }
 
-/// After Ernie 1's Properties panel: the first selected prim's schemas, a section each, their
-/// attributes grouped and edited through the undo history, authored ones in the accent colour.
-class PropertiesPanel final : public Panel {
+/// A prim's schemas, a section each, their attributes grouped and edited through the undo
+/// history, authored ones in the accent colour; as the Properties and Settings panels show them.
+class PrimFields {
   public:
-    PropertiesPanel(Scene& scene, const Selection& selection, EditHistory& history, MessageLog& log)
-        : Panel("Properties", Dock::RightLower), scene_(scene), selection_(selection),
-          history_(history), log_(log) {}
+    PrimFields(Scene& scene, EditHistory& history, MessageLog& log)
+        : scene_(scene), history_(history), log_(log) {}
 
-    void Draw() override {
-        if (selection_.Empty() || !scene_.Has(selection_.Paths().front())) {
-            ImGui::TextDisabled("Select a prim in the Stage or the viewport.");
-            return;
-        }
-        const Path& path = selection_.Paths().front();
+    /// @brief Draws the attributes whose names hold `filter`, any case, then the authored ones
+    /// no schema declares.
+    void Draw(const Path& path, std::string_view filter) {
+        filter_ = ToLower(filter);
         const PrimId prim = scene_.Require(path);
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::InputTextWithHint("##search", "Search", search_.data(), search_.size());
-        LabelValue("Path", path.String());
-        LabelValue("Type", TypeLabel(scene_.TypeName(prim)));
-        LabelValue("World bounds", BoxText(scene_.WorldBounds(path)));
-        if (const std::size_t selected = selection_.Paths().size(); selected > 1) {
-            ImGui::TextDisabled("The first of %zu selected.", selected);
-        }
         if (const SchemaDef* schema = scene_.Schema(prim)) {
             DrawSchema(path, prim, schema->name, schema->AllAttributes(), {});
             for (const std::string_view api : schema->AllBuiltinApis()) {
@@ -647,12 +636,11 @@ class PropertiesPanel final : public Panel {
     /// Draws a schema's attributes in its section, a table a group.
     void DrawSchema(const Path& path, PrimId prim, std::string_view title,
                     const std::vector<const AttributeDef*>& attributes, const ApiName& api) {
-        const std::string wanted = ToLower(search_.data());
         std::map<std::string_view, std::vector<std::pair<const AttributeDef*, std::string>>> groups;
         for (const AttributeDef* def : attributes) {
             std::string name =
                 api.schema != nullptr ? api.Attribute(def->name) : std::string(def->name);
-            if (ToLower(name).find(wanted) != std::string::npos) {
+            if (ToLower(name).find(filter_) != std::string::npos) {
                 groups[def->meta.group.empty() ? "Attributes" : def->meta.group].emplace_back(
                     def, std::move(name));
             }
@@ -754,9 +742,41 @@ class PropertiesPanel final : public Panel {
     }
 
     Scene& scene_;
-    const Selection& selection_;
     EditHistory& history_;
     MessageLog& log_;
+    std::string filter_;
+};
+
+/// After Ernie 1's Properties panel: the first selected prim's path, type and bounds, then its
+/// fields.
+class PropertiesPanel final : public Panel {
+  public:
+    PropertiesPanel(Scene& scene, const Selection& selection, EditHistory& history, MessageLog& log)
+        : Panel("Properties", Dock::RightLower), scene_(scene), selection_(selection),
+          fields_(scene, history, log) {}
+
+    void Draw() override {
+        if (selection_.Empty() || !scene_.Has(selection_.Paths().front())) {
+            ImGui::TextDisabled("Select a prim in the Stage or the viewport.");
+            return;
+        }
+        const Path& path = selection_.Paths().front();
+        const PrimId prim = scene_.Require(path);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##search", "Search", search_.data(), search_.size());
+        LabelValue("Path", path.String());
+        LabelValue("Type", TypeLabel(scene_.TypeName(prim)));
+        LabelValue("World bounds", BoxText(scene_.WorldBounds(path)));
+        if (const std::size_t selected = selection_.Paths().size(); selected > 1) {
+            ImGui::TextDisabled("The first of %zu selected.", selected);
+        }
+        fields_.Draw(path, search_.data());
+    }
+
+  private:
+    Scene& scene_;
+    const Selection& selection_;
+    PrimFields fields_;
     std::array<char, 128> search_{};
 };
 
@@ -1655,10 +1675,11 @@ Path SettingsCamera(const Scene& scene) {
 
 Shell::Shell(Scene& scene, const DeviceContext* device, const ShellOptions& options)
     : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks),
-      display_(options.display) {
-    // Stage and Demos above Properties on the right; Log, Capture, Info, Devices and Profiler
-    // tabbed at the bottom.
+      display_(options.display), initialDisplay_(options.display) {
+    // Stage, Settings and Demos above Properties on the right; Log, Capture, Info, Devices and
+    // Profiler tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
+    panels_.push_back(MakeSettingsPanel(scene, *this));
     panels_.push_back(MakeDemosPanel(*this));
     panels_.push_back(MakePropertiesPanel(scene, selection_, history_, log_));
     panels_.push_back(MakeLogPanel(log_, theme_));
@@ -1971,27 +1992,43 @@ void Shell::DrawLightingMenu() {
 }
 
 void Shell::DrawSettingsMenu() {
-    MenuSection("Navigation");
-    float fov = static_cast<float>(glm::degrees(camera_.verticalFov));
-    ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
-    if (ImGui::SliderFloat("Field of view", &fov, 10.0f, 120.0f, "%.0f°")) {
-        camera_.verticalFov = glm::radians(static_cast<double>(fov));
+    // Ernie 1's: a submenu a topic, then the resets and the Settings panel.
+    if (ImGui::BeginMenu("    Navigation")) {
+        if (MenuAction("Frame Selection", "F", !selection_.Empty())) {
+            Frame();
+        }
+        if (MenuAction("Frame All")) {
+            camera_.Frame(WorldBounds(scene_, scene_.Children(Path::Root())));
+        }
+        float fov = static_cast<float>(glm::degrees(camera_.verticalFov));
+        ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
+        if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f, "%.0f deg")) {
+            camera_.verticalFov = glm::radians(static_cast<double>(fov));
+        }
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("    Eco Mode")) {
+        ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
+        MenuCheck("Pause Rendering When Still", display_.eco);
+        ImGui::PopItemFlag();
+        ImGui::BeginDisabled(!display_.eco);
+        ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
+        ImGui::SliderInt("Frames Without Change", &display_.ecoFrames, 1, 10'000, "%d",
+                         ImGuiSliderFlags_Logarithmic);
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
     }
     ImGui::Separator();
-    MenuSection("Eco Mode");
-    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
-    MenuCheck("Pause Rendering When Still", display_.eco);
-    ImGui::PopItemFlag();
-    ImGui::BeginDisabled(!display_.eco);
-    ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
-    ImGui::SliderInt("Frames without change", &display_.ecoFrames, 1, 10'000, "%d",
-                     ImGuiSliderFlags_Logarithmic);
-    ImGui::EndDisabled();
-    ImGui::Separator();
-    if (MenuAction("Reset Camera")) {
-        const double fovKept = camera_.verticalFov;
-        camera_ = OrbitCamera{.verticalFov = fovKept};
+    if (MenuAction("Reset To Defaults")) {
+        display_ = initialDisplay_;
+        camera_ = OrbitCamera{};
         Frame();
+    }
+    if (MenuAction("Preferences...")) {
+        if (Panel* settings = FindPanel("Settings")) {
+            settings->SetVisible(true);
+            ImGui::SetWindowFocus("Settings");
+        }
     }
 }
 
@@ -2942,7 +2979,132 @@ class CapturePanel final : public Panel {
     int every_ = 1;
 };
 
+/// After Ernie 1's Settings panel: a Render tab editing the scene's render settings, and a Viewer
+/// tab of what changes only the viewport.
+class SettingsPanel final : public Panel {
+  public:
+    SettingsPanel(Scene& scene, Shell& shell)
+        : Panel("Settings", Dock::Right), scene_(scene), shell_(shell),
+          fields_(scene, shell.History(), shell.Log()) {}
+
+    void Draw() override {
+        if (!ImGui::BeginTabBar("##settings")) {
+            return;
+        }
+        if (ImGui::BeginTabItem("Render")) {
+            DrawRender();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Viewer")) {
+            DrawViewer();
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+
+  private:
+    /// A row of the viewer's table: its label, then the field filling the rest.
+    static void Row(const char* label) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label);
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(-1.0f);
+    }
+
+    /// The render settings prim chosen, when the scene has several, and its fields.
+    void DrawRender() {
+        const std::vector<Path> settings = scene_.Prims(RenderSettings::kName);
+        if (settings.empty()) {
+            ImGui::TextDisabled("The scene has no render settings.");
+            if (ImGui::Button("Create Render Settings")) {
+                try {
+                    const Path path = FreeChildPath(scene_, Path::Root(), "RenderSettings");
+                    shell_.History().Define(scene_, path, RenderSettings::kName);
+                    chosen_ = path;
+                } catch (const std::exception& error) {
+                    shell_.Log().Error(error.what());
+                }
+            }
+            return;
+        }
+        if (std::ranges::find(settings, chosen_) == settings.end()) {
+            chosen_ = settings.front();
+        }
+        if (settings.size() > 1) {
+            ImGui::SetNextItemWidth(-1.0f);
+            if (ImGui::BeginCombo("##prim", chosen_.String().c_str())) {
+                for (const Path& path : settings) {
+                    if (ImGui::Selectable(path.String().c_str(), path == chosen_)) {
+                        chosen_ = path;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+        fields_.Draw(chosen_, {});
+    }
+
+    void DrawViewer() {
+        if (!ImGui::BeginTable("##viewer", 2, ImGuiTableFlags_SizingFixedFit)) {
+            return;
+        }
+        ViewportDisplay& display = shell_.Display();
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed,
+                                11.0f * ImGui::GetFontSize());
+        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+        // Minimal is the one renderer until the Realtime tier.
+        Row("Renderer");
+        if (ImGui::BeginCombo("##renderer", "Minimal")) {
+            ImGui::Selectable("Minimal", true);
+            ImGui::EndCombo();
+        }
+        Row("Lighting");
+        if (ImGui::BeginCombo("##lighting", LightingName(display.lighting))) {
+            for (const Lighting lighting : {Lighting::Camera, Lighting::Stage, Lighting::Default}) {
+                const bool available = lighting == Lighting::Camera;
+                if (ImGui::Selectable(LightingName(lighting), lighting == display.lighting,
+                                      available ? 0 : ImGuiSelectableFlags_Disabled)) {
+                    display.lighting = lighting;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        Row("Field of view");
+        OrbitCamera& camera = shell_.Camera();
+        float fov = static_cast<float>(glm::degrees(camera.verticalFov));
+        if (ImGui::SliderFloat("##fov", &fov, 10.0f, 120.0f, "%.0f°")) {
+            camera.verticalFov = glm::radians(static_cast<double>(fov));
+        }
+        Row("Eco mode");
+        ImGui::Checkbox("##eco", &display.eco);
+        ImGui::SetItemTooltip("Pause rendering when nothing has changed for a while");
+        Row("Frames without change");
+        ImGui::BeginDisabled(!display.eco);
+        ImGui::SliderInt("##ecoFrames", &display.ecoFrames, 1, 10'000, "%d",
+                         ImGuiSliderFlags_Logarithmic);
+        ImGui::EndDisabled();
+        Row("Heads up display");
+        ImGui::Checkbox("##hud", &display.hud);
+        Row("Toolbar");
+        ImGui::Checkbox("##toolbar", &display.toolbar);
+        Row("Timeline");
+        ImGui::Checkbox("##timeline", &display.timeline);
+        ImGui::EndTable();
+    }
+
+    Scene& scene_;
+    Shell& shell_;
+    PrimFields fields_;
+    Path chosen_;
+};
+
 }  // namespace
+
+std::unique_ptr<Panel> MakeSettingsPanel(Scene& scene, Shell& shell) {
+    return std::make_unique<SettingsPanel>(scene, shell);
+}
 
 std::unique_ptr<Panel> MakeDemosPanel(Shell& shell) {
     return std::make_unique<DemosPanel>(shell);

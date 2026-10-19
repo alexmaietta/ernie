@@ -111,6 +111,40 @@ TEST(Shell, ShowsAndHidesPanels) {
     EXPECT_EQ(shell.FindPanel("Nonesuch"), nullptr);
 }
 
+TEST(Shell, TabsSettingsBesideTheStageAndDrawsTheRenderSettings) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    frames.Draw(shell);
+    ImGui::SetWindowFocus("Settings");
+    frames.Draw(shell);
+    ASSERT_TRUE(UiFrames::Drawn("Settings"));
+    EXPECT_EQ(ImGui::FindWindowByName("Settings")->DockNode,
+              ImGui::FindWindowByName("Stage")->DockNode);
+    // With no render settings, offering to create them, then with some to edit.
+    RenderSettings::Define(scene, "/Render/Settings");
+    scene.Update();
+    frames.Draw(shell);
+    EXPECT_TRUE(UiFrames::Drawn("Settings"));
+}
+
+TEST(Shell, TakesTheTimelinesStripOffTheViewport) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    frames.Draw(shell);
+    frames.Draw(shell);
+    const float shown = shell.Viewport().second.y;
+    EXPECT_TRUE(UiFrames::Drawn("##timeline"));
+    shell.Display().timeline = false;
+    frames.Draw(shell);
+    EXPECT_FALSE(UiFrames::Drawn("##timeline"));
+    EXPECT_NEAR(shell.Viewport().second.y - shown,
+                ImGui::GetFrameHeight() + 2.0f * ImGui::GetStyle().WindowPadding.y, 1e-3f);
+}
+
 TEST(Shell, ShowsTheSelectedPrimsProperties) {
     const UiFrames frames;
     Scene scene;
