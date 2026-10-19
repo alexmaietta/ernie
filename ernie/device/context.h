@@ -15,6 +15,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -79,6 +80,12 @@ class DeviceContext {
     }
     /// @return Each distinct queue once.
     std::vector<Queue*> Queues() const;
+    /// @return The queues' distinct families. With more than one, buffers and images are shared
+    /// by all of them concurrently, so any queue reads what another wrote, ordered by tickets,
+    /// with no ownership transfers.
+    std::span<const std::uint32_t> QueueFamilies() const {
+        return families_;
+    }
 
     /// @brief Keeps `object` alive until every queue's work submitted so far is done.
     void Retire(std::shared_ptr<const void> object);
@@ -161,6 +168,7 @@ class DeviceContext {
     VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
     std::unique_ptr<GpuProfiler> profiler_;
     std::vector<std::unique_ptr<Queue>> queues_;
+    std::vector<std::uint32_t> families_;
     Queue* main_ = nullptr;
     Queue* compute_ = nullptr;
     Queue* transfer_ = nullptr;

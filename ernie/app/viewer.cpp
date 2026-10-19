@@ -108,6 +108,12 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
             pose_ = std::make_unique<DeviceColumn>(*arenas_, "viewport pose", DType::Float32,
                                                    std::vector<std::int64_t>{4}, 3);
             poseUploader_ = std::make_unique<Uploader>(*context_, context_->Main());
+            // On one queue, a trace and the UI run in turn whatever the order: tracing apart
+            // would only show each image a frame later.
+            async_ = options.asyncRender && &context_->Compute() != &context_->Main();
+            if (async_) {
+                deviceScene_->SetQueue(context_->Compute());
+            }
         }
         sampler_ = std::make_unique<Sampler>(
             *context_, SamplerDescription{.filter = Filter::Nearest, .address = Address::Clamp},
@@ -117,8 +123,12 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
 }
 
 Viewer::~Viewer() {
-    // Frames in flight sample the viewport and read the frame's columns.
-    Quietly([this] { context_->Main().Last().Wait(); });
+    // Frames and traces in flight sample the viewport and read the frame's columns.
+    Quietly([this] {
+        for (const Queue* queue : context_->Queues()) {
+            queue->Last().Wait();
+        }
+    });
 }
 
 void Viewer::Run() {
@@ -291,7 +301,10 @@ bool Viewer::Step() {
         ERNIE_ZONE("Update the scene");
         scene_.Update();
     }
-    ShowViewport();
+    {
+        ERNIE_ZONE("Show the viewport");
+        ShowViewport();
+    }
     {
         ERNIE_ZONE("Build the UI's draw data");
         ImGui::Render();
@@ -317,11 +330,22 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Run the frame");
-            if (!ecoPaused_) {
+            if (tracingNow_) {
                 deviceScene_->Follow(shell_->Camera().Eye());
-                TraceViewport();
+                const std::size_t slot = *tracingNow_;
+                slots_[slot].traced = TraceViewport(slot);
+                // The UI shows it this frame, waiting for it, or once it has finished.
+                if (slot == shown_) {
+                    traced_ = true;
+                } else {
+                    tracing_ = slot;
+                }
+            } else if (!camera_ && !ecoPaused_) {
+                // The device scene still follows the scene, with nothing to trace.
+                deviceScene_->Step([](graph::Graph&) {}, recorded_);
             }
             drawn = DrawUi(data, *target);
+            slots_[shown_].sampled = drawn;
         }
         inFlight_.push_back(drawn);
         if (const std::optional<Shell::Pick> pick = shell_->TakePick()) {
@@ -335,7 +359,10 @@ bool Viewer::Step() {
         ERNIE_ZONE("Present");
         presenter_->Present(drawn);
     }
-    context_->Collect();
+    {
+        ERNIE_ZONE("Free retired objects");
+        context_->Collect();
+    }
     ++frames_;
     return shell_->Open() && (options_.frames == 0 || frames_ < options_.frames);
 }
@@ -349,19 +376,48 @@ void Viewer::ShowViewport() {
     }
     ecoPaused_ = EcoPause();
     shell_->SetEcoPaused(ecoPaused_);
-    // A traced frame takes the other slot, so the last one's image stays whole while it renders.
-    if (!ecoPaused_ && camera_) {
-        shown_ = (shown_ + 1) % kSlots;
-    }
+    ChooseSlots();
     ImGui::GetBackgroundDrawList()->AddImage(slots_[shown_].texture, position,
                                              {position.x + size.x, position.y + size.y});
 }
 
+void Viewer::ChooseSlots() {
+    tracingNow_.reset();
+    if (!camera_) {
+        return;
+    }
+    // A finished trace is the newest image.
+    if (tracing_ && slots_[*tracing_].traced.Done()) {
+        shown_ = *std::exchange(tracing_, std::nullopt);
+        traced_ = true;
+    }
+    if (ecoPaused_) {
+        return;
+    }
+    // A trace always takes a slot other than the newest one's, so that image stays whole.
+    const std::size_t next = ((tracing_ ? *tracing_ : shown_) + 1) % kSlots;
+    const bool capturing = recording_ || shell_->ScreenshotRequested();
+    if (!async_ || capturing || !traced_) {
+        // This frame's own image, which the UI waits for.
+        tracingNow_ = next;
+        shown_ = next;
+        tracing_.reset();
+    } else if (!tracing_) {
+        tracingNow_ = next;
+    }
+}
+
 void Viewer::ResizeViewport(glm::uvec2 pixels) {
     ERNIE_ZONE("Resize the viewport");
-    // Frames in flight may still sample the old images.
-    context_->Main().Last().Wait();
+    // Frames and traces in flight may still use the old images.
+    for (const Queue* queue : context_->Queues()) {
+        queue->Last().Wait();
+    }
+    tracing_.reset();
+    traced_ = false;
     for (ViewportSlot& slot : slots_) {
+        slot.traced = {};
+        slot.sampled = {};
         if (slot.image) {
             renderer_->RemoveTexture(slot.texture);
             if (heap_) {
@@ -416,13 +472,9 @@ bool Viewer::EcoPause() {
            stillFrames_ >= static_cast<std::uint64_t>(std::max(display.ecoFrames, 1));
 }
 
-Ticket Viewer::TraceViewport() {
-    if (!camera_) {
-        // The device scene still follows the scene, with nothing to trace.
-        return deviceScene_->Step([](graph::Graph&) {}, recorded_);
-    }
+Ticket Viewer::TraceViewport(std::size_t index) {
     const OrbitCamera& orbit = shell_->Camera();
-    const ViewportSlot& slot = slots_[shown_];
+    const ViewportSlot& slot = slots_[index];
     const glm::uvec2 size(slot.image->Description().extent);
     const RecordedView view{.size = size,
                             .fov = orbit.verticalFov,
@@ -432,7 +484,8 @@ Ticket Viewer::TraceViewport() {
         ++recorded_;
     }
     {
-        // Its own submission, before the trace's recorded commands read it.
+        // Its own submission on the trace's queue, after the last trace read it and before
+        // this one's recorded commands do.
         ERNIE_ZONE("Upload the viewport pose");
         const glm::dmat4 relative =
             glm::translate(glm::dmat4(1.0), -deviceScene_->Transforms().Origin()) *
@@ -443,8 +496,11 @@ Ticket Viewer::TraceViewport() {
         graph::Graph graph(*context_, deviceScene_->Pool());
         std::array buffers{graph.Import(*pose_)};
         graph::AddUploadPass(graph, "Upload the viewport pose", *poseUploader_, buffers);
-        graph.Execute(context_->Main());
+        graph.Execute(deviceScene_->FrameQueue());
     }
+    // After the UI frames that sampled the slot's last image.
+    const std::span<const Ticket> sampled =
+        slot.sampled.timeline != nullptr ? std::span(&slot.sampled, 1) : std::span<const Ticket>();
     return deviceScene_->Step(
         [&](graph::Graph& graph) {
             CameraOutputs outputs{.colour = graph.Import(*slot.image, "viewport"),
@@ -458,12 +514,13 @@ Ticket Viewer::TraceViewport() {
                           .pose = graph.Import(*pose_)},
                          outputs);
         },
-        recorded_ * kSlots + shown_);
+        recorded_ * kSlots + index, sampled);
 }
 
 Ticket Viewer::DrawUi(ImDrawData& data, const FrameTarget& target) {
     graph::Graph graph(*context_, deviceScene_->Pool());
-    graph::Image viewport = graph.Import(*slots_[shown_].image, "viewport");
+    const ViewportSlot& shown = slots_[shown_];
+    graph::Image viewport = graph.Import(*shown.image, "viewport");
     if (!camera_) {
         graph.Add(
             "Viewport", graph::Kind::Copy,
@@ -485,7 +542,11 @@ Ticket Viewer::DrawUi(ImDrawData& data, const FrameTarget& target) {
             renderer_->Record(pass.commands.Handle(), data, target,
                               glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         });
-    return graph.Execute(context_->Main(), {}, target.semaphores);
+    // The shown trace has finished unless this frame waits for its own; waiting on it either
+    // way makes its writes visible across queues.
+    const std::span<const Ticket> traced =
+        shown.traced.timeline != nullptr ? std::span(&shown.traced, 1) : std::span<const Ticket>();
+    return graph.Execute(context_->Main(), traced, target.semaphores);
 }
 
 std::string_view ViewUsage() {

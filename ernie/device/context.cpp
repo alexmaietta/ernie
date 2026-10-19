@@ -187,6 +187,7 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
     main_ = chosen[0];
     compute_ = chosen[1];
     transfer_ = chosen[2];
+    families_ = distinct;
 
     pipelineCachePath_ = options.pipelineCache;
     const std::vector<std::byte> cached =

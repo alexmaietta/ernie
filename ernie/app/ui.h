@@ -494,6 +494,10 @@ class Shell {
     bool TakeScreenshot() {
         return std::exchange(screenshot_, false);
     }
+    /// @return Whether a screenshot is asked for this frame, leaving the request.
+    bool ScreenshotRequested() const {
+        return screenshot_;
+    }
     void RequestScreenshot() {
         screenshot_ = true;
     }

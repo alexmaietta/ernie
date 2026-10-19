@@ -56,6 +56,9 @@ DeviceImage::DeviceImage(DeviceContext& context, const ImageDescription& descrip
                          std::string_view name)
     : context_(context), description_(description) {
     const bool volume = description.extent.z > 1;
+    // Shared by every queue family, as buffers are.
+    const std::span<const std::uint32_t> families = context.QueueFamilies();
+    const bool concurrent = families.size() > 1;
     const VkImageCreateInfo info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = volume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D,
@@ -66,7 +69,9 @@ DeviceImage::DeviceImage(DeviceContext& context, const ImageDescription& descrip
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = ToVkUsage(description.usage),
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .sharingMode = concurrent ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = concurrent ? static_cast<std::uint32_t>(families.size()) : 0,
+        .pQueueFamilyIndices = concurrent ? families.data() : nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
     const VkPhysicalDeviceImageFormatInfo2 query{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,

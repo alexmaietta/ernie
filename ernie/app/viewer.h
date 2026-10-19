@@ -40,6 +40,9 @@ struct ViewerOptions {
     bool validation = false;
     /// Wait for the display's refresh; off by default, so frames show what they cost.
     bool vsync = false;
+    /// Trace the viewport on the compute queue, apart from the UI, when the device has one: the
+    /// UI keeps its rate, showing the newest finished image, however long a trace takes.
+    bool asyncRender = true;
     /// Where `RunView` saves the last frame drawn offscreen as a PNG; empty for nowhere.
     std::filesystem::path screenshot;
     ShellOptions shell;
@@ -71,6 +74,10 @@ class Viewer {
     /// @return Whether eco mode skipped rendering the last frame.
     bool EcoPaused() const {
         return ecoPaused_;
+    }
+    /// @return Whether the viewport is traced on the compute queue, apart from the UI.
+    bool AsyncRender() const {
+        return async_;
     }
     /// @return Whether the last frame's trace submitted commands recorded for an earlier frame
     /// again, as it does while only the camera's pose and device columns change.
@@ -117,11 +124,17 @@ class Viewer {
     void RecordFrame(const Ticket& drawn);
     /// @brief Ends the recording, encoding its frames into video when asked.
     void FinishSequence();
-    /// @brief Uploads the orbit camera's pose, then traces the shown slot through the device
-    /// scene's steps: replayed while the scene, the origin and the view's size, lens and
-    /// background stand, so only the pose and device columns change.
+    /// @brief Uploads the orbit camera's pose, then traces into slot `index` through the device
+    /// scene's steps, on its queue, after the UI frames that sampled the slot: replayed while
+    /// the scene, the origin and the view's size, lens and background stand, so only the pose
+    /// and device columns change.
     /// @return The trace's ticket.
-    Ticket TraceViewport();
+    Ticket TraceViewport(std::size_t index);
+    /// @brief Picks the slot the UI shows this frame, and the one it traces into, if any: the
+    /// newest finished trace's and the other, rendering apart from the UI; or the one traced
+    /// this frame, waited for, while captures need this frame's own image, before any trace
+    /// has finished, or without asynchronous rendering.
+    void ChooseSlots();
     /// @brief Submits the UI over the target, sampling the shown slot, which it clears to the
     /// theme's colour without ray queries.
     /// @return The frame's ticket.
@@ -148,12 +161,23 @@ class Viewer {
         ImTextureID texture = 0;
         BindlessIndex storage;
         std::unique_ptr<DeviceColumn> prims;
+        /// The last trace into it, and the last UI frame that sampled it.
+        Ticket traced;
+        Ticket sampled;
     };
-    /// Frames take turns tracing into the slots, each with a recorded frame of its own to replay.
+    /// Traces take turns among the slots, each with a recorded frame of its own to replay.
     static constexpr std::size_t kSlots = 2;
     std::array<ViewportSlot, kSlots> slots_;
-    /// The slot the UI shows: the one traced this frame, or the last while eco mode pauses.
+    /// The slot the UI shows: the newest finished trace's, or this frame's when it waits for it.
     std::size_t shown_ = 0;
+    /// Whether traces run on the compute queue, apart from the UI.
+    bool async_ = false;
+    /// The slot a trace still runs into, apart from the UI.
+    std::optional<std::size_t> tracing_;
+    /// Whether the shown slot holds a finished trace, so the UI need not wait for one.
+    bool traced_ = false;
+    /// What this frame does, as `ShowViewport` decided it: the slot it traces into, if any.
+    std::optional<std::size_t> tracingNow_;
     /// The orbit camera's pose, three rows relative to the render origin, uploaded each frame.
     std::unique_ptr<DeviceColumn> pose_;
     std::unique_ptr<Uploader> poseUploader_;

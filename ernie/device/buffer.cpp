@@ -18,10 +18,16 @@ VkBufferCreateInfo BufferInfo(const DeviceContext& context, std::uint64_t size,
             ? VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
             : 0;
+    // Shared by every queue family, so queues pass buffers to each other with tickets alone.
+    const std::span<const std::uint32_t> families = context.QueueFamilies();
     return {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = size,
             .usage = usage | kBufferUsage | acceleration,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+            .sharingMode =
+                families.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount =
+                families.size() > 1 ? static_cast<std::uint32_t>(families.size()) : 0,
+            .pQueueFamilyIndices = families.size() > 1 ? families.data() : nullptr};
 }
 
 void RequireExternal(const DeviceContext& context) {

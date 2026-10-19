@@ -115,7 +115,12 @@ TEST(Viewer, ReplaysItsTraceAsTheCameraMoves) {
     Scene scene;
     const PrimId ball = scene.Define("/Ball", "Sphere");
     scene.Set(ball, "radius", 2.0);
-    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 6, .validation = true};
+    // Each frame shows its own trace, so the image follows the camera at once.
+    ViewerOptions options{.size = {320, 240},
+                          .offscreen = true,
+                          .frames = 6,
+                          .validation = true,
+                          .asyncRender = false};
     options.shell.display.eco = false;
     const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
     if (!viewer) {
@@ -136,6 +141,42 @@ TEST(Viewer, ReplaysItsTraceAsTheCameraMoves) {
     const std::array<std::uint8_t, 4> texel = ReadTexel(*viewer, middle);
     const glm::vec4 clear = viewer->GetShell().GetTheme().viewport;
     EXPECT_NEAR(texel[0], std::round(clear.r * 255.0f), 2.0) << "the background, past the ball";
+    test::ExpectClean(viewer->Context());
+}
+
+TEST(Viewer, TracesApartFromTheUiOnTheComputeQueue) {
+    Scene scene;
+    const PrimId ball = scene.Define("/Ball", "Sphere");
+    scene.Set(ball, "radius", 2.0);
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 6, .validation = true};
+    options.shell.display.eco = false;
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    if (!viewer->Context().Capabilities().rayQuery) {
+        GTEST_SKIP() << viewer->Context().Info().name << " has no ray queries";
+    }
+    if (&viewer->Context().Compute() == &viewer->Context().Main()) {
+        GTEST_SKIP() << viewer->Context().Info().name << " has no compute queue of its own";
+    }
+    EXPECT_TRUE(viewer->AsyncRender());
+    viewer->Run();
+    const auto [origin, size] = viewer->GetShell().Viewport();
+    const glm::uvec2 middle(static_cast<std::uint32_t>(origin.x + 0.5f * size.x),
+                            static_cast<std::uint32_t>(origin.y + 0.5f * size.y));
+    const float clear = std::round(viewer->GetShell().GetTheme().viewport.r * 255.0f);
+    EXPECT_GT(ReadTexel(*viewer, middle)[0], clear + 40) << "the ball";
+
+    // The UI shows the newest finished trace: the camera's move reaches the image within a few
+    // frames, however the two queues interleave.
+    viewer->GetShell().Camera().target += glm::dvec3(8.0, 0.0, 0.0);
+    bool moved = false;
+    for (int frame = 0; frame < 20 && !moved; ++frame) {
+        viewer->RunFrames(1);
+        moved = std::abs(ReadTexel(*viewer, middle)[0] - clear) <= 2.0f;
+    }
+    EXPECT_TRUE(moved) << "the background, past the ball";
     test::ExpectClean(viewer->Context());
 }
 

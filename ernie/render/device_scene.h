@@ -86,6 +86,13 @@ class DeviceScene {
     /// @return The frame's ticket.
     Ticket Step(const std::function<void(graph::Graph&)>& passes, std::uint64_t key,
                 std::span<const Ticket> waits = {});
+    /// @brief Runs frames on `queue` from now on, the main queue to begin with: the compute
+    /// queue runs them apart from a UI drawing on the main one. Frames on another queue wait
+    /// for the main queue's work submitted before them.
+    void SetQueue(Queue& queue);
+    Queue& FrameQueue() const {
+        return *queue_;
+    }
     /// @return Whether the last `Step` replayed a captured frame.
     bool Replayed() const {
         return replayed_;
@@ -111,9 +118,12 @@ class DeviceScene {
     void AddFrame(graph::Graph& graph, const std::function<void(graph::Graph&)>& passes);
     /// @return Whether no work waits for a later frame.
     bool Settled() const;
+    /// @return `waits`, and on a queue other than the main one, the main queue's last ticket.
+    std::vector<Ticket> Waits(std::span<const Ticket> waits) const;
 
     DeviceContext& context_;
     const Scene& scene_;
+    Queue* queue_;
     graph::TransientPool pool_;
     SceneColumns columns_;
     TransformGraph transforms_;

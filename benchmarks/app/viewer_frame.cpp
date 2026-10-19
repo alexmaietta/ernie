@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file viewer_frame.cpp
-/// @brief The viewer's frame on the host: an offscreen 1920 x 1080 viewer over a scene of a few
-/// hundred prims, tracing every frame (eco mode off), its host time split by profiler zone.
+/// @brief The viewer's frame: an offscreen 1920 x 1080 viewer over a scene of a few hundred
+/// prims, eco mode off, its time split by host and device profiler zone. `app.viewer_frame`
+/// traces apart from the UI where the device has a compute queue; `app.viewer_frame_sync` traces
+/// every frame before its UI.
 #include "benchmarks/bench.h"
 #include "ernie/app/viewer.h"
 #include "ernie/scene/schema/geom.h"
@@ -9,9 +11,11 @@
 #include "ernie/scene/xform.h"
 #include "ernie/util/profiler.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ernie::bench {
@@ -75,10 +79,11 @@ Average(const std::vector<profiler::Frame>& frames,
     return averages;
 }
 
-Timing RunViewerFrame() {
+Timing RunViewerFrame(bool async) {
     Scene scene;
     BuildScene(scene);
-    app::ViewerOptions options{.size = {1920, 1080}, .offscreen = true, .frames = kWarmup};
+    app::ViewerOptions options{
+        .size = {1920, 1080}, .offscreen = true, .frames = kWarmup, .asyncRender = async};
     options.shell.display.eco = false;
     // Zones every frame, not only while the Profiler panel's tab shows.
     options.shell.profile = true;
@@ -92,13 +97,30 @@ Timing RunViewerFrame() {
     viewer.RunFrames(kMeasured);
     profiler::SetEnabled(false);
     const std::vector<profiler::Frame> frames = profiler::Frames();
-    double frameMs = 0.0;
+    std::vector<double> durations;
     for (const profiler::Frame& frame : frames) {
-        frameMs += static_cast<double>(frame.end - frame.start) * 1e-6;
+        durations.push_back(static_cast<double>(frame.end - frame.start) * 1e-6);
     }
-    frameMs /= static_cast<double>(frames.size());
-    std::printf("  %zu frames of 1920 x 1080, %d prims: %.3f ms a frame\n", frames.size(),
-                kGroups * (kShapesPerGroup + 1) + 1, frameMs);
+    std::ranges::sort(durations);
+    double frameMs = 0.0;
+    for (const double ms : durations) {
+        frameMs += ms;
+    }
+    frameMs /= static_cast<double>(durations.size());
+    std::printf("  median %.3f ms, slowest %.3f ms a frame\n", durations[durations.size() / 2],
+                durations.back());
+    // A trace uploads the pose first: the frames that started one.
+    const auto traced = std::ranges::count_if(frames, [](const profiler::Frame& frame) {
+        return std::ranges::any_of(frame.cpu, [](const profiler::Zone& zone) {
+            return std::string_view(zone.name) == "Upload the viewport pose";
+        });
+    });
+    std::printf("  %zu frames of 1920 x 1080, %d prims, %s: %.3f ms a frame, %.0f frames and "
+                "%.0f traces a second\n",
+                frames.size(), kGroups * (kShapesPerGroup + 1) + 1,
+                viewer.AsyncRender() ? "tracing apart from the UI" : "tracing each frame", frameMs,
+                1e3 / frameMs,
+                static_cast<double>(traced) / static_cast<double>(frames.size()) * 1e3 / frameMs);
     for (const auto& [title, zones, deepest] :
          {std::tuple("Host", &profiler::Frame::cpu, 2u), {"Device", &profiler::Frame::gpu, 2u}}) {
         std::printf("  %s\n", title);
@@ -109,7 +131,9 @@ Timing RunViewerFrame() {
     return {.ms = frameMs, .targetMs = 1.0};
 }
 
-const bool kRegistered = Register("app.viewer_frame", RunViewerFrame);
+const bool kRegistered = Register("app.viewer_frame", [] { return RunViewerFrame(true); });
+const bool kRegisteredSync =
+    Register("app.viewer_frame_sync", [] { return RunViewerFrame(false); });
 
 }  // namespace
 }  // namespace ernie::bench

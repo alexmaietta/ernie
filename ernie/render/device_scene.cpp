@@ -12,9 +12,9 @@ namespace ernie {
 
 DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
                          const ShaderCompiler& compiler, WorldCapacities capacities)
-    : context_(context), scene_(scene), pool_(context), columns_(context, arenas, scene),
-      transforms_(context, arenas, scene, compiler), geometry_(context, arenas, scene),
-      instances_(context, arenas, scene, compiler, capacities) {
+    : context_(context), scene_(scene), queue_(&context.Main()), pool_(context),
+      columns_(context, arenas, scene), transforms_(context, arenas, scene, compiler),
+      geometry_(context, arenas, scene), instances_(context, arenas, scene, compiler, capacities) {
     if (context.Capabilities().rayQuery) {
         tracer_ = std::make_unique<RayTracer>(context, arenas, compiler, geometry_);
     }
@@ -35,11 +35,27 @@ Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,
     captured_.clear();
     graph::Graph graph(context_, pool_);
     AddFrame(graph, passes);
-    return graph.Execute(context_.Main(), waits, binary);
+    return graph.Execute(*queue_, Waits(waits), binary);
+}
+
+void DeviceScene::SetQueue(Queue& queue) {
+    queue_ = &queue;
+    // Recorded commands belong to their queue.
+    captured_.clear();
+}
+
+std::vector<Ticket> DeviceScene::Waits(std::span<const Ticket> waits) const {
+    std::vector<Ticket> all(waits.begin(), waits.end());
+    // The main queue's work the frame may read: columns' resizes, bindings' first values.
+    if (queue_ != &context_.Main()) {
+        all.push_back(context_.Main().Last());
+    }
+    return all;
 }
 
 Ticket DeviceScene::Step(const std::function<void(graph::Graph&)>& passes, std::uint64_t key,
-                         std::span<const Ticket> waits) {
+                         std::span<const Ticket> given) {
+    const std::vector<Ticket> waits = Waits(given);
     const CaptureKey now{scene_.Store().Version(), transforms_.Origin(), key};
     // Frames of another version or origin record what no longer stands.
     std::erase_if(captured_, [&](const Captured& frame) {
@@ -58,12 +74,12 @@ Ticket DeviceScene::Step(const std::function<void(graph::Graph&)>& passes, std::
     graph::Graph graph(context_, pool_);
     AddFrame(graph, passes);
     if (!Settled() || !graph.Capturable()) {
-        return graph.Execute(context_.Main(), waits);
+        return graph.Execute(*queue_, waits);
     }
     if (captured_.size() == kKeptFrames) {
         captured_.erase(captured_.begin());
     }
-    captured_.push_back({now, graph.Capture(context_.Main())});
+    captured_.push_back({now, graph.Capture(*queue_)});
     return captured_.back().graph->Submit(waits);
 }
 
