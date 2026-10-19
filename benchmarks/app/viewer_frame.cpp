@@ -109,10 +109,10 @@ Timing RunViewerFrame(bool async) {
     frameMs /= static_cast<double>(durations.size());
     std::printf("  median %.3f ms, slowest %.3f ms a frame\n", durations[durations.size() / 2],
                 durations.back());
-    // A trace uploads the pose first: the frames that started one.
+    // A trace writes its pose first: the frames that started one.
     const auto traced = std::ranges::count_if(frames, [](const profiler::Frame& frame) {
         return std::ranges::any_of(frame.cpu, [](const profiler::Zone& zone) {
-            return std::string_view(zone.name) == "Upload the viewport pose";
+            return std::string_view(zone.name) == "Write the viewport pose";
         });
     });
     std::printf("  %zu frames of 1920 x 1080, %d prims, %s: %.3f ms a frame, %.0f frames and "

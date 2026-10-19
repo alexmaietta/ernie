@@ -154,33 +154,35 @@ class Viewer {
     std::unique_ptr<BindlessHeap> heap_;
     std::unique_ptr<CameraPass> camera_;
     std::unique_ptr<Sampler> sampler_;
-    /// An image the viewport is rendered into, the UI's texture of it, its storage slot, and each
-    /// pixel's prim slot, which picking reads (null without ray queries).
+    /// An image the viewport is rendered into, the UI's texture of it, its storage slot, each
+    /// pixel's prim slot, which picking reads, and the orbit camera's pose its trace reads, three
+    /// rows relative to the render origin, written from the host (null without ray queries).
     struct ViewportSlot {
         std::unique_ptr<DeviceImage> image;
         ImTextureID texture = 0;
         BindlessIndex storage;
         std::unique_ptr<DeviceColumn> prims;
+        std::unique_ptr<Buffer> pose;
         /// The last trace into it, and the last UI frame that sampled it.
         Ticket traced;
         Ticket sampled;
     };
-    /// Traces take turns among the slots, each with a recorded frame of its own to replay.
-    static constexpr std::size_t kSlots = 2;
+    /// A pose's bytes: three rows of four floats.
+    static constexpr std::uint64_t kPoseBytes = 3 * sizeof(glm::vec4);
+    /// Traces take turns among the slots, each with a recorded frame of its own to replay: one
+    /// shown and up to two tracing, so the compute queue runs one trace after another.
+    static constexpr std::size_t kSlots = 3;
     std::array<ViewportSlot, kSlots> slots_;
     /// The slot the UI shows: the newest finished trace's, or this frame's when it waits for it.
     std::size_t shown_ = 0;
     /// Whether traces run on the compute queue, apart from the UI.
     bool async_ = false;
-    /// The slot a trace still runs into, apart from the UI.
-    std::optional<std::size_t> tracing_;
+    /// The slots traces still run into, apart from the UI, oldest first.
+    std::deque<std::size_t> tracing_;
     /// Whether the shown slot holds a finished trace, so the UI need not wait for one.
     bool traced_ = false;
     /// What this frame does, as `ShowViewport` decided it: the slot it traces into, if any.
     std::optional<std::size_t> tracingNow_;
-    /// The orbit camera's pose, three rows relative to the render origin, uploaded each frame.
-    std::unique_ptr<DeviceColumn> pose_;
-    std::unique_ptr<Uploader> poseUploader_;
     /// What the trace records besides the pose; a change, or new slots, records anew.
     struct RecordedView {
         glm::uvec2 size{0};

@@ -14,6 +14,7 @@
 #include <imgui.h>
 
 #include <charconv>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -105,9 +106,6 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
         if (deviceScene_->Tracer() != nullptr) {
             heap_ = std::make_unique<BindlessHeap>(*context_);
             camera_ = std::make_unique<CameraPass>(*context_, compiler, *heap_);
-            pose_ = std::make_unique<DeviceColumn>(*arenas_, "viewport pose", DType::Float32,
-                                                   std::vector<std::int64_t>{4}, 3);
-            poseUploader_ = std::make_unique<Uploader>(*context_, context_->Main());
             // On one queue, a trace and the UI run in turn whatever the order: tracing apart
             // would only show each image a frame later.
             async_ = options.asyncRender && &context_->Compute() != &context_->Main();
@@ -338,7 +336,7 @@ bool Viewer::Step() {
                 if (slot == shown_) {
                     traced_ = true;
                 } else {
-                    tracing_ = slot;
+                    tracing_.push_back(slot);
                 }
             } else if (!camera_ && !ecoPaused_) {
                 // The device scene still follows the scene, with nothing to trace.
@@ -386,23 +384,28 @@ void Viewer::ChooseSlots() {
     if (!camera_) {
         return;
     }
-    // A finished trace is the newest image.
-    if (tracing_ && slots_[*tracing_].traced.Done()) {
-        shown_ = *std::exchange(tracing_, std::nullopt);
+    // Traces finish in order on their queue: the newest finished one is shown.
+    while (!tracing_.empty() && slots_[tracing_.front()].traced.Done()) {
+        shown_ = tracing_.front();
+        tracing_.pop_front();
         traced_ = true;
     }
     if (ecoPaused_) {
         return;
     }
-    // A trace always takes a slot other than the newest one's, so that image stays whole.
-    const std::size_t next = ((tracing_ ? *tracing_ : shown_) + 1) % kSlots;
+    // A trace takes a slot neither shown nor tracing, so their images stay whole.
+    std::size_t next = 0;
+    while (next == shown_ || std::ranges::find(tracing_, next) != tracing_.end()) {
+        ++next;
+    }
     const bool capturing = recording_ || shell_->ScreenshotRequested();
     if (!async_ || capturing || !traced_) {
-        // This frame's own image, which the UI waits for.
+        // This frame's own image, which the UI waits for; older traces, still running, show
+        // nothing newer.
         tracingNow_ = next;
         shown_ = next;
-        tracing_.reset();
-    } else if (!tracing_) {
+        tracing_.clear();
+    } else if (tracing_.size() < kSlots - 1) {
         tracingNow_ = next;
     }
 }
@@ -413,7 +416,7 @@ void Viewer::ResizeViewport(glm::uvec2 pixels) {
     for (const Queue* queue : context_->Queues()) {
         queue->Last().Wait();
     }
-    tracing_.reset();
+    tracing_.clear();
     traced_ = false;
     for (ViewportSlot& slot : slots_) {
         slot.traced = {};
@@ -436,6 +439,10 @@ void Viewer::ResizeViewport(glm::uvec2 pixels) {
             slot.prims = std::make_unique<DeviceColumn>(*arenas_, "viewport prims", DType::UInt32,
                                                         std::vector<std::int64_t>{},
                                                         std::uint64_t{pixels.x} * pixels.y);
+            if (!slot.pose) {
+                slot.pose = std::make_unique<Buffer>(*context_, kPoseBytes, MemoryUse::Upload,
+                                                     "viewport pose");
+            }
         }
     }
     // The recorded frames name the old images.
@@ -474,7 +481,7 @@ bool Viewer::EcoPause() {
 
 Ticket Viewer::TraceViewport(std::size_t index) {
     const OrbitCamera& orbit = shell_->Camera();
-    const ViewportSlot& slot = slots_[index];
+    ViewportSlot& slot = slots_[index];
     const glm::uvec2 size(slot.image->Description().extent);
     const RecordedView view{.size = size,
                             .fov = orbit.verticalFov,
@@ -484,19 +491,18 @@ Ticket Viewer::TraceViewport(std::size_t index) {
         ++recorded_;
     }
     {
-        // Its own submission on the trace's queue, after the last trace read it and before
-        // this one's recorded commands do.
-        ERNIE_ZONE("Upload the viewport pose");
+        // Written in place from the host once the slot's last trace, which read it, is done:
+        // the submission makes it visible to this one.
+        ERNIE_ZONE("Write the viewport pose");
+        if (slot.traced.timeline != nullptr) {
+            slot.traced.Wait();
+        }
         const glm::dmat4 relative =
             glm::translate(glm::dmat4(1.0), -deviceScene_->Transforms().Origin()) *
             orbit.Transform();
         const std::array<glm::vec4, 3> rows = ToAffineRows(relative);
-        poseUploader_->Write(pose_->Storage(), pose_->Range().offset,
-                             std::span<const glm::vec4>(rows));
-        graph::Graph graph(*context_, deviceScene_->Pool());
-        std::array buffers{graph.Import(*pose_)};
-        graph::AddUploadPass(graph, "Upload the viewport pose", *poseUploader_, buffers);
-        graph.Execute(deviceScene_->FrameQueue());
+        std::memcpy(slot.pose->Mapped().data(), rows.data(), kPoseBytes);
+        slot.pose->Flush(0, kPoseBytes);
     }
     // After the UI frames that sampled the slot's last image.
     const std::span<const Ticket> sampled =
@@ -511,7 +517,7 @@ Ticket Viewer::TraceViewport(std::size_t index) {
                          {.cameraToWorld = orbit.Transform(),
                           .size = size,
                           .lens = MakePinhole(orbit.verticalFov, size),
-                          .pose = graph.Import(*pose_)},
+                          .pose = graph.Import(*slot.pose, 0, kPoseBytes, "viewport pose")},
                          outputs);
         },
         recorded_ * kSlots + index, sampled);
