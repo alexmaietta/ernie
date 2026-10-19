@@ -11,6 +11,7 @@
 #include "ernie/device/context.h"
 #include "ernie/scene/json.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/render.h"
 #include "ernie/scene/tokens.h"
@@ -40,6 +41,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
+#include <numbers>
 #include <span>
 #include <stdexcept>
 #include <type_traits>
@@ -145,6 +147,211 @@ class LogPanel final : public Panel {
     std::array<char, 128> filter_{};
 };
 
+// Prim type icons in the manner of Kit's stage icons, drawn as vectors so they are crisp at any
+// size with no image assets.
+
+ImU32 Rgb(int r, int g, int b, int a = 255) {
+    return IM_COL32(r, g, b, a);
+}
+
+/// A point of an icon's square: (u, v) in [0, 1] from its top-left corner, or a length in it.
+struct IconFrame {
+    ImVec2 corner;
+    float size;
+
+    ImVec2 operator()(float u, float v) const {
+        return {corner.x + u * size, corner.y + v * size};
+    }
+    float operator()(float length) const {
+        return length * size;
+    }
+};
+
+constexpr ImU32 kLamp = IM_COL32(226, 220, 132, 255);
+
+void DrawTripod(ImDrawList* draw, const IconFrame& at) {
+    const float width = std::max(1.2f, at(0.09f));
+    const ImVec2 centre = at(0.5f, 0.58f);
+    draw->AddLine(centre, at(0.5f, 0.1f), Rgb(110, 200, 90), width);
+    draw->AddLine(centre, at(0.1f, 0.86f), Rgb(225, 80, 70), width);
+    draw->AddLine(centre, at(0.9f, 0.86f), Rgb(80, 140, 235), width);
+}
+
+void DrawFolder(ImDrawList* draw, const IconFrame& at) {
+    draw->AddRectFilled(at(0.08f, 0.2f), at(0.45f, 0.38f), Rgb(74, 85, 88), at(0.06f));
+    draw->AddRectFilled(at(0.08f, 0.3f), at(0.92f, 0.82f), Rgb(96, 108, 112), at(0.08f));
+}
+
+/// A cube in three-quarter view, its faces lit from above-left.
+void DrawCube(ImDrawList* draw, const IconFrame& at, float scale = 1.0f, ImVec2 offset = {}) {
+    const auto p = [&](float u, float v) {
+        return at(offset.x + 0.5f + (u - 0.5f) * scale, offset.y + 0.5f + (v - 0.5f) * scale);
+    };
+    const std::array top{p(0.5f, 0.1f), p(0.9f, 0.3f), p(0.5f, 0.5f), p(0.1f, 0.3f)};
+    const std::array left{p(0.1f, 0.3f), p(0.5f, 0.5f), p(0.5f, 0.92f), p(0.1f, 0.72f)};
+    const std::array right{p(0.5f, 0.5f), p(0.9f, 0.3f), p(0.9f, 0.72f), p(0.5f, 0.92f)};
+    draw->AddConvexPolyFilled(top.data(), 4, Rgb(150, 160, 164));
+    draw->AddConvexPolyFilled(left.data(), 4, Rgb(104, 114, 118));
+    draw->AddConvexPolyFilled(right.data(), 4, Rgb(74, 85, 88));
+}
+
+/// A shaded ball: a base colour and a highlight up and to the left.
+void DrawBall(ImDrawList* draw, const IconFrame& at, ImU32 base, ImU32 middle, ImU32 highlight) {
+    draw->AddCircleFilled(at(0.5f, 0.52f), at(0.4f), base);
+    draw->AddCircleFilled(at(0.44f, 0.44f), at(0.28f), middle);
+    draw->AddCircleFilled(at(0.38f, 0.36f), at(0.11f), highlight);
+}
+
+void DrawCylinder(ImDrawList* draw, const IconFrame& at, bool cone) {
+    const ImU32 side = Rgb(96, 108, 112);
+    if (cone) {
+        draw->AddTriangleFilled(at(0.5f, 0.08f), at(0.88f, 0.8f), at(0.12f, 0.8f), side);
+        draw->AddEllipseFilled(at(0.5f, 0.8f), ImVec2(at(0.38f), at(0.12f)), Rgb(74, 85, 88));
+        return;
+    }
+    draw->AddRectFilled(at(0.15f, 0.26f), at(0.85f, 0.8f), side);
+    draw->AddEllipseFilled(at(0.5f, 0.8f), ImVec2(at(0.35f), at(0.12f)), side);
+    draw->AddEllipseFilled(at(0.5f, 0.26f), ImVec2(at(0.35f), at(0.12f)), Rgb(150, 160, 164));
+}
+
+void DrawSun(ImDrawList* draw, const IconFrame& at) {
+    draw->AddCircleFilled(at(0.5f, 0.5f), at(0.2f), kLamp);
+    for (int k = 0; k < 8; ++k) {
+        const float a = static_cast<float>(k) * std::numbers::pi_v<float> / 4.0f;
+        draw->AddLine(at(0.5f + 0.3f * std::cos(a), 0.5f + 0.3f * std::sin(a)),
+                      at(0.5f + 0.44f * std::cos(a), 0.5f + 0.44f * std::sin(a)), kLamp,
+                      std::max(1.0f, at(0.07f)));
+    }
+}
+
+void DrawBulb(ImDrawList* draw, const IconFrame& at) {
+    draw->AddCircleFilled(at(0.5f, 0.4f), at(0.28f), kLamp);
+    draw->AddRectFilled(at(0.38f, 0.64f), at(0.62f, 0.9f), Rgb(150, 160, 164), at(0.04f));
+}
+
+void DrawLightPanel(ImDrawList* draw, const IconFrame& at, bool disk) {
+    if (disk) {
+        draw->AddEllipseFilled(at(0.5f, 0.32f), ImVec2(at(0.38f), at(0.16f)), kLamp);
+    } else {
+        const std::array quad{at(0.22f, 0.16f), at(0.92f, 0.16f), at(0.78f, 0.46f),
+                              at(0.08f, 0.46f)};
+        draw->AddConvexPolyFilled(quad.data(), 4, kLamp);
+    }
+    for (const float u : {0.3f, 0.5f, 0.7f}) {
+        draw->AddLine(at(u, 0.56f), at(u, 0.9f), kLamp, std::max(1.0f, at(0.07f)));
+    }
+}
+
+void DrawDome(ImDrawList* draw, const IconFrame& at) {
+    draw->PathArcTo(at(0.5f, 0.72f), at(0.38f), std::numbers::pi_v<float>,
+                    2.0f * std::numbers::pi_v<float>, 16);
+    draw->PathFillConvex(kLamp);
+    draw->AddLine(at(0.08f, 0.76f), at(0.92f, 0.76f), kLamp, std::max(1.0f, at(0.08f)));
+}
+
+/// A five-pointed star with a smaller one beside it.
+void DrawStars(ImDrawList* draw, const IconFrame& at) {
+    const auto star = [&](float u, float v, float outer) {
+        std::array<ImVec2, 10> points{};
+        for (int k = 0; k < 10; ++k) {
+            const float a = -0.5f * std::numbers::pi_v<float> +
+                            static_cast<float>(k) * std::numbers::pi_v<float> / 5.0f;
+            const float r = k % 2 == 0 ? outer : 0.42f * outer;
+            points[static_cast<std::size_t>(k)] = at(u + r * std::cos(a), v + r * std::sin(a));
+        }
+        // Not convex: a fan of triangles from the centre.
+        for (std::size_t k = 0; k < points.size(); ++k) {
+            draw->AddTriangleFilled(at(u, v), points[k], points[(k + 1) % points.size()], kLamp);
+        }
+    };
+    star(0.42f, 0.56f, 0.38f);
+    star(0.8f, 0.2f, 0.16f);
+}
+
+void DrawCameraIcon(ImDrawList* draw, const IconFrame& at) {
+    const ImU32 body = Rgb(150, 160, 164);
+    draw->AddRectFilled(at(0.08f, 0.32f), at(0.66f, 0.78f), body, at(0.08f));
+    draw->AddTriangleFilled(at(0.66f, 0.55f), at(0.94f, 0.32f), at(0.94f, 0.78f), body);
+    draw->AddCircleFilled(at(0.26f, 0.22f), at(0.1f), body);
+    draw->AddCircleFilled(at(0.48f, 0.2f), at(0.12f), body);
+}
+
+void DrawPlaneIcon(ImDrawList* draw, const IconFrame& at) {
+    const std::array quad{at(0.3f, 0.3f), at(0.95f, 0.3f), at(0.7f, 0.78f), at(0.05f, 0.78f)};
+    draw->AddConvexPolyFilled(quad.data(), 4, Rgb(104, 114, 118));
+    draw->AddLine(at(0.5f, 0.3f), at(0.38f, 0.78f), Rgb(150, 160, 164), 1.0f);
+    draw->AddLine(at(0.18f, 0.54f), at(0.83f, 0.54f), Rgb(150, 160, 164), 1.0f);
+}
+
+void DrawMountain(ImDrawList* draw, const IconFrame& at) {
+    draw->AddTriangleFilled(at(0.36f, 0.22f), at(0.72f, 0.84f), at(0.02f, 0.84f),
+                            Rgb(120, 140, 96));
+    draw->AddTriangleFilled(at(0.66f, 0.38f), at(0.98f, 0.84f), at(0.36f, 0.84f),
+                            Rgb(150, 126, 92));
+    draw->AddTriangleFilled(at(0.36f, 0.22f), at(0.45f, 0.38f), at(0.27f, 0.38f),
+                            Rgb(230, 232, 234));
+}
+
+void DrawFilm(ImDrawList* draw, const IconFrame& at) {
+    const ImU32 colour = Rgb(127, 166, 194);
+    draw->AddRect(at(0.1f, 0.18f), at(0.9f, 0.82f), colour, at(0.06f), 0,
+                  std::max(1.2f, at(0.08f)));
+    for (const float u : {0.24f, 0.42f, 0.6f, 0.78f}) {
+        draw->AddRectFilled(at(u - 0.05f, 0.25f), at(u + 0.05f, 0.32f), colour);
+        draw->AddRectFilled(at(u - 0.05f, 0.68f), at(u + 0.05f, 0.75f), colour);
+    }
+}
+
+void DrawUntyped(ImDrawList* draw, const IconFrame& at) {
+    draw->AddCircle(at(0.5f, 0.5f), at(0.24f), Rgb(110, 120, 124), 0, std::max(1.2f, at(0.08f)));
+}
+
+/// @brief Draws a prim type's icon in the square at `corner`, `size` pixels a side.
+void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::string_view type) {
+    const IconFrame at{corner, size};
+    const auto is = [&](std::initializer_list<std::string_view> types) {
+        return std::ranges::find(types, type) != types.end();
+    };
+    if (type == "Xform") {
+        DrawTripod(draw, at);
+    } else if (type.empty() || type == "Scope") {
+        // Untyped prims group others, as folders do.
+        DrawFolder(draw, at);
+    } else if (is({"Sphere", "Capsule"})) {
+        DrawBall(draw, at, Rgb(74, 85, 88), Rgb(104, 114, 118), Rgb(170, 178, 182));
+    } else if (is({"Cylinder", "Cone"})) {
+        DrawCylinder(draw, at, type == "Cone");
+    } else if (is({"Mesh", "Cube", "Points", "OpenVDBAsset", "NanoVDBField", "DenseField"})) {
+        DrawCube(draw, at);
+    } else if (is({"Plane", "GroundPlane"})) {
+        DrawPlaneIcon(draw, at);
+    } else if (type == "PointInstancer") {
+        DrawCube(draw, at, 0.55f, {-0.2f, 0.18f});
+        DrawCube(draw, at, 0.55f, {0.2f, 0.18f});
+        DrawCube(draw, at, 0.55f, {0.0f, -0.18f});
+    } else if (is({"Material", "Shader", "NodeGraph"})) {
+        DrawBall(draw, at, Rgb(110, 92, 140), Rgb(150, 128, 178), Rgb(206, 198, 214));
+    } else if (type == "DistantLight") {
+        DrawSun(draw, at);
+    } else if (is({"SphereLight", "CylinderLight", "LaserLight"})) {
+        DrawBulb(draw, at);
+    } else if (is({"RectLight", "DiskLight", "PortalLight"})) {
+        DrawLightPanel(draw, at, type == "DiskLight");
+    } else if (is({"DomeLight", "Atmosphere"})) {
+        DrawDome(draw, at);
+    } else if (type == "StarField") {
+        DrawStars(draw, at);
+    } else if (type == "Camera") {
+        DrawCameraIcon(draw, at);
+    } else if (type == "Terrain") {
+        DrawMountain(draw, at);
+    } else if (is({"RenderSettings", "RenderProduct", "RenderVar", "RenderPass"})) {
+        DrawFilm(draw, at);
+    } else {
+        DrawUntyped(draw, at);
+    }
+}
+
 class StagePanel final : public Panel {
   public:
     StagePanel(const Scene& scene, Selection& selection)
@@ -202,8 +409,19 @@ class StagePanel final : public Panel {
         if (Searching()) {
             ImGui::SetNextItemOpen(true);
         }
+        // Room before the name for the type's icon, drawn once the node has its place.
+        const std::string_view type = scene_.TypeName(scene_.Require(path));
+        const float icon = ImGui::GetTextLineHeight();
         const std::string name(path.Name());
-        const bool open = ImGui::TreeNodeEx(path.String().c_str(), flags, "%s", name.c_str());
+        const bool open =
+            ImGui::TreeNodeEx(path.String().c_str(), flags, "%*s%s",
+                              static_cast<int>(std::ceil(1.4f * icon / ImGui::CalcTextSize(" ").x)),
+                              "", name.c_str());
+        const ImVec2 row = ImGui::GetItemRectMin();
+        DrawPrimIcon(ImGui::GetWindowDrawList(),
+                     ImVec2(row.x + ImGui::GetTreeNodeToLabelSpacing(),
+                            row.y + 0.5f * (ImGui::GetItemRectSize().y - icon)),
+                     icon, type);
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
             if (ImGui::GetIO().KeyCtrl) {
                 selection_.Toggle(path);
@@ -211,7 +429,7 @@ class StagePanel final : public Panel {
                 selection_.Set(path);
             }
         }
-        TableTexts({scene_.TypeName(scene_.Require(path))});
+        TableTexts({type});
         if (open && !leaf) {
             DrawChildren(path);
             ImGui::TreePop();
@@ -1305,6 +1523,14 @@ glm::dmat4 OrbitCamera::Transform() const {
     return glm::inverse(glm::lookAtRH(Eye(), target, glm::dvec3(0.0, 0.0, 1.0)));
 }
 
+void OrbitCamera::LookFrom(const glm::dmat4& cameraToWorld) {
+    // The camera looks down its -z: Eye's direction to the target, inverted.
+    const glm::dvec3 forward = glm::normalize(-glm::dvec3(cameraToWorld[2]));
+    pitch = std::clamp(std::asin(std::clamp(-forward.z, -1.0, 1.0)), kMinPitch, kMaxPitch);
+    yaw = std::atan2(-forward.x, forward.y);
+    target = glm::dvec3(cameraToWorld[3]) + distance * forward;
+}
+
 void OrbitCamera::Orbit(double deltaYaw, double deltaPitch) {
     yaw += deltaYaw;
     pitch = std::clamp(pitch + deltaPitch, kMinPitch, kMaxPitch);
@@ -1428,7 +1654,8 @@ Path SettingsCamera(const Scene& scene) {
 }  // namespace
 
 Shell::Shell(Scene& scene, const DeviceContext* device, const ShellOptions& options)
-    : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks) {
+    : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks),
+      display_(options.display) {
     // Stage above Properties on the right; Log, Info, Devices and Profiler tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
     panels_.push_back(MakePropertiesPanel(scene, selection_, history_, log_));
@@ -1475,6 +1702,7 @@ void Shell::Draw() {
     TakeShortcuts();
     {
         ERNIE_ZONE("Move the camera");
+        PullActiveCamera();
         Navigate();
     }
     if (!overlaysHidden_) {
@@ -1609,52 +1837,95 @@ void Shell::Navigate() {
     }
 }
 
+bool Shell::BeginPills(const char* id, ImVec2 at, ImVec2 pivot) {
+    ImGui::SetNextWindowPos(at, ImGuiCond_Always, pivot);
+    constexpr ImGuiWindowFlags kBar =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoNav;
+    if (!ImGui::Begin(id, nullptr, kBar)) {
+        ImGui::End();
+        return false;
+    }
+    // Kit's pills: dark, translucent, a thin lighter edge.
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme_.overlay * 1.25f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
+    ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme_.pillRounding);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.0f, 4.0f));
+    return true;
+}
+
+void Shell::EndPills() {
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(4);
+    ImGui::End();
+}
+
+void Shell::Pill(const char* id, const std::string& label, const char* tip,
+                 void (Shell::*items)()) {
+    constexpr ImGuiComboFlags kPill = ImGuiComboFlags_WidthFitPreview |
+                                      ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLargest;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(16.0f * ImGui::GetFontSize(), 0.0f),
+                                        ImVec2(FLT_MAX, FLT_MAX));
+    if (ImGui::BeginCombo(id, label.c_str(), kPill)) {
+        // Menu text in the panels' colours.
+        ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.text));
+        (this->*items)();
+        ImGui::PopStyleColor();
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("%s", tip);
+}
+
 void Shell::DrawToolbar() {
     if (!display_.toolbar) {
         return;
     }
     const auto [origin, size] = Viewport();
     const float pad = 8.0f;
-    ImGui::SetNextWindowPos(ImVec2(origin.x + pad, origin.y + pad));
-    constexpr ImGuiWindowFlags kBar =
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize |
-        ImGuiWindowFlags_NoNav;
-    if (ImGui::Begin("##viewport toolbar", nullptr, kBar)) {
-        // Kit's pills: dark, translucent, a thin lighter edge, menus of the overlay's colour.
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme_.overlay));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme_.overlay * 1.25f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ToImVec4(theme_.overlayBorder));
-        ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.hud));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme_.pillRounding);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.0f, 4.0f));
-        const auto pill = [&](const char* id, const std::string& label, const char* tip,
-                              void (Shell::*items)()) {
-            constexpr ImGuiComboFlags kPill =
-                ImGuiComboFlags_WidthFitPreview | ImGuiComboFlags_NoArrowButton;
-            ImGui::SetNextWindowSizeConstraints(ImVec2(16.0f * ImGui::GetFontSize(), 0.0f),
-                                                ImVec2(FLT_MAX, FLT_MAX));
-            if (ImGui::BeginCombo(id, label.c_str(), kPill | ImGuiComboFlags_HeightLargest)) {
-                // Menu text in the panels' colours.
-                ImGui::PushStyleColor(ImGuiCol_Text, ToImVec4(theme_.text));
-                (this->*items)();
-                ImGui::PopStyleColor();
-                ImGui::EndCombo();
-            }
-            ImGui::SetItemTooltip("%s", tip);
-            ImGui::SameLine();
-        };
-        pill("##settings", icons::kSettings, "Viewport settings", &Shell::DrawSettingsMenu);
-        pill("##show", icons::kEye, "What the viewport shows", &Shell::DrawShowMenu);
-        pill("##camera", std::string(icons::kCamera) + "  Perspective", "Camera and views",
+    if (BeginPills("##viewport toolbar", ImVec2(origin.x + pad, origin.y + pad), {0.0f, 0.0f})) {
+        Pill("##settings", icons::kSettings, "Viewport settings", &Shell::DrawSettingsMenu);
+        ImGui::SameLine();
+        Pill("##show", icons::kEye, "What the viewport shows", &Shell::DrawShowMenu);
+        ImGui::SameLine();
+        const std::string camera =
+            activeCamera_.IsEmpty() ? "Perspective" : std::string(activeCamera_.Name());
+        Pill("##camera", std::string(icons::kCamera) + "  " + camera, "Camera and views",
              &Shell::DrawCameraMenu);
-        ImGui::NewLine();
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor(4);
+        EndPills();
     }
-    ImGui::End();
+    if (BeginPills("##viewport toolbar right", ImVec2(origin.x + size.x - pad, origin.y + pad),
+                   {1.0f, 0.0f})) {
+        if (ecoPaused_) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(ImVec4(0.30f, 0.78f, 0.35f, 1.0f), "%s  Eco", icons::kLeaf);
+            ImGui::SetItemTooltip("Eco mode: rendering paused until something changes");
+            ImGui::SameLine();
+        }
+        Pill("##lighting", std::string(icons::kSun) + "  " + LightingName(display_.lighting),
+             "Lighting", &Shell::DrawLightingMenu);
+        EndPills();
+    }
+}
+
+void Shell::DrawLightingMenu() {
+    // Kit's order. Minimal lights from the eye; scene lights render with the lighting to come.
+    for (const Lighting lighting : {Lighting::Camera, Lighting::Stage, Lighting::Default}) {
+        const bool available = lighting == Lighting::Camera;
+        ImGui::BeginDisabled(!available);
+        bool chosen = display_.lighting == lighting;
+        MenuCheck(LightingName(lighting), chosen);
+        ImGui::EndDisabled();
+        if (!available) {
+            ImGui::SetItemTooltip("Scene lights render once the Realtime tier lights scenes");
+        } else if (chosen) {
+            display_.lighting = lighting;
+        }
+    }
 }
 
 void Shell::DrawSettingsMenu() {
@@ -1664,6 +1935,16 @@ void Shell::DrawSettingsMenu() {
     if (ImGui::SliderFloat("Field of view", &fov, 10.0f, 120.0f, "%.0f°")) {
         camera_.verticalFov = glm::radians(static_cast<double>(fov));
     }
+    ImGui::Separator();
+    MenuSection("Eco Mode");
+    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
+    MenuCheck("Pause Rendering When Still", display_.eco);
+    ImGui::PopItemFlag();
+    ImGui::BeginDisabled(!display_.eco);
+    ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
+    ImGui::SliderInt("Frames without change", &display_.ecoFrames, 1, 10'000, "%d",
+                     ImGuiSliderFlags_Logarithmic);
+    ImGui::EndDisabled();
     ImGui::Separator();
     if (MenuAction("Reset Camera")) {
         const double fovKept = camera_.verticalFov;
@@ -1690,10 +1971,22 @@ void Shell::DrawShowMenu() {
     ImGui::Separator();
     MenuCheck("Toolbar", display_.toolbar);
     ImGui::PopItemFlag();
-    ImGui::TextDisabled("    H hides everything over the viewport");
 }
 
 void Shell::DrawCameraMenu() {
+    const std::vector<Path> cameras = scene_.Prims(ernie::Camera::kName);
+    if (!cameras.empty()) {
+        MenuSection("Cameras");
+        for (const Path& camera : cameras) {
+            bool active = camera == activeCamera_;
+            MenuCheck(std::string(camera.Name()).c_str(), active);
+            ImGui::SetItemTooltip("%s", camera.String().c_str());
+            if (active && camera != activeCamera_) {
+                Attempt("Looking through a camera", [&] { LookThrough(camera); });
+            }
+        }
+        ImGui::Separator();
+    }
     MenuSection("Views");
     // Kit's views: the orbit from the side, or square on from the top, front or right.
     struct View {
@@ -1707,12 +2000,17 @@ void Shell::DrawCameraMenu() {
                                           {"Right", 1.5707963267948966, 0.0}}};
     for (const View& view : kViews) {
         if (MenuAction(view.name)) {
+            // The viewer's own camera, so a scene camera stays where it was.
+            activeCamera_ = Path();
             camera_.yaw = view.yaw;
             camera_.pitch = view.pitch;
         }
     }
     ImGui::Separator();
     choices_.frame |= MenuAction(selection_.Empty() ? "Frame Scene" : "Frame Selection", "F");
+    if (MenuAction("Create from View")) {
+        choices_.create = ernie::Camera::kName;
+    }
 }
 
 void Shell::RefreshHud() {
@@ -1782,7 +2080,9 @@ void Shell::DrawHud() {
     for (const std::string& text : hudLines_) {
         width = std::max(width, ImGui::CalcTextSize(text.c_str()).x);
     }
-    const ImVec2 topRight(origin.x + size.x - 8.0f, origin.y + 8.0f);
+    // Below the lighting pill, as Kit's.
+    const float below = display_.toolbar ? ImGui::GetFrameHeight() + 14.0f : 8.0f;
+    const ImVec2 topRight(origin.x + size.x - 8.0f, origin.y + below);
     const ImVec2 corner(topRight.x - width - 2.0f * pad, topRight.y);
     // Over the viewport's image, which the background list holds, and under every window.
     ImDrawList* draw = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
@@ -1991,6 +2291,56 @@ void Shell::Apply() {
     if (choices_.frame) {
         Frame();
     }
+    PushActiveCamera();
+}
+
+void Shell::LookThrough(const Path& camera) {
+    if (camera.IsEmpty()) {
+        activeCamera_ = Path();
+        return;
+    }
+    const std::optional<PrimId> prim = scene_.Find(camera);
+    if (!prim || scene_.TypeName(*prim) != ernie::Camera::kName) {
+        throw std::invalid_argument("'" + camera.String() + "' is no Camera");
+    }
+    const ernie::Camera lens(scene_, camera);
+    camera_.verticalFov = 2.0 * std::atan(0.5 * lens.GetVerticalAperture() / lens.GetFocalLength());
+    activeCamera_ = camera;
+    activeWorld_ = scene_.WorldTransform(*prim);
+    camera_.LookFrom(activeWorld_);
+}
+
+void Shell::PullActiveCamera() {
+    if (activeCamera_.IsEmpty()) {
+        return;
+    }
+    const std::optional<PrimId> prim = scene_.Find(activeCamera_);
+    if (!prim) {
+        // Removed: back to the viewer's own camera, where it was.
+        activeCamera_ = Path();
+        return;
+    }
+    if (const glm::dmat4 world = scene_.WorldTransform(*prim); world != activeWorld_) {
+        activeWorld_ = world;
+        camera_.LookFrom(world);
+    }
+}
+
+void Shell::PushActiveCamera() {
+    if (activeCamera_.IsEmpty() || !scene_.Has(activeCamera_)) {
+        return;
+    }
+    const glm::dmat4 world = camera_.Transform();
+    if (world == activeWorld_) {
+        return;
+    }
+    const Path parent = activeCamera_.Parent();
+    const std::optional<PrimId> above = parent.IsRoot() ? std::nullopt : scene_.Find(parent);
+    const glm::dmat4 parentWorld = above ? scene_.WorldTransform(*above) : glm::dmat4(1.0);
+    Attempt("Moving the camera", [&] {
+        scene_.Set(activeCamera_, tokens::kTransform, glm::inverse(parentWorld) * world);
+        activeWorld_ = world;
+    });
 }
 
 Path Shell::Create(std::string_view type) {

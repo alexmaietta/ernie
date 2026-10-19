@@ -24,8 +24,11 @@ namespace {
 using app::Viewer;
 using app::ViewerOptions;
 
-/// @return The viewer, or none when there is no Vulkan and it is not required.
-std::unique_ptr<Viewer> MakeViewer(Scene& scene, const ViewerOptions& options) {
+/// @return The viewer, or none when there is no Vulkan and it is not required. Its toolbar and
+/// heads-up display are off: the tests read and click the small viewport's pixels under them.
+std::unique_ptr<Viewer> MakeViewer(Scene& scene, ViewerOptions options) {
+    options.shell.display.toolbar = false;
+    options.shell.display.hud = false;
     try {
         return std::make_unique<Viewer>(scene, options);
     } catch (const DeviceError&) {
@@ -135,6 +138,26 @@ TEST(Viewer, ClickingTheViewportSelectsWhatItShows) {
     EXPECT_EQ(viewer->GetShell().Selected().Paths(), std::vector<Path>{Path("/Ball")});
     clickAt(0.9f, 0.15f);
     EXPECT_TRUE(viewer->GetShell().Selected().Empty()) << "the background clears it";
+    test::ExpectClean(viewer->Context());
+}
+
+TEST(Viewer, EcoModePausesRenderingUntilSomethingChanges) {
+    Scene scene;
+    scene.Define("/Ball", "Sphere");
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 4};
+    options.shell.display.ecoFrames = 3;
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    viewer->Run();
+    EXPECT_FALSE(viewer->EcoPaused()) << "still for too few frames";
+    viewer->Run();
+    viewer->Run();
+    EXPECT_TRUE(viewer->EcoPaused());
+    scene.Set(*scene.Find("/Ball"), "radius", 2.0);
+    viewer->Run();
+    EXPECT_FALSE(viewer->EcoPaused()) << "an edit renders again";
     test::ExpectClean(viewer->Context());
 }
 

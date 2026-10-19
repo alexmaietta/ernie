@@ -4,9 +4,11 @@
 /// Stage panel's search and the camera's controls.
 #include "ernie/app/imgui_backend.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/lux.h"
 #include "ernie/scene/schema/render.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 
 #include <gtest/gtest.h>
@@ -240,6 +242,34 @@ TEST(Shell, PicksOnAStillClickAndSelectsWhatItFinds) {
               (std::vector<Path>{Path("/World/Lamp"), Path("/World/Rover")}));
     shell.Picked(std::nullopt, false);
     EXPECT_TRUE(shell.Selected().Empty()) << "a click on nothing clears";
+}
+
+TEST(Shell, LooksThroughASceneCameraAndMovesIt) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    const glm::dvec3 eye(10.0, -6.0, 3.0);
+    Camera::Define(scene, "/World/Eye");
+    // Under /World, which stands 10 m along x: the camera's own transform is relative to it.
+    scene.Set("/World/Eye", tokens::kTransform,
+              LookAtTransform(eye - glm::dvec3(10.0, 0.0, 0.0), {0.0, 0.0, 1.0}, {0, 0, 1}));
+    scene.Update();
+    Shell shell(scene, nullptr);
+    shell.LookThrough("/World/Eye");
+    EXPECT_EQ(shell.ActiveCamera(), Path("/World/Eye"));
+    EXPECT_LT(glm::length(shell.Camera().Eye() - eye), 1e-9) << "from where the camera is";
+    EXPECT_THROW(shell.LookThrough("/World/Lamp"), std::invalid_argument);
+
+    // Navigating moves the camera prim with the view.
+    shell.Camera().Orbit(0.3, 0.1);
+    frames.Draw(shell);
+    scene.Update();
+    const glm::dmat4 world = scene.WorldTransform(*scene.Find("/World/Eye"));
+    EXPECT_LT(glm::length(glm::dvec3(world[3]) - shell.Camera().Eye()), 1e-9);
+
+    scene.Remove("/World/Eye");
+    frames.Draw(shell);
+    EXPECT_TRUE(shell.ActiveCamera().IsEmpty()) << "back to the viewer's own camera";
 }
 
 TEST(Shell, ShowsTheHudLinesItsEyeMenuChooses) {

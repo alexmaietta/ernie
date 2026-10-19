@@ -296,6 +296,9 @@ struct OrbitCamera {
     glm::dvec3 Eye() const;
     /// @return The camera-to-world transform of the eye looking at the target, +z up.
     glm::dmat4 Transform() const;
+    /// @brief Puts the eye where a camera is, looking where it looks, the target `distance` ahead;
+    /// a roll about the view axis is dropped, as the orbit keeps +z up.
+    void LookFrom(const glm::dmat4& cameraToWorld);
 
     /// @brief Turns by yaw and pitch radians, clamping pitch.
     void Orbit(double deltaYaw, double deltaPitch);
@@ -324,7 +327,24 @@ struct DockSizes {
     float bottom = 0.25f;
 };
 
-/// @brief What the viewport shows over its image, as its eye menu toggles it.
+/// @brief What lights the viewport, as Kit's lighting menu offers: the scene's own lights, a light
+/// from the eye, or a default sun.
+enum class Lighting : std::uint8_t { Stage, Camera, Default };
+
+/// @return The lighting's menu label.
+inline const char* LightingName(Lighting lighting) {
+    switch (lighting) {
+    case Lighting::Stage:
+        return "Stage Lights";
+    case Lighting::Camera:
+        return "Camera Light";
+    case Lighting::Default:
+        break;
+    }
+    return "Default Light";
+}
+
+/// @brief What the viewport shows over its image, as its eye menu toggles it, and how it is lit.
 struct ViewportDisplay {
     bool toolbar = true;
     bool hud = true;
@@ -333,6 +353,11 @@ struct ViewportDisplay {
     bool hudHostMemory = true;
     bool hudResolution = true;
     bool hudCamera = false;
+    Lighting lighting = Lighting::Camera;
+    /// Eco mode, after Omniverse's: the viewport stops rendering once nothing has changed for
+    /// `ecoFrames` frames, and the UI keeps running over its last image.
+    bool eco = true;
+    int ecoFrames = 500;
 };
 
 struct ShellOptions {
@@ -340,6 +365,8 @@ struct ShellOptions {
     DockSizes docks;
     /// Record profiler zones every frame, not only while the Profiler panel shows.
     bool profile = false;
+    /// What the viewport shows over its image to begin with.
+    ViewportDisplay display;
 };
 
 /// @brief The panels and controls over a scene. Panels read the scene and the menus edit it
@@ -389,6 +416,18 @@ class Shell {
     }
     ViewportDisplay& Display() {
         return display_;
+    }
+    /// @brief Looks through a scene camera: the orbit takes its pose and field of view, and
+    /// navigating moves it. An empty path looks through the viewer's own perspective camera.
+    /// @throws std::invalid_argument for a path that is no Camera.
+    void LookThrough(const Path& camera);
+    /// @return The scene camera looked through; empty for the viewer's own.
+    const Path& ActiveCamera() const {
+        return activeCamera_;
+    }
+    /// @brief Shows whether eco mode paused the viewport, as the viewer decides it.
+    void SetEcoPaused(bool paused) {
+        ecoPaused_ = paused;
     }
     /// @return The heads-up display's lines, as "label: value", as last refreshed.
     const std::vector<std::string>& HudLines() const {
@@ -464,9 +503,19 @@ class Shell {
     void DrawSettingsMenu();
     void DrawShowMenu();
     void DrawCameraMenu();
+    void DrawLightingMenu();
+    /// Opens a borderless window of pills at `at`, its corner `pivot` there, in the pills' style.
+    bool BeginPills(const char* id, ImVec2 at, ImVec2 pivot);
+    void EndPills();
+    /// Draws a pill whose menu `items` draws.
+    void Pill(const char* id, const std::string& label, const char* tip, void (Shell::*items)());
     /// Draws the heads-up display at the viewport's top right, over its image.
     void DrawHud();
     void RefreshHud();
+    /// Follows the active camera's edits made elsewhere into the orbit.
+    void PullActiveCamera();
+    /// Writes the orbit into the active camera once navigation moved it.
+    void PushActiveCamera();
     void Apply();
 
     Scene& scene_;
@@ -491,6 +540,11 @@ class Shell {
     bool dragging_ = false;
     std::optional<Pick> pick_;
     ViewportDisplay display_;
+    /// Whether eco mode paused the viewport this frame, as the viewer reports it.
+    bool ecoPaused_ = false;
+    Path activeCamera_;
+    /// The active camera's world transform as last read or written, to tell its edits apart.
+    glm::dmat4 activeWorld_{1.0};
     /// Whether H hid everything drawn over the viewport.
     bool overlaysHidden_ = false;
     /// The heads-up display's lines, refreshed a few times a second so they stay readable.

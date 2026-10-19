@@ -200,6 +200,8 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Run the frame");
+            ecoPaused_ = EcoPause();
+            shell_->SetEcoPaused(ecoPaused_);
             deviceScene_->Follow(shell_->Camera().Eye());
             drawn =
                 deviceScene_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
@@ -269,8 +271,25 @@ void Viewer::Pick(const Shell::Pick& pick, const Ticket& drawn) {
     shell_->Picked(prim ? std::optional(scene_.PrimPath(*prim)) : std::nullopt, pick.toggle);
 }
 
+bool Viewer::EcoPause() {
+    const OrbitCamera& orbit = shell_->Camera();
+    const ViewState now{.version = scene_.Store().Version(),
+                        .camera = orbit.Transform(),
+                        .fov = orbit.verticalFov,
+                        .size = glm::uvec2(viewport_->Description().extent)};
+    stillFrames_ = lastView_ == now ? stillFrames_ + 1 : 0;
+    lastView_ = now;
+    const ViewportDisplay& display = shell_->Display();
+    return display.eco &&
+           stillFrames_ >= static_cast<std::uint64_t>(std::max(display.ecoFrames, 1));
+}
+
 graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
     graph::Image viewport = graph.Import(*viewport_, "viewport");
+    if (ecoPaused_) {
+        // Still: the last frame's image stands.
+        return viewport;
+    }
     if (camera_) {
         const OrbitCamera& orbit = shell_->Camera();
         CameraOutputs outputs{.colour = viewport,

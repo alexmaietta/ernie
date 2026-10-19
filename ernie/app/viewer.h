@@ -63,6 +63,10 @@ class Viewer {
     std::uint64_t Frames() const {
         return frames_;
     }
+    /// @return Whether eco mode skipped rendering the last frame.
+    bool EcoPaused() const {
+        return ecoPaused_;
+    }
     Shell& GetShell() {
         return *shell_;
     }
@@ -87,6 +91,9 @@ class Viewer {
     void ResizeViewport(glm::uvec2 pixels);
     /// @brief Selects the prim the frame `drawn` shows under a click.
     void Pick(const Shell::Pick& pick, const Ticket& drawn);
+    /// @return Whether eco mode skips rendering this frame: nothing it renders from has changed
+    /// for the frames the shell's display asks.
+    bool EcoPause();
     /// @brief Adds the pass filling the viewport: traced, or the theme's colour without ray
     /// queries.
     /// @return The viewport, filled.
@@ -114,6 +121,17 @@ class Viewer {
     BindlessIndex viewportImage_;
     /// Each viewport pixel's prim slot, which picking reads; null without ray queries.
     std::unique_ptr<DeviceColumn> prims_;
+    /// What a frame renders from; eco mode counts the frames it stays the same.
+    struct ViewState {
+        std::uint64_t version = 0;
+        glm::dmat4 camera{1.0};
+        double fov = 0.0;
+        glm::uvec2 size{0};
+        bool operator==(const ViewState&) const = default;
+    };
+    std::optional<ViewState> lastView_;
+    std::uint64_t stillFrames_ = 0;
+    bool ecoPaused_ = false;
     /// The frames the device may still be drawing, oldest first.
     std::deque<Ticket> inFlight_;
     std::uint64_t frames_ = 0;
