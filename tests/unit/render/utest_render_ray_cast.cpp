@@ -68,6 +68,23 @@ TEST(RayCastTest, FindsTheClosestHitAndItsSurface) {
     });
 }
 
+TEST(RayCastTest, HitsQuadricsPreciselyFromFarAway) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Cylinder>("/Cylinder", {.translate = {0, 0, 0}});
+        scene->Define<Cone>("/Cone", {.translate = {0, 10, 0}});
+        scene->Define<Capsule>("/Capsule", {.translate = {0, 20, 0}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {-1000, 0.3f, 0, -1000, 10.3f, 0, -1000, 20.3f, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0}, 3);
+        const std::vector<float> distance = caster.Cast(rays).distance.ToHost<float>();
+        EXPECT_NEAR(distance[0], 1000 - std::sqrt(0.91), 1e-3);
+        EXPECT_NEAR(distance[1], 999.6, 1e-3);
+        EXPECT_NEAR(distance[2], 999.6, 1e-3);
+    });
+}
+
 TEST(RayCastTest, AnyHitsAndDistanceLimits) {
     ForEachDevice([](Device& device) {
         RayCaster caster(TwoBalls(device));

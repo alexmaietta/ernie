@@ -12,7 +12,7 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-ShapeHit UnitShapeHit(ShapeRecord record, Ray ray) {
+ShapeHit CenteredShapeHit(ShapeRecord record, Ray ray) {
     switch (ShapeKind(record.kind)) {
     case ShapeKind::Sphere:
         return Sphere(1).Intersect(ray);
@@ -42,6 +42,16 @@ ShapeHit UnitShapeHit(ShapeRecord record, Ray ray) {
     default:
         return Box(float3(1)).Intersect(ray);
     }
+}
+
+ShapeHit UnitShapeHit(ShapeRecord record, Ray ray) {
+    const float closest = -dot(ray.origin, ray.direction) / dot(ray.direction, ray.direction);
+    Ray centered = ray;
+    centered.origin = ray.origin + closest * ray.direction;
+    centered.tMin = ray.tMin - closest;
+    ShapeHit hit = CenteredShapeHit(record, centered);
+    hit.t += closest;
+    return hit;
 }
 
 #if !ERNIE_VULKAN
