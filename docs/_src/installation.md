@@ -39,7 +39,7 @@ pip install ernie-renderer
 Wheels are built for Linux, Windows and macOS. Check the install by listing the devices Ernie can render with.
 
 ```bash
-ernie
+ernie --devices
 python -c "import ernie; print(ernie.__version__)"
 ```
 
@@ -61,6 +61,21 @@ device = ernie.Device(backend=ernie.Backend.VULKAN, presentation=True)
 scene = ernie.Scene(device)
 viewer = ernie.viewer.Viewer(scene, product="/Render/View")
 viewer.run()
+```
+
+### Without a window
+
+The `ernie` command also renders the default scene without a window, which needs no display. `--output` writes the last frame's AOVs to a folder, `--worlds` clones the scene into several worlds with one image each, and `--preset` picks real-time or minimal shading.
+
+```bash
+ernie --output frames --size 640x360 --aovs DistanceToCamera,Normal --worlds 4
+```
+
+`--benchmark` times steps one at a time and three in flight, after `--warmup` steps, and `--json` prints the timings as one line for scripts. `--profile` adds the profiler's report of where the time went.
+
+```bash
+ernie --benchmark --frames 200 --size 1280x720 --json
+ernie --headless --frames 60 --profile
 ```
 
 ## C++
@@ -210,4 +225,4 @@ Ernie compiles its kernels the first time they run and keeps them in a cache, so
 
 ## Troubleshooting
 
-If `ernie` lists no devices, none of its backends found a driver to load. Install your GPU vendor's driver, or lavapipe for the CPU as in [Requirements](#requirements).
+If `ernie --devices` lists nothing, no backend found a driver to load. Install your GPU vendor's driver, or lavapipe for the CPU as in [Requirements](#requirements).

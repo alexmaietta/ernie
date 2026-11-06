@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `ernie` command renders without a window. `--headless`, `--frames` and `--output` render the default scene and write its AOVs, `--benchmark` with `--warmup` and `--json` times steps, and `--profile` prints the profiler's report.
+- `--worlds`, `--camera`, `--product`, `--preset` and `--aovs` set up what the command renders, in the viewer too.
+
+### Changed
+
+- Kernels are cached in `kernels/<version>` under the cache folder, which `ERNIE_CACHE_DIR` moves, and stay under 1 GiB by dropping the least recently used.
+
 ## [0.1.0] - 2026-11-06
 
 The first release of Ernie, a real-time spectral GPU renderer for planetary robotics and sensing with C++ and Python APIs.

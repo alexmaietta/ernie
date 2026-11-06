@@ -1699,87 +1699,20 @@ std::vector<uint8_t> Viewer::ReadPixels() {
     return m_impl->ReadPixels();
 }
 
-namespace {
-
-Ref<Scene> DefaultScene(device::Device& device) {
-    const Ref<Scene> scene = Scene::Create(device, {.waitForKernels = false});
-    scene->Define<Xform>("/World");
-    scene->Define<Scope>("/World/Looks");
-    scene->Define<Material>(
-        "/World/Looks/Red",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.8f, 0.3f, 0.2f}}}});
-    scene->Define<Material>(
-        "/World/Looks/Blue",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.2f, 0.5f, 0.8f}}}});
-    scene->Define<Material>(
-        "/World/Looks/Green",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.3f, 0.7f, 0.3f}}}});
-    scene->Define<Material>(
-        "/World/Looks/Yellow",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.9f, 0.7f, 0.2f}}}});
-    scene->Define<Material>(
-        "/World/Looks/Purple",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.6f, 0.4f, 0.8f}}}});
-    scene->Define<Plane>("/World/Ground", {.checkerboard = true,
-                                           .checkerColorA = {0.6f, 0.6f, 0.6f},
-                                           .checkerColorB = {0.3f, 0.3f, 0.3f},
-                                           .width = 0,
-                                           .length = 0});
-    scene->Define<Cube>("/World/Cube",
-                        {.materialBinding = {"/World/Looks/Red"}, .translate = {-6, 0, 1}});
-    scene->Define<Sphere>("/World/Sphere",
-                          {.materialBinding = {"/World/Looks/Blue"}, .translate = {-3, 0, 1}});
-    scene->Define<Cylinder>("/World/Cylinder",
-                            {.materialBinding = {"/World/Looks/Green"}, .translate = {0, 0, 1}});
-    scene->Define<Cone>("/World/Cone",
-                        {.materialBinding = {"/World/Looks/Yellow"}, .translate = {3, 0, 1}});
-    scene->Define<Capsule>("/World/Capsule",
-                           {.materialBinding = {"/World/Looks/Purple"}, .translate = {6, 0, 1}});
-    scene->Define<DistantLight>("/World/Sun", {.orient = FromAzimuthElevation(146, 44)});
-    const double halfFov = std::numbers::pi / 8;
-    const OrbitCamera view{
-        .target = {0, 0, 1}, .yaw = 0.6, .pitch = 0.45, .distance = 1.1 * 5.5 / std::sin(halfFov)};
-    scene->Define<Camera>("/World/Camera", {.translate = view.Eye(),
-                                            .orient = view.Orient(),
-                                            .focalLength = float(12 / std::tan(halfFov)),
-                                            .horizontalAperture = 24.0f * 16 / 9,
-                                            .verticalAperture = 24});
-    return scene;
-}
-
-int RunDefaultViewer(const Command& command) {
-    device::DeviceDesc desc = command.device;
-    if (desc.adapter.empty()) {
-        desc.backend = device::Backend::Vulkan;
-    }
-    for (const device::AdapterInfo& adapter : device::EnumerateAdapters()) {
-        if (adapter.alias == desc.adapter) {
-            desc.backend = adapter.backend;
-        }
-    }
-    desc.presentation = desc.backend == device::Backend::Vulkan;
-    const Ref<device::Device> device = device::Device::Create(desc);
-    Viewer viewer(DefaultScene(*device), {.aov = command.aov,
-                                          .width = command.width,
-                                          .height = command.height,
-                                          .vsync = command.vsync,
-                                          .layout = command.layout});
-    viewer.Run();
-    if (!device::CurrentBuilds().Done()) {
-        std::fflush(nullptr);
-        std::_Exit(0);
-    }
-    return 0;
-}
-
-}
-
 }
 
 extern "C" ERNIE_VIEWER_API int ErnieRunViewer(const ernie::app::Command* command,
+                                               ernie::Scene* scene, const std::string* product,
                                                std::string* error) {
     try {
-        return ernie::app::RunDefaultViewer(*command);
+        ernie::app::Viewer viewer(ernie::Ref<ernie::Scene>(scene), {.product = *product,
+                                                                    .aov = command->aov,
+                                                                    .width = command->width,
+                                                                    .height = command->height,
+                                                                    .vsync = command->vsync,
+                                                                    .layout = command->layout});
+        viewer.Run();
+        return 0;
     } catch (const std::exception& failure) {
         *error = failure.what();
         return 1;
