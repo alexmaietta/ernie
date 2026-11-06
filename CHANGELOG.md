@@ -7,23 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-06
+
+The first release of Ernie, a real-time spectral GPU renderer for planetary robotics and sensing with C++ and Python APIs.
+
 ### Added
 
+- The initial import, with Vulkan, CUDA and HIP device backends, Slang kernels compiled at runtime, software and hardware BVHs, a USD-style scene with batched worlds, real-time and minimal render modes, camera, lidar and radar sensors, scene importers, the interactive viewer, tests, benchmarks and CI.
 - A single `ernie` command in `ernie/app` that opens the viewer when run with no options, loads the viewer library at runtime when it is installed, and takes `-V`, `-v` and `-q` for the version and log level.
 - The `ernie-renderer` wheel ships the viewer, so `pip install ernie-renderer` brings the full interactive app with no separate package.
-
-### Changed
-
-- The viewer moved into `ernie/app/viewer`, and the `ernie-viewer` console script was replaced by the `ernie` command.
-- CI fails on any compiler or linker warning, and the existing warnings were fixed.
+- CI fails on any compiler or linker warning.
 
 ### Fixed
 
+- CUDA scenes build their BVHs when NVRTC 12 compiles the kernels, for example in a process that already loaded PyTorch's NVRTC, instead of crashing with an illegal or misaligned address.
 - Python calls that take DLPack tensors import each one on its own producer stream, so pose writes from a busy CUDA stream no longer read the tensor before its producer finishes writing it.
 - Framing a selected prim reads its world bounds instead of failing, and framing the whole scene leaves out infinite planes.
 - Infinite planes no longer stretch scene and world bounds, and finite planes get flat boxes.
 - Cylinders, cones and capsules no longer show black speckles on their lit sides when seen from far away.
 
-## [0.1.0] - 2026-11-06
-
-- Initial commit. The first import of Ernie, a real-time spectral GPU renderer for planetary robotics and sensing with C++ and Python APIs. It covers Vulkan, CUDA and HIP device backends, Slang kernels compiled at runtime, software and hardware BVHs, a USD-style scene with batched worlds, real-time and minimal render modes, camera, lidar and radar sensors, scene importers, the interactive viewer, tests, benchmarks and CI.
+[unreleased]: https://github.com/alexmaietta/ernie/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/alexmaietta/ernie/releases/tag/v0.1.0
