@@ -1,0 +1,27 @@
+name: MSVC developer environment
+description: Visual Studio's compilers and tools on the environment of the steps after this one
+inputs:
+  arch:
+    description: The architecture to build for, as vcvarsall.bat names it, such as x64 or arm64
+    default: x64
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        ARCH: ${{ inputs.arch }}
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $installation = & $vswhere -latest -products * -property installationPath
+        $vcvars = Join-Path $installation "VC\Auxiliary\Build\vcvarsall.bat"
+        $before = @{}
+        Get-ChildItem env: | ForEach-Object { $before[$_.Name] = $_.Value }
+        $after = cmd /c "`"$vcvars`" $env:ARCH >nul && set"
+        if ($LASTEXITCODE -ne 0) {
+            throw "vcvarsall.bat $env:ARCH failed"
+        }
+        foreach ($line in $after) {
+            if ($line -match '^([^=]+)=(.*)$' -and $before[$Matches[1]] -ne $Matches[2]) {
+                "$($Matches[1])=$($Matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+        }

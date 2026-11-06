@@ -20,8 +20,6 @@
 namespace ernie::app {
 namespace {
 
-constexpr uint32_t kNone = ~0u;
-
 enum class Shown { Any, Visible, Hidden };
 
 bool Glob(std::string_view pattern, std::string_view text) {

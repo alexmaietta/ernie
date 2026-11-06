@@ -43,7 +43,6 @@ result = ["ernie-renderer=={project[version]}", "numpy>=1.24"]
 [tool.scikit-build.cmake.define]
 ERNIE_BUILD_PYTHON = "ON"
 ERNIE_BUILD_VIEWER = "ON"
-ERNIE_BUILD_XR = "OFF"
 ERNIE_BUILD_TESTS = "OFF"
 ERNIE_INSTALL = "ON"
 

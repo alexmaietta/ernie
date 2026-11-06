@@ -64,6 +64,35 @@ function(ernie_check_public_files)
     ernie_check_includes("" ${public})
 endfunction()
 
+function(ernie_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+    else()
+        target_compile_options(
+            ${target}
+            PRIVATE
+                -Wall
+                -Wextra
+                -Wpedantic
+                -Wshadow
+                -Wno-missing-field-initializers
+        )
+    endif()
+    if(ERNIE_WARNINGS_AS_ERRORS)
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /WX)
+            target_link_options(${target} PRIVATE /WX)
+        else()
+            target_compile_options(${target} PRIVATE -Werror)
+            if(APPLE)
+                target_link_options(${target} PRIVATE "LINKER:-fatal_warnings")
+            else()
+                target_link_options(${target} PRIVATE "LINKER:--fatal-warnings")
+            endif()
+        endif()
+    endif()
+endfunction()
+
 function(ernie_coverage target)
     if(ERNIE_COVERAGE)
         target_compile_options(
@@ -91,19 +120,7 @@ function(ernie_object_library name)
             "${ERNIE_GENERATED_INCLUDE_DIR}"
     )
     target_compile_definitions(${name} PRIVATE ${ARG_EXPORTS})
-    if(MSVC)
-        target_compile_options(${name} PRIVATE /W4)
-    else()
-        target_compile_options(
-            ${name}
-            PRIVATE
-                -Wall
-                -Wextra
-                -Wpedantic
-                -Wshadow
-                -Wno-missing-field-initializers
-        )
-    endif()
+    ernie_warnings(${name})
     ernie_coverage(${name})
 endfunction()
 
@@ -146,6 +163,7 @@ function(ernie_shared_library name)
     if(ERNIE_COVERAGE)
         target_link_options(${name} PRIVATE --coverage)
     endif()
+    ernie_warnings(${name})
 endfunction()
 
 function(ernie_static_library name)

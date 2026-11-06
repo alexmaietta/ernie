@@ -391,8 +391,8 @@ void VulkanPresenter::CreateSwapchain() {
     }
     VkCompositeAlphaFlagBitsKHR alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     if ((capabilities.supportedCompositeAlpha & alpha) == 0) {
-        alpha = VkCompositeAlphaFlagBitsKHR(capabilities.supportedCompositeAlpha &
-                                            -capabilities.supportedCompositeAlpha);
+        const uint32_t supported = capabilities.supportedCompositeAlpha;
+        alpha = VkCompositeAlphaFlagBitsKHR(supported & (~supported + 1));
     }
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};

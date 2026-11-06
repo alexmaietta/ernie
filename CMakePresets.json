@@ -15,7 +15,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "ERNIE_BUILD_TESTS": "ON",
-                "ERNIE_INSTALL": "OFF"
+                "ERNIE_INSTALL": "OFF",
+                "ERNIE_WARNINGS_AS_ERRORS": "ON"
             }
         },
         {

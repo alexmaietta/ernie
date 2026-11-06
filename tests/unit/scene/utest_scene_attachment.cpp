@@ -325,7 +325,7 @@ TEST(AttachmentTest, InPlaceAttachmentNeedsAnAttachableBatch) {
 }
 
 TEST(ZeroCopyTest, ADenseMappingMovesNoBytesAndAScatteredOneStages) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
         const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 1000));
         Attribute<float> dense = View(catalog, SchemaId::Sphere, block).Get<float>(kSphereRadius);
         dense.Set(1.0f);

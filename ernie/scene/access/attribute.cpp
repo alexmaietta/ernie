@@ -820,7 +820,8 @@ void UntypedAttribute::MapArray(Mapping& mapping) {
     }
     bool run = first != arrays.end() && stride % device::ElementBytes(layout.type) == 0;
     if (run) {
-        const device::Buffer& buffer = heap.Range(*first).GetBuffer();
+        const device::BufferRange range = heap.Range(*first);
+        const device::Buffer& buffer = range.GetBuffer();
         uint64_t expected = first->address;
         for (const ArrayRef& array : arrays) {
             if (array.count == 0) {

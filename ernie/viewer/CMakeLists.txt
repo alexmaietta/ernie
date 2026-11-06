@@ -120,6 +120,7 @@ target_compile_definitions(
 target_link_libraries(ernie_viewer_internal PUBLIC Vulkan::Headers)
 
 add_executable(ernie_cli cli/main.cpp)
+ernie_warnings(ernie_cli)
 set_target_properties(
     ernie_cli
     PROPERTIES

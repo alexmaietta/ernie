@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.25)
+if(POLICY CMP0156)
+    cmake_policy(SET CMP0156 NEW)
+endif()
 set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "")
 project(
     Ernie
@@ -18,6 +21,7 @@ option(ERNIE_BUILD_PYTHON "Build Ernie's Python bindings" OFF)
 option(ERNIE_BUILD_VIEWER "Build the Ernie viewer" OFF)
 option(ERNIE_INSTALL "Install Ernie's library and headers" OFF)
 option(ERNIE_COVERAGE "Instrument Ernie for code coverage (GCC or Clang)" OFF)
+option(ERNIE_WARNINGS_AS_ERRORS "Fail on compiler and linker warnings in Ernie's own targets" OFF)
 option(ERNIE_DEBIAN_LIBDIR "Install the libraries in Debian's lib/<arch>-linux-gnu" OFF)
 
 set(CMAKE_CXX_STANDARD 20)

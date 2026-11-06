@@ -77,7 +77,7 @@ jobs:
           reg add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' //f //t REG_DWORD //d 0 \
             //v "$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")"
           echo "KERNEL_CACHE=$LOCALAPPDATA/ernie" >> "$GITHUB_ENV"
-      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - uses: ./.github/actions/msvc
         if: runner.os == 'Windows'
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

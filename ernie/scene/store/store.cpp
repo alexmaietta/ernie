@@ -423,8 +423,9 @@ void Store::CloneRows(SchemaId table, std::span<const uint32_t> sources, uint32_
     Table& rows = Schema(table);
     const Ref<device::Buffer> sourceRows = m_device.CreateBuffer({.label = "cloned rows"}, sources);
     const uint32_t count = uint32_t(sources.size());
+    const Span<const ColumnInfo> columns = Columns(table);
     for (uint32_t index = 0; index < Info(table).columnCount; ++index) {
-        const ColumnInfo& info = Columns(table)[index];
+        const ColumnInfo& info = columns[index];
         const ColumnRef column{table, &info, index};
         CloneRowsParams params{};
         params.column.address = rows.Pages(index);
@@ -617,8 +618,9 @@ SceneData Store::Data() const {
         const SchemaId schema = SchemaId(id);
         const SchemaInfo& info = Info(schema);
         const Entry& entry = m_entries[id];
+        const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t column = 0; column < Info(schema).columnCount; ++column) {
-            const ColumnInfo& at = Columns(schema)[column];
+            const ColumnInfo& at = columns[column];
             Place(schemas + base, at.offset, entry.table->Pages(column));
             if (entry.stamps[column] != kNoStamp) {
                 Place(schemas + base, at.stampOffset, entry.table->Pages(entry.stamps[column]));

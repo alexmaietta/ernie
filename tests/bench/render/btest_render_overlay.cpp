@@ -204,9 +204,12 @@ Overlay Draw(device::Device& device, Source source, uint32_t count,
         for (uint32_t at = 0; at < count; ++at) {
             values.push_back(float(at) * 0.37f - 50);
         }
-        OverlayNumbers numbers{.values = tensor(values, device::DType::Float32, {rows}),
-                               .format = {.prefix = "v=", .suffix = " m/s", .decimals = 2},
-                               .style = {.color = {1, 1, 1, 1}, .size = 12}};
+        OverlayNumbers numbers;
+        numbers.values = tensor(values, device::DType::Float32, {rows});
+        numbers.format.prefix = "v=";
+        numbers.format.suffix = " m/s";
+        numbers.format.decimals = 2;
+        numbers.style = {.color = {1, 1, 1, 1}, .size = 12};
         if (source == Source::Numbers) {
             numbers.points = tensor(points, device::DType::Float32, {rows, 3});
             if (worlds.size() > 1) {

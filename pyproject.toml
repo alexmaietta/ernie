@@ -44,7 +44,6 @@ regex = '''project\(\s*Ernie\s+VERSION\s+(?P<value>[0-9]+\.[0-9]+\.[0-9]+)'''
 [tool.scikit-build.cmake.define]
 ERNIE_BUILD_PYTHON = "ON"
 ERNIE_BUILD_VIEWER = "OFF"
-ERNIE_BUILD_XR = "OFF"
 ERNIE_BUILD_TESTS = "OFF"
 ERNIE_INSTALL = "ON"
 

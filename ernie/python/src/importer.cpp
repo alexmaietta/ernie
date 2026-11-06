@@ -29,7 +29,7 @@ namespace {
 
 class PyImporter : public Importer {
   public:
-    NB_TRAMPOLINE(Importer, 3);
+    NB_TRAMPOLINE(Importer);
 
     std::string Name() const override {
         NB_OVERRIDE_PURE_NAME("name", Name);
@@ -85,7 +85,7 @@ ImportDesc CreateImportDesc(std::optional<std::shared_ptr<Importer>> importer,
 }
 
 void BindSceneImports() {
-    const nb::handle scene = nb::type<Scene>();
+    const nb::handle sceneType = nb::type<Scene>();
     const auto import = [](Scene& scene, std::string_view path, const ImportSource& source,
                            std::optional<std::shared_ptr<Importer>> importer,
                            std::optional<nb::callable> progress, bool synchronous,
@@ -103,11 +103,11 @@ void BindSceneImports() {
             return import(scene, path, ImportSource{.file = file}, std::move(importer),
                           std::move(progress), synchronous, up, metersPerUnit);
         },
-        nb::is_method(), nb::scope(scene), nb::name("import_file"), nb::arg("path"),
+        nb::is_method(), nb::scope(sceneType), nb::name("import_file"), nb::arg("path"),
         nb::arg("file"), nb::kw_only(), nb::arg("importer") = nb::none(),
         nb::arg("progress") = nb::none(), nb::arg("synchronous") = false,
         nb::arg("up") = nb::none(), nb::arg("meters_per_unit") = nb::none());
-    nb::cpp_function_def(import, nb::is_method(), nb::scope(scene), nb::name("import_file"),
+    nb::cpp_function_def(import, nb::is_method(), nb::scope(sceneType), nb::name("import_file"),
                          nb::arg("path"), nb::arg("source"), nb::kw_only(),
                          nb::arg("importer") = nb::none(), nb::arg("progress") = nb::none(),
                          nb::arg("synchronous") = false, nb::arg("up") = nb::none(),
@@ -127,7 +127,7 @@ void BindSceneImports() {
             nb::gil_scoped_release release;
             return scene.Import(path, reader, desc);
         },
-        nb::is_method(), nb::scope(scene), nb::name("import_from"), nb::arg("path"),
+        nb::is_method(), nb::scope(sceneType), nb::name("import_from"), nb::arg("path"),
         nb::arg("read"), nb::kw_only(), nb::arg("name") = "a Python reader",
         nb::arg("progress") = nb::none(), nb::arg("synchronous") = false,
         nb::arg("up") = nb::none(), nb::arg("meters_per_unit") = nb::none());
@@ -136,9 +136,9 @@ void BindSceneImports() {
             scene.AddFile(std::move(path), ToFileBytes(bytes),
                           owner ? std::optional<Prim>(owner->prim) : std::nullopt);
         },
-        nb::is_method(), nb::scope(scene), nb::name("add_file"), nb::arg("path"), nb::arg("bytes"),
-        nb::kw_only(), nb::arg("owner") = nb::none());
-    nb::cpp_function_def(&Scene::RemoveFile, nb::is_method(), nb::scope(scene),
+        nb::is_method(), nb::scope(sceneType), nb::name("add_file"), nb::arg("path"),
+        nb::arg("bytes"), nb::kw_only(), nb::arg("owner") = nb::none());
+    nb::cpp_function_def(&Scene::RemoveFile, nb::is_method(), nb::scope(sceneType),
                          nb::name("remove_file"), nb::arg("path"));
 }
 

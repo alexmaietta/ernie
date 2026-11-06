@@ -17,6 +17,7 @@ function(ernie_test name)
             GTest::gtest_main
     )
     target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    ernie_warnings(${name})
     ernie_coverage(${name})
     add_test(NAME ${name} COMMAND ${name})
 endfunction()

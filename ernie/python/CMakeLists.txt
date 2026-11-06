@@ -26,6 +26,17 @@ nanobind_add_module(
     "${ernie_python_defines}"
 )
 target_link_libraries(_ernie PRIVATE ernie)
+ernie_warnings(_ernie)
+foreach(nanobind IN ITEMS nanobind-static nanobind-static-abi3)
+    if(TARGET ${nanobind})
+        set_target_properties(
+            ${nanobind}
+            PROPERTIES
+                SYSTEM
+                    ON
+        )
+    endif()
+endforeach()
 ernie_coverage(_ernie)
 target_include_directories(_ernie PRIVATE src)
 target_include_directories(_ernie SYSTEM PRIVATE ${Python_INCLUDE_DIRS})
@@ -113,6 +124,7 @@ if(ERNIE_BUILD_VIEWER)
             ernie_viewer
             ernie
     )
+    ernie_warnings(_viewer)
     target_include_directories(_viewer PRIVATE src)
     target_include_directories(_viewer SYSTEM PRIVATE ${Python_INCLUDE_DIRS})
     set_target_properties(

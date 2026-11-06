@@ -36,7 +36,7 @@ namespace {
 
 class PythonDelegate : public RenderDelegate {
   public:
-    NB_TRAMPOLINE(RenderDelegate, 2);
+    NB_TRAMPOLINE(RenderDelegate);
 
     std::optional<RenderFrame> Render(const RenderRequest& request) override {
         NB_OVERRIDE_PURE_NAME("render", Render, request);

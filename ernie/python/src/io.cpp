@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <algorithm>
 #include <filesystem>
 #include <optional>
 #include <vector>
@@ -30,7 +31,10 @@ template <class Array> Pixels ToPixels(const Array& array) {
     const nb::dlpack::dtype dtype = array.dtype();
     if (dtype == nb::dtype<double>()) {
         const auto* values = static_cast<const double*>(data);
-        return Pixels(std::vector<float>(values, values + array.size()), rows, cols, channels);
+        std::vector<float> floats(array.size());
+        std::transform(values, values + array.size(), floats.begin(),
+                       [](double value) { return float(value); });
+        return Pixels(std::move(floats), rows, cols, channels);
     }
     const device::DType type =
         dtype == nb::dtype<uint8_t>()    ? device::DType::UInt8

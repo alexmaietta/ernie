@@ -145,9 +145,9 @@ DLTensor Tensor::DLPack() const {
     }
     const ExternalAddress external = m_buffer->External(shared->device_type);
     const uint8_t bits = uint8_t(ElementBytes(m_dtype) * 8);
-    const uint8_t code = m_dtype == DType::Float32 || m_dtype == DType::Float64 ? kDLFloat
-                         : m_dtype == DType::Int32 || m_dtype == DType::Int64   ? kDLInt
-                                                                                : kDLUInt;
+    const auto code = uint8_t(m_dtype == DType::Float32 || m_dtype == DType::Float64 ? kDLFloat
+                              : m_dtype == DType::Int32 || m_dtype == DType::Int64   ? kDLInt
+                                                                                     : kDLUInt);
     DLTensor tensor{};
     tensor.data = reinterpret_cast<void*>(external.address + m_offset);
     tensor.device = external.device;

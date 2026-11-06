@@ -5,6 +5,7 @@ add_library(
     main.cpp
     bench.cpp
 )
+ernie_warnings(ernie_bench_main)
 target_link_libraries(
     ernie_bench_main
     PUBLIC
@@ -27,6 +28,7 @@ target_compile_definitions(
 function(ernie_bench name)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "SOURCES;LINK")
     add_executable(${name} ${ARG_SOURCES})
+    ernie_warnings(${name})
     target_link_libraries(
         ${name}
         PRIVATE

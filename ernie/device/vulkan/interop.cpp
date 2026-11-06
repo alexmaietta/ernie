@@ -26,12 +26,8 @@ namespace {
 constexpr uint32_t kVendorNvidia = 0x10de;
 constexpr uint32_t kVendorAmd = 0x1002;
 
+#if !defined(_WIN32)
 int ExportFd(VulkanDevice& device, VkSemaphore semaphore) {
-#if defined(_WIN32)
-    (void)device;
-    (void)semaphore;
-    throw UnsupportedError("Vulkan's semaphores aren't shared with CUDA or HIP on Windows yet");
-#else
     VkSemaphoreGetFdInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
     info.semaphore = semaphore;
     info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -39,8 +35,8 @@ int ExportFd(VulkanDevice& device, VkSemaphore semaphore) {
     Check(device.Functions().vkGetSemaphoreFdKHR(device.Handle(), &info, &fd),
           "vkGetSemaphoreFdKHR");
     return fd;
-#endif
 }
+#endif
 
 void CloseFd(int fd) {
 #if !defined(_WIN32)
@@ -102,6 +98,7 @@ class CudaContext {
     const cuda::Api& m_cuda;
 };
 
+#if !defined(_WIN32)
 class CudaInterop : public StreamInterop {
   public:
     CudaInterop(VulkanDevice& device, VkSemaphore timeline, VkSemaphore follow)
@@ -248,6 +245,7 @@ class HipInterop : public StreamInterop {
     hip::hipExternalSemaphore_t m_timeline = nullptr;
     hip::hipExternalSemaphore_t m_follow = nullptr;
 };
+#endif
 
 class HostInterop : public StreamInterop {
   public:
@@ -641,15 +639,19 @@ class HipMemoryInterop : public MemoryInterop {
 std::unique_ptr<StreamInterop> CreateStreamInterop(VulkanDevice& device, VkSemaphore timeline,
                                                    VkSemaphore follow) {
     if (device.VendorId() == kVendorNvidia && cuda::Available()) {
+#if !defined(_WIN32)
         if (device.SharesSemaphores()) {
             return std::make_unique<CudaInterop>(device, timeline, follow);
         }
+#endif
         return std::make_unique<CudaHostInterop>(device, timeline, follow);
     }
     if (device.VendorId() == kVendorAmd && hip::Available()) {
+#if !defined(_WIN32)
         if (device.SharesSemaphores()) {
             return std::make_unique<HipInterop>(device, timeline, follow);
         }
+#endif
         return std::make_unique<HipHostInterop>(device, timeline, follow);
     }
     throw UnsupportedError("{} shares no streams with CUDA or HIP: its GPU is of neither here",

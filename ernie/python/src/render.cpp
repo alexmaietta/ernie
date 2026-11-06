@@ -928,7 +928,7 @@ void RegisterRayCaster(nb::module_& module) {
                std::string label, std::optional<RayHits> kept, std::optional<uintptr_t> stream) {
                 device::Device& device = caster.GetScene().GetDevice();
                 HeldTensors held;
-                const auto input = [&](nb::handle value, const char* label) {
+                const auto input = [&](nb::handle value, const char* what) {
                     if (value.is_none()) {
                         return device::Tensor();
                     }
@@ -936,7 +936,7 @@ void RegisterRayCaster(nb::module_& module) {
                         return nb::cast<device::Tensor>(value);
                     }
                     const DLTensor* taken = held.Take(value, stream);
-                    return device.Import(*taken, held.Producer(), label);
+                    return device.Import(*taken, held.Producer(), what);
                 };
                 Rays rays;
                 rays.origins = input(origins, "ray origins");
