@@ -61,6 +61,18 @@ TEST(BoundsTest, ShapesAndMeshesBoundThemselvesAndTheirWorld) {
     });
 }
 
+TEST(BoundsTest, InfinitePlanesLeaveTheBoundsAlone) {
+    ForEachScene([](Scene& scene) {
+        const Prim ground = scene.Define<Plane>("/Ground", {.width = 0, .length = 0});
+        const Prim floor = scene.Define<Plane>("/Floor", {.width = 4, .length = 2});
+        scene.Define<Sphere>("/Ball", {.translate = {0, 0, 3}});
+        scene.Publish().Wait();
+        ExpectPrim(ground, {0, 0, 0}, {0, 0, 0});
+        ExpectPrim(floor, {-2, -1, 0}, {2, 1, 0});
+        ExpectBox(scene.Bounds(), {-2, -1, 0}, {2, 1, 4});
+    });
+}
+
 TEST(BoundsTest, WorldsAreBoundRelativeToTheirOriginWithoutGlobals) {
     ForEachScene([](Scene& scene) {
         scene.Define<World>("/env_0", {.translate = {100, 0, 0}});

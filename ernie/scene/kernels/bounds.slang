@@ -13,6 +13,14 @@ bool Shown(SceneData* scene, uint imageRow) {
            purpose != uint(Purpose::Proxy) && purpose != uint(Purpose::Guide);
 }
 
+bool Infinite(SceneData* scene, uint prim) {
+    if (SchemaId(scene->prims.schema[prim]) != SchemaId::Plane) {
+        return false;
+    }
+    const uint row = PrimRow(scene, prim, kSlotPlane);
+    return scene->schemas.plane.width[row] <= 0 || scene->schemas.plane.length[row] <= 0;
+}
+
 float3 OriginOffset(BoundsParams p, WorldTransform w, uint world) {
     if (world == kGlobalWorld || p.origins[world] == kNoRow) {
         return w.Translation();
@@ -36,8 +44,8 @@ void PrimBounds(uniform BoundsParams p) {
     const WorldTransform w = PrimWorld(scene, prim);
     const UnitShape shape = PlaceShape(scene, prim, w);
     float3 center = float3(0);
-    float3 half = float3(1);
-    bool bounded = ShapeKind(shape.record.kind) != ShapeKind::Mesh;
+    float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
+    bool bounded = ShapeKind(shape.record.kind) != ShapeKind::Mesh && !Infinite(scene, prim);
     if (schema == SchemaId::Mesh) {
         const ArrayRef extent = scene->schemas.mesh.pointBounds[PrimRow(scene, prim, kSlotMesh)];
         bounded = extent.count >= 2;
@@ -64,7 +72,6 @@ void PrimBounds(uniform BoundsParams p) {
     const float3 upper = middle + reach;
     scene->schemas.boundable.worldMin[boundRow] = Float3(lower);
     scene->schemas.boundable.worldMax[boundRow] = Float3(upper);
-
 }
 
 void Grow(Ptr<uint> extents, uint lowerAt, uint upperAt, float3 lower, float3 upper) {
@@ -105,12 +112,13 @@ void SlotBounds(uniform BoundsParams p) {
     const uint owner = drawn.instancer != kNoPrim ? drawn.instancer : drawn.prim;
     const uint world = scene->prims.world[owner];
     const bool global = tlas == layout->worldCount;
-    if ((world == kGlobalWorld) != global) {
+    if ((world == kGlobalWorld) != global || Infinite(scene, drawn.prim)) {
         return;
     }
+    const SchemaId schema = SchemaId(scene->prims.schema[drawn.prim]);
     float3 center = float3(0);
-    float3 half = float3(1);
-    if (SchemaId(scene->prims.schema[drawn.prim]) == SchemaId::Mesh) {
+    float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
+    if (schema == SchemaId::Mesh) {
         const ArrayRef extent =
             scene->schemas.mesh.pointBounds[PrimRow(scene, drawn.prim, kSlotMesh)];
         if (extent.count < 2) {
