@@ -52,10 +52,9 @@ pip install --pre ernie-renderer \
 
 ### Viewer
 
-The interactive viewer is a separate wheel that the `viewer` extra installs. It needs a GPU that can present to a window.
+The `ernie-renderer` wheel includes the interactive viewer. It needs a GPU that can present to a window.
 
 ```bash
-pip install "ernie-renderer[viewer]"
 ernie-viewer
 ```
 

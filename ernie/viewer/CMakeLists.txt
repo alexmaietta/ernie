@@ -148,10 +148,10 @@ if(ERNIE_BUILD_PYTHON)
             ernie_viewer
         RUNTIME
             DESTINATION ernie
-            COMPONENT viewer_python
+            COMPONENT python
         LIBRARY
             DESTINATION ernie
-            COMPONENT viewer_python
+            COMPONENT python
             NAMELINK_SKIP
     )
 endif()

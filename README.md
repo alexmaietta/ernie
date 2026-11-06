@@ -50,7 +50,7 @@ For a more detailed overview of the features, see our [documentation](https://al
 We recommend installing Ernie from PyPi. We also ship a GUI application that provides interactive viewing and editing of scenes. The following commands install Ernie, check it was installed sucessfully, and opens the GUI.
 
 ```sh
-pip install ernie-renderer[viewer]
+pip install ernie-renderer
 python -c "import ernie; print(ernie.__version__)"
 ernie
 ```

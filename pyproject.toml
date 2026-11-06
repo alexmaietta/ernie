@@ -15,7 +15,6 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-viewer = ["ernie-renderer-viewer"]
 
 [project.urls]
 Homepage = "https://github.com/alexmaietta/ernie"
@@ -25,6 +24,7 @@ Issues = "https://github.com/alexmaietta/ernie/issues"
 
 [project.scripts]
 ernie = "ernie.__main__:main"
+ernie-viewer = "ernie.viewer:main"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
@@ -33,7 +33,7 @@ cmake.build-type = "Release"
 build-dir = "build-wheel/ernie"
 wheel.py-api = "cp312"
 wheel.packages = []
-build.targets = ["_ernie", "ernie_python_stubs_ernie"]
+build.targets = ["_ernie", "_viewer", "ernie_python_stubs_ernie", "ernie_python_stubs_viewer"]
 install.components = ["python"]
 
 [tool.scikit-build.metadata.version]
@@ -43,7 +43,7 @@ regex = '''project\(\s*Ernie\s+VERSION\s+(?P<value>[0-9]+\.[0-9]+\.[0-9]+)'''
 
 [tool.scikit-build.cmake.define]
 ERNIE_BUILD_PYTHON = "ON"
-ERNIE_BUILD_VIEWER = "OFF"
+ERNIE_BUILD_VIEWER = "ON"
 ERNIE_BUILD_TESTS = "OFF"
 ERNIE_INSTALL = "ON"
 
@@ -55,9 +55,10 @@ build = "cp310-* cp311-* cp312-*"
 skip = "*-musllinux_*"
 manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"
-test-command = "python -c \"import ernie; print(ernie.__version__)\""
+test-command = "python -c \"import ernie, ernie.viewer; print(ernie.__version__)\""
 
 [tool.cibuildwheel.linux]
+before-all = "dnf install -y libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel wayland-devel libxkbcommon-devel"
 repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.macos]
@@ -66,4 +67,4 @@ environment = { MACOSX_DEPLOYMENT_TARGET = "26.0" }
 
 [tool.cibuildwheel.windows]
 archs = ["native"]
-repair-wheel-command = "delvewheel repair --no-dll \"ernie.dll;slang-compiler.dll;slang-glslang.dll;msvcp140.dll\" -w {dest_dir} {wheel}"
+repair-wheel-command = "delvewheel repair --no-dll \"ernie.dll;ernie_viewer.dll;slang-compiler.dll;slang-glslang.dll;msvcp140.dll\" -w {dest_dir} {wheel}"

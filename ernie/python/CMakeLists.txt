@@ -161,13 +161,13 @@ if(ERNIE_BUILD_VIEWER)
             _viewer
         LIBRARY
             DESTINATION ernie
-            COMPONENT viewer_python
+            COMPONENT python
     )
     install(
         FILES
             ernie/viewer.py
             "${ernie_python_dir}/_viewer.pyi"
         DESTINATION ernie
-        COMPONENT viewer_python
+        COMPONENT python
     )
 endif()
