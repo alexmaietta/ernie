@@ -55,10 +55,10 @@ pip install --pre ernie-renderer \
 The `ernie-renderer` wheel includes the interactive viewer. It needs a GPU that can present to a window.
 
 ```bash
-ernie-viewer
+ernie
 ```
 
-The `ernie-viewer` command opens the default scene, and `ernie-viewer --help` lists its options. From Python, open a viewer on your own scene.
+With no options, the `ernie` command opens the viewer on the default scene, and `ernie --help` lists its options. From Python, open a viewer on your own scene.
 
 ```python
 import ernie
