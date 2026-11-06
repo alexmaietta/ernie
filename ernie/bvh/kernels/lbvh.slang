@@ -304,6 +304,7 @@ struct Children {
     uint count;
 }
 
+[ForceInline]
 Children GatherChildren(LbvhParams p, uint task) {
     Children children;
     if (Count(p, task) <= kBvhLeafSize) {
@@ -349,6 +350,7 @@ uint4* SegmentRecords(LbvhParams p, uint segment) {
     return (uint4*)((uint*)SegmentHeader(p, segment) + uint(leaves / 4));
 }
 
+[ForceInline]
 void LinkChildren(LbvhParams p, inout BvhNode node, uint segment, Children children,
                   BvhSlots slots) {
     uint internal = 0;
