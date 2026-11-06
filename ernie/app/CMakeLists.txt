@@ -10,6 +10,7 @@ target_compile_definitions(ernie_app PRIVATE ERNIE_SOVERSION="${PROJECT_VERSION_
 
 add_executable(ernie_cli main.cpp)
 ernie_warnings(ernie_cli)
+ernie_coverage(ernie_cli)
 set_target_properties(
     ernie_cli
     PROPERTIES

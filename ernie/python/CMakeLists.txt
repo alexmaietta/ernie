@@ -32,6 +32,9 @@ target_link_libraries(
         ernie_app
 )
 ernie_warnings(_ernie)
+if(MSVC)
+    target_compile_options(_ernie PRIVATE /wd4714)
+endif()
 foreach(nanobind IN ITEMS nanobind-static nanobind-static-abi3)
     if(TARGET ${nanobind})
         set_target_properties(
@@ -130,6 +133,9 @@ if(ERNIE_BUILD_VIEWER)
             ernie
     )
     ernie_warnings(_viewer)
+    if(MSVC)
+        target_compile_options(_viewer PRIVATE /wd4714)
+    endif()
     target_include_directories(_viewer PRIVATE src)
     target_include_directories(_viewer SYSTEM PRIVATE ${Python_INCLUDE_DIRS})
     set_target_properties(
