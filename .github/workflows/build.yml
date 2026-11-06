@@ -1,0 +1,180 @@
+name: Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-gcc, os: ubuntu-24.04, cc: gcc, cxx: g++ }
+          - { name: linux-clang, os: ubuntu-24.04, cc: clang-18, cxx: clang++-18 }
+          - { name: linux-arm, os: ubuntu-24.04-arm, cc: gcc, cxx: g++ }
+          - { name: windows, os: windows-2025 }
+          - { name: macos, os: macos-26 }
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 1G
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ninja, ccache, the windowing libraries and lavapipe
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev mesa-vulkan-drivers libvulkan1
+          icd=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
+          {
+            echo "VK_DRIVER_FILES=$icd"
+            echo "VK_ICD_FILENAMES=$icd"
+            echo "KERNEL_CACHE=$HOME/.cache/ernie"
+          } >> "$GITHUB_ENV"
+      - uses: ./.github/actions/vulkan-validation
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+      - name: Install Ninja, ccache and lavapipe
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja ccache mesa vulkan-loader vulkan-validationlayers
+          prefix=$(brew --prefix)
+          icd=$(find "$prefix/share/vulkan/icd.d" -name 'lvp_icd*.json' | head -n1)
+          {
+            echo "VK_DRIVER_FILES=$icd"
+            echo "VK_ICD_FILENAMES=$icd"
+            echo "VK_LAYER_PATH=$prefix/share/vulkan/explicit_layer.d"
+            echo "ERNIE_VALIDATION=1"
+            echo "DYLD_FALLBACK_LIBRARY_PATH=$prefix/lib"
+            echo "KERNEL_CACHE=$HOME/Library/Caches/ernie"
+          } >> "$GITHUB_ENV"
+      - name: Install Ninja and ccache
+        if: runner.os == 'Windows'
+        run: choco install ninja ccache --no-progress -y
+      - name: Install lavapipe
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          vulkan="$RUNNER_TEMP/vulkan"
+          mkdir -p "$vulkan" && cd "$vulkan"
+          curl -fsSL -o mesa.7z https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z
+          curl -fsSL -o loader.zip https://sdk.lunarg.com/sdk/download/1.4.363.0/windows/VulkanRT-X64-1.4.363.0-Components.zip
+          echo "351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695  mesa.7z" | sha256sum -c -
+          echo "a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a  loader.zip" | sha256sum -c -
+          7z x -y -omesa mesa.7z > /dev/null
+          7z x -y -oloader loader.zip > /dev/null
+          cp loader/*/x64/vulkan-1.dll mesa/x64/
+          cygpath -w "$vulkan/mesa/x64" >> "$GITHUB_PATH"
+          reg add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' //f //t REG_DWORD //d 0 \
+            //v "$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")"
+          echo "KERNEL_CACHE=$LOCALAPPDATA/ernie" >> "$GITHUB_ENV"
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+      - run: python -m pip install nanobind numpy pytest
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: ccache
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.name }}-
+      - name: Configure
+        run: >
+          cmake --preset ci -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_VIEWER=ON
+          "-DPython_EXECUTABLE=$(python -c 'import sys; print(sys.executable)')"
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        shell: bash
+        run: |
+          ccache --zero-stats
+          cmake --build --preset ci --parallel 4
+          ccache --show-stats
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.ccache.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.name }}-${{ github.sha }}
+      - name: Install and build a consumer
+        shell: bash
+        run: |
+          prefix="$RUNNER_TEMP/ernie"
+          for component in runtime dev viewer viewer_dev; do
+            cmake --install build-ci --prefix "$prefix" --component "$component"
+          done
+          cmake -S tests/consumer -B build-consumer -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_PREFIX_PATH=$prefix"
+          cmake --build build-consumer
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: kernels
+        with:
+          path: ${{ env.KERNEL_CACHE }}
+          key: kernels-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: kernels-${{ matrix.name }}-
+      - name: Test
+        shell: bash
+        env:
+          LP_NUM_THREADS: "1"
+          ERNIE_TEST_REQUIRE_DEVICE: "1"
+          ERNIE_TEST_FULL: "1"
+        run: ctest --preset ci -j4
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.kernels.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.KERNEL_CACHE }}
+          key: kernels-${{ matrix.name }}-${{ github.sha }}
+
+  kernels:
+    name: kernels (nvrtc, hiprtc)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 1G
+      ERNIE_TEST_REQUIRE_COMPILERS: "1"
+      ERNIE_TEST_FULL: "1"
+      KERNEL_CACHE: /home/runner/.cache/ernie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ninja, ccache, NVRTC and hiprtc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo mkdir -p /etc/apt/keyrings
+          wget -qO- https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/rocm.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/7.2 noble main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cuda-nvrtc-13-0 hip-runtime-amd
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-13.0/targets/x86_64-linux/lib:/opt/rocm/lib" >> "$GITHUB_ENV"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ccache
+          key: ccache-kernels-${{ github.sha }}
+          restore-keys: ccache-kernels-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.KERNEL_CACHE }}
+          key: kernels-compilers-${{ github.sha }}
+          restore-keys: kernels-compilers-
+      - name: Configure
+        run: >
+          cmake --preset ci
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build --preset ci --parallel 4 --target ernie_runtime_compiler_tests
+      - name: Compile every kernel with NVRTC and hiprtc
+        run: build-ci/bin/ernie_runtime_compiler_tests

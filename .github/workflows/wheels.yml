@@ -1,0 +1,96 @@
+name: Wheels
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    name: wheel (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x86_64, runner: ubuntu-24.04, pythons: "cp310-* cp311-* cp312-*" }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, pythons: "cp310-* cp311-* cp312-*" }
+          - { platform: windows-amd64, runner: windows-2025, msvc: x64, pythons: "cp310-* cp311-* cp312-*" }
+          - { platform: windows-arm64, runner: windows-11-arm, msvc: arm64, pythons: "cp311-* cp312-*" }
+          - { platform: macos-arm64, runner: macos-26, pythons: "cp310-* cp311-* cp312-*" }
+    env:
+      CIBW_BUILD: ${{ matrix.pythons }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
+        with:
+          arch: ${{ matrix.msvc }}
+      - name: Set the dev version
+        if: contains(inputs.version, 'dev')
+        shell: python
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          import os
+          from pathlib import Path
+
+          for path, line in [
+              ("pyproject.toml", 'input = "CMakeLists.txt"\n'),
+              ("ernie/python/viewer/pyproject.toml", 'input = "../../../CMakeLists.txt"\n'),
+          ]:
+              pyproject = Path(path)
+              text = pyproject.read_text()
+              assert line in text
+              pyproject.write_text(text.replace(line, f'{line}result = "{os.environ["VERSION"]}"\n', 1))
+      - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
+        with:
+          output-dir: wheelhouse
+      - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
+        with:
+          package-dir: ernie/python/viewer
+          output-dir: wheelhouse-viewer
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Import the wheels
+        shell: bash
+        run: |
+          python -m pip install numpy
+          python -m pip install --no-index --find-links wheelhouse --find-links wheelhouse-viewer \
+            ernie-renderer ernie-renderer-viewer
+          cd "$RUNNER_TEMP"
+          python -c "import ernie, ernie.viewer; print(ernie.__version__)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: wheelhouse/*.whl
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-viewer-${{ matrix.platform }}
+          path: wheelhouse-viewer/*.whl
+
+  sdist:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: python -m build --sdist
+      - name: Install from the sdist
+        run: |
+          python -m pip install dist/*.tar.gz
+          cd "$RUNNER_TEMP" && python -c "import ernie; print(ernie.__version__)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sdist
+          path: dist/*.tar.gz

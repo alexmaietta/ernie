@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/kernels/schema/schema.h"
+
+namespace ernie {
+
+static const uint kPrimAlive = 1u << 0;
+static const uint kPrimSession = 1u << 1;
+
+struct PrimData {
+    Paged<uint> schema;
+    Paged<uint> parent;
+    Paged<uint> world;
+    Paged<uint> flags;
+    Paged<uint> slots;
+    Paged<uint64_t> apis;
+};
+
+ERNIE_CHECK_SIZE(PrimData, 48);
+
+struct SceneData {
+    PrimData prims;
+    Paged<uint> rows;
+    Paged<uint64_t> worldStamps;
+    Ptr<uint64_t> textureBindings;
+    Schemas schemas;
+    uint primCount;
+    uint worldCount;
+};
+
+ERNIE_CHECK_SIZE(SceneData, 80 + sizeof(Schemas));
+
+#ifdef __SLANG__
+
+uint WorldSlot(SceneData* scene, uint world) {
+    return world == kGlobalWorld ? 0 : world + 1;
+}
+
+uint PrimRow(SceneData* scene, uint prim, uint slot) {
+    return scene->rows[scene->prims.slots[prim] + slot];
+}
+
+bool HasApi(SceneData* scene, uint prim, uint api) {
+    const uint64_t apis = scene->prims.apis[prim];
+    return ((api < 32 ? uint(apis) >> api : uint(apis >> 32) >> (api - 32)) & 1) != 0;
+}
+
+uint ApiRow(SceneData* scene, uint prim, uint api) {
+    const uint64_t apis = scene->prims.apis[prim];
+    const uint low = uint(apis);
+    const uint below =
+        api < 32 ? countbits(low & ((1u << api) - 1))
+                 : countbits(low) + countbits(uint(apis >> 32) & ((1u << (api - 32)) - 1));
+    const uint typed = kSchemaSlotCounts[scene->prims.schema[prim]];
+    return scene->rows[scene->prims.slots[prim] + typed + below];
+}
+
+uint ApiInstanceRow(SceneData* scene, uint prim, uint api, uint instance, Paged<uint> names,
+                    Paged<uint> next) {
+    if (!HasApi(scene, prim, api)) {
+        return kNoRow;
+    }
+    uint row = ApiRow(scene, prim, api);
+    while (row != kNoRow && names[row] != instance) {
+        row = next[row];
+    }
+    return row;
+}
+
+WorldTransform PrimWorld(SceneData* scene, uint prim) {
+    return scene->schemas.xformable.worldTransform[PrimRow(scene, prim, kSlotXformable)];
+}
+
+#endif
+
+}

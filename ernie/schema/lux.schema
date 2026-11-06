@@ -1,0 +1,396 @@
+api class LightAPI : CollectionAPI:lightLink, CollectionAPI:shadowLink (
+    doc = "Emission shared by every light, with the collections of prims it lights and prims that shadow it."
+) {
+    bool collection:lightLink:includeRoot = true
+    bool collection:shadowLink:includeRoot = true
+    bool visibleInPrimaryRay = true (
+        tracked
+        group = "Light"
+        displayName = "Visible To Camera"
+        doc = "Whether camera rays see the light itself, as Omniverse RTX's attribute does. Other rays always see it."
+    )
+    float inputs:intensity = 1 (
+        unit = nits
+        group = "Light"
+        displayName = "Intensity"
+        doc = "Brightness of the light, scaled by exposure."
+    )
+    float inputs:exposure = 0 (
+        group = "Light"
+        displayName = "Exposure"
+        doc = "Brightness as a power of two, in stops."
+    )
+    float inputs:diffuse = 1 (
+        group = "Light"
+        displayName = "Diffuse Multiplier"
+        doc = "Multiplier on the light's diffuse contribution."
+    )
+    float inputs:specular = 1 (
+        group = "Light"
+        displayName = "Specular Multiplier"
+        doc = "Multiplier on the light's specular contribution."
+    )
+    bool inputs:normalize = false (
+        group = "Light"
+        displayName = "Normalize Power"
+        doc = "Divide the power by the light's area, so size doesn't change brightness."
+    )
+    color3f inputs:color = (1, 1, 1) (
+        group = "Light"
+        displayName = "Color"
+        doc = "Color of the emitted light, in linear energy."
+    )
+    bool inputs:enableColorTemperature = false (
+        group = "Color Temperature"
+        displayName = "Enable Color Temperature"
+        doc = "Tint the color by colorTemperature."
+    )
+    float inputs:colorTemperature = 6500 (
+        unit = kelvin
+        group = "Color Temperature"
+        displayName = "Color Temperature"
+        min = 1000
+        max = 10000
+        doc = "Blackbody temperature of the light."
+    )
+}
+
+api class ShapingAPI (
+    appliesTo = [SphereLight, RectLight, DiskLight, CylinderLight]
+    doc = "Shapes an area light's emission around its axis with a cone, a focus and an IES profile."
+) {
+    float inputs:shaping:focus = 0 (
+        tracked
+        group = "Shaping"
+        displayName = "Focus"
+        min = 0
+        doc = "An exponent on the cosine of the angle from the axis that concentrates emission toward the axis. 0 leaves emission unchanged."
+    )
+    color3f inputs:shaping:focusTint = (0, 0, 0) (
+        tracked
+        group = "Shaping"
+        displayName = "Focus Tint"
+        doc = "The color emission fades to away from the axis as focus concentrates it."
+    )
+    float inputs:shaping:cone:angle = 90 (
+        tracked
+        unit = degrees
+        group = "Shaping"
+        displayName = "Cone Angle"
+        min = 0
+        max = 180
+        doc = "The angle from the axis past which the light emits nothing."
+    )
+    float inputs:shaping:cone:softness = 0 (
+        tracked
+        group = "Shaping"
+        displayName = "Cone Softness"
+        min = 0
+        max = 1
+        doc = "How far inside the cone emission starts to fade, as a fraction of the cone angle."
+    )
+    asset inputs:shaping:ies:file = @@ (
+        tracked
+        group = "Shaping"
+        displayName = "IES File"
+        doc = "An IES profile giving emission by angle."
+    )
+    float inputs:shaping:ies:angleScale = 0 (
+        tracked
+        group = "Shaping"
+        displayName = "IES Angle Scale"
+        doc = "Scales the IES profile's vertical angles about the axis, widening it above 0 and narrowing it below."
+    )
+    bool inputs:shaping:ies:normalize = false (
+        tracked
+        group = "Shaping"
+        displayName = "IES Normalize"
+        doc = "Divides the IES profile by its power, so it changes the light's distribution but not its power."
+    )
+    uint ernie:textures (
+        derived
+        doc = "Where the IES profile's texture handle is in the texture bindings, or 0 without one, written by the texture system."
+    )
+}
+
+api class OmniShapingAPI (
+    autoApplyTo = [SphereLight, RectLight, DiskLight, CylinderLight]
+    doc = "Omniverse RTX's choice of the axis an area light's shaping and IES profile follow."
+) {
+    token omni:rtx:shaping:forwardAxis = "-Z" (
+        tracked
+        allowed = ["-Z", "+Z", "-Y", "+Y", "-X", "+X"]
+        enum = ShapingAxis
+        group = "Shaping"
+        displayName = "Forward Axis"
+        doc = "The local axis shaping and IES profiles are measured from."
+    )
+}
+
+api class ShadowAPI (
+    appliesTo = [NonboundableLightBase, BoundableLightBase]
+    doc = "Non-physical controls over the shadows a light casts."
+) {
+    bool inputs:shadow:enable = true (
+        tracked
+        group = "Shadow"
+        displayName = "Enable Shadows"
+        doc = "Whether prims shadow the light."
+    )
+    color3f inputs:shadow:color = (0, 0, 0) (
+        tracked
+        group = "Shadow"
+        displayName = "Shadow Color"
+        doc = "The color shadowed light takes instead of black."
+    )
+    float inputs:shadow:distance = -1 (
+        tracked
+        unit = meters
+        group = "Shadow"
+        displayName = "Shadow Distance"
+        doc = "How far from the shaded point occluders cast shadows. Negative casts them at any distance."
+    )
+    float inputs:shadow:falloff = -1 (
+        tracked
+        unit = meters
+        group = "Shadow"
+        displayName = "Shadow Falloff"
+        doc = "How far before the shadow distance shadows start to fade. Zero or less fades nothing."
+    )
+    float inputs:shadow:falloffGamma = 1 (
+        tracked
+        group = "Shadow"
+        displayName = "Shadow Falloff Gamma"
+        doc = "An exponent on the fade, shaping how shadows fall off."
+    )
+}
+
+api class PhysicalLightIlluminantAPI (
+    appliesTo = [NonboundableLightBase, BoundableLightBase]
+    doc = "Omniverse's choice of a light's emission spectrum."
+) {
+    token physical:illuminant = white (
+        tracked
+        allowed = [white, blackbody, "illuminant D", custom]
+        group = "Illuminant"
+        displayName = "Illuminant"
+        doc = "The emission spectrum. white is the rendering color space's white point, blackbody and illuminant D take colorTemperature in kelvin, and custom takes customIlluminant."
+    )
+    float2[] physical:customIlluminant (
+        tracked
+        group = "Illuminant"
+        displayName = "Custom Illuminant"
+        doc = "Wavelength and spectral radiance pairs with increasing wavelengths in nanometers. Nothing is emitted outside the first and last wavelength."
+    )
+}
+
+api class PhotometricAreaLightAPI : PhysicalLightIlluminantAPI (
+    appliesTo = [SphereLight, RectLight, DiskLight, CylinderLight]
+    doc = "Omniverse's photometric brightness for area lights, as luminous power or as illuminance at a distance."
+) {
+    float photometric:power = 1600 (
+        tracked
+        group = "Photometric"
+        displayName = "Power"
+        min = 0
+        doc = "Total luminous flux in lumens."
+    )
+    float photometric:illuminance = 0 (
+        tracked
+        unit = lux
+        group = "Photometric"
+        displayName = "Illuminance"
+        min = 0
+        doc = "Illuminance on a surface facing the light at illuminance distance. It takes over from power when both are positive."
+    )
+    float photometric:illuminance:distance = 0 (
+        tracked
+        unit = meters
+        group = "Photometric"
+        displayName = "Illuminance Distance"
+        min = 0
+        doc = "How far from the light illuminance is measured. Zero turns illuminance off."
+    )
+}
+
+api class PhotometricDistantLightAPI : PhysicalLightIlluminantAPI (
+    appliesTo = [DistantLight]
+    doc = "Omniverse's photometric brightness for distant lights, as illuminance."
+) {
+    float photometric:illuminance = 10000 (
+        tracked
+        unit = lux
+        group = "Photometric"
+        displayName = "Illuminance"
+        min = 0
+        doc = "Illuminance on a surface perpendicular to the light."
+    )
+}
+
+abstract class NonboundableLightBase : Xformable, LightAPI (
+    doc = "A light with no extent."
+) {}
+
+abstract class BoundableLightBase : Boundable, LightAPI (
+    doc = "A light with an extent."
+) {}
+
+class DistantLight : NonboundableLightBase (
+    doc = "A light infinitely far away, such as the sun."
+) {
+    float inputs:angle = 0.53 (
+        unit = degrees
+        group = "Shape"
+        displayName = "Angle"
+        doc = "Angular diameter of the light as seen from the scene."
+    )
+    float inputs:intensity = 50000
+}
+
+class DomeLight : NonboundableLightBase (
+    doc = "Light from every direction at infinity, from a uniform color or an environment image."
+) {
+    asset inputs:texture:file = @@ (
+        tracked
+        group = "Texture"
+        displayName = "Texture"
+        doc = "An environment image multiplying the emission by direction."
+    )
+    token inputs:texture:format = automatic (
+        tracked
+        allowed = [automatic, latlong, mirroredBall, angular, cubeMapVerticalCross]
+        enum = DomeTextureFormat
+        group = "Texture"
+        displayName = "Texture Format"
+        doc = "How the image maps to directions. automatic picks cubeMapVerticalCross for a 3 by 4 image, angular for a square one and latlong otherwise."
+    )
+    token poleAxis = scene (
+        tracked
+        allowed = [scene, Y, Z]
+        enum = DomePoleAxis
+        group = "Texture"
+        displayName = "Pole Axis"
+        doc = "The local axis the image's top pole points along before the dome's transform. scene is the scene's up axis, which is Z."
+    )
+    float guideRadius = 100000 (
+        unit = meters
+        group = "Guide"
+        displayName = "Guide Radius"
+        doc = "Radius of the sphere viewers draw the dome on. Rendering ignores it."
+    )
+    prim[] portals (
+        tracked
+        group = "Portals"
+        displayName = "Portals"
+        doc = "PortalLights that light from this dome enters through. With portals, direct lighting samples only the directions through them."
+    )
+    uint ernie:textures (
+        derived
+        doc = "Where the dome's texture handle is in the texture bindings, or 0 without one, written by the texture system."
+    )
+    uint2 ernie:textureSize (
+        derived
+        doc = "Width and height of the dome's image, or 0 without one, written by the texture system."
+    )
+}
+
+class PortalLight : BoundableLightBase (
+    doc = "A rectangle in its XY plane that light from a dome enters through, along its -Z axis. It emits nothing itself."
+) {
+    float inputs:width = 1 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Width"
+        doc = "Width of the rectangle along X."
+    )
+    float inputs:height = 1 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Height"
+        doc = "Height of the rectangle along Y."
+    )
+}
+
+class RectLight : BoundableLightBase (
+    doc = "A light emitting from one side of a rectangle in its XY plane, along its -Z axis."
+) {
+    float inputs:width = 1 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Width"
+        doc = "Width of the rectangle along X."
+    )
+    float inputs:height = 1 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Height"
+        doc = "Height of the rectangle along Y."
+    )
+    asset inputs:texture:file = @@ (
+        tracked
+        group = "Shape"
+        displayName = "Texture"
+        doc = "An image multiplying the emission across the rectangle, with s along +X and t along +Y, so it reads unmirrored from the +Z side."
+    )
+    uint ernie:textures (
+        derived
+        doc = "Where the rectangle's texture handle is in the texture bindings, or 0 without one, written by the texture system."
+    )
+}
+
+class DiskLight : BoundableLightBase (
+    doc = "A light emitting from one side of a disk in its XY plane, along its -Z axis."
+) {
+    float inputs:radius = 0.5 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Radius"
+        doc = "Radius of the disk."
+    )
+}
+
+class CylinderLight : BoundableLightBase (
+    doc = "A light emitting outward from the side of a cylinder along its X axis."
+) {
+    float inputs:length = 1 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Length"
+        doc = "Length of the cylinder along X."
+    )
+    float inputs:radius = 0.5 (
+        tracked
+        unit = meters
+        group = "Shape"
+        displayName = "Radius"
+        doc = "Radius of the cylinder."
+    )
+    bool treatAsLine = false (
+        tracked
+        group = "Shape"
+        displayName = "Treat As Line"
+        doc = "Treat the light as a line with no radius."
+    )
+}
+
+class SphereLight : BoundableLightBase (
+    doc = "A light emitting from a sphere."
+) {
+    float inputs:radius = 0.5 (
+        unit = meters
+        group = "Shape"
+        displayName = "Radius"
+        doc = "Radius of the sphere."
+    )
+    bool treatAsPoint = false (
+        group = "Shape"
+        displayName = "Treat As Point"
+        doc = "Treat the light as a point with no size."
+    )
+}

@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/prim.h"
+
+#include <algorithm>
+
+#include "ernie/scene/scene.h"
+#include "ernie/scene/scene_impl.h"
+#include "ernie/util/error.h"
+
+namespace ernie {
+
+Scene& Prim::GetScene() const {
+    if (m_scene == nullptr) {
+        throw Error("An empty prim belongs to no scene");
+    }
+    return *m_scene;
+}
+
+bool Prim::Valid() const {
+    if (m_scene == nullptr) {
+        return false;
+    }
+    const Prims& prims = SceneImpl::Get(*m_scene).GetCatalog().GetPrims();
+    return prims.Alive(m_index) && prims.Generation(m_index) == m_generation;
+}
+
+void Prim::Check() const {
+    if (!Valid()) {
+        throw Error("Prim {} was removed", m_index);
+    }
+}
+
+SchemaId Prim::Schema() const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPrims().At(m_index).schema;
+}
+
+bool Prim::IsSession() const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPrims().Session(m_index);
+}
+
+uint32_t Prim::World() const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPrims().At(m_index).world;
+}
+
+std::string Prim::Path() const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPaths().Path(m_index);
+}
+
+std::string_view Prim::Name() const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPaths().Name(m_index);
+}
+
+std::optional<Prim> Prim::Parent() const {
+    Check();
+    const uint32_t parent = SceneImpl::Get(*m_scene).GetCatalog().GetPrims().At(m_index).parent;
+    if (parent == kNoPrim) {
+        return std::nullopt;
+    }
+    return SceneImpl::Get(*m_scene).Handle(parent);
+}
+
+std::vector<Prim> Prim::Children() const {
+    Check();
+    std::vector<Prim> children;
+    for (const uint32_t child :
+         SceneImpl::Get(*m_scene).GetCatalog().GetPaths().Children(m_index)) {
+        children.push_back(SceneImpl::Get(*m_scene).Handle(child));
+    }
+    return children;
+}
+
+View Prim::Single() const {
+    return GetScene().Select(*this);
+}
+
+View Prim::Single(SchemaId api, std::string_view instance) const {
+    return GetScene().Select(*this, api, instance);
+}
+
+std::vector<std::string> Prim::Instances(SchemaId api) const {
+    Check();
+    const Catalog& catalog = SceneImpl::Get(*m_scene).GetCatalog();
+    std::vector<std::string> names;
+    for (const ApiInstance& entry : catalog.GetPrims().Instances(m_index, api)) {
+        names.emplace_back(catalog.GetTokens().Text(Token{entry.instance}));
+    }
+    std::ranges::sort(names);
+    return names;
+}
+
+bool Prim::IsA(SchemaId schema) const {
+    return ernie::IsA(Schema(), schema);
+}
+
+bool Prim::HasApi(SchemaId api) const {
+    Check();
+    return SceneImpl::Get(*m_scene).GetCatalog().GetPrims().HasApi(m_index, api);
+}
+
+void Prim::CheckSchema(SchemaId schema) const {
+    if (!ernie::IsA(Schema(), schema) && !HasApi(schema)) {
+        throw Error("{} is a {}, not a {}", Path(), Info(Schema()).name, Info(schema).name);
+    }
+}
+
+Token Prim::Intern(std::string_view text) const {
+    return GetScene().Token(text);
+}
+
+std::string_view Prim::Text(Token token) const {
+    return GetScene().Text(token);
+}
+
+}

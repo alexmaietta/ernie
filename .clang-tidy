@@ -1,0 +1,30 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  clang-analyzer-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-equals-default,
+  modernize-use-equals-delete,
+  readability-else-after-return,
+  readability-redundant-*,
+  readability-function-size,
+  readability-function-cognitive-complexity,
+  -bugprone-easily-swappable-parameters,
+  -portability-avoid-pragma-once,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  -clang-analyzer-optin.core.EnumCastOutOfRange
+CheckOptions:
+  readability-function-size.LineThreshold: 60
+  readability-function-size.NestingThreshold: 4
+  readability-function-cognitive-complexity.Threshold: 25
+  bugprone-signed-bitwise.IgnorePositiveIntegerLiterals: true
+  bugprone-exception-escape.IgnoredExceptions: format_error
+  bugprone-invalid-enum-default-initialization.IgnoredEnums: '::std::errc;::Vk.*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*/ernie/[a-z_/]+\.h$'
+FormatStyle: file

@@ -1,0 +1,298 @@
+api class TextureMappingAPI (
+    doc = "Places a surface's textures: from a primvar or projected from the shaded position, then transformed and optionally hex tiled."
+) {
+    token inputs:projection = uv (
+        allowed = [uv, planar, box, triplanar]
+        enum = TextureProjection
+        group = "Mapping"
+        displayName = "Projection"
+        doc = "Where texture coordinates come from: a primvar, or the position projected onto the xy plane, onto the box face the normal points at, or onto all three axes blended."
+    )
+    token inputs:projectionSpace = object (
+        allowed = [object, world]
+        enum = TextureSpace
+        group = "Mapping"
+        displayName = "Projection Space"
+        doc = "Whether projected textures move with the object or stay fixed in the world."
+    )
+    token inputs:wrap = repeat (
+        tracked
+        allowed = [repeat, mirror, clamp, black]
+        enum = TextureWrapMode
+        group = "Mapping"
+        displayName = "Wrap"
+        doc = "How texture coordinates outside 0 to 1 wrap. Black reads transparent black."
+    )
+    token inputs:uvPrimvar = st (
+        group = "Mapping"
+        displayName = "UV Primvar"
+        doc = "The float2 primvar read when projection is uv."
+    )
+    float inputs:tileSize = 1 (
+        unit = meters
+        group = "Mapping"
+        displayName = "Tile Size"
+        doc = "Length of one texture repeat for planar, box and triplanar projections."
+    )
+    float inputs:triplanarBlend = 0.25 (
+        group = "Mapping"
+        displayName = "Triplanar Blend"
+        min = 0
+        max = 1
+        doc = "How widely triplanar projections blend across edges. 0 gives hard box seams."
+    )
+    float2 inputs:uvScale = (1, 1) (
+        group = "Mapping"
+        displayName = "Tiling"
+        doc = "Repeats per unit of texture coordinate, applied after rotation."
+    )
+    float2 inputs:uvOffset = (0, 0) (
+        group = "Mapping"
+        displayName = "Offset"
+        doc = "Shift applied after rotation and tiling."
+    )
+    float inputs:uvRotation = 0 (
+        unit = degrees
+        group = "Mapping"
+        displayName = "Rotation"
+        doc = "Rotation about the texture origin, applied first."
+    )
+    bool inputs:hexTiling = false (
+        group = "Hex Tiling"
+        displayName = "Hex Tiling"
+        doc = "Blend randomly rotated and offset copies on a hex grid to hide repetition."
+    )
+    float inputs:hexTilingContrast = 0.5 (
+        group = "Hex Tiling"
+        displayName = "Contrast"
+        min = 0
+        max = 1
+        enabledBy = "hexTiling"
+        doc = "How sharply neighbouring hex tiles blend."
+    )
+    float inputs:hexTilingRotation = 180 (
+        unit = degrees
+        group = "Hex Tiling"
+        displayName = "Rotation"
+        min = 0
+        max = 180
+        enabledBy = "hexTiling"
+        doc = "Largest random rotation of each hex tile."
+    )
+}
+
+api class SurfaceDetailAPI (
+    doc = "Perturbs a surface's shading: a normal map, detail normal and albedo maps at a finer tiling, and displacement."
+) {
+    texturable normal3f inputs:normal = (0, 0, 1) (
+        group = "Normal"
+        displayName = "Normal"
+        doc = "Tangent-space shading normal, usually from a normal map."
+    )
+    float inputs:normalStrength = 1 (
+        group = "Normal"
+        displayName = "Normal Strength"
+        min = 0
+        max = 2
+        doc = "Scales how far the normal map tilts the shading normal."
+    )
+    token inputs:normalConvention = openGL (
+        allowed = [openGL, directX]
+        enum = NormalConvention
+        group = "Normal"
+        displayName = "Normal Convention"
+        doc = "Whether the normal map's green channel points up the texture, as in OpenGL, or down, as in DirectX."
+    )
+    bool inputs:enableDetail = false (
+        group = "Detail"
+        displayName = "Enable Detail"
+        doc = "Layer detail normal and albedo maps over the surface at a finer tiling."
+    )
+    texturable normal3f inputs:detailNormal = (0, 0, 1) (
+        group = "Detail"
+        displayName = "Detail Normal"
+        enabledBy = "enableDetail"
+        doc = "Tangent-space detail normal, blended onto the normal with reoriented normal mapping."
+    )
+    float inputs:detailNormalStrength = 1 (
+        group = "Detail"
+        displayName = "Detail Normal Strength"
+        min = 0
+        max = 2
+        enabledBy = "enableDetail"
+        doc = "Scales how far the detail normal map tilts the shading normal."
+    )
+    texturable color3f inputs:detailAlbedo = (0.5, 0.5, 0.5) (
+        group = "Detail"
+        displayName = "Detail Albedo"
+        enabledBy = "enableDetail"
+        doc = "Overlaid on the surface's albedo. Mid grey leaves it unchanged."
+    )
+    float inputs:detailAlbedoStrength = 1 (
+        group = "Detail"
+        displayName = "Detail Albedo Strength"
+        min = 0
+        max = 1
+        enabledBy = "enableDetail"
+        doc = "How strongly the detail albedo overlays the albedo."
+    )
+    float2 inputs:detailScale = (8, 8) (
+        group = "Detail"
+        displayName = "Detail Tiling"
+        enabledBy = "enableDetail"
+        doc = "Detail repeats per repeat of the surface's mapping."
+    )
+    float2 inputs:detailOffset = (0, 0) (
+        group = "Detail"
+        displayName = "Detail Offset"
+        enabledBy = "enableDetail"
+        doc = "Shift of the detail maps, applied after their rotation and tiling."
+    )
+    float inputs:detailRotation = 0 (
+        unit = degrees
+        group = "Detail"
+        displayName = "Detail Rotation"
+        enabledBy = "enableDetail"
+        doc = "Rotation of the detail maps, applied first."
+    )
+    bool inputs:detailHexTiling = false (
+        group = "Detail"
+        displayName = "Detail Hex Tiling"
+        enabledBy = "enableDetail"
+        doc = "Hex tile the detail maps to hide their repetition."
+    )
+    bool inputs:enableDisplacement = false (
+        group = "Displacement"
+        displayName = "Enable Displacement"
+        doc = "Displace the surface by a height. It bumps the shading normal for now, without moving geometry."
+    )
+    texturable float inputs:displacement = 0 (
+        group = "Displacement"
+        displayName = "Height"
+        enabledBy = "enableDisplacement"
+        doc = "Height along the normal, usually from a height map."
+    )
+    float inputs:displacementScale = 0.01 (
+        unit = meters
+        group = "Displacement"
+        displayName = "Displacement Scale"
+        enabledBy = "enableDisplacement"
+        doc = "Distance a height of 1 moves the surface."
+    )
+    float inputs:displacementMidlevel = 0.5 (
+        group = "Displacement"
+        displayName = "Midlevel"
+        min = 0
+        max = 1
+        enabledBy = "enableDisplacement"
+        doc = "The height that leaves the surface where it is."
+    )
+}
+
+abstract class Material : Typed (
+    doc = "A material bound to geometry. Each concrete material is one shading model with all its inputs."
+) {
+    token info:id (
+        group = "Material"
+        displayName = "Material Type"
+        doc = "The material's type, which Define<Material> defines."
+    )
+    inputs inputs (
+        group = "Material"
+        displayName = "Inputs"
+        doc = "Named input values. Define<Material> picks the material by id and sets these on its columns."
+    )
+    uint ernie:textures (
+        derived
+        doc = "Where the material's texture handles start in the texture bindings, or 0 without any, written by the texture system."
+    )
+}
+
+class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (
+    doc = "USD's preview surface: a diffuse and specular surface with clearcoat, emission and opacity."
+) {
+    token info:id = UsdPreviewSurface
+    texturable color3f inputs:diffuseColor = (0.18, 0.18, 0.18) (
+        group = "Diffuse"
+        displayName = "Diffuse Color"
+        doc = "Diffuse reflectance, or base color in the metallic workflow."
+    )
+    texturable color3f inputs:emissiveColor = (0, 0, 0) (
+        group = "Emission"
+        displayName = "Emissive Color"
+        doc = "Light emitted by the surface."
+    )
+    bool inputs:useSpecularWorkflow = false (
+        group = "Specular"
+        displayName = "Use Specular Workflow"
+        doc = "Use specularColor rather than metallic."
+    )
+    texturable color3f inputs:specularColor = (0, 0, 0) (
+        group = "Specular"
+        displayName = "Specular Color"
+        enabledBy = "useSpecularWorkflow"
+        doc = "Specular reflectance at normal incidence, in the specular workflow."
+    )
+    texturable float inputs:metallic = 0 (
+        group = "Specular"
+        displayName = "Metallic"
+        min = 0
+        max = 1
+        doc = "How metallic the surface is, in the metallic workflow."
+    )
+    texturable float inputs:roughness = 0.5 (
+        group = "Specular"
+        displayName = "Roughness"
+        min = 0
+        max = 1
+        doc = "Specular roughness, from mirror at 0 to rough at 1."
+    )
+    float inputs:ior = 1.5 (
+        group = "Specular"
+        displayName = "IOR"
+        min = 1
+        max = 3
+        doc = "Index of refraction, which sets the Fresnel reflectance."
+    )
+    texturable float inputs:clearcoat = 0 (
+        group = "Clearcoat"
+        displayName = "Clearcoat"
+        min = 0
+        max = 1
+        doc = "Strength of a second, white specular layer."
+    )
+    texturable float inputs:clearcoatRoughness = 0.01 (
+        group = "Clearcoat"
+        displayName = "Clearcoat Roughness"
+        min = 0
+        max = 1
+        doc = "Roughness of the clearcoat layer."
+    )
+    texturable float inputs:opacity = 1 (
+        group = "Opacity"
+        displayName = "Opacity"
+        min = 0
+        max = 1
+        doc = "Opacity, from transparent at 0 to opaque at 1."
+    )
+    token inputs:opacityMode = transparent (
+        allowed = [transparent, presence]
+        group = "Opacity"
+        displayName = "Opacity Mode"
+        doc = "Whether zero opacity is a clear surface that still reflects, or no surface at all."
+    )
+    float inputs:opacityThreshold = 0 (
+        group = "Opacity"
+        displayName = "Opacity Threshold"
+        min = 0
+        max = 1
+        doc = "Above zero, opacity cuts the surface out where it falls below this, rather than blending."
+    )
+    texturable float inputs:occlusion = 1 (
+        group = "Occlusion"
+        displayName = "Occlusion"
+        min = 0
+        max = 1
+        doc = "Ambient occlusion, from fully occluded at 0 to open at 1."
+    )
+}

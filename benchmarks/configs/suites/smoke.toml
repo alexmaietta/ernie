@@ -1,0 +1,21 @@
+name = "smoke"
+backends = ["ernie"]
+scenes = ["hide_and_seek"]
+workload = "throughput"
+
+[measurement]
+warmup_min_iterations = 3
+warmup_min_seconds = 0.0
+warmup_max_seconds = 0.2
+warmup_window = 3
+iterations = 10
+repeats = 2
+max_repeats = 3
+
+[sweep]
+worlds = [1, 16, 256]
+resolution = [[32, 32], [64, 64]]
+
+[capture]
+steps = [0, 30]
+images = [0]

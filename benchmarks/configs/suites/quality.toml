@@ -1,0 +1,24 @@
+name = "quality"
+backends = ["newton", "ovrtx_tiled", "madrona_rt", "madrona_rast", "mitsuba", "ernie_vulkan_hardware"]
+scenes = ["hide_and_seek"]
+workload = "throughput"
+
+[measurement]
+warmup_min_iterations = 3
+warmup_min_seconds = 0.0
+warmup_max_seconds = 1.0
+warmup_window = 3
+iterations = 5
+repeats = 1
+max_repeats = 1
+
+[sweep]
+worlds = [4]
+cameras_per_world = [2]
+resolution = [[64, 64]]
+tier = ["unlit", "direct"]
+outputs = [["rgb", "depth"]]
+
+[capture]
+steps = [0, 30, 60]
+images = [0, 3, 5, 7]

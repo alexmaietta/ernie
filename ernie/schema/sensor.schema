@@ -1,0 +1,340 @@
+api class LensDistortionAPI (
+    doc = "How the lens bends rays away from the ideal projection. The camera's focal length, apertures and aperture offsets give the intrinsics, so only coefficients live here. An OpenCV calibration of a width by height image carries over with horizontalAperture = focalLength width / fx, verticalAperture = focalLength height / fy, horizontalApertureOffset = (width / 2 - cx) horizontalAperture / width and verticalApertureOffset = (cy - height / 2) verticalAperture / height."
+) {
+    token distortion:model = none (
+        tracked
+        allowed = [none, brownConrady, kannalaBrandt, lut]
+        group = "Distortion"
+        displayName = "Model"
+        doc = "none keeps the ideal projection. brownConrady distorts a perspective image by its radius, as OpenCV's pinhole model does. kannalaBrandt maps the angle from the axis to the image radius, as OpenCV's fisheye model does, and reaches past 180 degrees. lut reads every pixel's ray from lookup textures."
+    )
+    float4 distortion:radial = (0, 0, 0, 0) (
+        tracked
+        group = "Distortion"
+        displayName = "Radial"
+        doc = "k1 to k4, scaling the radius by 1 + k1 x^2 + k2 x^4 + k3 x^6 + k4 x^8, where x is the undistorted image radius under brownConrady and the angle from the axis under kannalaBrandt. OpenCV's pinhole model has no k4 here, so leave it 0."
+    )
+    float3 distortion:radialDivisor = (0, 0, 0) (
+        tracked
+        group = "Distortion"
+        displayName = "Radial Divisor"
+        doc = "brownConrady's rational terms, dividing the radial scale by 1 + d1 r^2 + d2 r^4 + d3 r^6. They are OpenCV's k4, k5 and k6."
+    )
+    float2 distortion:tangential = (0, 0) (
+        tracked
+        group = "Distortion"
+        displayName = "Tangential"
+        doc = "brownConrady's decentering coefficients p1 and p2."
+    )
+    float4 distortion:thinPrism = (0, 0, 0, 0) (
+        tracked
+        group = "Distortion"
+        displayName = "Thin Prism"
+        doc = "brownConrady's thin-prism coefficients s1 to s4."
+    )
+    float distortion:maxFieldOfView = 180 (
+        tracked
+        unit = degrees
+        group = "Distortion"
+        displayName = "Max Field of View"
+        min = 0
+        max = 360
+        doc = "The widest kannalaBrandt renders. Film points mapping past it see nothing."
+    )
+    asset distortion:lutRayDirections = @@ (
+        tracked
+        group = "Distortion"
+        displayName = "Ray Directions"
+        doc = "Under lut, an RGB image whose pixels hold the camera-space direction of the ray leaving the film there."
+    )
+    asset distortion:lutRayOrigins = @@ (
+        tracked
+        group = "Distortion"
+        displayName = "Ray Origins"
+        doc = "Under lut, an RGB image whose red and green hold where on the film, from 0 to 1, the pixel's ray starts."
+    )
+}
+
+api class SensorAPI (
+    doc = "When a sensor captures. A sensor with a frame rate captures at its start time and every period after, and Renderer::Step renders its products only in the steps that reach a capture. A sensor without one captures every step. Every sensor has it built in."
+) {
+    float sensor:frameRate = 0 (
+        tracked
+        unit = hertz
+        group = "Sensor"
+        displayName = "Frame Rate"
+        min = 0
+        doc = "Captures per second of simulation time. 0 captures every step."
+    )
+    float sensor:startTime = 0 (
+        tracked
+        unit = seconds
+        group = "Sensor"
+        displayName = "Start Time"
+        doc = "The simulation time of the first capture."
+    )
+}
+
+abstract class Sensor : Xformable, SensorAPI (
+    doc = "A prim that captures the scene. Render products render sensors, and each kind of sensor shapes its own rays and outputs."
+) {}
+
+class Camera : Sensor, LensDistortionAPI (
+    doc = "A camera looking down its local -z axis, with +y up, following UsdGeomCamera."
+) {
+    token projection = perspective (
+        tracked
+        allowed = [perspective, orthographic]
+        group = "Projection"
+        displayName = "Projection"
+        doc = "Perspective rays leave one point and spread by the focal length and apertures. Orthographic rays run parallel along -z from a film whose width and height are the apertures in tenths of a scene unit, as in USD."
+    )
+    float focalLength = 50 (
+        tracked
+        unit = millimeters
+        group = "Projection"
+        displayName = "Focal Length"
+        doc = "Distance from the lens to the film. Orthographic cameras ignore it."
+    )
+    float horizontalAperture = 20.955 (
+        tracked
+        unit = millimeters
+        group = "Aperture"
+        displayName = "Horizontal Aperture"
+        doc = "Width of the film."
+    )
+    float verticalAperture = 15.2908 (
+        tracked
+        unit = millimeters
+        group = "Aperture"
+        displayName = "Vertical Aperture"
+        doc = "Height of the film."
+    )
+    float horizontalApertureOffset = 0 (
+        tracked
+        unit = millimeters
+        group = "Aperture"
+        displayName = "Horizontal Aperture Offset"
+        doc = "How far the film is shifted right of the lens axis, in the units of the aperture."
+    )
+    float verticalApertureOffset = 0 (
+        tracked
+        unit = millimeters
+        group = "Aperture"
+        displayName = "Vertical Aperture Offset"
+        doc = "How far the film is shifted up from the lens axis, in the units of the aperture."
+    )
+    float2 clippingRange = (1, 1000000) (
+        tracked
+        unit = meters
+        group = "Clipping"
+        displayName = "Clipping Range"
+        doc = "Nearest and farthest distances rendered."
+    )
+    float4[] clippingPlanes (
+        tracked
+        group = "Clipping"
+        displayName = "Clipping Planes"
+        doc = "Extra planes in camera space as (a, b, c, d). Points where a x + b y + c z + d is below 0 are clipped."
+    )
+    float fStop = 0 (
+        tracked
+        group = "Depth of Field"
+        displayName = "F-Stop"
+        min = 0
+        doc = "The lens aperture's f-number. 0 keeps everything in focus, as a pinhole does."
+    )
+    float focusDistance = 0 (
+        tracked
+        unit = meters
+        group = "Depth of Field"
+        displayName = "Focus Distance"
+        min = 0
+        doc = "Distance from the camera to the plane in sharpest focus."
+    )
+    float shutter:open = 0 (
+        tracked
+        unit = seconds
+        group = "Shutter"
+        displayName = "Shutter Open"
+        doc = "When the shutter opens, relative to the frame's time."
+    )
+    float shutter:close = 0 (
+        tracked
+        unit = seconds
+        group = "Shutter"
+        displayName = "Shutter Close"
+        doc = "When the shutter closes, relative to the frame's time. Equal to the opening, nothing blurs."
+    )
+    float exposure = 0 (
+        tracked
+        group = "Exposure"
+        displayName = "Exposure"
+        doc = "Exposure compensation in stops, scaling the image by 2 raised to it."
+    )
+    float exposure:iso = 100 (
+        tracked
+        group = "Exposure"
+        displayName = "ISO"
+        min = 0
+        doc = "The sensor's sensitivity, scaling the image by it over 100."
+    )
+    float exposure:time = 1 (
+        tracked
+        unit = seconds
+        group = "Exposure"
+        displayName = "Exposure Time"
+        min = 0
+        doc = "How long the sensor gathers light, scaling the image by it. Motion blur follows the shutter instead."
+    )
+    float exposure:fStop = 1 (
+        tracked
+        group = "Exposure"
+        displayName = "Exposure F-Stop"
+        min = 0
+        doc = "The f-number the exposure is computed with, scaling the image by one over its square. Depth of field follows fStop instead."
+    )
+    float exposure:responsivity = 1 (
+        tracked
+        group = "Exposure"
+        displayName = "Responsivity"
+        min = 0
+        doc = "A linear scale for the sensor's response."
+    )
+}
+
+class Lidar : Sensor (
+    doc = "A lidar firing a table of emitters, as ovrtx's generic lidar does. Each firing fires every emitter once at its own azimuth, elevation and time, and a scan is firingsPerScan firings. Like a camera it looks down -z with +y up. Azimuth turns from -z toward -x, counterclockwise seen from +y, and elevation tilts toward +y."
+) {
+    token scanType = rotary (
+        tracked
+        allowed = [rotary, solidState]
+        group = "Scan"
+        displayName = "Scan Type"
+        doc = "rotary turns the emitters across azimuthRange over a scan, so firings step evenly from its first azimuth to its second. solidState fires the emitters at their own azimuths every firing."
+    )
+    float2 azimuthRange = (-180, 180) (
+        tracked
+        unit = degrees
+        group = "Scan"
+        displayName = "Azimuth Range"
+        doc = "Where a rotary scan starts and ends. It turns counterclockwise when the second azimuth is larger and clockwise when it is smaller, so (-180, 180) is one full counterclockwise turn."
+    )
+    uint firingsPerScan = 1800 (
+        tracked
+        group = "Scan"
+        displayName = "Firings per Scan"
+        min = 1
+        doc = "Firings in one scan. A rotary lidar spreads them evenly across azimuthRange, so 1800 firings over a full turn step 0.2 degrees."
+    )
+    float[] emitter:elevations (
+        tracked
+        unit = degrees
+        group = "Emitters"
+        displayName = "Elevations"
+        doc = "Each emitter's elevation. Its length is the number of emitters."
+    )
+    float[] emitter:azimuths (
+        tracked
+        unit = degrees
+        group = "Emitters"
+        displayName = "Azimuths"
+        doc = "Each emitter's azimuth, added to the scan's azimuth on a rotary lidar. Emitters past its end fire at 0."
+    )
+    float[] emitter:fireTimes (
+        tracked
+        unit = seconds
+        group = "Emitters"
+        displayName = "Fire Times"
+        doc = "When each emitter fires, from the start of its firing. Emitters past its end fire at 0."
+    )
+    float2 range = (0.3, 120) (
+        tracked
+        unit = meters
+        group = "Returns"
+        displayName = "Range"
+        doc = "The nearest and farthest distances a return is reported at."
+    )
+    uint maxReturns = 1 (
+        tracked
+        group = "Returns"
+        displayName = "Max Returns"
+        min = 1
+        max = 4
+        doc = "The most returns each emitter reports per firing, up to 4, as when its beam spreads across an edge and echoes off two surfaces. Each output holds this many returns per beam, with misses past the ones found."
+    )
+    token returnMode = strongest (
+        tracked
+        allowed = [strongest, first, last, mean]
+        group = "Returns"
+        displayName = "Return Mode"
+        doc = "Which returns a beam reports when it sees more than maxReturns. strongest keeps the most intense, first the nearest and last the farthest. mean averages every hit of the beam into one return."
+    )
+    float2 beam:divergence = (0, 0) (
+        tracked
+        unit = degrees
+        group = "Beam"
+        displayName = "Divergence"
+        min = 0
+        doc = "The full horizontal and vertical angles each beam spreads over. 0 traces one ideal ray."
+    )
+    uint beam:samples = 1 (
+        tracked
+        group = "Beam"
+        displayName = "Samples"
+        min = 1
+        doc = "Rays traced across each beam's spread and merged into its returns."
+    )
+}
+
+class Radar : Sensor (
+    doc = "A radar tracing a grid of rays across its field of view and reporting each hit's range, radial velocity and intensity. The intensity is the material's radar backscatter scaled by the cosine of the angle the ray strikes at. Radial velocity is how fast the hit point moves away from the radar, from the MotionAPI of both. Like a camera it looks down -z with +y up, and its rows run from the top of the field of view down while its columns run from left to right."
+) {
+    float2 fieldOfView = (120, 30) (
+        tracked
+        unit = degrees
+        group = "Scan"
+        displayName = "Field of View"
+        min = 0
+        doc = "The horizontal and vertical angles covered, centered on -z."
+    )
+    uint2 rays = (240, 60) (
+        tracked
+        group = "Scan"
+        displayName = "Rays"
+        doc = "Rays traced across the field of view, horizontally and vertically. They set the shape of the radar's outputs."
+    )
+    float2 range = (0.5, 200) (
+        tracked
+        unit = meters
+        group = "Returns"
+        displayName = "Range"
+        doc = "The nearest and farthest distances a return is reported at."
+    )
+}
+
+api class NonVisualMaterialAPI (
+    appliesTo = [Material]
+    doc = "How a material looks to lidar and radar, apart from how it shades. A material without it reflects both as a white diffuse surface."
+) {
+    float nonvisual:lidarReflectance = 1 (
+        tracked
+        group = "Non-Visual"
+        displayName = "Lidar Reflectance"
+        min = 0
+        doc = "The fraction of a lidar's light the surface scatters back, scaling the intensity of its returns."
+    )
+    float nonvisual:radarBackscatter = 1 (
+        tracked
+        group = "Non-Visual"
+        displayName = "Radar Backscatter"
+        min = 0
+        doc = "Scales the radar cross section of the surface's returns."
+    )
+    bool nonvisual:retroreflective = false (
+        tracked
+        group = "Non-Visual"
+        displayName = "Retroreflective"
+        doc = "Sends lidar straight back toward its emitter, so the intensity of a return doesn't fall with the angle it strikes at."
+    )
+}

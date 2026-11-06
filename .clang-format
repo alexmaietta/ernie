@@ -1,0 +1,16 @@
+BasedOnStyle: LLVM
+Standard: c++20
+IndentWidth: 4
+ColumnLimit: 100
+PointerAlignment: Left
+ReferenceAlignment: Left
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+SpacesBeforeTrailingComments: 2
+FixNamespaceComments: false
+SeparateDefinitionBlocks: Always
+Macros:
+  - 'ERNIE_ENUM(name)=enum class name : uint32_t'

@@ -1,0 +1,24 @@
+From b87898fd571969ba3fe88b93c0f1e75a9046d80f Mon Sep 17 00:00:00 2001
+From: llGuy <luc.rosenzweig@yahoo.com>
+Date: Fri, 15 Nov 2024 11:07:50 -0800
+Subject: [PATCH] fixed issue where RT depth doesn't get converted if the hit
+ is the last node in the satck
+
+---
+ src/mw/device/bvh_raycast.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/mw/device/bvh_raycast.cpp b/src/mw/device/bvh_raycast.cpp
+index f94d6371..099f8cf5 100644
+--- a/src/mw/device/bvh_raycast.cpp
++++ b/src/mw/device/bvh_raycast.cpp
+@@ -720,6 +720,9 @@ static __device__ TraceResult traceRay(
+         // break out of the tracing loop
+         if (getPresentBits(current_grp) == 0) {
+             if (stack_size == 0) {
++                t_max = t_max / t_scale;
++                t_scale = 1.f;
++
+                 break;
+             } else {
+                 if (getGroupType(current_grp) == GroupType::BottomLevelRoot) {

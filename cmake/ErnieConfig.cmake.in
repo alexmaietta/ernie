@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: BSD-3-Clause
+@PACKAGE_INIT@
+
+if(NOT TARGET Ernie::dlpack)
+    set(ernie_dlpack "${ERNIE_DLPACK_TARGET}")
+    if(NOT ernie_dlpack AND NOT TARGET dlpack::dlpack)
+        find_package(dlpack CONFIG QUIET)
+    endif()
+    if(NOT ernie_dlpack AND TARGET dlpack::dlpack)
+        set(ernie_dlpack dlpack::dlpack)
+    endif()
+    if(NOT ernie_dlpack AND NOT @ernie_dlpack_bundled@)
+        set(Ernie_FOUND FALSE)
+        set(Ernie_NOT_FOUND_MESSAGE
+            "Ernie was built against an outside DLPack; find dlpack 1.0 or later first, or set "
+            "ERNIE_DLPACK_TARGET to a target of it"
+        )
+        return()
+    endif()
+    add_library(Ernie::dlpack INTERFACE IMPORTED)
+    if(ernie_dlpack)
+        target_link_libraries(Ernie::dlpack INTERFACE "${ernie_dlpack}")
+    else()
+        target_include_directories(
+            Ernie::dlpack
+            INTERFACE
+                "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@/ernie/third_party/dlpack"
+        )
+    endif()
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/ErnieTargets.cmake")
+
+set(Ernie_viewer_FOUND FALSE)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/ErnieViewerTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/ErnieViewerTargets.cmake")
+    set(Ernie_viewer_FOUND TRUE)
+endif()
+
+set(Ernie_xr_FOUND FALSE)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/ErnieXrTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/ErnieXrTargets.cmake")
+    set(Ernie_xr_FOUND TRUE)
+endif()
+
+foreach(target IN ITEMS Ernie::ernie Ernie::viewer Ernie::ernie_xr)
+    if(NOT TARGET ${target})
+        continue()
+    endif()
+    foreach(config IN ITEMS RELWITHDEBINFO MINSIZEREL)
+        get_target_property(mapped ${target} MAP_IMPORTED_CONFIG_${config})
+        if(NOT mapped)
+            set_target_properties(
+                ${target}
+                PROPERTIES
+                    MAP_IMPORTED_CONFIG_${config}
+                        RELEASE
+            )
+        endif()
+    endforeach()
+endforeach()
+
+if(vulkan IN_LIST Ernie_FIND_COMPONENTS)
+    find_package(VulkanHeaders CONFIG QUIET)
+    if(NOT TARGET Vulkan::Headers)
+        find_package(Vulkan QUIET)
+    endif()
+    if(TARGET Vulkan::Headers)
+        if(NOT TARGET Ernie::vulkan)
+            add_library(Ernie::vulkan INTERFACE IMPORTED)
+            target_link_libraries(
+                Ernie::vulkan
+                INTERFACE
+                    Ernie::ernie
+                    Vulkan::Headers
+            )
+        endif()
+        set(Ernie_vulkan_FOUND TRUE)
+    else()
+        set(Ernie_vulkan_FOUND FALSE)
+    endif()
+endif()
+
+check_required_components(Ernie)

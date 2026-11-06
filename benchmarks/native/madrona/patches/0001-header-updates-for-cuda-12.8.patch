@@ -1,0 +1,37 @@
+From 8404e47e0fc8473bed9e7e82eaf694538f4a93d9 Mon Sep 17 00:00:00 2001
+From: Brennan Shacklett <bpshacklett@gmail.com>
+Date: Tue, 4 Feb 2025 15:00:19 -0800
+Subject: [PATCH] Header updates for CUDA 12.8
+
+---
+ src/mw/device/include/algorithm | 6 ++++++
+ src/mw/device/include/atomic    | 1 +
+ 2 files changed, 7 insertions(+)
+
+diff --git a/src/mw/device/include/algorithm b/src/mw/device/include/algorithm
+index 19088a3f..d43a8e9f 100644
+--- a/src/mw/device/include/algorithm
++++ b/src/mw/device/include/algorithm
+@@ -1,5 +1,11 @@
+ #pragma once
+ 
++#if __has_include(<cuda/std/algorithm>)
++#include <cuda/std/algorithm>
++#elif __has_include(<cuda/std/__algorithm_>)
++#include <cuda/std/__algorithm_>
++#elif __has_include(<cuda/std/__algorithm>)
+ #include <cuda/std/__algorithm>
++#endif
+ 
+ #include "cuda_std_post"
+diff --git a/src/mw/device/include/atomic b/src/mw/device/include/atomic
+index 8330709e..4c3e65aa 100644
+--- a/src/mw/device/include/atomic
++++ b/src/mw/device/include/atomic
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
+ #include <cuda/std/atomic>
++#include <cuda/atomic>
+ 
+ #include "cuda_std_post"

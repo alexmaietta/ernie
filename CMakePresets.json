@@ -1,0 +1,205 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "ci",
+            "displayName": "CI",
+            "description": "Release build with tests, in build-ci",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-ci",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ERNIE_BUILD_TESTS": "ON",
+                "ERNIE_INSTALL": "OFF"
+            }
+        },
+        {
+            "name": "bench",
+            "displayName": "Benchmarks",
+            "description": "Release build of the benchmarks, in build-bench",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-bench",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ERNIE_BUILD_BENCHMARKS": "ON",
+                "ERNIE_INSTALL": "OFF"
+            }
+        },
+        {
+            "name": "coverage",
+            "displayName": "Coverage",
+            "description": "Instrumented for code coverage, as CI measures it, in build-coverage",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-coverage",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ERNIE_BUILD_PYTHON": "ON",
+                "ERNIE_BUILD_TESTS": "ON",
+                "ERNIE_COVERAGE": "ON"
+            }
+        },
+        {
+            "name": "package",
+            "displayName": "Packages",
+            "description": "Release build for the DEB, RPM and TGZ packages, or the macOS TGZ, in build-package",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-package",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_INSTALL_PREFIX": "/usr",
+                "ERNIE_BUILD_TESTS": "OFF",
+                "ERNIE_BUILD_VIEWER": "ON",
+                "ERNIE_INSTALL": "ON"
+            }
+        },
+        {
+            "name": "package-deb",
+            "inherits": "package",
+            "displayName": "DEB packages",
+            "description": "Release build for the DEB packages, with the library where Debian and Ubuntu look, in build-package-deb",
+            "binaryDir": "${sourceDir}/build-package-deb",
+            "cacheVariables": {
+                "ERNIE_DEBIAN_LIBDIR": "ON"
+            }
+        },
+        {
+            "name": "package-rpm",
+            "inherits": "package",
+            "displayName": "RPM packages",
+            "description": "Release build for the RPM packages, with the library in lib64 as RHEL and Fedora look, in build-package-rpm",
+            "binaryDir": "${sourceDir}/build-package-rpm",
+            "cacheVariables": {
+                "CMAKE_INSTALL_LIBDIR": "lib64"
+            }
+        },
+        {
+            "name": "package-windows",
+            "inherits": "package",
+            "displayName": "Windows packages",
+            "description": "Debug and Release builds for the Windows ZIP, in build-package-windows",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build-package-windows",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "ci",
+            "configurePreset": "ci",
+            "jobs": 8
+        },
+        {
+            "name": "bench",
+            "configurePreset": "bench",
+            "jobs": 8
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
+            "jobs": 8
+        },
+        {
+            "name": "package",
+            "configurePreset": "package",
+            "jobs": 8
+        },
+        {
+            "name": "package-deb",
+            "configurePreset": "package-deb",
+            "jobs": 8
+        },
+        {
+            "name": "package-rpm",
+            "configurePreset": "package-rpm",
+            "jobs": 8
+        },
+        {
+            "name": "package-windows-debug",
+            "configurePreset": "package-windows",
+            "configuration": "Debug",
+            "jobs": 8
+        },
+        {
+            "name": "package-windows",
+            "configurePreset": "package-windows",
+            "configuration": "Release",
+            "jobs": 8
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "ci",
+            "configurePreset": "ci",
+            "filter": {
+                "exclude": {
+                    "label": "kernels"
+                }
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "bench",
+            "configurePreset": "bench",
+            "filter": {
+                "include": {
+                    "label": "bench"
+                }
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
+            "filter": {
+                "exclude": {
+                    "label": "kernels"
+                }
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "packagePresets": [
+        {
+            "name": "package",
+            "configurePreset": "package",
+            "generators": [
+                "TGZ"
+            ]
+        },
+        {
+            "name": "package-deb",
+            "configurePreset": "package-deb",
+            "generators": [
+                "DEB"
+            ]
+        },
+        {
+            "name": "package-rpm",
+            "configurePreset": "package-rpm",
+            "generators": [
+                "RPM"
+            ]
+        },
+        {
+            "name": "package-windows",
+            "configurePreset": "package-windows",
+            "configurations": [
+                "Debug",
+                "Release"
+            ]
+        }
+    ]
+}

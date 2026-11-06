@@ -1,0 +1,551 @@
+abstract class Typed (
+    doc = "The root of every typed schema."
+) {}
+
+api class MaterialBindingAPI (
+    doc = "Binds a material to a prim and, unless they bind their own, its descendants."
+) {
+    prim[] material:binding (
+        tracked
+        group = "Material"
+        displayName = "Material"
+        doc = "The bound Material. Only the first target is used."
+    )
+}
+
+multiple api class CollectionAPI (
+    doc = "A named set of prims, such as the prims a light lights, given by the prims it includes and excludes."
+) {
+    bool collection:__INSTANCE_NAME__:includeRoot = false (
+        tracked
+        group = "Collection"
+        displayName = "Include Root"
+        doc = "Include every prim that no include or exclude decides."
+    )
+    prim[] collection:__INSTANCE_NAME__:includes (
+        tracked
+        group = "Collection"
+        displayName = "Includes"
+        doc = "Prims in the collection, with their descendants unless expansionRule is explicitOnly."
+    )
+    prim[] collection:__INSTANCE_NAME__:excludes (
+        tracked
+        group = "Collection"
+        displayName = "Excludes"
+        doc = "Prims left out of the collection, with their descendants unless expansionRule is explicitOnly. A prim counts by its nearest listed ancestor, and an exclude wins a tie."
+    )
+    token collection:__INSTANCE_NAME__:expansionRule = expandPrims (
+        tracked
+        allowed = [explicitOnly, expandPrims, expandPrimsAndProperties]
+        group = "Collection"
+        displayName = "Expansion Rule"
+        doc = "explicitOnly takes the listed prims alone. expandPrims also takes their descendants, and expandPrimsAndProperties does the same for prims."
+    )
+}
+
+multiple api class SemanticsLabelsAPI (
+    appliesTo = [Imageable]
+    doc = "Semantic labels of a prim and its descendants, one list per taxonomy such as class. Descendants without labels in a taxonomy take their nearest labeled ancestor's."
+) {
+    token[] semantics:labels:__INSTANCE_NAME__ (
+        tracked
+        group = "Semantics"
+        displayName = "Labels"
+        doc = "The labels in the taxonomy the instance names."
+    )
+}
+
+abstract class Imageable : Typed, MaterialBindingAPI (
+    doc = "A prim that can be rendered or seen."
+) {
+    token visibility = inherited (
+        tracked
+        allowed = [inherited, invisible]
+        group = "Visibility"
+        displayName = "Visibility"
+        doc = "Invisible hides the prim and its subtree."
+    )
+    token purpose = default (
+        tracked
+        allowed = [default, render, proxy, guide]
+        group = "Visibility"
+        displayName = "Purpose"
+        doc = "Which renders include the prim. Default inherits the parent's purpose."
+    )
+    token ernie:computedVisibility (
+        derived
+        tracked
+        enum = Visibility
+        doc = "Invisible when the prim or any ancestor is, written by the hierarchy system."
+    )
+    token ernie:computedPurpose (
+        derived
+        tracked
+        enum = Purpose
+        doc = "The prim's purpose, or its nearest ancestor's that isn't default."
+    )
+    uint ernie:computedMaterial (
+        derived
+        tracked
+        doc = "The Material bound to the prim or its nearest bound ancestor, or none."
+    )
+}
+
+class Scope : Imageable (
+    doc = "A grouping prim with no transform."
+) {}
+
+api class MotionAPI (
+    appliesTo = [Xformable]
+    doc = "How a prim and its descendants move, for sensors that measure velocity such as radar, and how they blur, as USD's MotionAPI gives it. A prim without it moves with its nearest ancestor that has it, and is still when none does. Rendering doesn't move or blur anything by it yet."
+) {
+    vector3f motion:velocity = (0, 0, 0) (
+        tracked
+        group = "Motion"
+        displayName = "Velocity"
+        doc = "The world-space velocity of the prim's origin, in meters per second."
+    )
+    vector3f motion:angularVelocity = (0, 0, 0) (
+        tracked
+        group = "Motion"
+        displayName = "Angular Velocity"
+        doc = "The world-space angular velocity about the prim's origin, in degrees per second as UsdPhysics gives it."
+    )
+    float motion:blurScale = 1 (
+        tracked
+        group = "Motion"
+        displayName = "Blur Scale"
+        min = 0
+        doc = "Scales the motion blur of the prim and its descendants. 0 renders them sharp and 1 blurs them as they move. Rendering doesn't use it yet."
+    )
+    int motion:nonlinearSampleCount = 3 (
+        tracked
+        group = "Motion"
+        displayName = "Nonlinear Sample Count"
+        min = 2
+        doc = "Positions sampled across the shutter for motion that isn't linear, such as points with accelerations or instances with angular velocities. Rendering doesn't use it yet."
+    )
+}
+
+api class PrototypeAPI (
+    appliesTo = [Xformable]
+    doc = "Draws a prototype root's subtree at this prim's transform, as one copy that shares the prototype's geometry. USD's instanceable prims map onto it."
+) {
+    prim[] prototype (
+        tracked
+        group = "Instancing"
+        displayName = "Prototype"
+        doc = "The prototype root to draw. Only the first target is used, and prims at or under it are drawn only through instancers."
+    )
+}
+
+abstract class Xformable : Imageable (
+    doc = "A prim with a transform relative to its parent."
+) {
+    double3 xformOp:translate = (0, 0, 0) (
+        tracked
+        unit = meters
+        group = "Transform"
+        displayName = "Translate"
+        doc = "Translation from the parent."
+    )
+    quatd xformOp:orient = (0, 0, 0, 1) (
+        tracked
+        group = "Transform"
+        displayName = "Orient"
+        doc = "Rotation as a unit quaternion in xyzw order."
+    )
+    float3 xformOp:scale = (1, 1, 1) (
+        tracked
+        group = "Transform"
+        displayName = "Scale"
+        doc = "Scale along each local axis."
+    )
+    bool resetXformStack = false (
+        tracked
+        group = "Transform"
+        displayName = "Reset Transform Stack"
+        doc = "Ignore the parent transforms, placing the prim in world space."
+    )
+    transform ernie:worldTransform (
+        derived
+        tracked
+        unit = meters
+        doc = "Transform to world space, written by the hierarchy system."
+    )
+}
+
+class Xform : Xformable (
+    doc = "A transform with no geometry."
+) {}
+
+class World : Xformable (
+    doc = "The root of an isolated world. Its subtree sees only itself and global prims."
+) {}
+
+abstract class Boundable : Xformable (
+    doc = "A prim with a bounded extent."
+) {
+    float3 ernie:worldMin (
+        derived
+        unit = meters
+        doc = "Lowest corner of the prim's world space box, relative to its world's origin, written by the bounds system."
+    )
+    float3 ernie:worldMax (
+        derived
+        unit = meters
+        doc = "Highest corner of the prim's world space box, relative to its world's origin, written by the bounds system."
+    )
+}
+
+abstract class Gprim : Boundable (
+    doc = "A geometric primitive that can be rendered."
+) {
+    color3f primvars:displayColor = (0.5, 0.5, 0.5) (
+        group = "Display"
+        displayName = "Display Color"
+        doc = "Color used without a bound material."
+    )
+    float primvars:displayOpacity = 1 (
+        group = "Display"
+        displayName = "Display Opacity"
+        min = 0
+        max = 1
+        doc = "Opacity used without a bound material."
+    )
+    primvars primvars (
+        tracked
+        group = "Primvars"
+        displayName = "Primvars"
+        doc = "Every other primvar, packed into one table: a count, a PrimvarEntry per primvar sorted by name, then their values and indices."
+    )
+    bool doubleSided = false (
+        group = "Geometry"
+        displayName = "Double Sided"
+        doc = "Whether both sides of each face are visible."
+    )
+}
+
+class Sphere : Gprim (
+    doc = "A sphere centered at the origin."
+) {
+    float radius = 1 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Radius"
+        doc = "Radius of the sphere."
+    )
+}
+
+class Cube : Gprim (
+    doc = "A cube centered at the origin."
+) {
+    float size = 2 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Size"
+        doc = "Length of each edge."
+    )
+}
+
+class Cylinder : Gprim (
+    doc = "A capped cylinder centered at the origin, along axis."
+) {
+    float radius = 1 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Radius"
+        doc = "Radius of the cylinder."
+    )
+    float height = 2 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Height"
+        doc = "Length along axis, cap to cap."
+    )
+    token axis = Z (
+        allowed = [X, Y, Z]
+        group = "Geometry"
+        displayName = "Axis"
+        doc = "The axis the cylinder runs along."
+    )
+}
+
+class Cone : Gprim (
+    doc = "A capped cone centered at the origin, its apex toward +axis."
+) {
+    float radius = 1 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Radius"
+        doc = "Radius of the base."
+    )
+    float height = 2 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Height"
+        doc = "Length along axis, base to apex."
+    )
+    token axis = Z (
+        allowed = [X, Y, Z]
+        group = "Geometry"
+        displayName = "Axis"
+        doc = "The axis from the base to the apex."
+    )
+}
+
+class Capsule : Gprim (
+    doc = "A cylinder with hemispherical ends, centered at the origin, along axis."
+) {
+    float radius = 0.5 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Radius"
+        doc = "Radius of the cylinder and its hemispheres."
+    )
+    float height = 1 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Height"
+        doc = "Length of the cylinder between the hemispheres' centers."
+    )
+    token axis = Z (
+        allowed = [X, Y, Z]
+        group = "Geometry"
+        displayName = "Axis"
+        doc = "The axis the capsule runs along."
+    )
+}
+
+api class CheckerboardAPI (
+    doc = "Shades a plane with a checkerboard of two colors."
+) {
+    bool checkerboard = false (
+        tracked
+        group = "Checkerboard"
+        displayName = "Checkerboard"
+        doc = "Shade the plane with a checkerboard rather than displayColor."
+    )
+    color3f checkerColorA = (0.8, 0.8, 0.8) (
+        group = "Checkerboard"
+        displayName = "Color A"
+        enabledBy = "checkerboard"
+        doc = "Color of the square at the origin and every other square."
+    )
+    color3f checkerColorB = (0.2, 0.2, 0.2) (
+        group = "Checkerboard"
+        displayName = "Color B"
+        enabledBy = "checkerboard"
+        doc = "Color of the remaining squares."
+    )
+    float checkerSize = 1 (
+        unit = meters
+        group = "Checkerboard"
+        displayName = "Square Size"
+        enabledBy = "checkerboard"
+        doc = "Edge length of each square."
+    )
+}
+
+class Plane : Gprim, CheckerboardAPI (
+    doc = "A rectangle through the origin, facing along axis. A width or length of 0 makes it infinite."
+) {
+    float width = 2 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Width"
+        doc = "Size along the axis after axis, or infinite at 0."
+    )
+    float length = 2 (
+        unit = meters
+        group = "Geometry"
+        displayName = "Length"
+        doc = "Size along the axis before axis, or infinite at 0."
+    )
+    token axis = Z (
+        allowed = [X, Y, Z]
+        group = "Geometry"
+        displayName = "Axis"
+        doc = "The axis the plane faces along."
+    )
+}
+
+abstract class PointBased : Gprim (
+    doc = "Geometry defined by a set of points."
+) {
+    point3f[] points (
+        tracked
+        unit = meters
+        group = "Geometry"
+        displayName = "Points"
+        doc = "Point positions in local space."
+    )
+    normal3f[] normals (
+        tracked
+        group = "Geometry"
+        displayName = "Normals"
+        doc = "Shading normals, indexed as normalsInterpolation says."
+    )
+    vector3f[] velocities (
+        tracked
+        unit = meters
+        group = "Motion"
+        displayName = "Velocities"
+        doc = "The velocity of each point in local space, in meters per second, for motion blur. Empty leaves points still. Rendering doesn't use it yet."
+    )
+    vector3f[] accelerations (
+        tracked
+        group = "Motion"
+        displayName = "Accelerations"
+        doc = "The acceleration of each point in local space, in meters per second squared, for motion blur. Empty leaves velocities constant. Rendering doesn't use it yet."
+    )
+    token normalsInterpolation = vertex (
+        tracked
+        allowed = [
+            constant
+            uniform
+            varying
+            vertex
+            faceVarying
+        ]
+        enum = Interpolation
+        group = "Geometry"
+        displayName = "Normals Interpolation"
+        doc = "How normals map onto the geometry: one, one per face, one per point, or one per face vertex. USD's interpolation metadata on normals."
+    )
+}
+
+class Mesh : PointBased (
+    doc = "A polygon mesh."
+) {
+    int[] faceVertexIndices (
+        tracked
+        group = "Geometry"
+        displayName = "Face Vertex Indices"
+        doc = "Point index of each face vertex."
+    )
+    int[] faceVertexCounts (
+        tracked
+        group = "Geometry"
+        displayName = "Face Vertex Counts"
+        doc = "Number of vertices in each face."
+    )
+    token subdivisionScheme = catmullClark (
+        tracked
+        allowed = [catmullClark, loop, bilinear, none]
+        group = "Geometry"
+        displayName = "Subdivision Scheme"
+        doc = "The surface the faces describe. Any scheme but none is smooth, and its normals are computed rather than read from normals."
+    )
+    uint64 ernie:blas (
+        derived
+        doc = "The mesh's BLAS handle, or 0 with no triangles, written by the geometry system."
+    )
+    int[] ernie:triangleCorners (
+        derived
+        doc = "The face-vertex index of each triangle's corners, three per triangle."
+    )
+    int[] ernie:triangleFaces (
+        derived
+        doc = "The face each triangle came from."
+    )
+    int[] ernie:pointTriangleStarts (
+        derived
+        doc = "Where each point's triangles start in pointTriangles, one more than the points."
+    )
+    int[] ernie:pointTriangles (
+        derived
+        doc = "The triangles around each point."
+    )
+    point3f[] ernie:pointBounds (
+        derived
+        unit = meters
+        doc = "Lowest and highest corners of the points' box, written by the geometry system."
+    )
+    normal3f[] ernie:smoothNormals (
+        derived
+        doc = "Area-weighted smooth normals, one per point."
+    )
+    int[] ernie:tangents (
+        derived
+        doc = "MikkTSpace tangents, four floats per face vertex, the tangent and the bitangent's sign."
+    )
+    token ernie:tangentPrimvar (
+        derived
+        doc = "The primvar the tangents follow, or none without tangents."
+    )
+    bool doubleSided = true
+}
+
+class PointInstancer : Boundable (
+    doc = "Copies of prototype prims, one per entry of positions, each placed by its position, orientation and scale."
+) {
+    prim[] prototypes (
+        tracked
+        group = "Instancing"
+        displayName = "Prototypes"
+        doc = "The prototype roots instances choose from by protoIndices. Prims at or under a prototype root are drawn only through instancers."
+    )
+    int[] protoIndices (
+        tracked
+        group = "Instancing"
+        displayName = "Prototype Indices"
+        doc = "The prototype of each instance, as an index into prototypes. Instances with an index outside prototypes are not drawn."
+    )
+    point3f[] positions (
+        tracked
+        unit = meters
+        group = "Instancing"
+        displayName = "Positions"
+        doc = "The position of each instance in the instancer's space. Its length is the number of instances."
+    )
+    quath[] orientations (
+        tracked
+        group = "Instancing"
+        displayName = "Orientations"
+        doc = "The rotation of each instance as an xyzw quaternion, stored in single precision. Empty leaves instances unrotated."
+    )
+    float3[] scales (
+        tracked
+        group = "Instancing"
+        displayName = "Scales"
+        doc = "The scale of each instance along its prototype's axes. Empty leaves instances unscaled."
+    )
+    vector3f[] velocities (
+        tracked
+        unit = meters
+        group = "Motion"
+        displayName = "Velocities"
+        doc = "The velocity of each instance in meters per second, for motion blur. Rendering doesn't use it yet."
+    )
+    vector3f[] accelerations (
+        tracked
+        group = "Motion"
+        displayName = "Accelerations"
+        doc = "The acceleration of each instance in meters per second squared, for motion blur. Rendering doesn't use it yet."
+    )
+    vector3f[] angularVelocities (
+        tracked
+        group = "Motion"
+        displayName = "Angular Velocities"
+        doc = "The angular velocity of each instance in degrees per second, for motion blur. Rendering doesn't use it yet."
+    )
+    int64[] ids (
+        tracked
+        group = "Instancing"
+        displayName = "Ids"
+        doc = "A stable id per instance, which invisibleIds and outputs use. Empty makes each instance's index its id."
+    )
+    int64[] invisibleIds (
+        tracked
+        group = "Instancing"
+        displayName = "Invisible Ids"
+        doc = "Ids of instances that are not drawn."
+    )
+    primvars primvars (
+        tracked
+        group = "Primvars"
+        displayName = "Primvars"
+        doc = "Primvars for the copies, packed as on gprims. A constant primvar applies to every copy, and any other interpolation holds one value per instance. Copies read them before their prototype's own, so displayColor here tints each instance."
+    )
+}

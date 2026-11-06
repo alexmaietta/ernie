@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include <cstdint>
+#include <set>
+#include <span>
+#include <vector>
+
+#include "ernie/device/buffer.h"
+#include "ernie/device/program.h"
+#include "ernie/device/ref.h"
+#include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/systems/instances.h"
+#include "ernie/scene/systems/system.h"
+
+namespace ernie {
+
+class Lights : public System {
+  public:
+    Lights(Catalog& catalog, const Instances& instances)
+        : m_catalog(catalog), m_instances(instances) {}
+
+    std::string_view Name() const override {
+        return "lights";
+    }
+
+    std::span<const ColumnRef> Inputs() const override;
+    std::span<const ColumnRef> Outputs() const override;
+    void Prepare() override;
+    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+
+    const Ref<device::Buffer>& Layout() const {
+        return m_layout;
+    }
+
+    const Ref<device::Buffer>& Records() const {
+        return m_records;
+    }
+
+    std::span<const uint32_t> Counts() const {
+        return m_counts;
+    }
+
+    uint32_t Runs() const {
+        return m_runs;
+    }
+
+    uint32_t Written() const {
+        return m_written;
+    }
+
+    const Ref<device::Buffer>& Spectra();
+
+  private:
+    bool Restructured(const ChangeSet& changes) const;
+    void Relayout();
+    device::Program& Kernels();
+
+    Catalog& m_catalog;
+    Ref<device::Program> m_program;
+    Ref<device::Buffer> m_layout;
+    Ref<device::Buffer> m_records;
+    Ref<device::Buffer> m_cdf;
+    Ref<device::Buffer> m_maps;
+    Ref<device::Buffer> m_spectra;
+    std::set<uint32_t> m_lights;
+    std::set<uint32_t> m_worldPrims;
+    std::map<uint32_t, std::set<uint32_t>> m_shownIn;
+    uint64_t m_compositions = ~uint64_t(0);
+    std::vector<uint32_t> m_counts;
+    uint32_t m_worlds = 0;
+    uint32_t m_domes = 0;
+    uint32_t m_instancesVersion = ~0u;
+    const Instances& m_instances;
+    uint32_t m_runs = 0;
+    uint32_t m_written = 0;
+};
+
+}

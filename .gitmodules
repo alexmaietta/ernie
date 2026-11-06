@@ -1,0 +1,5 @@
+[submodule "benchmarks/external/madrona_benchmark"]
+	path = benchmarks/external/madrona_benchmark
+	url = https://github.com/llGuy/madrona_benchmark.git
+	update = none
+	ignore = dirty

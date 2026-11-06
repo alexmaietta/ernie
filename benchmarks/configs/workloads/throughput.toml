@@ -1,0 +1,20 @@
+[workload]
+cameras_per_world = 1
+width = 64
+height = 64
+outputs = ["rgb"]
+tier = "unlit"
+spp = 1
+
+[measurement]
+warmup_min_iterations = 10
+warmup_min_seconds = 1.0
+warmup_max_seconds = 30.0
+warmup_window = 10
+warmup_cv = 0.02
+iterations = 50
+repeats = 5
+max_repeats = 20
+target_ci = 0.01
+confidence = 0.95
+monitor_interval = 0.05

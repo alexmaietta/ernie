@@ -1,0 +1,144 @@
+name: Packages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  archives:
+    name: archives (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            container: quay.io/pypa/manylinux_2_34_x86_64
+            preset: package
+            configure: -DCMAKE_INSTALL_LIBDIR=lib
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            container: quay.io/pypa/manylinux_2_34_aarch64
+            preset: package
+            configure: -DCMAKE_INSTALL_LIBDIR=lib
+          - { name: windows-x86_64, os: windows-2025, preset: package-windows, msvc: x64 }
+          - { name: windows-aarch64, os: windows-11-arm, preset: package-windows, msvc: arm64 }
+          - { name: macos-aarch64, os: macos-26, preset: package }
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the build tools
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            dnf install -y -q libX11-devel libXrandr-devel libXinerama-devel \
+              libXcursor-devel libXi-devel wayland-devel libxkbcommon-devel
+            command -v ninja >/dev/null || pipx install -q ninja
+          elif [[ "$RUNNER_OS" == Windows ]]; then
+            choco install ninja --no-progress -y
+          else
+            brew install ninja
+          fi
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
+        with:
+          arch: ${{ matrix.msvc }}
+      - name: Build
+        run: |
+          cmake --preset ${{ matrix.preset }} ${{ matrix.configure }} \
+            "-DERNIE_PACKAGE_VERSION=${{ inputs.version }}"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cmake --build --preset package-windows-debug --parallel 4
+          fi
+          cmake --build --preset ${{ matrix.preset }} --parallel 4
+          cpack --preset ${{ matrix.preset }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-${{ matrix.name }}
+          path: |
+            build-*/packages/*.zip
+            build-*/packages/*.tar.gz
+
+  archive-test:
+    name: archive-test (${{ matrix.name }})
+    needs: archives
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            container: rockylinux/rockylinux:9
+            configs: Release
+            device: true
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            container: rockylinux/rockylinux:9
+            configs: Release
+          - { name: windows-x86_64, os: windows-2025, msvc: x64, configs: "Debug Release RelWithDebInfo" }
+          - { name: windows-aarch64, os: windows-11-arm, msvc: arm64, configs: "Debug Release RelWithDebInfo" }
+          - { name: macos-aarch64, os: macos-26, configs: Release }
+    container: ${{ matrix.container }}
+    env:
+      LP_NUM_THREADS: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the build tools and the Vulkan loader
+        if: runner.os == 'Linux'
+        run: |
+          dnf install -y tar cmake make gcc-toolset-14-gcc-c++ vulkan-loader
+          echo "CXX=/opt/rh/gcc-toolset-14/root/usr/bin/g++" >> "$GITHUB_ENV"
+      - name: Install lavapipe
+        if: runner.os == 'Linux' && matrix.device
+        run: dnf install -y mesa-vulkan-drivers
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages-${{ matrix.name }}
+          path: archive
+      - name: Unpack
+        run: |
+          prefix="$RUNNER_TEMP/ernie"
+          mkdir -p "$prefix"
+          find archive -name 'ernie-*.zip' -o -name 'ernie-*.tar.gz' | while read -r archive; do
+            if [[ "$archive" == *.zip ]]; then
+              rm -rf "$RUNNER_TEMP/unpacked"
+              7z x -y "-o$RUNNER_TEMP/unpacked" "$archive" > /dev/null
+              cp -R "$RUNNER_TEMP"/unpacked/*/. "$prefix"
+            else
+              tar -xzf "$archive" -C "$prefix" --strip-components=1
+            fi
+          done
+          echo "ERNIE_PREFIX=$prefix" >> "$GITHUB_ENV"
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
+        with:
+          arch: ${{ matrix.msvc }}
+      - name: Build a consumer and test it
+        env:
+          TESTS: ${{ matrix.device && '.' || '^adapters$' }}
+        run: |
+          for config in ${{ matrix.configs }}; do
+            cmake -S tests/consumer -B "build-$config" "-DCMAKE_BUILD_TYPE=$config" \
+              "-DCMAKE_PREFIX_PATH=$ERNIE_PREFIX"
+            cmake --build "build-$config" --config "$config"
+            PATH="$ERNIE_PREFIX/bin:$PATH" ctest --test-dir "build-$config" -C "$config" \
+              --output-on-failure -R "$TESTS"
+          done
+      - name: Run the viewer's command line
+        run: PATH="$ERNIE_PREFIX/bin:$PATH" ernie --version

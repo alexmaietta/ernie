@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    echo "usage: make-env BACKEND [--python INTERPRETER]" >&2
+    exit 2
+}
+
+[[ $# -ge 1 ]] || usage
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+BACKEND=$1
+shift
+PYTHON=python3
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --python) PYTHON=$2; shift 2 ;;
+        *) usage ;;
+    esac
+done
+
+ENV=$ROOT/envs/$BACKEND
+mkdir -p "$ENV"
+"$PYTHON" -m venv "$ENV/.venv"
+"$ENV/.venv/bin/python" -m pip install --quiet --upgrade pip
+"$ENV/.venv/bin/python" -m pip install --quiet -e "$ROOT"
+if [[ -s $ENV/paths.txt ]]; then
+    SITE=$("$ENV/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+    while read -r entry; do
+        [[ -n $entry ]] && (cd "$ROOT" && realpath -m "$entry")
+    done < "$ENV/paths.txt" > "$SITE/ernie-bench-paths.pth"
+fi
+if [[ -s $ENV/requirements.txt ]]; then
+    "$ENV/.venv/bin/python" -m pip install --quiet -r "$ENV/requirements.txt"
+fi
+"$ENV/.venv/bin/python" -c "import ernie_bench, sys; print('ready:', sys.executable, sys.version.split()[0])"

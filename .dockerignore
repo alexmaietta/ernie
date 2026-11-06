@@ -1,0 +1,9 @@
+.git/lfs
+build/
+build-*/
+benchmarks/
+dist/
+site/
+.venv/
+.vscode/
+.claude/

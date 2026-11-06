@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: BSD-3-Clause
+ernie_object_library(
+    ernie_scene
+    access/attribute.cpp
+    access/layout.cpp
+    access/mapping.cpp
+    access/poses.cpp
+    access/view.cpp
+    catalog/catalog.cpp
+    catalog/packing.cpp
+    catalog/paths.cpp
+    catalog/prims.cpp
+    catalog/tokens.cpp
+    prim.cpp
+    rotation.cpp
+    scene.cpp
+    store/arrays.cpp
+    store/heap.cpp
+    store/store.cpp
+    store/table.cpp
+    systems/bounds.cpp
+    systems/geometry.cpp
+    systems/hierarchy.cpp
+    systems/instances.cpp
+    systems/lights.cpp
+    systems/regions.cpp
+    systems/semantics.cpp
+    systems/tangents.cpp
+    systems/textures.cpp
+    timeline/changes.cpp
+    timeline/timeline.cpp
+    "${ernie_scene_defines}"
+)
+target_link_libraries(
+    ernie_scene
+    PUBLIC
+        ernie_device
+        ernie_algorithms
+        ernie_bvh
+        ernie_io
+        ernie_texture
+        ernie_mikktspace
+)
+ernie_embed(
+    ernie_scene
+    LIBRARY kSceneKernels
+    USES
+        kBvhKernels
+        kIoKernels
+        kTextureKernels
+    HEADER ernie/scene/kernels.h
+    ROOTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.h"
+        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels|ernie/scene/kernels/|*.h"
+)
+
+ernie_static_library(
+    ernie_scene_internal
+    ernie_scene
+    ernie_bvh_internal
+    ernie_io_internal
+    ernie_texture_internal
+)
+
+ernie_public_files(
+    access/attribute.h
+    access/layout.h
+    access/mapping.h
+    access/poses.h
+    access/view.h
+    catalog/tokens.h
+    kernels/ids.h
+    kernels/paged.h
+    kernels/primvars.h
+    kernels/scene.h
+    kernels/schema/schema.h
+    kernels/schema/types.h
+    kernels/semantics.h
+    kernels/textures.h
+    prim.h
+    primvar.h
+    rotation.h
+    scene.h
+    types.h
+)

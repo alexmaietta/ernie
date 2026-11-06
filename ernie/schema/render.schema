@@ -1,0 +1,219 @@
+class RenderVar : Typed (
+    doc = "One output of a render product, such as its color."
+) {
+    token sourceName = LdrColor (
+        tracked
+        allowed = [
+            LdrColor
+            HdrColor
+            DistanceToCamera
+            DistanceToImagePlane
+            NonStableInstanceSegmentation
+            Normal
+            DiffuseAlbedo
+            SemanticSegmentation
+            SemanticIdMap
+            SemanticInstanceSegmentation
+            StableIdSegmentation
+            StableIdMap
+            Intensity
+            PointCloud
+            RadialVelocity
+            InstanceId
+            InstancerStableId
+        ]
+        enum = RenderVarSource
+        group = "Render Var"
+        displayName = "Source Name"
+        doc = "The output this variable holds: display color, linear color, distance from the camera, distance from the image plane, the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits, the world-space shading normal facing the camera, the unlit diffuse color of the bound material, or displayColor where there's none, the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, the ids and labels of SemanticSegmentation, the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, the stable id of the hit prim, the stable ids and paths of every prim the segmentations name, the intensity of a lidar or radar return, a lidar's or radar's returns packed into a point cloud with the fields channels names, how fast a radar's hit moves away from it in meters per second, the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, or the stable id of that copy's instancer, with 0 where there's none."
+    )
+    token[] channels (
+        tracked
+        group = "Render Var"
+        displayName = "Channels"
+        doc = "The fields a PointCloud holds, each a tensor of its own. Coordinates are xyz in frameOfReference, Distance the range along the beam, Intensity the return's intensity, StableId the hit prim's stable id, RadialVelocity a radar return's speed away from it, and Emitter, Firing and Echo where the return sits in the sensor's grid, which for a radar are its row, its column and 0. Empty holds Coordinates and Intensity. Every point cloud also has Counts, the points each sensor returned."
+    )
+    token frameOfReference = sensor (
+        tracked
+        allowed = [sensor, world]
+        group = "Render Var"
+        displayName = "Frame of Reference"
+        doc = "The space a PointCloud's Coordinates are in. sensor is the sensor's own frame, looking down -z with +y up. world is the space prims' world transforms are in."
+    )
+}
+
+api class MinimalAPI (
+    doc = "Settings of the minimal render mode: shading, shadows and the ambient environment. It lights with the first distant light the camera's world sees, or a headlight when there is none."
+) {
+    token mode = textureDiffuse (
+        tracked
+        allowed = [data, displayColor, textureDiffuse, full]
+        enum = MinimalMode
+        group = "Minimal Shading"
+        displayName = "Shading Mode"
+        doc = "data renders no color, only outputs such as depth, normals and segmentation, and its diffuse albedo is black. displayColor shades every surface in its displayColor without reading materials or textures. textureDiffuse shades the diffuse color of bound materials, or displayColor where there's none. full shades the bound materials with diffuse, glossy and emission."
+    )
+    bool castShadows = true (
+        group = "Minimal Shading"
+        displayName = "Cast Shadows"
+        doc = "Whether the distant light casts hard shadows."
+    )
+    color3f ambientLightColor = (0, 0, 0) (
+        group = "Minimal Shading"
+        displayName = "Ambient Light Color"
+        doc = "Color of the ambient environment, which lights every surface evenly, or the sky's color with ambientHemispheric."
+    )
+    float ambientLightIntensity = 0 (
+        group = "Minimal Shading"
+        displayName = "Ambient Light Intensity"
+        doc = "Brightness of the ambient environment, where 1 lights a white surface to display white. 0 disables it."
+    )
+    bool ambientHemispheric = false (
+        group = "Minimal Shading"
+        displayName = "Hemispheric Ambient"
+        doc = "Blend the ambient environment from ambientGroundColor on surfaces facing down, -Z, to ambientLightColor on surfaces facing up, +Z, as a sky over a ground lights them."
+    )
+    color3f ambientGroundColor = (0, 0, 0) (
+        group = "Minimal Shading"
+        displayName = "Ambient Ground Color"
+        doc = "Color of the ambient environment below the horizon, which reaches surfaces facing down when ambientHemispheric is on."
+    )
+    float shadowVisibility = 0 (
+        group = "Minimal Shading"
+        displayName = "Shadow Visibility"
+        min = 0
+        max = 1
+        doc = "How much of the distant light still reaches a shadowed surface. 0 is a full shadow and 1 casts none."
+    )
+}
+
+api class RealTimeAPI (
+    doc = "Settings of the real-time render mode."
+) {
+    int maxBounces = 0 (
+        min = 0
+        max = 64
+        group = "Real Time"
+        displayName = "Max Bounces"
+        doc = "Indirect bounces after the first hit, one path per pixel. 0 lights only by direct light."
+    )
+}
+
+abstract class Background : Typed (
+    doc = "What camera rays see when they leave the scene, lighting nothing. A render product picks one with ernie:background. Colors are linear and display-exact, so LdrColor shows them as authored and HdrColor holds the radiance that displays as them."
+) {}
+
+class ColorBackground : Background (
+    doc = "One color in every direction."
+) {
+    color3f color = (0, 0, 0) (
+        group = "Background"
+        displayName = "Color"
+        doc = "The background's color, as LdrColor shows it."
+    )
+}
+
+class GradientBackground : Background (
+    doc = "A sky blended from horizonColor at and below the horizon to zenithColor straight up, +Z."
+) {
+    color3f horizonColor = (0.35, 0.4, 0.45) (
+        group = "Background"
+        displayName = "Horizon Color"
+        doc = "Color at and below the horizon, as LdrColor shows it."
+    )
+    color3f zenithColor = (0.15, 0.25, 0.5) (
+        group = "Background"
+        displayName = "Zenith Color"
+        doc = "Color straight up, as LdrColor shows it."
+    )
+}
+
+api class BackgroundAPI (
+    doc = "What a product's camera rays see when they miss. Color outputs keep alpha 0 there, so the color holds the background unpremultiplied."
+) {
+    prim[] ernie:background (
+        group = "Background"
+        displayName = "Background"
+        doc = "The Background prim shown. Only the first target is used. Without one, ernie:backgroundColor is shown."
+    )
+    color3f ernie:backgroundColor = (0, 0, 0) (
+        group = "Background"
+        displayName = "Background Color"
+        doc = "The color shown when no Background prim is set, as LdrColor shows it."
+    )
+}
+
+class RenderSettings : Typed (
+    doc = "Settings shared by every render product. The renderer reads the first one defined."
+) {}
+
+class RenderProduct : Typed, MinimalAPI, BackgroundAPI, RealTimeAPI (
+    doc = "Images rendered from cameras, one per camera, each holding the product's variables."
+) {
+    token renderMode = Minimal (
+        tracked
+        allowed = [Minimal, RealTime]
+        enum = RenderMode
+        group = "Product"
+        displayName = "Render Mode"
+        doc = "How the product is shaded. Minimal follows MinimalAPI, RealTime shades displayColor under every light with shadows and no ambient environment."
+    )
+    token spectralMode = rgb (
+        tracked
+        allowed = [rgb, bands]
+        group = "Product"
+        displayName = "Spectral Mode"
+        doc = "How light is carried through cameras, lights and materials. rgb carries three channels and is what Minimal renders with. bands carries fixed wavelength bands, a placeholder that RealTime will use."
+    )
+    bool disableMotionBlur = false (
+        tracked
+        group = "Product"
+        displayName = "Disable Motion Blur"
+        doc = "Renders every prim at the shutter's opening instead of blurring it across the shutter, as UsdRender's disableMotionBlur does. Rendering doesn't blur anything yet, so it changes nothing."
+    )
+    prim[] camera (
+        tracked
+        group = "Product"
+        displayName = "Sensors"
+        doc = "The sensors rendered, stacked into one batch of outputs. They are one kind of sensor and capture at the same times. The name follows UsdRender, where it holds cameras."
+    )
+    uint2 resolution = (640, 480) (
+        tracked
+        group = "Product"
+        displayName = "Resolution"
+        doc = "Width and height of each image in pixels."
+    )
+    token semanticTaxonomy = class (
+        tracked
+        group = "Product"
+        displayName = "Semantic Taxonomy"
+        doc = "Which taxonomy of SemanticsLabelsAPI the semantic variables segment by."
+    )
+    float missDistance = inf (
+        tracked
+        unit = meters
+        group = "Product"
+        displayName = "Miss Distance"
+        doc = "What DistanceToCamera and DistanceToImagePlane hold where a ray hits nothing before the camera's far clipping distance. Infinite by default, and 0 for renderers that mark a miss with 0."
+    )
+    prim[] orderedVars (
+        tracked
+        group = "Product"
+        displayName = "Render Vars"
+        doc = "The render variables written, in order."
+    )
+    float textureLodBias = -0.5 (
+        group = "Textures"
+        displayName = "LOD Bias"
+        min = -4
+        max = 4
+        doc = "Added to every texture's mip level. Below 0 is sharper, above 0 is blurrier."
+    )
+    int maxAnisotropy = 8 (
+        group = "Textures"
+        displayName = "Max Anisotropy"
+        min = 1
+        max = 16
+        doc = "Most texture probes taken along a footprint stretched by a grazing view. 1 filters isotropically."
+    )
+}

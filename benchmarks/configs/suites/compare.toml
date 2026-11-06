@@ -1,0 +1,19 @@
+name = "compare"
+backends = ["newton", "ernie_cuda_software", "madrona_rt"]
+scenes = ["hide_and_seek"]
+workload = "throughput"
+
+[measurement]
+warmup_max_seconds = 5.0
+iterations = 30
+repeats = 3
+max_repeats = 6
+
+[sweep]
+worlds = [16, 256, 1024]
+resolution = [[64, 64]]
+tier = ["direct", "unlit"]
+
+[capture]
+steps = [0]
+images = [0]

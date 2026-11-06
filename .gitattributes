@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+*.exr binary
+*.jpeg binary
+*.jpg binary
+*.ktx2 binary
+*.png binary
+*.spv binary
+*.tif binary
+*.tiff binary
+*.vdb binary

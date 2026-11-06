@@ -1,0 +1,42 @@
+name: Vulkan validation layer
+description: The LunarG SDK's Khronos validation layer on x86-64 Linux, on VK_LAYER_PATH for the steps after this one
+inputs:
+  version:
+    description: LunarG SDK release
+    default: "1.4.341.0"
+  sha256:
+    description: Hash of the SDK's archive
+    default: "ed66477d587a5587dc3601b1c2cdcc1fab5529c505f53a00171876cecd9b4fbe"
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      id: cache
+      with:
+        path: ~/.cache/vulkan-validation-${{ inputs.version }}
+        key: vulkan-validation-${{ inputs.version }}
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        version=${{ inputs.version }}
+        out=~/.cache/vulkan-validation-$version
+        work=$(mktemp -d)
+        curl -sSfL --retry 6 --retry-all-errors --retry-delay 15 -o "$work/sdk.tar.xz" \
+          "https://sdk.lunarg.com/sdk/download/$version/linux/vulkansdk-linux-x86_64-$version.tar.xz"
+        echo "${{ inputs.sha256 }}  $work/sdk.tar.xz" | sha256sum -c -
+        tar xJf "$work/sdk.tar.xz" -C "$work" \
+          "$version/x86_64/lib/libVkLayer_khronos_validation.so" \
+          "$version/x86_64/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json"
+        mkdir -p "$out"
+        cp "$work/$version/x86_64/lib/libVkLayer_khronos_validation.so" "$out/"
+        strip --strip-unneeded "$out/libVkLayer_khronos_validation.so"
+        sed 's#"library_path": "libVkLayer#"library_path": "./libVkLayer#' \
+          "$work/$version/x86_64/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json" \
+          > "$out/VkLayer_khronos_validation.json"
+        rm -rf "$work"
+    - shell: bash
+      run: |
+        {
+          echo "VK_LAYER_PATH=$HOME/.cache/vulkan-validation-${{ inputs.version }}"
+          echo "ERNIE_VALIDATION=1"
+        } >> "$GITHUB_ENV"

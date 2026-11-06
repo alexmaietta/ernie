@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include <cstdint>
+#include <map>
+#include <set>
+#include <span>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/textures.h"
+#include "ernie/scene/systems/system.h"
+#include "ernie/texture/cache.h"
+
+namespace ernie {
+
+struct TextureStats {
+    uint32_t images = 0;
+    uint32_t bound = 0;
+    uint32_t loaded = 0;
+    uint32_t failed = 0;
+    uint32_t loading = 0;
+};
+
+struct TextureSlot {
+    SchemaId table = SchemaId::None;
+    uint32_t texture = 0;
+    bool color = false;
+};
+
+std::vector<TextureSlot> TextureSlots(SchemaId material);
+
+class Textures : public System {
+  public:
+    explicit Textures(Catalog& catalog, unsigned threads = 4);
+    ~Textures() override;
+    Textures(const Textures&) = delete;
+    Textures& operator=(const Textures&) = delete;
+
+    std::string_view Name() const override {
+        return "textures";
+    }
+
+    std::span<const ColumnRef> Inputs() const override {
+        return m_inputs;
+    }
+
+    std::span<const ColumnRef> Outputs() const override;
+    bool Pending() const override;
+    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+
+    void Finish() override;
+    uint64_t Handle(uint32_t prim, std::string_view input) const;
+
+    uint64_t Checker() const {
+        return m_cache.Binding(kCheckerTextureBinding);
+    }
+
+    uint32_t Runs() const {
+        return m_runs;
+    }
+
+    const TextureStats& Stats() const {
+        return m_stats;
+    }
+
+  private:
+    using RowKey = std::pair<SchemaId, uint32_t>;
+
+    struct Bound {
+        TextureSlot slot;
+        TextureBinding binding;
+    };
+
+    struct Material {
+        std::vector<Bound> slots;
+        std::vector<RowKey> rows;
+        uint32_t bindings = kNoTextures;
+        bool checkered = false;
+    };
+
+    struct Cells {
+        std::map<RowKey, std::vector<uint32_t>> columns;
+    };
+
+    const std::vector<uint32_t>& Read(Cells& cells, SchemaId table, uint32_t column);
+    std::set<uint32_t> Collect();
+    void Refresh(uint32_t prim);
+    void Release(uint32_t prim);
+    void StageLight(uint32_t prim, const Material& material);
+    void Rebind(uint32_t prim, Cells& cells);
+    void UploadBindings();
+
+    Catalog& m_catalog;
+    TextureCache m_cache;
+    std::map<SchemaId, std::vector<TextureSlot>> m_slots;
+    std::vector<ColumnRef> m_inputs;
+    std::unordered_map<uint32_t, Material> m_materials;
+    std::map<RowKey, uint32_t> m_byRow;
+    uint64_t m_bindingAddress = 0;
+    TextureBinding m_checker;
+    uint32_t m_checkerUsers = 0;
+    TextureStats m_stats;
+    uint32_t m_runs = 0;
+};
+
+}

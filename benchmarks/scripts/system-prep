@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR=/run/ernie-bench
+STATE=$STATE_DIR/system-prep.env
+IRQ_STATE=$STATE_DIR/irq-affinity.txt
+CPU=/sys/devices/system/cpu
+HOUSEKEEPING_UNITS=(system.slice init.scope)
+REALTIME_PRIORITY=50
+
+usage() {
+    cat >&2 <<EOF
+usage: system-prep apply [--gpu INDEX] [--gpu-clock MHZ] [--memory-clock MHZ] [--power-limit WATTS] [--no-turbo]
+                     [--isolate CPUS] [--realtime] [--mps]
+       system-prep restore
+       system-prep status
+       system-prep drop-caches
+
+  --isolate CPUS  move system services and interrupts off CPUS, e.g. 2-7
+  --realtime      let the shell that ran sudo, and what it starts, use nice -20 and SCHED_FIFO
+  --mps           start the CUDA MPS daemon, needed to sweep sm_percent
+EOF
+    exit 2
+}
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echo "system-prep $1 needs root: sudo $0 $1" >&2
+        exit 1
+    fi
+}
+
+gpu_query() {
+    nvidia-smi -i "$GPU" --query-gpu="$1" --format=csv,noheader,nounits
+}
+
+set_governor() {
+    for file in "$CPU"/cpu[0-9]*/cpufreq/scaling_governor; do
+        echo "$1" > "$file"
+    done
+}
+
+set_energy_preference() {
+    for file in "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference; do
+        [[ -w $file ]] && echo "$1" > "$file" 2>/dev/null || true
+    done
+}
+
+expand_cpus() {
+    local part parts cpus=()
+    IFS=, read -ra parts <<< "$1"
+    for part in "${parts[@]}"; do
+        if [[ $part == *-* ]]; then
+            cpus+=($(seq "${part%-*}" "${part#*-}"))
+        else
+            cpus+=("$part")
+        fi
+    done
+    echo "${cpus[@]}"
+}
+
+housekeeping_cpus() {
+    local isolated=" $(expand_cpus "$1") " cpu kept=()
+    for cpu in $(expand_cpus "$(cat "$CPU/online")"); do
+        [[ $isolated == *" $cpu "* ]] || kept+=("$cpu")
+    done
+    if [[ ${#kept[@]} -eq 0 ]]; then
+        echo "--isolate $1 leaves no cpu for the rest of the system" >&2
+        exit 1
+    fi
+    local IFS=,
+    echo "${kept[*]}"
+}
+
+cpu_mask() {
+    local cpu mask=0
+    for cpu in $(expand_cpus "$1"); do
+        mask=$((mask | 1 << cpu))
+    done
+    printf '%x' "$mask"
+}
+
+invoking_shell() {
+    local pid=$PPID
+    while [[ $(ps -o comm= -p "$pid") == sudo ]]; do
+        pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+    done
+    echo "$pid"
+}
+
+isolate() {
+    local unit irq
+    for unit in "${HOUSEKEEPING_UNITS[@]}"; do
+        systemctl set-property --runtime "$unit" AllowedCPUs="$1"
+    done
+    cat /proc/irq/default_smp_affinity > "$IRQ_STATE"
+    for irq in /proc/irq/[0-9]*; do
+        echo "${irq##*/} $(cat "$irq/smp_affinity_list")" >> "$IRQ_STATE"
+        echo "$1" > "$irq/smp_affinity_list" 2>/dev/null || true
+    done
+    cpu_mask "$1" > /proc/irq/default_smp_affinity
+}
+
+release_isolation() {
+    local unit irq affinity
+    for unit in "${HOUSEKEEPING_UNITS[@]}"; do
+        systemctl set-property --runtime "$unit" AllowedCPUs= || true
+    done
+    if [[ -e $IRQ_STATE ]]; then
+        {
+            read -r affinity
+            echo "$affinity" > /proc/irq/default_smp_affinity
+            while read -r irq affinity; do
+                echo "$affinity" > "/proc/irq/$irq/smp_affinity_list" 2>/dev/null || true
+            done
+        } < "$IRQ_STATE"
+        rm "$IRQ_STATE"
+    fi
+}
+
+apply() {
+    require_root apply
+    GPU=0 GPU_CLOCK="" MEMORY_CLOCK="" POWER_LIMIT="" NO_TURBO="" ISOLATE="" HOUSEKEEPING="" REALTIME_SHELL="" MPS=""
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --gpu) GPU=$2; shift 2 ;;
+            --gpu-clock) GPU_CLOCK=$2; shift 2 ;;
+            --memory-clock) MEMORY_CLOCK=$2; shift 2 ;;
+            --power-limit) POWER_LIMIT=$2; shift 2 ;;
+            --no-turbo) NO_TURBO=1; shift ;;
+            --isolate) ISOLATE=$2; shift 2 ;;
+            --realtime) REALTIME_SHELL=$(invoking_shell); shift ;;
+            --mps) MPS=1; shift ;;
+            *) usage ;;
+        esac
+    done
+    if [[ -e $STATE ]]; then
+        echo "system-prep is already applied, run restore first" >&2
+        exit 1
+    fi
+
+    if [[ -n $ISOLATE ]]; then
+        HOUSEKEEPING=$(housekeeping_cpus "$ISOLATE")
+    fi
+
+    mkdir -p "$STATE_DIR"
+    cat > "$STATE" <<EOF
+APPLIED_AT=$(date -Is)
+GPU=$GPU
+PREVIOUS_GOVERNOR=$(cat "$CPU/cpu0/cpufreq/scaling_governor")
+PREVIOUS_ENERGY_PREFERENCE=$(cat "$CPU/cpu0/cpufreq/energy_performance_preference" 2>/dev/null || true)
+PREVIOUS_NO_TURBO=$(cat "$CPU/intel_pstate/no_turbo" 2>/dev/null || true)
+PREVIOUS_PERF_PARANOID=$(cat /proc/sys/kernel/perf_event_paranoid)
+PREVIOUS_PERSISTENCE=$(gpu_query persistence_mode)
+PREVIOUS_POWER_LIMIT=$(gpu_query enforced.power.limit)
+APPLIED_GPU_CLOCK=$GPU_CLOCK
+APPLIED_MEMORY_CLOCK=$MEMORY_CLOCK
+APPLIED_POWER_LIMIT=$POWER_LIMIT
+APPLIED_NO_TURBO=$NO_TURBO
+APPLIED_PERF_PARANOID=1
+APPLIED_ISOLATE=$ISOLATE
+APPLIED_HOUSEKEEPING=$HOUSEKEEPING
+APPLIED_REALTIME_SHELL=$REALTIME_SHELL
+PREVIOUS_REALTIME_LIMITS="${REALTIME_SHELL:+$(prlimit --pid "$REALTIME_SHELL" --rtprio --nice --raw --noheadings --output SOFT,HARD | tr '\n' ' ')}"
+APPLIED_MPS=$MPS
+EOF
+
+    echo 1 > /proc/sys/kernel/perf_event_paranoid
+    set_governor performance
+    set_energy_preference performance
+    if [[ -n $NO_TURBO && -e $CPU/intel_pstate/no_turbo ]]; then
+        echo 1 > "$CPU/intel_pstate/no_turbo"
+    fi
+    nvidia-smi -i "$GPU" -pm 1
+    if [[ -n $GPU_CLOCK ]]; then
+        nvidia-smi -i "$GPU" -lgc "$GPU_CLOCK,$GPU_CLOCK"
+    fi
+    if [[ -n $MEMORY_CLOCK ]]; then
+        nvidia-smi -i "$GPU" -lmc "$MEMORY_CLOCK,$MEMORY_CLOCK"
+    fi
+    if [[ -n $POWER_LIMIT ]]; then
+        nvidia-smi -i "$GPU" -pl "$POWER_LIMIT"
+    fi
+    if [[ -n $ISOLATE ]]; then
+        isolate "$HOUSEKEEPING"
+    fi
+    if [[ -n $REALTIME_SHELL ]]; then
+        prlimit --pid "$REALTIME_SHELL" --rtprio="$REALTIME_PRIORITY:$REALTIME_PRIORITY" --nice=40:40
+    fi
+    if [[ -n $MPS ]]; then
+        nvidia-cuda-mps-control -d
+    fi
+    echo "applied, state saved to $STATE"
+}
+
+restore() {
+    require_root restore
+    if [[ ! -e $STATE ]]; then
+        echo "nothing to restore, $STATE does not exist" >&2
+        exit 1
+    fi
+    source "$STATE"
+
+    if [[ -n ${APPLIED_MPS:-} ]]; then
+        echo quit | nvidia-cuda-mps-control || true
+    fi
+    if [[ -n ${APPLIED_REALTIME_SHELL:-} ]] && kill -0 "$APPLIED_REALTIME_SHELL" 2>/dev/null; then
+        read -r rtprio_soft rtprio_hard nice_soft nice_hard <<< "$PREVIOUS_REALTIME_LIMITS"
+        prlimit --pid "$APPLIED_REALTIME_SHELL" --rtprio="$rtprio_soft:$rtprio_hard" --nice="$nice_soft:$nice_hard" || true
+    fi
+    if [[ -n ${APPLIED_ISOLATE:-} ]]; then
+        release_isolation
+    fi
+    if [[ -n $APPLIED_GPU_CLOCK ]]; then
+        nvidia-smi -i "$GPU" -rgc || true
+    fi
+    if [[ -n $APPLIED_MEMORY_CLOCK ]]; then
+        nvidia-smi -i "$GPU" -rmc || true
+    fi
+    if [[ -n $APPLIED_POWER_LIMIT ]]; then
+        nvidia-smi -i "$GPU" -pl "$PREVIOUS_POWER_LIMIT" || true
+    fi
+    if [[ $PREVIOUS_PERSISTENCE == Disabled ]]; then
+        nvidia-smi -i "$GPU" -pm 0 || true
+    fi
+    if [[ -n $PREVIOUS_NO_TURBO ]]; then
+        echo "$PREVIOUS_NO_TURBO" > "$CPU/intel_pstate/no_turbo"
+    fi
+    echo "$PREVIOUS_PERF_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+    set_governor "$PREVIOUS_GOVERNOR"
+    if [[ -n $PREVIOUS_ENERGY_PREFERENCE ]]; then
+        set_energy_preference "$PREVIOUS_ENERGY_PREFERENCE"
+    fi
+    rm "$STATE"
+    echo "restored"
+}
+
+status() {
+    GPU=0
+    if [[ -e $STATE ]]; then
+        echo "applied ($STATE):"
+        sed 's/^/  /' "$STATE"
+        source "$STATE"
+    else
+        echo "not applied"
+    fi
+    echo "cpu governors:   $(cat "$CPU"/cpu[0-9]*/cpufreq/scaling_governor | sort -u | tr '\n' ' ')"
+    echo "cpu preferences: $(cat "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference 2>/dev/null | sort -u | tr '\n' ' ')"
+    echo "cpu no_turbo:    $(cat "$CPU/intel_pstate/no_turbo" 2>/dev/null || echo n/a)"
+    echo "perf paranoid:   $(cat /proc/sys/kernel/perf_event_paranoid)"
+    echo "isolated cpus:   kernel '$(cat "$CPU/isolated")', services on '$(systemctl show -P AllowedCPUs system.slice)'"
+    echo "mps:             $([[ -e ${CUDA_MPS_PIPE_DIRECTORY:-/tmp/nvidia-mps}/control ]] && echo running || echo off)"
+    nvidia-smi -i "$GPU" --query-gpu=name,persistence_mode,clocks.sm,clocks.mem,clocks.max.sm,power.draw,enforced.power.limit,temperature.gpu,clocks_event_reasons.active --format=csv
+}
+
+drop_caches() {
+    require_root drop-caches
+    sync
+    echo 3 > /proc/sys/vm/drop_caches
+}
+
+case ${1:-} in
+    apply) shift; apply "$@" ;;
+    restore) restore ;;
+    status) status ;;
+    drop-caches) drop_caches ;;
+    *) usage ;;
+esac

@@ -1,0 +1,16 @@
+build*/
+site/
+*.log
+*.venv
+.venv*/
+*.ruff_cache
+*.pytest_cache
+*.mypy_cache
+TODO.md
+__pycache__/
+python/ernie/_ernie*/
+tests/bench/data/
+README.md
+!/README.md
+!/benchmarks/README.md
+examples/

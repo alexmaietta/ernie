@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+__exported import ernie.render.kernels.query.hit;
+
+#include "ernie/scene/kernels/textures.h"
+
+using namespace ernie;
+
+struct MaterialQuery {
+    HitQuery hit;
+    float lodBias;
+    uint maxAnisotropy;
+    bool minimal;
+
+    __init(HitQuery hit, float lodBias, uint maxAnisotropy) {
+        this.hit = hit;
+        this.lodBias = lodBias;
+        this.maxAnisotropy = maxAnisotropy;
+        minimal = false;
+    }
+
+    static MaterialQuery Load(HitQuery hit, uint product) {
+        RenderProductData* products = &hit.data->schemas.renderProduct;
+        const uint row = PrimRow(hit.data, product, kSlotRenderProduct);
+        return MaterialQuery(hit, products.textureLodBias[row],
+                             uint(max(products.maxAnisotropy[row], 1)));
+    }
+
+    uint BoundMaterial(uint prim) {
+        const uint row = PrimRow(hit.data, prim, kSlotImageable);
+        return hit.data->schemas.imageable.computedMaterial[row];
+    }
+
+    SchemaId Schema(uint material) {
+        return material == kNoPrim ? SchemaId::None : SchemaId(hit.data->prims.schema[material]);
+    }
+
+    uint Textures(uint material) {
+        return hit.data->schemas.material.textures[PrimRow(hit.data, material, kSlotMaterial)];
+    }
+
+    Ptr<uint64_t> Bindings(uint textures, uint first) {
+        return textures == kNoTextures ? Ptr<uint64_t>(0)
+                                       : hit.data->textureBindings + (textures + first);
+    }
+
+    uint64_t Texture(uint textures, uint input) {
+        return textures == kNoTextures ? 0 : hit.data->textureBindings[textures + input];
+    }
+}

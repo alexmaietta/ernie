@@ -1,0 +1,178 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
+#include <span>
+#include <string>
+#include <vector>
+
+#include "ernie/algorithms/scan.h"
+#include "ernie/device/buffer.h"
+#include "ernie/device/program.h"
+#include "ernie/device/queue.h"
+#include "ernie/render/kernels/render/render.h"
+#include "ernie/render/overlay/overlay_impl.h"
+#include "ernie/render/renderer.h"
+#include "ernie/scene/scene.h"
+
+namespace ernie {
+
+enum class RenderEntry : uint32_t {
+    MinimalData,
+    MinimalDisplayColor,
+    MinimalTextureDiffuse,
+    MinimalFull,
+    RealTime,
+    RealTimeBands,
+    Lidar,
+    Radar,
+};
+
+inline constexpr uint32_t kRenderEntryCount = 8;
+inline constexpr size_t kCachedPlans = 4;
+
+class RendererImpl {
+  public:
+    explicit RendererImpl(Ref<Scene> scene, const RendererDesc& desc = {});
+
+    RenderOutput Step(std::span<const std::string> products, double dt,
+                      Stream stream = Stream::None());
+    void Reset(double time);
+
+    double Time() const {
+        return m_time;
+    }
+
+    struct ProductVar {
+        RenderVarSource source;
+        RenderVarOutput output;
+        device::DType type = device::DType::UInt8;
+        std::vector<int64_t> shape;
+        std::vector<std::string> channels;
+        bool world = false;
+    };
+
+    struct Product {
+        uint32_t prim = kNoPrim;
+        SchemaId sensor = SchemaId::Camera;
+        std::vector<uint32_t> sensors;
+        Uint2 resolution;
+        Token taxonomy;
+        float missDistance = 0;
+        uint32_t returns = 0;
+        float frameRate = 0;
+        float startTime = 0;
+        bool semantic = false;
+        uint32_t mapVersion = ~0u;
+        RenderEntry entry = RenderEntry::MinimalData;
+        std::vector<ProductVar> vars;
+    };
+
+    struct Launch {
+        std::vector<Capture> captures;
+        uint64_t pixelCount = 0;
+    };
+
+    struct OwnedVar {
+        std::string product;
+        std::string renderVar;
+        device::Tensor tensor;
+        std::string channel;
+    };
+
+    struct OwnedCloud {
+        uint32_t product = kNoPrim;
+        uint32_t slots = 0;
+        Ref<device::Buffer> cloud;
+        Ref<device::Buffer> records;
+        Ref<device::Buffer> flags;
+        Ref<device::Buffer> offsets;
+    };
+
+    struct Schedule {
+        float frameRate = 0;
+        float startTime = 0;
+        int64_t next = 0;
+    };
+
+    struct OwnedOverlay {
+        std::string product;
+        device::Tensor tensor;
+        uint64_t depth = 0;
+        Ref<device::Buffer> ownDepth;
+        Ref<device::Buffer> primIds;
+    };
+
+    struct OutputSet {
+        std::array<std::vector<Capture>, kRenderEntryCount> captures;
+        std::array<Ref<device::Buffer>, kRenderEntryCount> captureBuffers;
+        std::vector<OwnedVar> vars;
+        std::vector<OwnedOverlay> overlays;
+        std::vector<OwnedCloud> clouds;
+        bool outlined = false;
+    };
+
+    struct StepPlan {
+        std::array<Launch, kRenderEntryCount> launches;
+        uint32_t captureCount = 0;
+        uint64_t pixelCount = 0;
+        std::vector<Token> taxonomies;
+        std::map<std::string, ProductOutput, std::less<>> products;
+        std::map<std::string, std::vector<std::string>, std::less<>> shownOverlays;
+        std::vector<OutputSet> sets;
+    };
+
+    bool ProductsChanged();
+    StepPlan& PlanProducts(std::span<const std::string> products);
+    Product& PrepareProduct(const std::string& path);
+    ProductVar PrepareVar(uint32_t var, const Product& product);
+    void ClearProducts();
+    void UpdateMaps();
+    bool Due(const std::string& path, const Product& product, double dt);
+
+    OutputSet& AcquireSet(StepPlan& plan);
+    uint64_t AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
+                          const ProductVar& var, uint64_t next);
+    device::Operation Trace(const OutputSet& set, const std::set<uint32_t>& due,
+                            const Snapshot& snapshot);
+    std::vector<OverlayContents> RecordOverlays(device::CommandEncoder& encoder,
+                                                const OutputSet& set, const std::set<uint32_t>& due,
+                                                const Snapshot& snapshot);
+
+    void SetOverlay(std::string_view name, Overlay overlay);
+    void RemoveOverlay(std::string_view name);
+    void ShowOverlays(std::string_view product, std::span<const std::string> names);
+    void HideOverlays(std::string_view product);
+    OverlayPick PickOverlay(std::string_view product, Float2 pixel, float radius, uint32_t layer);
+
+    Ref<Scene> m_scene;
+    uint64_t m_maxPixelsPerLaunch;
+    Ref<device::Program> m_renderProgram;
+
+    double m_time = 0;
+    uint64_t m_epoch = ~uint64_t(0);
+    std::vector<uint64_t> m_productWrites;
+    std::map<std::string, Product> m_products;
+    std::unique_ptr<algorithms::Scan> m_scan;
+    uint32_t m_scanCapacity = 0;
+    std::map<std::string, Schedule> m_schedules;
+    std::list<StepPlan> m_plans;
+    StepPlan* m_plan = nullptr;
+
+    std::mutex m_stepMutex;
+    std::mutex m_overlayMutex;
+    std::map<std::string, OverlayContents, std::less<>> m_overlays;
+    std::map<std::string, std::vector<std::string>, std::less<>> m_shownOverlays;
+    std::optional<OverlayPass> m_overlayPass;
+    std::vector<std::shared_ptr<OverlayPickState>> m_picks;
+    std::vector<std::shared_ptr<OverlayPickState>> m_servedPicks;
+};
+
+}
