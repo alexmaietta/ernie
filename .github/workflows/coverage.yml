@@ -61,6 +61,9 @@ jobs:
             --exclude-unreachable-branches --exclude-throw-branches \
             --html-details coverage/index.html --json-summary coverage/summary.json \
             --cobertura coverage/cobertura.xml --print-summary
+          gcovr --root . --filter 'ernie/[^/]+/kernels/' --object-directory build-coverage \
+            --exclude-unreachable-branches --exclude-throw-branches \
+            --json-summary coverage/kernel-summary.json
           cp build-coverage/python-coverage.xml coverage/
       - name: Summary
         shell: python
@@ -69,12 +72,23 @@ jobs:
           import xml.etree.ElementTree as tree
 
           summary = json.load(open("coverage/summary.json"))
+          kernels = json.load(open("coverage/kernel-summary.json"))
           python = float(tree.parse("build-coverage/python-coverage.xml").getroot().get("line-rate"))
+
+          def badge(name, label, percent):
+              color = next(c for limit, c in [(90, "brightgreen"), (75, "green"), (60, "yellow"),
+                                              (40, "orange"), (0, "red")] if percent >= limit)
+              json.dump({"schemaVersion": 1, "label": label, "message": f"{percent:.0f}%",
+                         "color": color}, open(f"coverage/{name}", "w"))
+
+          badge("badge.json", "coverage", summary["line_percent"])
+          badge("kernel-badge.json", "kernel coverage", kernels["line_percent"])
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
               out.write(f"### Coverage\n\n"
                         f"- C++ lines: {summary['line_percent']:.1f}%\n"
                         f"- C++ branches: {summary['branch_percent']:.1f}%\n"
                         f"- C++ functions: {summary['function_percent']:.1f}%\n"
+                        f"- Kernel lines: {kernels['line_percent']:.1f}%\n"
                         f"- Python lines: {python * 100:.1f}%\n")
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
