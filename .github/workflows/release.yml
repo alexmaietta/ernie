@@ -25,7 +25,6 @@ jobs:
           merge-multiple: true
           path: assets
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: sdist
           path: assets
@@ -33,33 +32,9 @@ jobs:
         run: |
           find assets -mindepth 2 -type f -exec mv -t assets {} +
           find assets -mindepth 1 -type d -empty -delete
-      - name: Drop the versions from the dev file names
-        if: github.ref == 'refs/heads/main'
-        run: |
-          for file in assets/*; do
-            [[ "$file" == *.whl ]] && continue
-            name=$(basename "$file" | sed -E 's/[-_][0-9]+\.[0-9]+\.[0-9]+[^-_]*(-1)?([-_.])/\2/')
-            [[ "assets/$name" == "$file" ]] || mv "$file" "assets/$name"
-          done
       - name: Checksums
         run: cd assets && sha256sum -- * > SHA256SUMS
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
         run: >
           gh release create "$GITHUB_REF_NAME" assets/*
           --title "Ernie ${GITHUB_REF_NAME#v}" --generate-notes
-      - name: Dev release
-        if: github.ref == 'refs/heads/main'
-        run: |
-          notes="Built from main at $GITHUB_SHA."
-          if gh release view dev > /dev/null 2>&1; then
-            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/dev" -f "sha=$GITHUB_SHA" -F force=true
-            gh release upload dev assets/* --clobber
-            gh release view dev --json assets --jq '.assets[].name' | while read -r name; do
-              [[ -e "assets/$name" ]] || gh release delete-asset dev "$name" --yes
-            done
-            gh release edit dev --notes "$notes"
-          else
-            gh release create dev assets/* --target "$GITHUB_SHA" --prerelease --latest=false \
-              --title "Ernie dev" --notes "$notes"
-          fi

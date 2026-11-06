@@ -2,10 +2,6 @@ name: Wheels
 
 on:
   workflow_call:
-    inputs:
-      version:
-        type: string
-        required: true
 
 permissions:
   contents: read
@@ -32,20 +28,6 @@ jobs:
         if: runner.os == 'Windows'
         with:
           arch: ${{ matrix.msvc }}
-      - name: Set the dev version
-        if: contains(inputs.version, 'dev')
-        shell: python
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          import os
-          from pathlib import Path
-
-          pyproject = Path("pyproject.toml")
-          line = 'input = "CMakeLists.txt"\n'
-          text = pyproject.read_text()
-          assert line in text
-          pyproject.write_text(text.replace(line, f'{line}result = "{os.environ["VERSION"]}"\n', 1))
       - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
         with:
           output-dir: wheelhouse

@@ -64,14 +64,10 @@ jobs:
   packages:
     needs: version
     uses: ./.github/workflows/packages.yml
-    with:
-      version: ${{ needs.version.outputs.package }}
 
   wheels:
     needs: version
     uses: ./.github/workflows/wheels.yml
-    with:
-      version: ${{ needs.version.outputs.python }}
 
   docker:
     needs: [lint, build]
@@ -82,9 +78,7 @@ jobs:
 
   pypi:
     needs: [lint, build, packages, wheels]
-    if: >
-      github.event_name == 'push'
-      && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
@@ -99,7 +93,6 @@ jobs:
           merge-multiple: true
           path: dist
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: sdist
           path: dist
@@ -107,9 +100,7 @@ jobs:
 
   release:
     needs: [lint, build, packages, wheels]
-    if: >
-      github.event_name == 'push'
-      && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/release.yml
     permissions:
       contents: write

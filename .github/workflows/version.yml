@@ -2,13 +2,6 @@ name: Version
 
 on:
   workflow_call:
-    outputs:
-      package:
-        description: The package version, with a dev suffix on pushes to main
-        value: ${{ jobs.version.outputs.package }}
-      python:
-        description: The Python package version, as a dev release on pushes to main
-        value: ${{ jobs.version.outputs.python }}
 
 permissions:
   contents: read
@@ -17,27 +10,13 @@ jobs:
   version:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    outputs:
-      package: ${{ steps.check.outputs.package }}
-      python: ${{ steps.check.outputs.python }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the tag
-        id: check
         run: |
           project=$(grep -m 1 -oP '^\s*VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
           if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF_NAME#v}" != "$project" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match CMakeLists.txt's version $project"
             exit 1
           fi
-          package=$project
-          python=$project
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
-            package="$project+dev.$GITHUB_RUN_NUMBER"
-            python="$project.post0.dev$GITHUB_RUN_NUMBER"
-          fi
-          {
-            echo "package=$package"
-            echo "python=$python"
-          } >> "$GITHUB_OUTPUT"
-          echo "Version $project, packaged as $package and $python"
+          echo "Version $project"

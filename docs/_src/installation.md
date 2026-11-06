@@ -43,13 +43,6 @@ ernie
 python -c "import ernie; print(ernie.__version__)"
 ```
 
-The `dev` release also holds wheels rebuilt from main on every push. They are versioned like `0.1.0.post0.dev42`, which pip treats as a pre-release, so ask for one with `--pre`.
-
-```bash
-pip install --pre ernie-renderer \
-    --find-links https://github.com/alexmaietta/ernie/releases/expanded_assets/dev
-```
-
 ### Viewer
 
 The `ernie-renderer` wheel includes the interactive viewer. It needs a GPU that can present to a window.
@@ -74,7 +67,7 @@ viewer.run()
 
 Download the archive for your platform from the [latest release](https://github.com/alexmaietta/ernie/releases/latest). It holds the library, its C++17 headers, the CMake package and a pkg-config file. The Linux archives are built against glibc 2.34, so they run on any distribution from the [requirements](#requirements).
 
-Releases follow tags, so `latest` points at the newest one, with `dev` rebuilt from main on every push. The commands below install the latest release from the command line. On Linux and macOS, look up its version first.
+Releases follow tags, so `latest` points at the newest one. The commands below install the latest release from the command line. On Linux and macOS, look up its version first.
 
 ```bash
 VERSION=$(curl -fsSL https://api.github.com/repos/alexmaietta/ernie/releases/latest \
@@ -112,36 +105,7 @@ Set `VERSION` yourself to install another release.
     Rename-Item "ernie-$VERSION-Windows-$ARCH" ernie
     ```
 
-The `dev` release leaves the version out of its file names, so it installs from fixed URLs. Its builds are versioned like `0.1.0+dev.42`, which sorts after `0.1.0` and before the next release.
-
-=== "Linux"
-
-    ```bash
-    URL=https://github.com/alexmaietta/ernie/releases/download/dev
-    curl -fL $URL/ernie-Linux-$(uname -m).tar.gz \
-        | tar -xz -C ~/.local --strip-components=1
-    ```
-
-=== "macOS"
-
-    ```bash
-    URL=https://github.com/alexmaietta/ernie/releases/download/dev
-    mkdir -p ~/.local
-    curl -fL $URL/ernie-macOS-aarch64.tar.gz \
-        | tar -xz -C ~/.local --strip-components=1
-    ```
-
-=== "Windows"
-
-    ```powershell
-    $URL = "https://github.com/alexmaietta/ernie/releases/download/dev"
-    $ARCH = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "aarch64" } else { "x86_64" }
-    Invoke-WebRequest "$URL/ernie-Windows-$ARCH.zip" -OutFile ernie.zip
-    Expand-Archive ernie.zip .
-    Rename-Item (Get-Item "ernie-*-Windows-$ARCH") ernie
-    ```
-
-Each release, `dev` included, also lists a `SHA256SUMS` file to check the downloads against.
+Each release also lists a `SHA256SUMS` file to check the downloads against.
 
 The Windows ZIP holds both Debug and Release builds, so either configuration links against it. Add the `ernie` folder to `CMAKE_PREFIX_PATH` so CMake finds it, and its `bin` folder to `PATH` so programs built against it find the DLLs.
 
@@ -171,7 +135,7 @@ The image is Ubuntu 24.04 with Ernie installed in `/opt/ernie`.
 docker run --rm -it ghcr.io/alexmaietta/ernie
 ```
 
-Tags follow releases, so `0.1.0`, `0.1` and `latest`, with `dev` built from main. Add `--gpus all` to render on an NVIDIA GPU, which needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host.
+Tags follow releases, so `0.1.0`, `0.1` and `latest`. Add `--gpus all` to render on an NVIDIA GPU, which needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host.
 
 `CMAKE_PREFIX_PATH` already points at Ernie, so a project mounted into the container can build against it.
 
