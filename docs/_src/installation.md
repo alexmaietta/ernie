@@ -195,15 +195,16 @@ cmake --install build --prefix ~/.local
 | Option | Default | Builds |
 | --- | --- | --- |
 | `ERNIE_BUILD_PYTHON` | `OFF` | The Python bindings |
-| `ERNIE_BUILD_VIEWER` | `OFF` | The viewer and the `ernie` command line tool, which need X11 or Wayland development files on Linux |
+| `ERNIE_BUILD_VIEWER` | `OFF` | The viewer that the `ernie` command opens, which needs X11 and Wayland development files on Linux |
 | `ERNIE_BUILD_TESTS` | `OFF` | The C++ and Python tests |
 | `ERNIE_BUILD_BENCHMARKS` | `OFF` | The benchmarks |
 | `ERNIE_INSTALL` | `OFF` | The install rules and packages |
 | `ERNIE_COVERAGE` | `OFF` | Code coverage instrumentation, with GCC or Clang |
 
-The Python package builds from the checkout with pip.
+The Python package builds from the checkout with pip. It includes the viewer, so on Linux it needs the X11 and Wayland development files, which these packages provide on Ubuntu.
 
 ```bash
+sudo apt-get install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libwayland-dev libxkbcommon-dev
 pip install .
 ```
 
