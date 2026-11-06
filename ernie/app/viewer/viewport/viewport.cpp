@@ -1066,8 +1066,8 @@ void Viewport::Frame(bool selected) {
         return;
     }
     const View view = m_scene->Select(Span<const std::string>(bounded), SchemaId::Boundable);
-    m_framing.push_back(view.Get("ernie:worldMin").ReadHostAsync());
-    m_framing.push_back(view.Get("ernie:worldMax").ReadHostAsync());
+    m_framing.push_back(view.Get("worldMin").ReadHostAsync());
+    m_framing.push_back(view.Get("worldMax").ReadHostAsync());
 }
 
 void Viewport::LandFraming() {
@@ -1127,7 +1127,9 @@ void Viewport::LandFraming() {
             Float3 upper;
             std::memcpy(&lower, lows.data() + at, sizeof(Float3));
             std::memcpy(&upper, highs.data() + at, sizeof(Float3));
-            grow(lower, upper);
+            if (lower.x != upper.x || lower.y != upper.y || lower.z != upper.z) {
+                grow(lower, upper);
+            }
         }
     }
     m_framing.clear();
