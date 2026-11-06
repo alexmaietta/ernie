@@ -293,7 +293,7 @@ VulkanDevice::VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, T
         m_allocator = CreateAllocator(m_instance, m_physicalDevice, m_device);
 
         const std::optional<std::string> saved =
-            DiskCache(CacheDirectory()).Load(PipelineCacheKey(Adapter()));
+            DiskCache(KernelCacheDirectory() / "vulkan").Load(PipelineCacheKey(Adapter()));
         VkPipelineCacheCreateInfo pipelines{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
         pipelines.initialDataSize = saved ? saved->size() : 0;
         pipelines.pInitialData = saved ? saved->data() : nullptr;
@@ -451,7 +451,7 @@ void VulkanDevice::Destroy() {
             m_functions.vkGetPipelineCacheData(m_device, m_pipelineCache, bytes, items);
         });
         if (!data.empty()) {
-            DiskCache(CacheDirectory())
+            DiskCache(KernelCacheDirectory() / "vulkan")
                 .Store(PipelineCacheKey(Adapter()), {data.data(), data.size()});
         }
         m_functions.vkDestroyPipelineCache(m_device, m_pipelineCache, nullptr);

@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -29,6 +30,8 @@
 
 namespace ernie::device {
 namespace {
+
+constexpr uint64_t kKernelCacheBytes = uint64_t(1) << 30;
 
 BufferRange ContiguousRange(const Tensor& tensor, const char* role) {
     if (tensor.Empty()) {
@@ -366,9 +369,17 @@ struct Device::AccelSizeCache {
 Device::Device(AdapterInfo adapter, const DeviceDesc& desc, Traversal traversal)
     : m_adapter(std::move(adapter)), m_traversal(traversal), m_sampling(desc.sampling),
       m_cacheDirectory(desc.cacheDirectory.empty() ? UserCacheDirectory() : desc.cacheDirectory),
+      m_kernelCacheDirectory(ernie::KernelCacheDirectory(m_cacheDirectory)),
       m_profiling(desc.profiling), m_synchronous(desc.synchronous),
       m_kernelDebugInfo(desc.kernelDebugInfo), m_presents(desc.presentation),
-      m_counters(std::make_unique<Counters>()), m_accelSizes(std::make_unique<AccelSizeCache>()) {}
+      m_counters(std::make_unique<Counters>()), m_accelSizes(std::make_unique<AccelSizeCache>()) {
+    static std::mutex trimming;
+    static std::set<std::filesystem::path> trimmed;
+    const std::lock_guard lock(trimming);
+    if (trimmed.insert(m_cacheDirectory).second) {
+        TrimKernelCache(m_cacheDirectory, kKernelCacheBytes);
+    }
+}
 
 Device::~Device() = default;
 

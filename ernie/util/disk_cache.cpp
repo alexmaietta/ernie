@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/disk_cache.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -10,10 +11,12 @@
 #include <iterator>
 #include <system_error>
 #include <thread>
+#include <vector>
 
 #include "ernie/util/environment.h"
 #include "ernie/util/log.h"
 #include "ernie/util/text.h"
+#include "ernie/util/version.h"
 
 namespace ernie {
 namespace {
@@ -54,6 +57,9 @@ std::optional<std::string> DiskCache::Load(std::string_view key) const {
     if (!bytes.starts_with(preamble)) {
         return std::nullopt;
     }
+    std::error_code error;
+    std::filesystem::last_write_time(Path(key), std::filesystem::file_time_type::clock::now(),
+                                     error);
     return bytes.substr(preamble.size());
 }
 
@@ -76,9 +82,12 @@ void DiskCache::Store(std::string_view key, std::string_view bytes) const {
 }
 
 std::filesystem::path UserCacheDirectory() {
+    if (const std::string chosen = Environment("ERNIE_CACHE_DIR"); !chosen.empty()) {
+        return chosen;
+    }
 #if defined(_WIN32)
     if (const std::string local = Environment("LOCALAPPDATA"); !local.empty()) {
-        return std::filesystem::path(local) / "ernie";
+        return std::filesystem::path(local) / "ernie" / "cache";
     }
 #elif defined(__APPLE__)
     if (const std::string home = Environment("HOME"); !home.empty()) {
@@ -94,6 +103,46 @@ std::filesystem::path UserCacheDirectory() {
 #endif
     std::error_code error;
     return std::filesystem::temp_directory_path(error) / "ernie-cache";
+}
+
+std::filesystem::path KernelCacheDirectory(const std::filesystem::path& root) {
+    const Version version = GetBuildInfo().version;
+    return root / "kernels" / std::format("{}.{}.{}", version.major, version.minor, version.patch);
+}
+
+void TrimKernelCache(const std::filesystem::path& root, uint64_t limit) {
+    namespace fs = std::filesystem;
+    std::error_code error;
+
+    struct Entry {
+        fs::path path;
+        fs::file_time_type used;
+        uint64_t bytes;
+    };
+
+    std::vector<Entry> entries;
+    uint64_t total = 0;
+    for (const fs::directory_entry& entry :
+         fs::recursive_directory_iterator(root / "kernels", error)) {
+        if (!entry.is_regular_file(error)) {
+            continue;
+        }
+        const uint64_t bytes = entry.file_size(error);
+        entries.push_back({entry.path(), entry.last_write_time(error), bytes});
+        total += bytes;
+    }
+    if (total <= limit) {
+        return;
+    }
+    std::ranges::sort(entries, {}, &Entry::used);
+    for (const Entry& entry : entries) {
+        if (total <= limit) {
+            break;
+        }
+        if (fs::remove(entry.path, error)) {
+            total -= entry.bytes;
+        }
+    }
 }
 
 }

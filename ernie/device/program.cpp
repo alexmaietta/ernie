@@ -253,7 +253,7 @@ Kernel& Program::Request(std::string_view name, bool wanted) {
                 traversal = m_state->traversal, sampling = GetDevice().GetSampling(),
                 debugInfo = GetDevice().m_kernelDebugInfo, library = m_state->library,
                 sources = m_state->sources, modules = m_state->modules, entry = kernel.Name(),
-                program = Label(), directory = GetDevice().CacheDirectory(),
+                program = Label(), directory = GetDevice().KernelCacheDirectory(),
                 narrow = adapter.features.waveSizeMin < 8] {
                    {
                        Builds& builds = PendingBuilds();
@@ -261,12 +261,13 @@ Kernel& Program::Request(std::string_view name, bool wanted) {
                        builds.building.insert(label);
                    }
                    const auto start = std::chrono::steady_clock::now();
-                   const DiskCache cache(directory);
+                   const DiskCache slang(directory / "slang");
+                   const DiskCache native(directory / BackendName(backend));
                    std::optional<KernelCode> code;
                    std::exception_ptr failure;
                    try {
                        code = Compile(backend, traversal, sampling, debugInfo, library, *sources,
-                                      modules, entry, program, cache, narrow);
+                                      modules, entry, program, slang, narrow);
                    } catch (...) {
                        failure = std::current_exception();
                    }
@@ -288,7 +289,7 @@ Kernel& Program::Request(std::string_view name, bool wanted) {
                    if (failure) {
                        kernel.m_state->promise.set_exception(failure);
                    } else {
-                       Load(kernel, *code, cache, start);
+                       Load(kernel, *code, native, start);
                    }
                    Finish(kernel, label);
                });
@@ -303,7 +304,8 @@ void Program::QueueLoad(Kernel& kernel) {
         ++builds.queued;
     }
     Pool().Add(&kernel, [this, &kernel, label = Label() + ": " + kernel.Name(),
-                         directory = GetDevice().CacheDirectory()] {
+                         directory = GetDevice().KernelCacheDirectory() /
+                                     BackendName(GetDevice().Adapter().backend)] {
         {
             Builds& builds = PendingBuilds();
             const std::lock_guard building(builds.mutex);

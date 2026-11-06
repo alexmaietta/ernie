@@ -152,6 +152,10 @@ class ERNIE_API Device : public RefCounted {
         return m_cacheDirectory;
     }
 
+    const std::filesystem::path& KernelCacheDirectory() const {
+        return m_kernelCacheDirectory;
+    }
+
     Ref<Buffer> CreateBuffer(const BufferDesc& desc);
     Ref<Buffer> Borrow(DLDevice source, uint64_t address, uint64_t bytes,
                        std::string label = "borrowed");
@@ -258,6 +262,7 @@ class ERNIE_API Device : public RefCounted {
     Traversal m_traversal;
     Sampling m_sampling;
     std::filesystem::path m_cacheDirectory;
+    std::filesystem::path m_kernelCacheDirectory;
     bool m_profiling;
     bool m_synchronous;
     bool m_kernelDebugInfo;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -24,5 +25,9 @@ class DiskCache {
 };
 
 std::filesystem::path UserCacheDirectory();
+
+std::filesystem::path KernelCacheDirectory(const std::filesystem::path& root);
+
+void TrimKernelCache(const std::filesystem::path& root, uint64_t limit);
 
 }

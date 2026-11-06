@@ -204,6 +204,10 @@ cmake --build --preset package
 cpack --preset package
 ```
 
+## Kernel cache
+
+Ernie compiles its kernels the first time they run and keeps them in a cache, so later runs start quickly. The cache lives in `~/.cache/ernie` on Linux, `~/Library/Caches/ernie` on macOS and `%LOCALAPPDATA%\ernie\cache` on Windows, and `ERNIE_CACHE_DIR` moves it anywhere else. Kernels sit in `kernels/<version>`, so each version of Ernie keeps its own, and all of them together stay under 1 GiB by dropping the least recently used. Deleting the folder is always safe.
+
 ## Troubleshooting
 
 If `ernie` lists no devices, none of its backends found a driver to load. Install your GPU vendor's driver, or lavapipe for the CPU as in [Requirements](#requirements).
