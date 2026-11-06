@@ -142,8 +142,7 @@ void WriteTensor(Scene& scene, UntypedAttribute& target, nb::handle value,
             words.is_none() ? device::Tensor()
             : nb::isinstance<device::Tensor>(words)
                 ? nb::cast<device::Tensor>(words)
-                : scene.GetDevice().Import(*held.Take(words, stream), held.Producer(),
-                                           "attribute mask");
+                : held.Import(scene.GetDevice(), words, stream, "attribute mask");
         const device::Tensor values = nb::cast<device::Tensor>(value);
         const Stream producer =
             held.Producer().IsNone() && stream ? ToStream(stream) : held.Producer();
@@ -947,7 +946,7 @@ void RegisterSelection(nb::module_& module) {
                     if (nb::isinstance<device::Tensor>(value)) {
                         return nb::cast<device::Tensor>(value);
                     }
-                    return device.Import(*held.Take(value, stream), held.Producer(), label);
+                    return held.Import(device, value, stream, label);
                 };
                 const device::Tensor packed = input(tensor, "pose staging");
                 const device::Tensor translations = input(translation, "translation staging");

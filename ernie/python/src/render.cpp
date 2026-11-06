@@ -935,8 +935,7 @@ void RegisterRayCaster(nb::module_& module) {
                     if (nb::isinstance<device::Tensor>(value)) {
                         return nb::cast<device::Tensor>(value);
                     }
-                    const DLTensor* taken = held.Take(value, stream);
-                    return device.Import(*taken, held.Producer(), what);
+                    return held.Import(device, value, stream, what);
                 };
                 Rays rays;
                 rays.origins = input(origins, "ray origins");

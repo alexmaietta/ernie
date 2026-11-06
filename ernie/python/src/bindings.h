@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -53,13 +54,13 @@ class HeldTensors {
         if (value.is_none()) {
             return nullptr;
         }
-        const TakenTensor taken = TakeTensor(value, stream);
-        m_held->push_back(Hold(taken.managed));
-        if (!m_taken) {
-            m_producer = taken.producer;
-            m_taken = true;
-        }
-        return &taken.managed->dl_tensor;
+        return &Keep(value, stream).managed->dl_tensor;
+    }
+
+    device::Tensor Import(device::Device& device, nanobind::handle value,
+                          std::optional<uintptr_t> stream, std::string label) {
+        const TakenTensor taken = Keep(value, stream);
+        return device.Import(taken.managed->dl_tensor, taken.producer, std::move(label));
     }
 
     Stream Producer() const {
@@ -71,6 +72,16 @@ class HeldTensors {
     }
 
   private:
+    TakenTensor Keep(nanobind::handle value, std::optional<uintptr_t> stream) {
+        const TakenTensor taken = TakeTensor(value, stream);
+        m_held->push_back(Hold(taken.managed));
+        if (!m_taken) {
+            m_producer = taken.producer;
+            m_taken = true;
+        }
+        return taken;
+    }
+
     std::shared_ptr<std::vector<std::shared_ptr<void>>> m_held =
         std::make_shared<std::vector<std::shared_ptr<void>>>();
     Stream m_producer = Stream::None();

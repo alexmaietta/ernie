@@ -54,3 +54,52 @@ def test_tensors_move_between_numpy_and_the_device(device):
     copy = device.create_tensor(ernie.DType.FLOAT32, (2, 3))
     device.copy(tensor, copy).wait()
     np.testing.assert_array_equal(copy.numpy(), values)
+
+
+def paired_devices():
+    adapters = ernie.list_adapters()
+    for cuda in adapters:
+        if cuda.backend != ernie.Backend.CUDA or cuda.unsupported:
+            continue
+        for vulkan in adapters:
+            if vulkan.backend != ernie.Backend.VULKAN or vulkan.unsupported:
+                continue
+            if vulkan.type == ernie.AdapterType.CPU:
+                continue
+            render = ernie.Device(backend=vulkan.backend, adapter=vulkan.alias)
+            if render.shared_device == (2, cuda.ordinal):
+                return ernie.Device(backend=cuda.backend, adapter=cuda.alias), render
+    pytest.skip("no Vulkan device shares a GPU with CUDA")
+
+
+class Foreign:
+    def __init__(self, tensor):
+        self.tensor = tensor
+
+    def __dlpack__(self, **options):
+        return self.tensor.__dlpack__(**options)
+
+    def __dlpack_device__(self):
+        return self.tensor.__dlpack_device__()
+
+
+def test_poses_from_a_busy_cuda_stream_land_after_its_work():
+    cuda, render = paired_devices()
+    scene = ernie.Scene(render)
+    for i in range(4):
+        ernie.Xform.define(scene, f"/P{i}")
+    selection = scene.select([f"/P{i}" for i in range(4)])
+    scene.publish(wait=True)
+    big = cuda.create_tensor(ernie.DType.FLOAT32, (32 << 20,))
+    spare = cuda.create_tensor(ernie.DType.FLOAT32, (32 << 20,))
+    poses = cuda.create_tensor(ernie.DType.FLOAT32, (4, 7))
+    for step in range(1, 4):
+        wanted = np.zeros((4, 7), dtype=np.float32)
+        wanted[:, :3] = step
+        wanted[:, 6] = 1
+        filled = cuda.import_tensor(wanted)
+        for _ in range(8):
+            cuda.copy(big, spare)
+        cuda.copy(filled, poses)
+        selection.write_poses(Foreign(poses))
+        np.testing.assert_array_equal(selection.read_poses().numpy(), wanted)
