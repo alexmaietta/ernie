@@ -1,18 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-import argparse
 import sys
 
-import ernie
+from ernie._ernie import run_cli
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="ernie")
-    parser.add_argument("--version", action="version", version=f"ernie {ernie.__version__}")
-    parser.parse_args()
-    for adapter in ernie.list_adapters():
-        unsupported = f", unsupported: {adapter.unsupported}" if adapter.unsupported else ""
-        print(f"{adapter.alias}: {adapter.name} ({ernie.backend_name(adapter.backend)}){unsupported}")
-    return 0
+    return run_cli(sys.argv[1:])
 
 
 if __name__ == "__main__":

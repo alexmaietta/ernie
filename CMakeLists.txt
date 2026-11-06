@@ -67,10 +67,7 @@ include(cmake/third_party/openexr.cmake)
 include(cmake/third_party/tinyobjloader.cmake)
 
 add_subdirectory(ernie)
-if(ERNIE_BUILD_VIEWER)
-    include(cmake/third_party/json.cmake)
-    add_subdirectory(ernie/viewer)
-endif()
+add_subdirectory(ernie/app)
 
 if(ERNIE_BUILD_TESTS OR ERNIE_BUILD_BENCHMARKS)
     enable_testing()

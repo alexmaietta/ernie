@@ -23,8 +23,7 @@
 #include <nanobind/trampoline.h>
 
 #include "bindings.h"
-#include "ernie/viewer/cli/cli.h"
-#include "ernie/viewer/viewer.h"
+#include "ernie/app/viewer/viewer.h"
 
 namespace nb = nanobind;
 
@@ -568,13 +567,4 @@ NB_MODULE(_viewer, module) {
              nb::arg("file"), nb::arg("placement") = Placement{}, nb::arg("opacity") = 1.0f,
              nb::arg("viewport") = "")
         .def("remove_overlay", &Viewer::RemoveOverlay, nb::arg("id"));
-
-    module.def(
-        "run_cli",
-        [](const std::vector<std::string>& args) {
-            const Command command = ParseCommand(args);
-            nb::gil_scoped_release release;
-            return RunCommand(command);
-        },
-        nb::arg("args"));
 }

@@ -24,7 +24,6 @@ Issues = "https://github.com/alexmaietta/ernie/issues"
 
 [project.scripts]
 ernie = "ernie.__main__:main"
-ernie-viewer = "ernie.viewer:main"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

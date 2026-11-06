@@ -1,6 +1,4 @@
 # SPDX-License-Identifier: BSD-3-Clause
-import sys
-
 from ernie._ernie import Colormap, Overlay
 from ernie._viewer import (
     Anchor,
@@ -26,7 +24,6 @@ from ernie._viewer import (
     WorldLayout,
     WorldPick,
     imgui,
-    run_cli,
 )
 
 __all__ = [
@@ -58,8 +55,6 @@ __all__ = [
     "closest_on_axis",
     "hit_plane",
     "imgui",
-    "main",
-    "run_cli",
 ]
 
 
@@ -191,11 +186,3 @@ class Manipulator:
             return True
         self.on_click(event)
         return True
-
-
-def main() -> int:
-    return run_cli(sys.argv[1:])
-
-
-if __name__ == "__main__":
-    sys.exit(main())

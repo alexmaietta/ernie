@@ -23,6 +23,14 @@ function(ernie_test name)
 endfunction()
 
 ernie_test(
+    ernie_app_tests
+    LINK
+        ernie_app
+    SOURCES
+        unit/app/utest_app_cli.cpp
+)
+
+ernie_test(
     ernie_algorithms_tests
     LINK
         ernie_algorithms_internal
@@ -166,10 +174,9 @@ if(ERNIE_BUILD_VIEWER)
         LINK
             ernie_viewer_internal
         SOURCES
-            unit/viewer/utest_viewer_cli.cpp
-            unit/viewer/utest_viewer_editor.cpp
-            unit/viewer/utest_viewer_history.cpp
-            unit/viewer/utest_viewer_orbit_camera.cpp
+            unit/app/viewer/utest_viewer_editor.cpp
+            unit/app/viewer/utest_viewer_history.cpp
+            unit/app/viewer/utest_viewer_orbit_camera.cpp
     )
 endif()
 

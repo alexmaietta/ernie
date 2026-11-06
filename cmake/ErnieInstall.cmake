@@ -11,6 +11,13 @@ endif()
 
 install(
     TARGETS
+        ernie_cli
+    RUNTIME
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        COMPONENT runtime
+)
+install(
+    TARGETS
         ernie
     EXPORT ErnieTargets
     RUNTIME
@@ -40,15 +47,6 @@ if(ernie_viewer)
             DESTINATION "${CMAKE_INSTALL_LIBDIR}"
             COMPONENT viewer_dev
     )
-    if(TARGET ernie_cli)
-        install(
-            TARGETS
-                ernie_cli
-            RUNTIME
-                DESTINATION "${CMAKE_INSTALL_BINDIR}"
-                COMPONENT viewer
-        )
-    endif()
 endif()
 if(TARGET ernie_xr)
     install(
@@ -194,14 +192,14 @@ set(ernie_pc_imgui "")
 if(ernie_viewer)
     install(
         FILES
-            "${PROJECT_SOURCE_DIR}/ernie/viewer/viewer.h"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/viewer"
+            "${PROJECT_SOURCE_DIR}/ernie/app/viewer/viewer.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/app/viewer"
         COMPONENT viewer_dev
     )
     install(
         FILES
-            "${PROJECT_SOURCE_DIR}/ernie/viewer/imgui_config.h"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/viewer"
+            "${PROJECT_SOURCE_DIR}/ernie/app/viewer/imgui_config.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/app/viewer"
         COMPONENT viewer_dev
     )
     install(

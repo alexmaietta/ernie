@@ -80,7 +80,7 @@ else()
         ernie_imgui
         PUBLIC
             IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-            "$<BUILD_INTERFACE:IMGUI_USER_CONFIG=\"ernie/viewer/imgui_config.h\">"
+            "$<BUILD_INTERFACE:IMGUI_USER_CONFIG=\"ernie/app/viewer/imgui_config.h\">"
         PRIVATE
             ernie_viewer_EXPORTS
     )

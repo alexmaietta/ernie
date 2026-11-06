@@ -25,7 +25,12 @@ nanobind_add_module(
     src/values.cpp
     "${ernie_python_defines}"
 )
-target_link_libraries(_ernie PRIVATE ernie)
+target_link_libraries(
+    _ernie
+    PRIVATE
+        ernie
+        ernie_app
+)
 ernie_warnings(_ernie)
 foreach(nanobind IN ITEMS nanobind-static nanobind-static-abi3)
     if(TARGET ${nanobind})
