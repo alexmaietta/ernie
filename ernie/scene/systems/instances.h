@@ -163,6 +163,7 @@ class Instances : public System {
     uint64_t m_offsetBasesOffset = 0;
     uint64_t m_offsetsOffset = 0;
     Ref<device::Buffer> m_renderOrigins;
+    Ref<device::Buffer> m_surfaces;
     Ref<device::Buffer> m_viewers;
     std::vector<uint32_t> m_products;
     Ref<device::Buffer> m_productBuffer;

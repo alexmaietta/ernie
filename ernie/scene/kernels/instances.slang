@@ -25,6 +25,27 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
     const UnitShape shape = PlaceShape(scene, prim, w);
     p.shapes[slot] = shape.record;
+    SurfaceRecord surface = {};
+    if (schema == SchemaId::Mesh) {
+        const uint meshRow = PrimRow(scene, prim, kSlotMesh);
+        const uint pointsRow = PrimRow(scene, prim, kSlotPointBased);
+        const MeshRecord mesh = p.meshes[meshRow];
+        const ArrayRef authored = scene->schemas.pointBased.normals[pointsRow];
+        surface.points = scene->schemas.pointBased.points[pointsRow].address;
+        surface.indices = scene->schemas.mesh.faceVertexIndices[meshRow].address;
+        surface.corners = mesh.corners.address;
+        surface.faces = mesh.faces.address;
+        surface.smooth = mesh.normals.address;
+        surface.meshRow = meshRow;
+        const bool subdivided =
+            scene->schemas.mesh.subdivisionScheme[meshRow] != uint(SubdivisionScheme::None);
+        if (!subdivided && authored.count > 0) {
+            surface.normals = authored.address;
+            surface.normalsInterpolation = scene->schemas.pointBased.normalsInterpolation[pointsRow];
+            surface.normalsCount = authored.count;
+        }
+    }
+    p.surfaces[slot] = surface;
     uint64_t blas = p.unitBox;
     if (ShapeKind(shape.record.kind) == ShapeKind::Mesh) {
         blas = schema == SchemaId::Mesh ? p.meshes[PrimRow(scene, prim, kSlotMesh)].blas

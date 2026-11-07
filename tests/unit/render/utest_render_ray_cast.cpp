@@ -144,6 +144,58 @@ TEST(RayCastTest, HidingAPrimOrItsParentRemovesItFromCasts) {
     });
 }
 
+TEST(RayCastTest, ReshapedMeshesHitTheirNewPoints) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim mesh = scene->Define<Mesh>(
+            "/Mesh", {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                      .faceVertexIndices = {0, 1, 2, 3},
+                      .faceVertexCounts = {4}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0.25f, 0.25f, 5}, 3);
+        rays.directions = Floats(device, {0, 0, -1}, 3);
+        const RayCastDesc options{.outputs = RayOutput::Distance | RayOutput::Position};
+        EXPECT_NEAR(caster.Cast(rays, options).distance.ToHost<float>().front(), 5, 1e-4);
+
+        mesh.Set(Mesh::kPoints,
+                 std::vector<Float3>{{-2, -2, 2}, {2, -2, 2}, {0, 2, 2}, {9, 9, 9}, {8, 8, 8}});
+        mesh.Set(Mesh::kFaceVertexCounts, std::vector<int32_t>{3});
+        mesh.Set(Mesh::kFaceVertexIndices, std::vector<int32_t>{0, 1, 2});
+        const RayHits hits = caster.Cast(rays, options);
+        EXPECT_NEAR(hits.distance.ToHost<float>().front(), 3, 1e-4);
+        EXPECT_NEAR(hits.position.ToHost<float>()[2], 2, 1e-4);
+    });
+}
+
+TEST(RayCastTest, InstancedMeshCopiesHitAtTheirOwnPlaces) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<PointInstancer>("/Inst", {.prototypes = {"/Inst/Protos/Tile"},
+                                                .protoIndices = {0, 0},
+                                                .positions = {{0, 0, 0}, {10, 0, 3}}});
+        scene->Define<Scope>("/Inst/Protos");
+        scene->Define<Mesh>("/Inst/Protos/Tile",
+                            {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                             .faceVertexIndices = {0, 1, 2, 3},
+                             .faceVertexCounts = {4}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0.5f, 0.5f, 5, 10.5f, -0.5f, 5}, 3);
+        rays.directions = Floats(device, {0, 0, -1, 0, 0, -1}, 3);
+        const RayHits hits = caster.Cast(
+            rays, {.outputs = RayOutput::Distance | RayOutput::Position | RayOutput::Normal});
+        const std::vector<float> distance = hits.distance.ToHost<float>();
+        const std::vector<float> position = hits.position.ToHost<float>();
+        const std::vector<float> normal = hits.normal.ToHost<float>();
+        EXPECT_NEAR(distance[0], 5, 1e-4);
+        EXPECT_NEAR(distance[1], 2, 1e-4);
+        EXPECT_NEAR(position[3], 10.5f, 1e-4);
+        EXPECT_NEAR(position[5], 3, 1e-4);
+        EXPECT_NEAR(normal[5], 1, 1e-4);
+    });
+}
+
 TEST(RayCastTest, RejectsRaysItCannotCast) {
     ForEachDevice([](Device& device) {
         RayCaster caster(TwoBalls(device));

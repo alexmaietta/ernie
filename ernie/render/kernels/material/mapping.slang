@@ -35,9 +35,8 @@ bool UvTangents(HitQuery query, SurfacePoint point, PrimvarRef primvar, uint nam
     if (!element.mesh || !primvar.Found()) {
         return false;
     }
-    SceneData* scene = query.scene;
-    const uint pointsRow = PrimRow(scene, point.prim, kSlotPointBased);
-    const Ptr<Float3> positions = Ptr<Float3>(scene->schemas.pointBased.points[pointsRow].address);
+    const SurfaceRecord surface = query.tables->surfaces[point.slot];
+    const Ptr<Float3> positions = Ptr<Float3>(surface.points);
     const float3 a = positions[element.points.x].Vector();
     const float3 e1 = w.Apply(positions[element.points.y].Vector() - a);
     const float3 e2 = w.Apply(positions[element.points.z].Vector() - a);
@@ -56,8 +55,7 @@ bool UvTangents(HitQuery query, SurfacePoint point, PrimvarRef primvar, uint nam
     const float det = d1.x * d2.y - d2.x * d1.y;
     const float area = length(cross(e1, e2));
     density = area > 0 ? sqrt(abs(det) / area) : 1;
-    const uint meshRow = PrimRow(scene, point.prim, kSlotMesh);
-    const TangentRecord record = query.tables->tangents[meshRow];
+    const TangentRecord record = query.tables->tangents[surface.meshRow];
     const ArrayRef tangents = record.tangents;
     if (tangents.count > 0 && record.primvar == name) {
         const Ptr<float4> corners = Ptr<float4>(tangents.address);

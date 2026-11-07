@@ -58,8 +58,10 @@ constexpr ColumnRef kLayoutInputs[] = {kPointInstancerPrototypes, kPointInstance
 
 const std::vector<ColumnRef>& InputColumns() {
     static const std::vector<ColumnRef> inputs = [] {
-        std::vector<ColumnRef> columns = {kPointBasedPoints, kPointInstancerOrientations,
-                                          kPointInstancerScales, kRenderProductCamera};
+        std::vector<ColumnRef> columns = {
+            kPointBasedPoints,      kPointBasedNormals,     kPointBasedNormalsInterpolation,
+            kMeshFaceVertexIndices, kMeshSubdivisionScheme, kPointInstancerOrientations,
+            kPointInstancerScales,  kRenderProductCamera};
         columns.insert(columns.end(), std::begin(kActivation), std::end(kActivation));
         columns.insert(columns.end(), std::begin(kLayoutInputs), std::end(kLayoutInputs));
         return columns;
@@ -269,6 +271,9 @@ void Instances::Relayout() {
         {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(InstanceRecord),
          .usage = device::BufferUsage::AccelBuildInput,
          .label = "instances"});
+    m_surfaces = device.CreateBuffer(
+        {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(SurfaceRecord),
+         .label = "instance surfaces"});
     m_shapes = device.CreateBuffer(
         {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(ShapeRecord),
          .label = "instance shapes"});
@@ -278,6 +283,7 @@ void Instances::Relayout() {
     device::CommandEncoder clear = device.GetQueue().CreateEncoder();
     clear.Fill(*m_records);
     clear.Fill(*m_shapes);
+    clear.Fill(*m_surfaces);
     clear.Fill(*m_hits);
     device.GetQueue().Submit(clear.Finish());
 
@@ -766,6 +772,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
+    params.surfaces.address = m_surfaces->Address();
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -805,11 +812,12 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
 void Instances::Describe(RenderTables& tables) const {
     tables.instances.address = m_layout ? m_layout->Address() : 0;
     tables.origins.address = m_renderOrigins ? m_renderOrigins->Address() : 0;
+    tables.surfaces.address = m_surfaces ? m_surfaces->Address() : 0;
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
     for (const Ref<device::Buffer>& buffer :
-         {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins}) {
+         {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins, m_surfaces}) {
         if (buffer) {
             held.emplace_back(buffer);
         }

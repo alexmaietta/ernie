@@ -25,21 +25,19 @@ struct SurfaceElement {
     }
 }
 
-SurfaceElement FindSurfaceElement(SceneData* scene, Ptr<MeshRecord> meshes, uint prim, Hit hit) {
+SurfaceElement FindSurfaceElement(SceneData* scene, SurfaceRecord surface, uint prim, Hit hit) {
     SurfaceElement element = SurfaceElement.Shape(hit.primitive);
     if (SchemaId(scene->prims.schema[prim]) != SchemaId::Mesh) {
         return element;
     }
     element.mesh = true;
-    const uint meshRow = PrimRow(scene, prim, kSlotMesh);
-    const MeshRecord record = meshes[meshRow];
-    const Ptr<uint> corners = Ptr<uint>(record.corners.address);
-    const Ptr<int> indices = Ptr<int>(scene->schemas.mesh.faceVertexIndices[meshRow].address);
+    const Ptr<uint> corners = Ptr<uint>(surface.corners);
+    const Ptr<int> indices = Ptr<int>(surface.indices);
     element.corners = uint3(corners[hit.primitive * 3 + 0], corners[hit.primitive * 3 + 1],
                             corners[hit.primitive * 3 + 2]);
     element.points = uint3(indices[element.corners.x], indices[element.corners.y],
                            indices[element.corners.z]);
-    element.face = Ptr<uint>(record.faces.address)[hit.primitive];
+    element.face = Ptr<uint>(surface.faces)[hit.primitive];
     element.weights = float3(1 - hit.barycentrics.x - hit.barycentrics.y, hit.barycentrics.x,
                              hit.barycentrics.y);
     return element;

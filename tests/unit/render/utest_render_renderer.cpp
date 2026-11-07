@@ -238,5 +238,37 @@ TEST(RendererTest, NormalMapsLightTheSurfaceButLeaveTheNormalOutputGeometric) {
     });
 }
 
+TEST(RendererTest, AuthoredNormalsAndTheSubdivisionSchemeReachTheNormalOutput) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kSide = 9;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 400});
+        const float s = std::sqrt(0.5f);
+        const Prim quad = scene->Define<Mesh>(
+            "/Roof", {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                      .normals = {{s, 0, s}, {s, 0, s}, {s, 0, s}, {s, 0, s}},
+                      .faceVertexIndices = {0, 1, 2, 3},
+                      .faceVertexCounts = {4},
+                      .subdivisionScheme = SubdivisionScheme::None});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderProduct>(
+            "/Render/Roof",
+            {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
+        Renderer renderer(scene);
+        EXPECT_NEAR(CenterNormal(renderer, kSide).x, s, 1e-3f);
+
+        quad.Set(Mesh::kNormals, std::vector<Float3>{{0, s, s}, {0, s, s}, {0, s, s}, {0, s, s}});
+        const Float3 turned = CenterNormal(renderer, kSide);
+        EXPECT_NEAR(turned.x, 0, 1e-3f);
+        EXPECT_NEAR(turned.y, s, 1e-3f);
+
+        quad.Set(Mesh::kSubdivisionScheme, SubdivisionScheme::CatmullClark);
+        EXPECT_NEAR(CenterNormal(renderer, kSide).z, 1, 1e-3f);
+    });
+}
+
 }
 }

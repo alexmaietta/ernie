@@ -6,6 +6,7 @@
 #include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/kernels/tables/surfaces.h"
 
 namespace ernie {
 
@@ -20,10 +21,11 @@ struct InstanceParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
+    Ptr<SurfaceRecord> surfaces;
     uint64_t unitBox;
 };
 
-ERNIE_CHECK_SIZE(InstanceParams, 88);
+ERNIE_CHECK_SIZE(InstanceParams, 96);
 
 struct OriginParams {
     Ptr<SceneData> scene;
