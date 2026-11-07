@@ -119,7 +119,7 @@ Sunlit CountSunlit(const Frame& frame, Double3 toward) {
         if (!std::isfinite(frame.depth[pixel])) {
             continue;
         }
-        const float* n = &frame.normal[pixel * 4];
+        const float* n = &frame.normal[pixel * 3];
         if (n[0] * toward.x + n[1] * toward.y + n[2] * toward.z > 0.02) {
             ++count.facing;
             count.dark += frame.color[pixel * 4] <= 0 ? 1 : 0;
