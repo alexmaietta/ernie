@@ -92,7 +92,6 @@ class Tangents : public System {
     }
 
     std::span<const ColumnRef> Inputs() const override;
-    std::span<const ColumnRef> Outputs() const override;
 
     std::span<const TableId> TableInputs() const override {
         static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshData};

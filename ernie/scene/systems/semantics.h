@@ -47,7 +47,6 @@ class Semantics : public System {
     }
 
     std::span<const ColumnRef> Inputs() const override;
-    std::span<const ColumnRef> Outputs() const override;
     bool Pending() const override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 

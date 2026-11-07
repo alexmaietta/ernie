@@ -158,10 +158,6 @@ std::span<const ColumnRef> Tangents::Inputs() const {
     return kInputs;
 }
 
-std::span<const ColumnRef> Tangents::Outputs() const {
-    return {};
-}
-
 void Tangents::Describe(RenderTables& tables) const {
     tables.tangents.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }

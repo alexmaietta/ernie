@@ -25,7 +25,6 @@ class Hierarchy : public System {
     }
 
     std::span<const ColumnRef> Inputs() const override;
-    std::span<const ColumnRef> Outputs() const override;
     std::span<const TableId> TableOutputs() const override;
     void Describe(RenderTables& tables) const override;
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;

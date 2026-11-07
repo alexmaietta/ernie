@@ -97,10 +97,6 @@ std::span<const ColumnRef> Instances::Inputs() const {
     return InputColumns();
 }
 
-std::span<const ColumnRef> Instances::Outputs() const {
-    return {};
-}
-
 bool Instances::ShowsGlobals(uint32_t tlas) const {
     const auto composed = m_composed.find(tlas);
     return composed == m_composed.end() || composed->second.global;

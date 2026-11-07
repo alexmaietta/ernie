@@ -233,3 +233,12 @@ if(ERNIE_BUILD_PYTHON)
                 "PYTHONPATH=${PROJECT_BINARY_DIR}/python"
     )
 endif()
+
+add_test(
+    NAME ernie_schema_rejects_derived
+    COMMAND
+        "${CMAKE_COMMAND}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/schema/rejects_derived"
+        "-DBINARY=${CMAKE_CURRENT_BINARY_DIR}/schema/rejects_derived" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DEXPECTED=ernie:computed is derived" -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema/expect_configure_failure.cmake"
+)

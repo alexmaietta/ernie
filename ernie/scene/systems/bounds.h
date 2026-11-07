@@ -34,7 +34,6 @@ class Bounds : public System {
         return kTables;
     }
 
-    std::span<const ColumnRef> Outputs() const override;
     void Prepare() override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 

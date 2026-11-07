@@ -26,23 +26,6 @@ bool Timeline::Pending() const {
 }
 
 void Timeline::Add(System& system) {
-    for (const ColumnRef output : system.Outputs()) {
-        for (const ColumnRef input : system.Inputs()) {
-            if (input.column == output.column) {
-                throw Error("System {} reads its own output {}", system.Name(),
-                            input.column->field);
-            }
-        }
-        for (const Scheduled& earlier : m_systems) {
-            for (const ColumnRef input : earlier.system->Inputs()) {
-                if (input.column == output.column) {
-                    throw Error("System {} writes {}, which {} reads, so add {} first",
-                                system.Name(), output.column->field, earlier.system->Name(),
-                                system.Name());
-                }
-            }
-        }
-    }
     for (const TableId output : system.TableOutputs()) {
         for (const TableId input : system.TableInputs()) {
             if (input == output) {

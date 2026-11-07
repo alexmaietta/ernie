@@ -36,10 +36,6 @@ std::span<const ColumnRef> Geometry::Inputs() const {
     return kInputs;
 }
 
-std::span<const ColumnRef> Geometry::Outputs() const {
-    return {};
-}
-
 std::span<const TableId> Geometry::TableOutputs() const {
     return kTableOutputs;
 }

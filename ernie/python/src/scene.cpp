@@ -657,6 +657,26 @@ void RegisterScene(nb::module_& module) {
             "World transforms of the prims at paths as an (N, 4, 3) array of the x, y and z axes "
             "and the translation, as of the latest publish. Prims without a transform read as "
             "zeros.")
+        .def(
+            "prim_bounds",
+            [](const Scene& scene, const std::vector<std::string>& paths) {
+                std::vector<Box> boxes;
+                {
+                    const nb::gil_scoped_release release;
+                    boxes = scene.PrimBounds(Span<const std::string>(paths));
+                }
+                nb::list rows;
+                for (const Box& box : boxes) {
+                    rows.append(
+                        nb::make_tuple(nb::make_tuple(box.lower.x, box.lower.y, box.lower.z),
+                                       nb::make_tuple(box.upper.x, box.upper.y, box.upper.z)));
+                }
+                return nb::module_::import_("numpy").attr("asarray")(rows, "dtype"_a = "float32");
+            },
+            nb::arg("paths"),
+            "World-space boxes of the prims at paths, relative to each prim's world origin, as an "
+            "(N, 2, 3) array of lower and upper corners as of the latest publish. Prims without "
+            "bounds read as zeros.")
         .def_prop_ro("pending", &Scene::Pending)
         .def_prop_ro("world_count", &Scene::WorldCount)
         .def_prop_ro("prim_count", &Scene::PrimCount)

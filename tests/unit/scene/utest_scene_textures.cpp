@@ -76,10 +76,6 @@ class TextureProbe : public System {
         return {};
     }
 
-    std::span<const ColumnRef> Outputs() const override {
-        return {};
-    }
-
     std::span<const TableId> TableInputs() const override {
         static constexpr TableId kTables[] = {TableId::Textures};
         return kTables;

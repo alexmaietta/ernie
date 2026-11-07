@@ -19,7 +19,7 @@ set(_ernie_schema_units
     hertz
 )
 set(_ernie_schema_metadata_keys
-    "tracked|texturable|derived|doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
+    "tracked|texturable|doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
 )
 set(_ernie_schema_number "-?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
 
@@ -127,7 +127,7 @@ function(
     set(auto "")
     string(STRIP "${text}" text)
     while(NOT text STREQUAL "")
-        if(attribute AND text MATCHES "^(tracked|texturable|derived)[ \t]*(,(.*))?$")
+        if(attribute AND text MATCHES "^(tracked|texturable)[ \t]*(,(.*))?$")
             list(APPEND flags ${CMAKE_MATCH_1})
             set(text "${CMAKE_MATCH_3}")
         elseif(text MATCHES "^doc[ \t]*=[ \t]*\"([^\"\\\\]*)\"[ \t]*(,(.*))?$")
@@ -230,7 +230,7 @@ function(
         else()
             message(
                 FATAL_ERROR
-                "${where}: expected tracked, texturable, derived, doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
+                "${where}: expected tracked, texturable, doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
             )
         endif()
         string(STRIP "${text}" text)
@@ -846,7 +846,7 @@ function(_ernie_schema_python name out_prim out_selection)
                 "\n    @property\n    def ${python}(self) -> ${get_type}:\n        \"${doc}\"\n"
                 "        return ${read}\n"
             )
-            if(NOT "derived" IN_LIST flags_${name}_${field})
+            if(NOT "internal" IN_LIST flags_${name}_${field})
                 string(
                     APPEND ${target}
                     "\n    @${python}.setter\n    def ${python}(self, value: ${set_type}) -> None:\n"
@@ -1090,7 +1090,7 @@ function(ernie_generate_schemas directory)
                         endif()
                         list(APPEND fields_${current} ${field})
                         set(attribute_${current}_${field} "ernie:${field}")
-                        set(flags_${current}_${field} derived)
+                        set(flags_${current}_${field} internal)
                         set(unit_${current}_${field} None)
                         set(group_${current}_${field} "")
                         set(display_${current}_${field} "")
@@ -1115,6 +1115,12 @@ function(ernie_generate_schemas directory)
             set(type "${CMAKE_MATCH_1}")
             set(attribute "${CMAKE_MATCH_2}")
             set(rest "${CMAKE_MATCH_3}")
+            if(rest MATCHES "\\([ \t]*derived[ \t]*(,|\\))")
+                message(
+                    FATAL_ERROR
+                    "${where}: ${attribute} is derived, but schemas hold only authored attributes. A system computes derived data into its own table."
+                )
+            endif()
             set(metadata "")
             if(rest MATCHES "^(.*)\\(([ \t]*(${_ernie_schema_metadata_keys}).*)\\)[ \t]*$")
                 set(rest "${CMAKE_MATCH_1}")
@@ -1447,7 +1453,7 @@ function(ernie_generate_schemas directory)
             endforeach()
             foreach(api IN LISTS expanded_${level})
                 foreach(field IN LISTS fields_${api})
-                    if("derived" IN_LIST flags_${api}_${field})
+                    if("internal" IN_LIST flags_${api}_${field})
                         continue()
                     endif()
                     if(field IN_LIST desc)
@@ -1463,7 +1469,7 @@ function(ernie_generate_schemas directory)
                 endforeach()
             endforeach()
             foreach(field IN LISTS fields_${level})
-                if("derived" IN_LIST flags_${level}_${field})
+                if("internal" IN_LIST flags_${level}_${field})
                     if(level STREQUAL name)
                         list(APPEND columns ${field})
                     endif()
@@ -1637,7 +1643,7 @@ function(ernie_generate_schemas directory)
                 APPEND prim_accessors
                 "\n    ${cpp} ${capital}() const {\n        return Get(${name}::k${capital});\n    }\n"
             )
-            if(NOT "derived" IN_LIST flags_${owner}_${field})
+            if(NOT "internal" IN_LIST flags_${owner}_${field})
                 string(
                     APPEND prim_accessors
                     "\n    void Set${capital}(const ${cpp}& value) const {\n"
@@ -1689,7 +1695,7 @@ function(ernie_generate_schemas directory)
             if(multiple_${api})
                 set(stored "")
                 foreach(field IN LISTS fields_${api})
-                    if(NOT "derived" IN_LIST flags_${api}_${field})
+                    if(NOT "internal" IN_LIST flags_${api}_${field})
                         list(APPEND stored ${field})
                     endif()
                 endforeach()

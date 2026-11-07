@@ -193,10 +193,6 @@ std::span<const ColumnRef> Lights::Inputs() const {
     return inputs;
 }
 
-std::span<const ColumnRef> Lights::Outputs() const {
-    return {};
-}
-
 void Lights::Describe(RenderTables& tables) const {
     tables.lights.address = m_layout ? m_layout->Address() : 0;
 }

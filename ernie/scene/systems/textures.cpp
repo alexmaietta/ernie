@@ -98,10 +98,6 @@ Textures::Textures(Catalog& catalog, unsigned threads)
 
 Textures::~Textures() = default;
 
-std::span<const ColumnRef> Textures::Outputs() const {
-    return {};
-}
-
 void Textures::Describe(RenderTables& tables) const {
     tables.textures.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }

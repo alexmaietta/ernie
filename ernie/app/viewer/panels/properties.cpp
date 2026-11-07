@@ -33,7 +33,6 @@ using Clock = std::chrono::steady_clock;
 constexpr auto kRefreshEvery = std::chrono::milliseconds(250);
 constexpr size_t kShownItems = 16;
 constexpr std::string_view kTransform = "Transform";
-constexpr std::string_view kComputed = "Computed";
 
 const char* UnitSuffix(Unit unit) {
     switch (unit) {
@@ -198,17 +197,17 @@ class Properties {
             const Span<const ColumnInfo> columns = Columns(owner);
             for (uint32_t index = 0; index < columns.size(); ++index) {
                 const ColumnInfo& info = columns[index];
+                if (Has(info.flags, ColumnFlags::Internal)) {
+                    continue;
+                }
                 const std::string_view label =
                     info.displayName.empty() ? info.field : info.displayName;
-                const std::string_view section = Has(info.flags, ColumnFlags::Derived) ? kComputed
-                                                 : info.group.empty()                  ? fallback
-                                                                                       : info.group;
+                const std::string_view section = info.group.empty() ? fallback : info.group;
                 m_rows.push_back({{owner, &info, index},
                                   instance,
                                   view,
-                                  instance.empty() || section == kComputed
-                                      ? std::string(section)
-                                      : fmt::format("{}:{}", section, instance),
+                                  instance.empty() ? std::string(section)
+                                                   : fmt::format("{}:{}", section, instance),
                                   std::string(label),
                                   {}});
             }
@@ -229,9 +228,7 @@ class Properties {
                 }
             }
         }
-        const auto rank = [](const Row& row) {
-            return row.section == kTransform ? 0 : row.section == kComputed ? 2 : 1;
-        };
+        const auto rank = [](const Row& row) { return row.section == kTransform ? 0 : 1; };
         std::ranges::stable_sort(m_rows, {}, rank);
     }
 
@@ -346,9 +343,7 @@ class Properties {
             if (std::ranges::none_of(m_rows, matches)) {
                 continue;
             }
-            const ImGuiTreeNodeFlags open =
-                section == kComputed ? ImGuiTreeNodeFlags_None : ImGuiTreeNodeFlags_DefaultOpen;
-            if (!ImGui::CollapsingHeader(section.c_str(), open)) {
+            if (!ImGui::CollapsingHeader(section.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
                 continue;
             }
             if (!ImGui::BeginTable(section.c_str(), 2, kTable)) {
@@ -368,22 +363,16 @@ class Properties {
     void DrawRow(size_t index) {
         const Row& row = m_rows[index];
         const ColumnInfo& info = *row.column.column;
-        const bool derived = Has(info.flags, ColumnFlags::Derived);
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::AlignTextToFramePadding();
-        ImGui::PushStyleColor(ImGuiCol_Text, derived ? m_theme.textMuted : m_theme.text);
         ImGui::TextUnformatted(row.label.c_str());
-        ImGui::PopStyleColor();
         if (ImGui::BeginItemTooltip()) {
             ImGui::TextUnformatted(std::string(info.field).c_str());
             if (!info.doc.empty()) {
                 ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24);
                 ImGui::TextDisabled("%.*s", int(info.doc.size()), info.doc.data());
                 ImGui::PopTextWrapPos();
-            }
-            if (derived) {
-                ImGui::TextDisabled("Computed by the scene");
             }
             ImGui::EndTooltip();
         }
@@ -398,11 +387,7 @@ class Properties {
             const bool enabled = Enabled(row);
             ImGui::BeginDisabled(!enabled);
             ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, mixed);
-            if (derived) {
-                DrawReadOnly(row, row.cells.data());
-            } else {
-                DrawEditor(index, row.cells.data(), mixed);
-            }
+            DrawEditor(index, row.cells.data(), mixed);
             ImGui::PopItemFlag();
             ImGui::EndDisabled();
         }

@@ -41,9 +41,8 @@ std::vector<uint32_t> Rows(Catalog& catalog, std::span<const uint32_t> prims, Sc
 
 class Counter : public System {
   public:
-    explicit Counter(std::vector<ColumnRef> inputs, std::vector<ColumnRef> outputs = {},
-                     bool structural = true)
-        : m_inputs(std::move(inputs)), m_outputs(std::move(outputs)), m_structural(structural) {}
+    explicit Counter(std::vector<ColumnRef> inputs, bool structural = true)
+        : m_inputs(std::move(inputs)), m_structural(structural) {}
 
     std::string_view Name() const override {
         return "counter";
@@ -51,10 +50,6 @@ class Counter : public System {
 
     std::span<const ColumnRef> Inputs() const override {
         return m_inputs;
-    }
-
-    std::span<const ColumnRef> Outputs() const override {
-        return m_outputs;
     }
 
     bool Structural() const override {
@@ -72,7 +67,6 @@ class Counter : public System {
 
   private:
     std::vector<ColumnRef> m_inputs;
-    std::vector<ColumnRef> m_outputs;
     bool m_structural;
 };
 
@@ -184,7 +178,7 @@ TEST(TimelineTest, StructuralChangesCarryTheirOrdinal) {
 TEST(TimelineTest, SystemsRunOnlyWhenTheirInputsChange) {
     ForEachTimeline([](device::Device&, Catalog& catalog, Timeline& timeline) {
         Counter transforms({kXformableTranslate});
-        Counter radii({kSphereRadius}, {}, false);
+        Counter radii({kSphereRadius}, false);
         timeline.Add(transforms);
         timeline.Add(radii);
         const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 4));
@@ -215,17 +209,6 @@ TEST(TimelineTest, SystemsRunOnlyWhenTheirInputsChange) {
         EXPECT_EQ(transforms.runs, 3u);
         EXPECT_EQ(radii.runs, 2u);
         EXPECT_EQ(transforms.last.added.size(), 1u);
-    });
-}
-
-TEST(TimelineTest, SystemsMustBeAddedBeforeTheirReaders) {
-    ForEachTimeline([](device::Device&, Catalog&, Timeline& timeline) {
-        Counter reader({kSphereRadius});
-        Counter writer({kXformableTranslate}, {kSphereRadius});
-        Counter loop({kSphereRadius}, {kSphereRadius});
-        timeline.Add(reader);
-        EXPECT_THROW(timeline.Add(writer), Error);
-        EXPECT_THROW(timeline.Add(loop), Error);
     });
 }
 

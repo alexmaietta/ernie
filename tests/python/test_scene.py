@@ -112,3 +112,12 @@ def test_world_transforms_compose_the_hierarchy(scene):
     assert transforms[0, 3].tolist() == [1e7 + 0.25, 2, 0]
     assert transforms[0, 0].tolist() == [1, 0, 0]
     assert not transforms[1].any()
+
+
+def test_prim_bounds_cover_each_prim(scene):
+    ernie.Sphere.define(scene, "/Ball", translate=(1, 2, 3), radius=2)
+    scene.publish(wait=True)
+    bounds = scene.prim_bounds(["/Ball", "/Missing"])
+    assert bounds.shape == (2, 2, 3)
+    assert bounds[0].tolist() == [[-1, 0, 1], [3, 4, 5]]
+    assert not bounds[1].any()

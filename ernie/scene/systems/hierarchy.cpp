@@ -40,10 +40,6 @@ std::span<const ColumnRef> Hierarchy::Inputs() const {
     return kInputs;
 }
 
-std::span<const ColumnRef> Hierarchy::Outputs() const {
-    return {};
-}
-
 std::span<const TableId> Hierarchy::TableOutputs() const {
     return kTableOutputs;
 }

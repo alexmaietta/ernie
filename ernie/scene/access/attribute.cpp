@@ -108,8 +108,8 @@ uint32_t UntypedAttribute::CellBytes() const {
 }
 
 void UntypedAttribute::CheckWritable(bool arrays) const {
-    if (Has(m_column.column->flags, ColumnFlags::Derived)) {
-        throw Error("{}'s {} is derived; the scene writes it", Info(m_column.schema).name,
+    if (Has(m_column.column->flags, ColumnFlags::Internal)) {
+        throw Error("{}'s {} is internal; the catalog writes it", Info(m_column.schema).name,
                     m_column.column->field);
     }
     if (!arrays && IsArray(m_column.column->type)) {

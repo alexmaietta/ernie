@@ -65,10 +65,6 @@ class Probe : public System {
         return {};
     }
 
-    std::span<const ColumnRef> Outputs() const override {
-        return {};
-    }
-
     std::span<const TableId> TableInputs() const override {
         static constexpr TableId kTables[] = {TableId::Transforms};
         return kTables;
@@ -95,6 +91,14 @@ class Probe : public System {
     std::vector<uint32_t> worlds;
     bool wrote = false;
     uint64_t transforms = 0;
+};
+
+class Loop : public Probe {
+  public:
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Transforms};
+        return kTables;
+    }
 };
 
 struct Fixture {
@@ -164,6 +168,8 @@ TEST(TableTrackingTest, ReadersMustBeAddedAfterTheirWriters) {
         Probe probe;
         timeline.Add(probe);
         EXPECT_THROW(timeline.Add(hierarchy), Error);
+        Loop loop;
+        EXPECT_THROW(timeline.Add(loop), Error);
     });
 }
 

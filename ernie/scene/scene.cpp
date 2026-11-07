@@ -77,7 +77,7 @@ ColumnRef InputColumn(SchemaId schema, std::string_view id, std::string_view nam
     const bool owned =
         column && column.schema != SchemaId::Material &&
         (IsA(column.schema, SchemaId::Material) || Info(column.schema).kind == SchemaKind::Api);
-    if (!owned || Has(column.column->flags, ColumnFlags::Derived)) {
+    if (!owned || Has(column.column->flags, ColumnFlags::Internal)) {
         throw Error("{} has no input {}", id, name);
     }
     return column;
@@ -741,7 +741,7 @@ PrimCopy Scene::Copy(Prim prim) {
             const Span<const ColumnInfo> columns = Columns(table);
             for (const std::string& name : names) {
                 for (uint32_t column = 0; column < columns.size(); ++column) {
-                    if (!Has(columns[column].flags, ColumnFlags::Derived)) {
+                    if (!Has(columns[column].flags, ColumnFlags::Internal)) {
                         copied.values.push_back({table, column, {}, name});
                     }
                 }

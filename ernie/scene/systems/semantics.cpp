@@ -73,10 +73,6 @@ std::span<const ColumnRef> Semantics::Inputs() const {
     return kInputs;
 }
 
-std::span<const ColumnRef> Semantics::Outputs() const {
-    return {};
-}
-
 bool Semantics::Pending() const {
     return m_wanted != m_taxonomies;
 }

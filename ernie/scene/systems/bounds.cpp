@@ -55,10 +55,6 @@ std::span<const ColumnRef> Bounds::Inputs() const {
     return kInputs;
 }
 
-std::span<const ColumnRef> Bounds::Outputs() const {
-    return {};
-}
-
 void Bounds::Relayout() {
     const Prims& prims = m_catalog.GetPrims();
     device::Device& device = m_catalog.GetStore().GetDevice();

@@ -22,7 +22,6 @@ class System {
 
     virtual std::string_view Name() const = 0;
     virtual std::span<const ColumnRef> Inputs() const = 0;
-    virtual std::span<const ColumnRef> Outputs() const = 0;
 
     virtual std::span<const TableId> TableInputs() const {
         return {};
