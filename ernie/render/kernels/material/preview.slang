@@ -103,7 +103,7 @@ struct PreviewSurfaceBsdf<Spectrum : ISpectrum> : IBsdf<Spectrum> {
 
 struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     typealias Bsdf = PreviewSurfaceBsdf<Spectrum>;
-    typealias Medium = Vacuum;
+    typealias Medium = Vacuum<Spectrum>;
 
     float3 diffuseColor;
     float3 emissiveColor;
@@ -248,19 +248,17 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     }
 
     [Differentiable]
-    PreviewSurfaceBsdf<Spectrum> Surface(SurfacePoint point) {
+    Bsdf Surface(SurfacePoint point) {
         const float alpha = max(roughness * roughness, kMinimumAlpha);
         const float clearcoatAlpha = max(clearcoatRoughness * clearcoatRoughness, kMinimumAlpha);
         if (useSpecularWorkflow) {
-            return PreviewSurfaceBsdf<Spectrum>(Spectrum.FromRgb(diffuseColor),
-                                                Spectrum.FromRgb(specularColor), alpha, clearcoat,
-                                                clearcoatAlpha);
+            return Bsdf(Spectrum.FromRgb(diffuseColor), Spectrum.FromRgb(specularColor), alpha,
+                        clearcoat, clearcoatAlpha);
         }
         const float r = (1 - ior) / (1 + ior);
-        return PreviewSurfaceBsdf<Spectrum>(
-            Spectrum.FromRgb(diffuseColor * (1 - metallic)),
-            Spectrum.FromRgb(lerp(float3(r * r), diffuseColor, metallic)), alpha, clearcoat,
-            clearcoatAlpha);
+        return Bsdf(Spectrum.FromRgb(diffuseColor * (1 - metallic)),
+                    Spectrum.FromRgb(lerp(float3(r * r), diffuseColor, metallic)), alpha,
+                    clearcoat, clearcoatAlpha);
     }
 
     [Differentiable]
@@ -274,7 +272,7 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     }
 
     [Differentiable]
-    Vacuum Volume(SurfacePoint point) {
-        return Vacuum();
+    Medium Volume(SurfacePoint point) {
+        return Medium();
     }
 }

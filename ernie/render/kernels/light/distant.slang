@@ -26,7 +26,7 @@ struct DistantLight<Spectrum : ISpectrum> : ILight<Spectrum> {
         visible = false;
     }
 
-    static DistantLight<Spectrum> FromRecord(LightRecord record) {
+    static DistantLight<Spectrum> Load(LightContext context, LightRecord record) {
         DistantLight<Spectrum> light = DistantLight<Spectrum>(record.axisZ.Vector(),
                                                 Spectrum.FromRgb(record.radiance.Vector()),
                                                 record.diffuse, record.specular);

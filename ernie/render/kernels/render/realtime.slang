@@ -160,6 +160,7 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
                  float scatteredPdf, bool scatteredDelta) {
         const bool camera = originPrim == kNoPrim;
         Spectrum seen = Spectrum.Constant(0);
+        const LightContext context = LightContext(query.data, lights, query.tlas);
         const uint first = lights->firstLights[query.tlas];
         const uint last = lights->firstLights[query.tlas + 1];
         for (uint i = first; i < last; ++i) {
@@ -173,12 +174,11 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
             Spectrum emitted;
             float pdf = 0;
             if (type == LightType::Dome) {
-                const DomeLight<Spectrum> light =
-                    DomeLight<Spectrum>.Load(record, query.data, lights, query.tlas);
+                const DomeLight<Spectrum> light = DomeLight<Spectrum>.Load(context, record);
                 emitted = light.Radiance(origin, direction);
                 pdf = camera ? 0 : light.Pdf(origin, direction);
             } else {
-                const DistantLight<Spectrum> light = DistantLight<Spectrum>.FromRecord(record);
+                const DistantLight<Spectrum> light = DistantLight<Spectrum>.Load(context, record);
                 emitted = light.Radiance(origin, direction);
                 pdf = light.Pdf(origin, direction);
             }
@@ -208,7 +208,7 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
                 return Spectrum.Constant(0);
             }
             const AreaLight<Spectrum> light =
-                AreaLight<Spectrum>.Load(lights->records[i], query.data);
+                AreaLight<Spectrum>.Load(LightContext(query.data, lights, query.tlas), candidate);
             const Spectrum emitted = light.EmittedToward(origin, point.position);
             if (camera) {
                 return emitted;
@@ -221,14 +221,14 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
 
     LightSample<Spectrum> SampleLight(HitQuery query, LightRecord record, float3 position,
                                       float2 u) {
+        const LightContext context = LightContext(query.data, lights, query.tlas);
         switch (LightType(record.type)) {
         case LightType::Distant:
-            return DistantLight<Spectrum>.FromRecord(record).Sample(position, u);
+            return DistantLight<Spectrum>.Load(context, record).Sample(position, u);
         case LightType::Dome:
-            return DomeLight<Spectrum>.Load(record, query.data, lights, query.tlas)
-                .Sample(position, u);
+            return DomeLight<Spectrum>.Load(context, record).Sample(position, u);
         default:
-            return AreaLight<Spectrum>.Load(record, query.data).Sample(position, u);
+            return AreaLight<Spectrum>.Load(context, record).Sample(position, u);
         }
     }
 

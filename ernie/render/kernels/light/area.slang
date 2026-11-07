@@ -15,22 +15,13 @@ struct AreaLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     no_diff uint64_t ies;
     no_diff uint64_t texture;
 
-    static AreaLight<Spectrum> FromRecord(LightRecord record) {
+    static AreaLight<Spectrum> Load(LightContext context, LightRecord record) {
         AreaLight<Spectrum> light;
         light.record = record;
-        light.ies = 0;
-        light.texture = 0;
-        return light;
-    }
-
-    static AreaLight<Spectrum> Load(LightRecord record, SceneData* scene) {
-        AreaLight<Spectrum> light = FromRecord(record);
-        if (record.ies != 0) {
-            light.ies = scene->textureBindings[record.ies];
-        }
-        if (record.textures != 0 && LightType(record.type) == LightType::Rect) {
-            light.texture = scene->textureBindings[record.textures];
-        }
+        light.ies = record.ies != 0 ? context.scene->textureBindings[record.ies] : 0;
+        light.texture = record.textures != 0 && LightType(record.type) == LightType::Rect
+                            ? context.scene->textureBindings[record.textures]
+                            : 0;
         return light;
     }
 

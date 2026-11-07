@@ -5,6 +5,18 @@ __exported import ernie.render.kernels.spectrum.spectrum;
 
 using namespace ernie;
 
+struct LightContext {
+    SceneData* scene;
+    LightLayout* lights;
+    uint tlas;
+
+    __init(SceneData* scene, LightLayout* lights, uint tlas) {
+        this.scene = scene;
+        this.lights = lights;
+        this.tlas = tlas;
+    }
+}
+
 struct LightSample<Spectrum : ISpectrum> : IDifferentiable {
     float3 direction;
     no_diff float distance;
@@ -16,7 +28,7 @@ struct LightSample<Spectrum : ISpectrum> : IDifferentiable {
 }
 
 interface ILight<Spectrum : ISpectrum> : IDifferentiable {
-    static This FromRecord(LightRecord record);
+    static This Load(LightContext context, LightRecord record);
 
     [Differentiable]
     LightSample<Spectrum> Sample(float3 position, no_diff float2 u);

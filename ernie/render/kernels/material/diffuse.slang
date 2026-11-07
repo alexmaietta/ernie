@@ -9,7 +9,7 @@ using namespace ernie;
 
 struct DiffuseMaterial<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     typealias Bsdf = Lambert<Spectrum>;
-    typealias Medium = Vacuum;
+    typealias Medium = Vacuum<Spectrum>;
 
     Spectrum color;
 
@@ -34,8 +34,8 @@ struct DiffuseMaterial<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     }
 
     [Differentiable]
-    Lambert<Spectrum> Surface(SurfacePoint point) {
-        return Lambert<Spectrum>(color);
+    Bsdf Surface(SurfacePoint point) {
+        return Bsdf(color);
     }
 
     [Differentiable]
@@ -49,7 +49,7 @@ struct DiffuseMaterial<Spectrum : ISpectrum> : IMaterial<Spectrum> {
     }
 
     [Differentiable]
-    Vacuum Volume(SurfacePoint point) {
-        return Vacuum();
+    Medium Volume(SurfacePoint point) {
+        return Medium();
     }
 }

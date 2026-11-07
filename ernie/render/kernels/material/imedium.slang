@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-struct MediumProperties : IDifferentiable {
-    float3 absorption;
-    float3 scattering;
-    float3 emission;
+__exported import ernie.render.kernels.spectrum.spectrum;
+
+struct MediumProperties<Spectrum : ISpectrum> : IDifferentiable {
+    Spectrum absorption;
+    Spectrum scattering;
+    Spectrum emission;
     float anisotropy;
 
     [Differentiable]
-    __init(float3 absorption, float3 scattering, float3 emission, float anisotropy) {
+    __init(Spectrum absorption, Spectrum scattering, Spectrum emission, float anisotropy) {
         this.absorption = absorption;
         this.scattering = scattering;
         this.emission = emission;
@@ -15,14 +17,15 @@ struct MediumProperties : IDifferentiable {
     }
 }
 
-interface IMedium : IDifferentiable {
+interface IMedium<Spectrum : ISpectrum> : IDifferentiable {
     [Differentiable]
-    MediumProperties Evaluate(float3 position);
+    MediumProperties<Spectrum> Evaluate(float3 position);
 }
 
-struct Vacuum : IMedium {
+struct Vacuum<Spectrum : ISpectrum> : IMedium<Spectrum> {
     [Differentiable]
-    MediumProperties Evaluate(float3 position) {
-        return MediumProperties(float3(0), float3(0), float3(0), 0);
+    MediumProperties<Spectrum> Evaluate(float3 position) {
+        return MediumProperties<Spectrum>(Spectrum.Constant(0), Spectrum.Constant(0),
+                                          Spectrum.Constant(0), 0);
     }
 }

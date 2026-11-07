@@ -7,7 +7,7 @@ __exported import ernie.render.kernels.surface.point;
 
 interface IMaterial<Spectrum : ISpectrum> : IDifferentiable {
     associatedtype Bsdf : IBsdf<Spectrum>;
-    associatedtype Medium : IMedium;
+    associatedtype Medium : IMedium<Spectrum>;
 
     static This Load(MaterialQuery query, uint material, inout SurfacePoint point);
 

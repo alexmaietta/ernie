@@ -9,36 +9,27 @@ using namespace ernie;
 
 struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     no_diff LightRecord record;
+    no_diff LightContext context;
     no_diff uint64_t texture;
     no_diff ArrayRef portals;
-    LightLayout* lights;
     no_diff uint first;
     no_diff uint last;
 
-    static DomeLight<Spectrum> FromRecord(LightRecord record) {
+    static DomeLight<Spectrum> Load(LightContext context, LightRecord record) {
+        SceneData* scene = context.scene;
         DomeLight<Spectrum> light;
         light.record = record;
-        light.texture = 0;
+        light.context = context;
+        light.texture = record.textures != 0 ? scene->textureBindings[record.textures] : 0;
         light.portals.address = 0;
         light.portals.count = 0;
-        light.lights = nullptr;
         light.first = 0;
         light.last = 0;
-        return light;
-    }
-
-    static DomeLight<Spectrum> Load(LightRecord record, SceneData* scene, LightLayout* lights,
-                                    uint tlas) {
-        DomeLight<Spectrum> light = FromRecord(record);
-        if (record.textures != 0) {
-            light.texture = scene->textureBindings[record.textures];
-        }
         if (record.portals > 0) {
             light.portals =
                 scene->schemas.domeLight.portals[PrimRow(scene, record.prim, kSlotDomeLight)];
-            light.lights = lights;
-            light.first = lights->firstLights[tlas];
-            light.last = lights->firstLights[tlas + 1];
+            light.first = context.lights->firstLights[context.tlas];
+            light.last = context.lights->firstLights[context.tlas + 1];
         }
         return light;
     }
@@ -64,7 +55,7 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
         if (dot(position - portal.position.Vector(), portal.axisZ.Vector()) >= 0) {
             return 0;
         }
-        return AreaLight<Spectrum>.FromRecord(portal).RectSolidAngle(position);
+        return AreaLight<Spectrum>.Load(context, portal).RectSolidAngle(position);
     }
 
     bool Through(LightRecord portal, float3 position, float3 direction) {
@@ -87,7 +78,7 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
         float total = 0;
         uint hits = 0;
         for (uint i = first; i < last; ++i) {
-            const LightRecord portal = lights->records[i];
+            const LightRecord portal = context.lights->records[i];
             if (!IsPortal(portal)) {
                 continue;
             }
@@ -118,8 +109,8 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     LightSample<Spectrum> SamplePortals(float3 position, float2 u) {
         float total = 0;
         for (uint i = first; i < last; ++i) {
-            if (IsPortal(lights->records[i])) {
-                total += Facing(lights->records[i], position);
+            if (IsPortal(context.lights->records[i])) {
+                total += Facing(context.lights->records[i], position);
             }
         }
         if (total <= 0) {
@@ -128,7 +119,7 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
         const float target = u.x * total;
         float before = 0;
         for (uint i = first; i < last; ++i) {
-            const LightRecord portal = lights->records[i];
+            const LightRecord portal = context.lights->records[i];
             if (!IsPortal(portal)) {
                 continue;
             }
@@ -141,7 +132,7 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
                 float3 emitted;
                 float3 at;
                 const LightSample<Spectrum> through =
-                    AreaLight<Spectrum>.FromRecord(portal).SampleRect(
+                    AreaLight<Spectrum>.Load(context, portal).SampleRect(
                         position, float2(remapped, u.y), emitted, at);
                 if (through.pdf <= 0) {
                     return Empty();

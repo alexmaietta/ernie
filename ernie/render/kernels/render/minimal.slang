@@ -40,8 +40,8 @@ struct MinimalLighting {
         for (uint i = first; i < last; ++i) {
             const LightRecord record = lights->records[i];
             if (LightType(record.type) == LightType::Distant) {
-                const DistantLight<RgbSpectrum> sun =
-                    DistantLight<RgbSpectrum>.FromRecord(record);
+                const DistantLight<RgbSpectrum> sun = DistantLight<RgbSpectrum>.Load(
+                    LightContext(scene, lights, query.tlas), record);
                 const float spread = sun.spread > 0 ? sun.SolidAngle() : 1;
                 lighting.light = DistantLight<RgbSpectrum>(
                     sun.direction, sun.radiance.Scale(spread), sun.diffuse, sun.specular);
