@@ -6,7 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/alexmaietta/ernie?include_prereleases&sort=semver&color=orange)](https://github.com/alexmaietta/ernie/releases)
 [![PyPI](https://img.shields.io/pypi/v/ernie-renderer?color=3775A9&logo=pypi&logoColor=white)](https://pypi.org/project/ernie-renderer/)
 [![Docs](https://img.shields.io/badge/docs-latest-8A2BE2)](https://alexmaietta.github.io/ernie/)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-2E8B57)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-2E8B57)](https://github.com/alexmaietta/ernie/blob/main/LICENSE)
 
 # Efficient Renderer for Natural and Interplanetary Environments (Ernie)
 
@@ -152,17 +152,17 @@ for step in range(4):
   </tr>
   <tr>
     <th>Front</th>
-    <td><img src="docs/_src/images/readme_front_LdrColor.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_front_DistanceToCamera.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_front_Normal.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_front_SemanticSegmentation.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_front_LdrColor.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_front_DistanceToCamera.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_front_Normal.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_front_SemanticSegmentation.png" width="200"></td>
   </tr>
   <tr>
     <th>Top</th>
-    <td><img src="docs/_src/images/readme_top_LdrColor.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_top_DistanceToCamera.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_top_Normal.png" width="200"></td>
-    <td><img src="docs/_src/images/readme_top_SemanticSegmentation.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_top_LdrColor.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_top_DistanceToCamera.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_top_Normal.png" width="200"></td>
+    <td><img src="https://raw.githubusercontent.com/alexmaietta/ernie/main/docs/_src/images/readme_top_SemanticSegmentation.png" width="200"></td>
   </tr>
 </table>
 
@@ -172,7 +172,7 @@ For more information about Ernie's requirements, C++ installation, or other inst
 
 ## Citation
 
-If you use Ernie in your research, please cite it. GitHub's "Cite this repository" button gives the same citation from [CITATION.cff](CITATION.cff).
+If you use Ernie in your research, please cite it. GitHub's "Cite this repository" button gives the same citation from [CITATION.cff](https://github.com/alexmaietta/ernie/blob/main/CITATION.cff).
 
 ```bibtex
 @software{maietta2026ernie,
@@ -187,7 +187,7 @@ If you use Ernie in your research, please cite it. GitHub's "Cite this repositor
 
 ## License
 
-Ernie is licensed under the [BSD 3-Clause License](LICENSE).
+Ernie is licensed under the [BSD 3-Clause License](https://github.com/alexmaietta/ernie/blob/main/LICENSE).
 
 ## Acknowledgements
 
