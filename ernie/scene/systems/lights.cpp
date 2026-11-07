@@ -216,8 +216,7 @@ const Ref<device::Buffer>& Lights::Spectra() {
 }
 
 bool Lights::Restructured(const ChangeSet& changes) const {
-    if (m_catalog.GetPrims().WorldCount() != m_worlds ||
-        m_instances.Version() != m_instancesVersion) {
+    if (m_catalog.GetPrims().WorldCount() != m_worlds || changes.Wrote(TableId::Instances)) {
         return true;
     }
     for (const StructureEntry& entry : changes.removed) {
@@ -270,7 +269,6 @@ void Lights::Relayout() {
     std::vector<uint32_t> items;
     std::vector<uint32_t> copies;
     std::vector<uint32_t> starts = {0};
-    m_instancesVersion = m_instances.Version();
     m_counts.clear();
     m_compositions = m_catalog.CompositionVersion();
     m_shownIn.clear();

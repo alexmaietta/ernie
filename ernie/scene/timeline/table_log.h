@@ -15,9 +15,10 @@ enum class TableId : uint32_t {
     MeshPoints,
     Tangents,
     Textures,
+    Instances,
 };
 
-inline constexpr uint32_t kTableCount = 6;
+inline constexpr uint32_t kTableCount = 7;
 
 class TableLog {
   public:

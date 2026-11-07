@@ -214,5 +214,33 @@ TEST(InstancersTest, LightsInPrototypesLightFromEveryCopyAndNotInPlace) {
     });
 }
 
+TEST(InstancersTest, LightCopiesFollowCountChangesThatKeepTheLayout) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim inst =
+            scene->Define<PointInstancer>("/Lamps", {.prototypes = {"/Lamps/Lamp"},
+                                                     .protoIndices = {0, 0},
+                                                     .positions = {{0, 0, 2}, {5, 0, 2}}});
+        scene->Define<SphereLight>("/Lamps/Lamp", {.intensity = 3, .treatAsPoint = true});
+        scene->Publish({.wait = true});
+        SceneImpl& impl = SceneImpl::Get(*scene);
+        const uint32_t relayouts = impl.GetInstances().Relayouts();
+        const auto total = [&] {
+            uint32_t count = 0;
+            for (const uint32_t lights : impl.GetLights().Counts()) {
+                count += lights;
+            }
+            return count;
+        };
+        ASSERT_EQ(total(), 2u);
+
+        inst.Set(PointInstancer::kPositions, std::vector<Float3>{{0, 0, 2}, {5, 0, 2}, {9, 0, 2}});
+        inst.Set(PointInstancer::kProtoIndices, std::vector<int32_t>{0, 0, 0});
+        scene->Publish({.wait = true});
+        EXPECT_EQ(impl.GetInstances().Relayouts(), relayouts);
+        EXPECT_EQ(total(), 3u);
+    });
+}
+
 }
 }

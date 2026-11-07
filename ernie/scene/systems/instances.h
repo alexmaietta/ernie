@@ -45,6 +45,11 @@ class Instances : public System {
         return kTables;
     }
 
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Instances};
+        return kTables;
+    }
+
     void Prepare() override;
     void Run(const ChangeSet& changes, TableLog& log) override;
 
@@ -82,10 +87,6 @@ class Instances : public System {
     std::span<const std::pair<uint32_t, uint32_t>> LightCopies(uint32_t tlas) const {
         return tlas < m_lightCopies.size() ? std::span(m_lightCopies[tlas])
                                            : std::span<const std::pair<uint32_t, uint32_t>>();
-    }
-
-    uint32_t Version() const {
-        return m_version;
     }
 
     std::span<const uint32_t> FirstInstances() const {
@@ -148,7 +149,6 @@ class Instances : public System {
     std::map<uint32_t, std::vector<uint32_t>> m_drawables;
     std::map<uint32_t, std::vector<uint32_t>> m_nested;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> m_lightCopies;
-    uint32_t m_version = 0;
     std::map<uint32_t, std::set<uint32_t>> m_watch;
     uint64_t m_firstOffset = 0;
     uint64_t m_originsOffset = 0;

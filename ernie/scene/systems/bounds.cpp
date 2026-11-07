@@ -101,9 +101,9 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
             {.bytes = std::bit_ceil(instancerBytes), .label = "instancer extents"});
     }
     params.instancerExtents.address = m_instancerExtents->Address();
-    const bool slots = m_instances.Layout() != nullptr;
+    const bool slots = changes.tables->instances.address != 0;
     if (slots) {
-        params.instances.address = m_instances.Layout()->Address();
+        params.instances = changes.tables->instances;
         params.instanceSlots = uint32_t(m_instances.InstancePrims().size());
         params.tlasCount = uint32_t(m_instances.InstanceCounts().size());
     }

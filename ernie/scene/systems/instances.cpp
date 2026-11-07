@@ -502,7 +502,6 @@ void Instances::BuildInstancing() {
             }
         }
     }
-    ++m_version;
 
     std::vector<std::byte> tables;
     const auto table = [&](auto values) {
@@ -632,7 +631,7 @@ std::optional<std::set<uint32_t>> Instances::Apply(const ChangeSet& changes) {
     return touched;
 }
 
-void Instances::Run(const ChangeSet& changes, TableLog&) {
+void Instances::Run(const ChangeSet& changes, TableLog& log) {
     ERNIE_ZONE("Instances/Run");
     Store& store = m_catalog.GetStore();
     const uint64_t seen = store.WriteSequence();
@@ -667,6 +666,9 @@ void Instances::Run(const ChangeSet& changes, TableLog&) {
     }
     if (relaid) {
         Relayout();
+    }
+    if (relaid || restacked) {
+        log.Wrote(TableId::Instances, std::vector<uint32_t>{kGlobalWorld});
     }
     const uint32_t tlases = m_regions.Size();
     const uint32_t worlds = m_worlds;
