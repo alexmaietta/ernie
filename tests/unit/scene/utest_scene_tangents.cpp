@@ -3,12 +3,14 @@
 
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/scene/access/attribute.h"
 #include "ernie/scene/access/view.h"
@@ -85,9 +87,7 @@ struct Scene {
     }
 
     ArrayRef Cell(uint32_t prim) {
-        const uint32_t row = catalog.GetPrims().Row(prim, SchemaId::Mesh);
-        return Items<ArrayRef>(store.Schema(SchemaId::Mesh).Read(kMeshTangents.index, row, 1))
-            .front();
+        return tangents.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh)).tangents;
     }
 
     std::vector<Float4> Read(uint32_t prim) {
@@ -115,9 +115,7 @@ struct Scene {
     }
 
     uint32_t Follows(uint32_t prim) {
-        const uint32_t row = catalog.GetPrims().Row(prim, SchemaId::Mesh);
-        return Items<uint32_t>(store.Schema(SchemaId::Mesh).Read(kMeshTangentPrimvar.index, row, 1))
-            .front();
+        return tangents.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh)).primvar;
     }
 };
 
@@ -126,7 +124,10 @@ template <class Test> void ForEachScene(Test test) {
         Store store(device);
         Catalog catalog(store);
         Timeline timeline(catalog);
-        Tangents tangents(catalog);
+        const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
+        Geometry geometry(catalog, *builder);
+        Tangents tangents(catalog, geometry);
+        timeline.Add(geometry);
         timeline.Add(tangents);
         Scene scene{store, catalog, timeline, tangents};
         test(scene);
@@ -237,7 +238,7 @@ TEST(TangentTest, SharedPointsMovedInPlaceRecomputeOnce) {
         s.store.Arrays(ColumnType::Float3Array).Write(points, std::as_bytes(std::span(turned)));
         s.store.SetArray(kPointBasedPoints, row, points);
         s.Publish();
-        EXPECT_EQ(s.tangents.Stats().computed, 1u);
+        EXPECT_EQ(s.tangents.Stats().computed + s.tangents.Stats().deformed, 1u);
         EXPECT_EQ(s.tangents.Stats().sets, 1u);
         EXPECT_EQ(s.Cell(copy.Prim(0, 0)).address, s.Cell(quad).address);
     });

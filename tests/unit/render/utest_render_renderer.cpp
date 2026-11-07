@@ -140,5 +140,79 @@ TEST(RendererTest, WritesFramesAsImages) {
     });
 }
 
+std::vector<Float3> Roof(float ridge) {
+    return {{-1, -1, 0}, {0, -1, ridge}, {1, -1, 0}, {-1, 1, 0}, {0, 1, ridge}, {1, 1, 0}};
+}
+
+Float3 CenterNormal(Renderer& renderer, uint32_t side) {
+    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Roof"}, 1.0 / 30);
+    output.Wait();
+    const std::vector<float> normals =
+        output["/Render/Roof"].frames.at(0).Source("Normal").tensor.ToHost<float>();
+    const uint32_t center = ((side / 2) * side + side / 2) * 4;
+    return {normals[center], normals[center + 1], normals[center + 2]};
+}
+
+TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kSide = 9;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {-0.5, 0, 5},
+                                       .orient = LookAt({-0.5, 0, 5}, {-0.5, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 400});
+        scene->Define<Mesh>("/Roof", {.points = Roof(1),
+                                      .faceVertexIndices = {0, 1, 4, 3, 1, 2, 5, 4},
+                                      .faceVertexCounts = {4, 4},
+                                      .subdivisionScheme = SubdivisionScheme::None});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderProduct>(
+            "/Render/Roof",
+            {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
+        Renderer renderer(scene);
+        const Float3 smooth = CenterNormal(renderer, kSide);
+        EXPECT_NEAR(smooth.x, -0.5257f, 2e-3f);
+        EXPECT_NEAR(smooth.z, 0.8507f, 2e-3f);
+
+        scene->Find("/Roof")->Set(Mesh::kPoints, Roof(2));
+        const Float3 steeper = CenterNormal(renderer, kSide);
+        EXPECT_NEAR(steeper.x, -0.7497f, 2e-3f);
+        EXPECT_NEAR(steeper.z, 0.6618f, 2e-3f);
+    });
+}
+
+TEST(RendererTest, NormalMapsTiltAlongTheMeshesTangents) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kSide = 9;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 400});
+        scene->Define<Scope>("/Looks");
+        scene->Define<UsdPreviewSurface>("/Looks/Bent", {.normal = {0.5f, 0, 1}});
+        const std::vector<Float2> st = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
+        scene->Define<Mesh>("/Quad",
+                            {.materialBinding = {"/Looks/Bent"},
+                             .primvars = {Primvar::Create("st", Interpolation::Vertex, st)},
+                             .points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                             .faceVertexIndices = {0, 1, 2, 3},
+                             .faceVertexCounts = {4},
+                             .subdivisionScheme = SubdivisionScheme::None});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+        scene->Define<RenderProduct>("/Render/Roof",
+                                     {.camera = {"/Cam"},
+                                      .resolution = {kSide, kSide},
+                                      .orderedVars = {"/Render/Normal", "/Render/Color"}});
+        scene->Select("/Render/Roof").Get<RenderMode>("renderMode").Set(RenderMode::RealTime);
+        Renderer renderer(scene);
+        const Float3 normal = CenterNormal(renderer, kSide);
+        EXPECT_NEAR(normal.x, 0, 2e-3f);
+        EXPECT_NEAR(normal.y, 0.4472f, 2e-3f);
+        EXPECT_NEAR(normal.z, 0.8944f, 2e-3f);
+    });
+}
+
 }
 }

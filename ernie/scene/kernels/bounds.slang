@@ -41,7 +41,7 @@ void PrimBounds(uniform BoundsParams p) {
     float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
     bool bounded = ShapeKind(shape.record.kind) != ShapeKind::Mesh && !Infinite(scene, prim);
     if (schema == SchemaId::Mesh) {
-        const ArrayRef extent = scene->schemas.mesh.pointBounds[PrimRow(scene, prim, kSlotMesh)];
+        const ArrayRef extent = p.meshes[PrimRow(scene, prim, kSlotMesh)].bounds;
         bounded = extent.count >= 2;
         if (bounded) {
             const float3 lower = Ptr<Float3>(extent.address)[0].Vector();
@@ -113,8 +113,7 @@ void SlotBounds(uniform BoundsParams p) {
     float3 center = float3(0);
     float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
     if (schema == SchemaId::Mesh) {
-        const ArrayRef extent =
-            scene->schemas.mesh.pointBounds[PrimRow(scene, drawn.prim, kSlotMesh)];
+        const ArrayRef extent = p.meshes[PrimRow(scene, drawn.prim, kSlotMesh)].bounds;
         if (extent.count < 2) {
             return;
         }

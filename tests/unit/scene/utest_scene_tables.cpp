@@ -2,12 +2,14 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/scene/access/view.h"
 #include "ernie/scene/catalog/catalog.h"
@@ -15,7 +17,9 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/store/store.h"
+#include "ernie/scene/systems/geometry.h"
 #include "ernie/scene/systems/hierarchy.h"
+#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/scene/timeline/table_log.h"
 #include "ernie/scene/timeline/timeline.h"
@@ -314,6 +318,99 @@ TEST(TableTrackingTest, OriginsFollowRenderProductsAsTheyComeAndGo) {
         scene->Remove(product);
         scene->Publish().Wait();
         EXPECT_EQ(GlobalOrigin(*scene, device).high.x, 0.0f);
+    });
+}
+
+TEST(RecordTableTest, OnlyChangedRowsUploadAndGrowthReplacesTheBuffer) {
+    test::ForEachDevice([](device::Device& device) {
+        RecordTable<Float4> table("test records");
+        table.Reserve(4);
+        EXPECT_TRUE(table.Upload(device));
+        const uint64_t first = table.Buffer()->Address();
+        EXPECT_FALSE(table.Set(1, Float4{}));
+        EXPECT_TRUE(table.Set(2, Float4{1, 2, 3, 4}));
+        EXPECT_FALSE(table.Upload(device));
+        EXPECT_EQ(table.Buffer()->Address(), first);
+        EXPECT_TRUE(table.Set(9, Float4{5, 6, 7, 8}));
+        EXPECT_GE(table.Rows(), 10u);
+        EXPECT_TRUE(table.Upload(device));
+        std::vector<Float4> rows(table.Rows());
+        device.GetQueue().Read(table.Buffer()->Slice(0, rows.size() * sizeof(Float4)), rows.data());
+        EXPECT_EQ(rows[2].z, 3.0f);
+        EXPECT_EQ(rows[9].w, 8.0f);
+        EXPECT_EQ(rows[1].x, 0.0f);
+    });
+}
+
+class MeshProbe : public Probe {
+  public:
+    std::span<const TableId> TableInputs() const override {
+        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshData};
+        return kTables;
+    }
+
+    device::Operation Run(const ChangeSet& changes, Stream) override {
+        ++runs;
+        relinked = changes.Wrote(TableId::Meshes);
+        updated = changes.Wrote(TableId::MeshData);
+        worlds = changes.worlds;
+        return {};
+    }
+
+    bool relinked = false;
+    bool updated = false;
+};
+
+TEST(TableTrackingTest, DeformingAMeshUpdatesItsDataAndReshapingRelinksIt) {
+    test::ForEachDevice([](device::Device& device) {
+        if (device.Adapter().backend == device::Backend::Hip) {
+            return;
+        }
+        Store store(device);
+        Catalog catalog(store);
+        Timeline timeline(catalog);
+        const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
+        Geometry geometry(catalog, *builder);
+        MeshProbe probe;
+        timeline.Add(geometry);
+        timeline.Add(probe);
+        Ordinal ordinal = 0;
+        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env"});
+        const uint32_t quad =
+            catalog
+                .Define<Mesh>(std::vector<std::string>{"/Env/Quad"},
+                              {.points = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},
+                               .faceVertexIndices = {0, 1, 2, 3},
+                               .faceVertexCounts = {4}})
+                .firstPrim;
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_TRUE(probe.relinked);
+        const uint32_t meshRow = catalog.GetPrims().Row(quad, SchemaId::Mesh);
+        const uint64_t blas = geometry.Record(meshRow).blas;
+        EXPECT_NE(blas, 0u);
+
+        const uint32_t pointsRow = catalog.GetPrims().Row(quad, SchemaId::PointBased);
+        const ArrayRef points = store.Array(kPointBasedPoints, pointsRow);
+        const std::vector<Float3> lifted = {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+        store.Arrays(ColumnType::Float3Array).Write(points, std::as_bytes(std::span(lifted)));
+        store.SetArray(kPointBasedPoints, pointsRow, points);
+        const uint32_t runs = probe.runs;
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_EQ(probe.runs, runs + 1);
+        EXPECT_FALSE(probe.relinked);
+        EXPECT_TRUE(probe.updated);
+        EXPECT_EQ(probe.worlds, (std::vector<uint32_t>{0}));
+        EXPECT_EQ(geometry.Record(meshRow).blas, blas);
+
+        View(catalog, SchemaId::Mesh, std::vector<uint32_t>{quad})
+            .GetArray<int32_t>(kMeshFaceVertexIndices)
+            .Set(0, std::vector<int32_t>{0, 1, 2});
+        View(catalog, SchemaId::Mesh, std::vector<uint32_t>{quad})
+            .GetArray<int32_t>(kMeshFaceVertexCounts)
+            .Set(0, std::vector<int32_t>{3});
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_TRUE(probe.relinked);
+        EXPECT_EQ(geometry.Record(meshRow).faces.count, 1u);
     });
 }
 

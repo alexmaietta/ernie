@@ -26,8 +26,7 @@ namespace ernie {
 
 namespace {
 
-constexpr ColumnRef kActivation[] = {kMeshBlas,
-                                     kSphereRadius,
+constexpr ColumnRef kActivation[] = {kSphereRadius,
                                      kCubeSize,
                                      kPlaneWidth,
                                      kPlaneLength,
@@ -718,7 +717,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
             }
         }
     }
-    const bool activated = changes.Wrote(TableId::Imageables) ||
+    const bool activated = changes.Wrote(TableId::Imageables) || changes.Wrote(TableId::Meshes) ||
                            std::ranges::any_of(kActivation, [&](ColumnRef column) {
                                return store.LastWrite(column) > m_seen;
                            });
@@ -766,6 +765,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     params.origins.address = m_renderOrigins->Address();
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
+    params.meshes = changes.tables->meshes;
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();

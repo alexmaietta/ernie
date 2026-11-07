@@ -12,7 +12,8 @@ float3 Interpolate(Ptr<Float3> values, uint3 indices, float3 weights) {
            values[indices.z].Vector() * weights.z;
 }
 
-float3 MeshShadingNormal(SceneData* data, ObjectSpace space, uint prim, SurfaceElement element) {
+float3 MeshShadingNormal(SceneData* data, Ptr<MeshRecord> meshes, ObjectSpace space, uint prim,
+                         SurfaceElement element) {
     const uint meshRow = PrimRow(data, prim, kSlotMesh);
     const uint pointsRow = PrimRow(data, prim, kSlotPointBased);
     const ArrayRef authored = data->schemas.pointBased.normals[pointsRow];
@@ -26,7 +27,7 @@ float3 MeshShadingNormal(SceneData* data, ObjectSpace space, uint prim, SurfaceE
                 Interpolate(Ptr<Float3>(authored.address), at, element.weights));
         }
     }
-    const Ptr<Float3> smooth = Ptr<Float3>(data->schemas.mesh.smoothNormals[meshRow].address);
+    const Ptr<Float3> smooth = Ptr<Float3>(meshes[meshRow].normals.address);
     return space.NormalToWorld(Interpolate(smooth, element.points, element.weights));
 }
 
@@ -38,7 +39,7 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     point.prim = prim;
     point.slot = primHit.slot;
     point.distance = primHit.hit.t;
-    point.element = FindSurfaceElement(data, prim, primHit.hit);
+    point.element = FindSurfaceElement(data, query.tables->meshes, prim, primHit.hit);
     float3 error;
 
     if (point.element.mesh) {
@@ -55,7 +56,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
         const float3 largest = max(max(abs(a), abs(b)), abs(c));
         error = space.ErrorToWorld(local, Gamma(7) * max(largest.x, max(largest.y, largest.z)));
         point.geometricNormal = space.NormalToWorld(cross(b - a, c - a));
-        point.shadingNormal = MeshShadingNormal(data, space, prim, point.element);
+        point.shadingNormal =
+            MeshShadingNormal(data, query.tables->meshes, space, prim, point.element);
     } else {
         const Ray local = space.ToObject(ray);
         const ShapeHit hit = IntersectUnitShape(primHit.shape, local);

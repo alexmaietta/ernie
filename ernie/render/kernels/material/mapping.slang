@@ -57,8 +57,9 @@ bool UvTangents(HitQuery query, SurfacePoint point, PrimvarRef primvar, uint nam
     const float area = length(cross(e1, e2));
     density = area > 0 ? sqrt(abs(det) / area) : 1;
     const uint meshRow = PrimRow(scene, point.prim, kSlotMesh);
-    const ArrayRef tangents = scene->schemas.mesh.tangents[meshRow];
-    if (tangents.count > 0 && scene->schemas.mesh.tangentPrimvar[meshRow] == name) {
+    const TangentRecord record = query.tables->tangents[meshRow];
+    const ArrayRef tangents = record.tangents;
+    if (tangents.count > 0 && record.primvar == name) {
         const Ptr<float4> corners = Ptr<float4>(tangents.address);
         const uint3 c = element.corners;
         const float3 weights = element.weights;

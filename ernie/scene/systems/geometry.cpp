@@ -10,6 +10,7 @@
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/geometry.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/profiler.h"
 
@@ -21,12 +22,12 @@ constexpr uint32_t kPreparedScan = 1024;
 
 constexpr ColumnRef kInputs[] = {kPointBasedPoints, kMeshFaceVertexIndices, kMeshFaceVertexCounts};
 
-constexpr ColumnRef kOutputs[] = {
-    kMeshBlas,           kMeshTriangleCorners, kMeshTriangleFaces, kMeshPointTriangleStarts,
-    kMeshPointTriangles, kMeshSmoothNormals,   kMeshPointBounds};
+constexpr TableId kTableOutputs[] = {TableId::Meshes, TableId::MeshData};
 
-template <class T> std::span<const std::byte> Cell(const T& value) {
-    return std::as_bytes(std::span(&value, 1));
+void AddWorld(std::vector<uint32_t>& worlds, uint32_t world) {
+    if (std::ranges::find(worlds, world) == worlds.end()) {
+        worlds.push_back(world);
+    }
 }
 
 }
@@ -36,7 +37,15 @@ std::span<const ColumnRef> Geometry::Inputs() const {
 }
 
 std::span<const ColumnRef> Geometry::Outputs() const {
-    return kOutputs;
+    return {};
+}
+
+std::span<const TableId> Geometry::TableOutputs() const {
+    return kTableOutputs;
+}
+
+void Geometry::Describe(RenderTables& tables) const {
+    tables.meshes.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }
 
 std::optional<MeshShape> Geometry::Find(uint32_t prim) const {
@@ -302,39 +311,20 @@ void Geometry::Release(Mesh& mesh) {
 }
 
 void Geometry::Link(const Mesh& mesh) {
-    Store& store = m_catalog.GetStore();
-    uint64_t blas = 0;
-    ArrayRef corners{};
-    ArrayRef faces{};
-    ArrayRef starts{};
-    ArrayRef adjacency{};
-    ArrayRef normals{};
-    ArrayRef bounds{};
+    MeshRecord record{};
     if (mesh.key) {
         const Shape& shape = m_shapes.at(*mesh.key);
         const Topology& topology = m_topologies.at(mesh.key->topology);
-        blas = shape.blas->Handle();
-        corners = topology.corners;
-        faces = topology.faces;
-        starts = topology.starts;
-        adjacency = topology.adjacency;
-        normals = shape.normals;
-        bounds = shape.bounds;
+        record.blas = shape.blas->Handle();
+        record.corners = topology.corners;
+        record.faces = topology.faces;
+        record.starts = topology.starts;
+        record.adjacency = topology.adjacency;
+        record.normals = shape.normals;
+        record.bounds = shape.bounds;
     }
-    const auto set = [&](ColumnRef column, const ArrayRef& array) {
-        if (store.Array(column, mesh.meshRow).address != array.address) {
-            store.SetArray(column, mesh.meshRow, store.Arrays(column.column->type).Share(array));
-        }
-    };
-    store.Stage(kMeshBlas, mesh.meshRow, Cell(blas));
-    set(kMeshTriangleCorners, corners);
-    set(kMeshTriangleFaces, faces);
-    set(kMeshPointTriangleStarts, starts);
-    set(kMeshPointTriangles, adjacency);
-    set(kMeshSmoothNormals, normals);
-    set(kMeshPointBounds, bounds);
-    if (m_catalog.GetPrims().Alive(mesh.prim)) {
-        store.StampWorld(m_catalog.GetPrims().At(mesh.prim).world);
+    if (m_records.Set(mesh.meshRow, record) && m_catalog.GetPrims().Alive(mesh.prim)) {
+        AddWorld(m_relinked, m_catalog.GetPrims().At(mesh.prim).world);
     }
 }
 
@@ -430,10 +420,26 @@ device::Operation Geometry::Run(const ChangeSet& changes, Stream) {
     }
     Settle();
     Prune();
-    return Update();
+    std::vector<uint32_t> updated;
+    const device::Operation done = Update(updated);
+    m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
+    const bool replaced = m_records.Upload(m_catalog.GetStore().GetDevice());
+    if (replaced) {
+        m_relinked = {kGlobalWorld};
+    }
+    if (changes.log != nullptr) {
+        if (!m_relinked.empty()) {
+            changes.log->Wrote(TableId::Meshes, m_relinked);
+        }
+        if (!updated.empty()) {
+            changes.log->Wrote(TableId::MeshData, updated);
+        }
+    }
+    m_relinked.clear();
+    return done;
 }
 
-device::Operation Geometry::Update() {
+device::Operation Geometry::Update(std::vector<uint32_t>& updated) {
     std::vector<Ref<bvh::Blas>> built;
     std::vector<Ref<bvh::Blas>> refit;
     std::vector<NormalsShape> normals;
@@ -471,7 +477,7 @@ device::Operation Geometry::Update() {
     const Prims& prims = m_catalog.GetPrims();
     for (const auto& [prim, mesh] : m_meshes) {
         if (mesh.shape && mesh.shape->updated == m_runs && prims.Alive(prim)) {
-            m_catalog.GetStore().StampWorld(prims.At(prim).world);
+            AddWorld(updated, prims.At(prim).world);
         }
     }
 
@@ -503,12 +509,14 @@ device::Operation Geometry::Update() {
                      {.x = device::GroupCount(total, kNormalsGroup)});
     encoder.Dispatch(Kernels().Entry("FinishShapeBounds"), params,
                      {.x = device::GroupCount(params.shapeCount, kNormalsGroup)});
-    store.Touch(kMeshPointBounds);
     encoder.EndZone();
     return queue.Submit(encoder.Finish());
 }
 
 void Geometry::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    if (m_records.Buffer()) {
+        held.emplace_back(m_records.Buffer());
+    }
     for (const auto& [key, shape] : m_shapes) {
         if (shape.blas) {
             held.emplace_back(shape.blas);

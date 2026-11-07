@@ -11,9 +11,12 @@ namespace ernie {
 enum class TableId : uint32_t {
     Transforms,
     Imageables,
+    Meshes,
+    MeshData,
+    Tangents,
 };
 
-inline constexpr uint32_t kTableCount = 2;
+inline constexpr uint32_t kTableCount = 5;
 
 class TableLog {
   public:

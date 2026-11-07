@@ -6,6 +6,7 @@
 #include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/semantics.h"
+#include "ernie/scene/kernels/tables/meshes.h"
 #include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
@@ -13,6 +14,8 @@ namespace ernie {
 struct RenderTables {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
+    Ptr<MeshRecord> meshes;
+    Ptr<TangentRecord> tangents;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
@@ -22,7 +25,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 88);
+ERNIE_CHECK_SIZE(RenderTables, 104);
 
 #ifdef __SLANG__
 

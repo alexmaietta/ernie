@@ -27,7 +27,7 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     p.shapes[slot] = shape.record;
     uint64_t blas = p.unitBox;
     if (ShapeKind(shape.record.kind) == ShapeKind::Mesh) {
-        blas = schema == SchemaId::Mesh ? scene->schemas.mesh.blas[PrimRow(scene, prim, kSlotMesh)]
+        blas = schema == SchemaId::Mesh ? p.meshes[PrimRow(scene, prim, kSlotMesh)].blas
                                         : 0;
     }
     const bool point =

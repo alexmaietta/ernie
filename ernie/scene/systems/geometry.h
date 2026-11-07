@@ -18,6 +18,8 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
 
 namespace ernie {
@@ -48,6 +50,8 @@ class Geometry : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     std::span<const ColumnRef> Outputs() const override;
+    std::span<const TableId> TableOutputs() const override;
+    void Describe(RenderTables& tables) const override;
     void Prepare() override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 
@@ -60,6 +64,10 @@ class Geometry : public System {
     }
 
     std::optional<MeshShape> Find(uint32_t prim) const;
+
+    const MeshRecord& Record(uint32_t meshRow) const {
+        return m_records.At(meshRow);
+    }
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
@@ -120,7 +128,7 @@ class Geometry : public System {
     void Release(Mesh& mesh);
     ShapeKey Key(const Mesh& mesh) const;
     void Link(const Mesh& mesh);
-    device::Operation Update();
+    device::Operation Update(std::vector<uint32_t>& updated);
 
     Catalog& m_catalog;
     bvh::Builder& m_builder;
@@ -138,6 +146,8 @@ class Geometry : public System {
     std::map<TopologyKey, Topology> m_topologies;
     std::map<ShapeKey, Shape> m_shapes;
     GeometryStats m_stats;
+    RecordTable<MeshRecord> m_records{"mesh records"};
+    std::vector<uint32_t> m_relinked;
     uint32_t m_runs = 0;
     bool m_stale = false;
 };

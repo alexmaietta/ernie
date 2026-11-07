@@ -15,6 +15,9 @@
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/systems/geometry.h"
+#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
 
 namespace ernie {
@@ -81,7 +84,8 @@ struct TangentStats {
 
 class Tangents : public System {
   public:
-    explicit Tangents(Catalog& catalog) : m_catalog(catalog) {}
+    Tangents(Catalog& catalog, const Geometry& geometry)
+        : m_catalog(catalog), m_geometry(geometry) {}
 
     std::string_view Name() const override {
         return "tangents";
@@ -89,6 +93,24 @@ class Tangents : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     std::span<const ColumnRef> Outputs() const override;
+
+    std::span<const TableId> TableInputs() const override {
+        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshData};
+        return kTables;
+    }
+
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Tangents};
+        return kTables;
+    }
+
+    void Describe(RenderTables& tables) const override;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
+
+    const TangentRecord& Record(uint32_t meshRow) const {
+        return m_records.At(meshRow);
+    }
+
     void Prepare() override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 
@@ -156,9 +178,13 @@ class Tangents : public System {
     void CacheCells(Mesh& mesh, const Cells& cells) const;
     void Release(Mesh& mesh);
     void Prune();
-    void Link(const Mesh& mesh);
+    void Link(uint32_t prim, const Mesh& mesh);
+    device::Operation Process(const ChangeSet& changes);
 
     Catalog& m_catalog;
+    const Geometry& m_geometry;
+    RecordTable<TangentRecord> m_records{"tangent records"};
+    std::vector<uint32_t> m_relinked;
     std::unordered_map<uint32_t, Mesh> m_meshes;
     std::unordered_map<uint32_t, uint32_t> m_byPointsRow;
     std::unordered_map<uint32_t, uint32_t> m_byMeshRow;

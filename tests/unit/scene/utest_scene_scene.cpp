@@ -419,7 +419,12 @@ TEST(SceneTest, DeformedMeshesRecomputeTangentsOnTheDevice) {
         deformed.normals = SmoothCornerNormals(points, indices, counts);
         deformed.st = *CornerValues<Float2>(st, {}, Interpolation::Vertex, indices, counts);
         const std::vector<Float4> expected = MikkTangents(deformed);
-        const std::vector<Float4> found = Items<Float4>(view.Get("tangents").GetArray(0));
+        SceneImpl& impl = SceneImpl::Get(scene);
+        const uint32_t meshRow = impl.GetCatalog().GetPrims().Row(grid.Index(), SchemaId::Mesh);
+        const std::vector<Float4> found =
+            Items<Float4>(impl.GetStore()
+                              .Arrays(ColumnType::IntArray)
+                              .Read(impl.GetTangents().Record(meshRow).tangents));
         ASSERT_EQ(found.size(), expected.size());
         for (uint32_t corner = 0; corner < found.size(); ++corner) {
             const float agree = found[corner].x * expected[corner].x +

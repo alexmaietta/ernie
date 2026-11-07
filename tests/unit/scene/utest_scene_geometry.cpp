@@ -50,19 +50,23 @@ struct Scene {
         return catalog.GetPrims().Row(prim, SchemaId::PointBased);
     }
 
-    template <class T> std::vector<T> Derived(uint32_t prim, ColumnRef column) {
-        return View(catalog, SchemaId::Mesh, std::vector<uint32_t>{prim})
-            .GetArray<T>(column)
-            .Get(0);
+    const MeshRecord& Record(uint32_t prim) {
+        return geometry.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh));
+    }
+
+    template <class T> std::vector<T> Derived(uint32_t prim, ArrayRef MeshRecord::* field) {
+        const ArrayRef array = Record(prim).*field;
+        const ColumnType type =
+            sizeof(T) == sizeof(Float3) ? ColumnType::Float3Array : ColumnType::IntArray;
+        return array.count == 0 ? std::vector<T>{} : Items<T>(store.Arrays(type).Read(array));
     }
 
     std::vector<Float3> Normals(uint32_t prim) {
-        return Derived<Float3>(prim, kMeshSmoothNormals);
+        return Derived<Float3>(prim, &MeshRecord::normals);
     }
 
     uint64_t BlasCell(uint32_t prim) {
-        const uint32_t row = catalog.GetPrims().Row(prim, SchemaId::Mesh);
-        return Items<uint64_t>(store.Schema(SchemaId::Mesh).Read(kMeshBlas.index, row, 1)).front();
+        return Record(prim).blas;
     }
 };
 
@@ -117,21 +121,21 @@ TEST(GeometryTest, FacesAreFannedOnTheDeviceAndInvalidOnesSkipped) {
         EXPECT_EQ(s.geometry.Stats().triangulated, 2u);
 
         EXPECT_EQ(s.geometry.Find(mixed)->triangles, 6u);
-        EXPECT_EQ(s.Derived<int32_t>(mixed, kMeshTriangleFaces),
+        EXPECT_EQ(s.Derived<int32_t>(mixed, &MeshRecord::faces),
                   (std::vector<int32_t>{0, 1, 1, 4, 4, 4}));
         EXPECT_EQ(
-            s.Derived<int32_t>(mixed, kMeshTriangleCorners),
+            s.Derived<int32_t>(mixed, &MeshRecord::corners),
             (std::vector<int32_t>{0, 1, 2, 3, 4, 5, 3, 5, 6, 12, 13, 14, 12, 14, 15, 12, 15, 16}));
-        EXPECT_EQ(s.Derived<int32_t>(mixed, kMeshPointTriangleStarts),
+        EXPECT_EQ(s.Derived<int32_t>(mixed, &MeshRecord::starts),
                   (std::vector<int32_t>{0, 1, 4, 6, 8, 13, 15, 17, 18}));
-        EXPECT_EQ(s.Derived<int32_t>(mixed, kMeshPointTriangles),
+        EXPECT_EQ(s.Derived<int32_t>(mixed, &MeshRecord::adjacency),
                   (std::vector<int32_t>{0, 0, 1, 2, 0, 2, 1, 3, 1, 2, 3, 4, 5, 3, 4, 4, 5, 5}));
 
         EXPECT_EQ(s.geometry.Find(overrun)->triangles, 2u);
-        EXPECT_EQ(s.Derived<int32_t>(overrun, kMeshTriangleFaces), (std::vector<int32_t>{0, 0}));
-        EXPECT_EQ(s.Derived<int32_t>(overrun, kMeshPointTriangleStarts),
+        EXPECT_EQ(s.Derived<int32_t>(overrun, &MeshRecord::faces), (std::vector<int32_t>{0, 0}));
+        EXPECT_EQ(s.Derived<int32_t>(overrun, &MeshRecord::starts),
                   (std::vector<int32_t>{0, 2, 3, 5, 6}));
-        EXPECT_EQ(s.Derived<int32_t>(overrun, kMeshPointTriangles),
+        EXPECT_EQ(s.Derived<int32_t>(overrun, &MeshRecord::adjacency),
                   (std::vector<int32_t>{0, 1, 0, 0, 1, 1}));
     });
 }
@@ -147,7 +151,7 @@ TEST(GeometryTest, AMeshIndexingPastItsPointsHasNoShape) {
         s.Publish();
         EXPECT_FALSE(s.geometry.Find(prim));
         EXPECT_EQ(s.BlasCell(prim), 0u);
-        EXPECT_TRUE(s.Derived<int32_t>(prim, kMeshTriangleCorners).empty());
+        EXPECT_TRUE(s.Derived<int32_t>(prim, &MeshRecord::corners).empty());
     });
 }
 

@@ -29,7 +29,8 @@ class Bounds : public System {
     std::span<const ColumnRef> Inputs() const override;
 
     std::span<const TableId> TableInputs() const override {
-        static constexpr TableId kTables[] = {TableId::Transforms, TableId::Imageables};
+        static constexpr TableId kTables[] = {TableId::Transforms, TableId::Imageables,
+                                              TableId::Meshes, TableId::MeshData};
         return kTables;
     }
 

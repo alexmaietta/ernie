@@ -414,43 +414,6 @@ class Mesh : PointBased (
         displayName = "Subdivision Scheme"
         doc = "The surface the faces describe. Any scheme but none is smooth, and its normals are computed rather than read from normals."
     )
-    uint64 ernie:blas (
-        derived
-        doc = "The mesh's BLAS handle, or 0 with no triangles, written by the geometry system."
-    )
-    int[] ernie:triangleCorners (
-        derived
-        doc = "The face-vertex index of each triangle's corners, three per triangle."
-    )
-    int[] ernie:triangleFaces (
-        derived
-        doc = "The face each triangle came from."
-    )
-    int[] ernie:pointTriangleStarts (
-        derived
-        doc = "Where each point's triangles start in pointTriangles, one more than the points."
-    )
-    int[] ernie:pointTriangles (
-        derived
-        doc = "The triangles around each point."
-    )
-    point3f[] ernie:pointBounds (
-        derived
-        unit = meters
-        doc = "Lowest and highest corners of the points' box, written by the geometry system."
-    )
-    normal3f[] ernie:smoothNormals (
-        derived
-        doc = "Area-weighted smooth normals, one per point."
-    )
-    int[] ernie:tangents (
-        derived
-        doc = "MikkTSpace tangents, four floats per face vertex, the tangent and the bitangent's sign."
-    )
-    token ernie:tangentPrimvar (
-        derived
-        doc = "The primvar the tangents follow, or none without tangents."
-    )
     bool doubleSided = true
 }
 

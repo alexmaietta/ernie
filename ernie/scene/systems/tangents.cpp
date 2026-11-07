@@ -14,6 +14,7 @@
 #include "ernie/scene/catalog/packing.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/kernels/tangents.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/profiler.h"
@@ -151,12 +152,6 @@ constexpr ColumnRef kInputs[] = {
     kPointBasedPoints,  kMeshFaceVertexIndices,          kMeshFaceVertexCounts, kGprimPrimvars,
     kPointBasedNormals, kPointBasedNormalsInterpolation, kMeshSubdivisionScheme};
 
-constexpr ColumnRef kOutputs[] = {kMeshTangents, kMeshTangentPrimvar};
-
-template <class T> std::span<const std::byte> Cell(const T& value) {
-    return std::as_bytes(std::span(&value, 1));
-}
-
 }
 
 std::span<const ColumnRef> Tangents::Inputs() const {
@@ -164,7 +159,17 @@ std::span<const ColumnRef> Tangents::Inputs() const {
 }
 
 std::span<const ColumnRef> Tangents::Outputs() const {
-    return kOutputs;
+    return {};
+}
+
+void Tangents::Describe(RenderTables& tables) const {
+    tables.tangents.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
+}
+
+void Tangents::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    if (m_records.Buffer()) {
+        held.emplace_back(m_records.Buffer());
+    }
 }
 
 void Tangents::CacheCells(Mesh& mesh, const Cells& cells) const {
@@ -296,8 +301,7 @@ void Tangents::Recompute(const Mesh& mesh, const Key& key, Set& set,
     const Deform& deform = *set.deform;
     TangentParams params{};
     params.points.address = key.points;
-    params.smoothNormals.address =
-        m_catalog.GetStore().Array(kMeshSmoothNormals, mesh.meshRow).address;
+    params.smoothNormals.address = m_geometry.Record(mesh.meshRow).normals.address;
     params.cornerNormals.address = deform.normals ? deform.normals->Address() : 0;
     params.cornerSt.address = deform.st->Address();
     params.indices.address = key.indices;
@@ -315,22 +319,22 @@ void Tangents::Recompute(const Mesh& mesh, const Key& key, Set& set,
                      {.x = device::GroupCount(params.cornerCount, kTangentsGroup)});
 }
 
-void Tangents::Link(const Mesh& mesh) {
-    Store& store = m_catalog.GetStore();
-    ArrayRef tangents{};
-    uint32_t follows = 0;
+void Tangents::Link(uint32_t prim, const Mesh& mesh) {
+    TangentRecord record{};
     if (mesh.key) {
         const Set& set = m_sets.at(*mesh.key);
         if (set.words > 0) {
-            tangents = set.tangents;
-            follows = m_catalog.GetTokens().Find("st").id;
+            record.tangents = set.tangents;
+            record.primvar = m_catalog.GetTokens().Find("st").id;
         }
     }
-    if (store.Array(kMeshTangents, mesh.meshRow).address != tangents.address) {
-        store.SetArray(kMeshTangents, mesh.meshRow,
-                       store.Arrays(ColumnType::IntArray).Share(tangents));
+    const Prims& prims = m_catalog.GetPrims();
+    if (m_records.Set(mesh.meshRow, record) && prims.Alive(prim)) {
+        const uint32_t world = prims.At(prim).world;
+        if (std::ranges::find(m_relinked, world) == m_relinked.end()) {
+            m_relinked.push_back(world);
+        }
     }
-    store.Stage(kMeshTangentPrimvar, mesh.meshRow, Cell(follows));
 }
 
 void Tangents::Place(uint32_t prim, const Cells& cells) {
@@ -352,8 +356,7 @@ void Tangents::Place(uint32_t prim, const Cells& cells) {
     ++entry->second.users;
     mesh.key = key;
     mesh.set = &entry->second;
-    Link(mesh);
-    m_catalog.GetStore().StampWorld(prims.At(prim).world);
+    Link(prim, mesh);
     m_meshes[prim] = mesh;
 }
 
@@ -391,6 +394,19 @@ void Tangents::Forget(uint32_t prim) {
 }
 
 device::Operation Tangents::Run(const ChangeSet& changes, Stream) {
+    const device::Operation done = Process(changes);
+    m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
+    if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
+        m_relinked = {kGlobalWorld};
+    }
+    if (changes.log != nullptr && !m_relinked.empty()) {
+        changes.log->Wrote(TableId::Tangents, m_relinked);
+    }
+    m_relinked.clear();
+    return done;
+}
+
+device::Operation Tangents::Process(const ChangeSet& changes) {
     ERNIE_ZONE("Tangents/Run");
     ++m_runs;
     m_stats.computed = 0;
@@ -525,9 +541,9 @@ device::Operation Tangents::Run(const ChangeSet& changes, Stream) {
         for (const uint32_t prim : owners) {
             const Mesh& mesh = m_meshes.at(prim);
             if (!computed) {
-                const bool onDevice = set.deform && !exact.contains(key) &&
-                                      (set.deform->normals ||
-                                       store.Array(kMeshSmoothNormals, mesh.meshRow).address != 0);
+                const bool onDevice =
+                    set.deform && !exact.contains(key) &&
+                    (set.deform->normals || m_geometry.Record(mesh.meshRow).normals.address != 0);
                 if (onDevice) {
                     if (!encoder) {
                         encoder = device.GetQueue().CreateEncoder();
@@ -539,8 +555,7 @@ device::Operation Tangents::Run(const ChangeSet& changes, Stream) {
                 }
                 computed = true;
             }
-            Link(mesh);
-            store.StampWorld(prims.At(prim).world);
+            Link(prim, mesh);
         }
     }
     Prune();

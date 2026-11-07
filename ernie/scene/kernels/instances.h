@@ -5,6 +5,7 @@
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
+#include "ernie/scene/kernels/tables/meshes.h"
 
 namespace ernie {
 
@@ -18,10 +19,11 @@ struct InstanceParams {
     Ptr<RenderOrigin> origins;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
+    Ptr<MeshRecord> meshes;
     uint64_t unitBox;
 };
 
-ERNIE_CHECK_SIZE(InstanceParams, 80);
+ERNIE_CHECK_SIZE(InstanceParams, 88);
 
 struct OriginParams {
     Ptr<SceneData> scene;

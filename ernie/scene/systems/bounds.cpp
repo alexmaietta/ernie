@@ -20,7 +20,7 @@ namespace ernie {
 
 namespace {
 
-constexpr ColumnRef kInputs[] = {kMeshPointBounds,
+constexpr ColumnRef kInputs[] = {kPointBasedPoints,
                                  kSphereRadius,
                                  kCubeSize,
                                  kPlaneWidth,
@@ -99,6 +99,7 @@ device::Operation Bounds::Run(const ChangeSet& changes, Stream) {
     params.boxes.address = m_boxes->Address();
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
+    params.meshes = changes.tables->meshes;
     params.primCount = m_catalog.GetPrims().Size();
     params.slotCount = m_slots;
     const uint64_t instancerBytes = std::max<uint64_t>(params.primCount, 1) * 6 * sizeof(uint32_t);
