@@ -149,7 +149,7 @@ Float3 CenterNormal(Renderer& renderer, uint32_t side) {
     output.Wait();
     const std::vector<float> normals =
         output["/Render/Roof"].frames.at(0).Source("Normal").tensor.ToHost<float>();
-    const uint32_t center = ((side / 2) * side + side / 2) * 4;
+    const uint32_t center = ((side / 2) * side + side / 2) * 3;
     return {normals[center], normals[center + 1], normals[center + 2]};
 }
 
@@ -219,8 +219,9 @@ Lit RenderLitQuad(Device& device, Float3 tilt, RenderMode mode) {
     const FrameOutput& frame = output["/Render/Roof"].frames.at(0);
     const std::vector<float> normals = frame.Source("Normal").tensor.ToHost<float>();
     const std::vector<float> colors = frame.Source("HdrColor").tensor.ToHost<float>();
-    const uint32_t center = ((kSide / 2) * kSide + kSide / 2) * 4;
-    return {{normals[center], normals[center + 1], normals[center + 2]}, colors[center]};
+    const uint32_t center = (kSide / 2) * kSide + kSide / 2;
+    return {{normals[center * 3], normals[center * 3 + 1], normals[center * 3 + 2]},
+            colors[center * 4]};
 }
 
 TEST(RendererTest, NormalMapsLightTheSurfaceButLeaveTheNormalOutputGeometric) {
@@ -235,6 +236,36 @@ TEST(RendererTest, NormalMapsLightTheSurfaceButLeaveTheNormalOutputGeometric) {
             }
             EXPECT_GT(bent.red, 1.1f * flat.red) << int(mode);
         }
+    });
+}
+
+TEST(RendererTest, NormalsHaveThreeChannelsAndMissesAreZero) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kSide = 9;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 10});
+        scene->Define<Mesh>("/Quad", {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                                      .faceVertexIndices = {0, 1, 2, 3},
+                                      .faceVertexCounts = {4},
+                                      .subdivisionScheme = SubdivisionScheme::None});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderProduct>(
+            "/Render/Quad",
+            {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
+        Renderer renderer(scene);
+        RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Quad"}, 1.0 / 30);
+        output.Wait();
+        const device::Tensor& tensor = output["/Render/Quad"].frames.at(0).Source("Normal").tensor;
+        EXPECT_EQ(std::vector<int64_t>(tensor.Shape().begin(), tensor.Shape().end()),
+                  (std::vector<int64_t>{1, kSide, kSide, 3}));
+        const std::vector<float> normals = tensor.ToHost<float>();
+        const uint32_t center = ((kSide / 2) * kSide + kSide / 2) * 3;
+        EXPECT_NEAR(normals[center + 2], 1, 1e-4f);
+        EXPECT_EQ(std::vector<float>(normals.begin(), normals.begin() + 3),
+                  (std::vector<float>{0, 0, 0}));
     });
 }
 

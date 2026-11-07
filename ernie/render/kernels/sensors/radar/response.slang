@@ -73,14 +73,14 @@ struct RadarResponse : IResponse<RadarPattern> {
             Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
             Write(pixel, RenderVarSource::Intensity, 0.0f);
             Write(pixel, RenderVarSource::RadialVelocity, 0.0f);
-            Write(pixel, RenderVarSource::Normal, float4(0));
+            WriteNormal(pixel, float3(0));
             WriteSegmentation(params, pixel, kNoPrim);
             return;
         }
         Write(pixel, RenderVarSource::DistanceToCamera, distance);
         Write(pixel, RenderVarSource::Intensity, intensity);
         Write(pixel, RenderVarSource::RadialVelocity, radialVelocity);
-        Write(pixel, RenderVarSource::Normal, float4(normal, 1));
+        WriteNormal(pixel, normal);
         WriteSegmentation(params, pixel, prim);
     }
 }

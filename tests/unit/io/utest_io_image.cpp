@@ -182,10 +182,11 @@ TEST(ImageTest, DataIsColorizedForViewing) {
                 .ToHost<uint8_t>()[0],
             255);
 
-        const device::Tensor normals = Upload(device, std::vector<float>{1, 0, -1, 0, 0, 1},
-                                              {1, 2, 3}, device::DType::Float32);
+        const device::Tensor normals =
+            Upload(device, std::vector<float>{1, 0, -1, 0, 0, 1, 0, 0, 0}, {1, 3, 3},
+                   device::DType::Float32);
         EXPECT_EQ(ColorizeNormals(normals).ToHost<uint8_t>(),
-                  (std::vector<uint8_t>{255, 128, 0, 255, 128, 128, 255, 255}));
+                  (std::vector<uint8_t>{255, 128, 0, 255, 128, 128, 255, 255, 0, 0, 0, 0}));
 
         const device::Tensor ids =
             Upload(device, std::vector<uint32_t>{0, 1, 2, 1}, {2, 2}, device::DType::UInt32);

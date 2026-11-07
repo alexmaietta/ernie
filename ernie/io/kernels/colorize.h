@@ -133,6 +133,9 @@ ERNIE_SHARED uint ScalarRgba(float value, ScalarBounds bounds, uint flags, uint 
 }
 
 ERNIE_SHARED uint NormalRgba(float x, float y, float z) {
+    if (x == 0 && y == 0 && z == 0) {
+        return 0;
+    }
     return PackRgba8(Unorm8(x * 0.5f + 0.5f), Unorm8(y * 0.5f + 0.5f), Unorm8(z * 0.5f + 0.5f),
                      255);
 }

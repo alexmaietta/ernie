@@ -60,7 +60,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
         if (!hit) {
             Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
             Write(pixel, RenderVarSource::DistanceToImagePlane, pixel.capture->missDistance);
-            Write(pixel, RenderVarSource::Normal, float4(0));
+            WriteNormal(pixel, float3(0));
             Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(float3(0), false));
             WriteSegmentation(params, pixel, kNoPrim);
             WriteInstance(params, pixel, first.slot, false);
@@ -69,7 +69,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
         Write(pixel, RenderVarSource::DistanceToCamera, first.distance);
         Write(pixel, RenderVarSource::DistanceToImagePlane,
               camera.ImagePlaneDistance(first.position));
-        Write(pixel, RenderVarSource::Normal, float4(first.shadingNormal, 1));
+        WriteNormal(pixel, first.shadingNormal);
         Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(albedo, true));
         WriteSegmentation(params, pixel, first.prim);
         WriteInstance(params, pixel, first.slot, true);

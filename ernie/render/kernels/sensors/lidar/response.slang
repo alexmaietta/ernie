@@ -148,12 +148,12 @@ struct LidarResponse : IResponse<LidarPattern> {
                 const LidarReturn result = results[i];
                 Write(at, RenderVarSource::DistanceToCamera, result.distance);
                 Write(at, RenderVarSource::Intensity, result.intensity);
-                Write(at, RenderVarSource::Normal, float4(result.normal, 1));
+                WriteNormal(at, result.normal);
                 WriteSegmentation(params, at, result.prim);
             } else {
                 Write(at, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
                 Write(at, RenderVarSource::Intensity, 0.0f);
-                Write(at, RenderVarSource::Normal, float4(0));
+                WriteNormal(at, float3(0));
                 WriteSegmentation(params, at, kNoPrim);
             }
         }

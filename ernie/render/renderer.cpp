@@ -47,7 +47,7 @@ RenderVarFormat SourceFormat(RenderVarSource source) {
     case RenderVarSource::NonStableInstanceSegmentation:
         return {device::DType::UInt32, 1};
     case RenderVarSource::Normal:
-        return {device::DType::Float32, 4};
+        return {device::DType::Float32, 3};
     case RenderVarSource::DiffuseAlbedo:
         return {device::DType::UInt8, 4};
     case RenderVarSource::SemanticSegmentation:

@@ -16,6 +16,16 @@ void Write<T>(CapturePixel pixel, RenderVarSource source, T value) {
     }
 }
 
+void WriteNormal(CapturePixel pixel, float3 normal) {
+    if (Wants(pixel, RenderVarSource::Normal)) {
+        Ptr<float> normals = Ptr<float>(pixel.capture->vars[uint(RenderVarSource::Normal)]);
+        const uint base = pixel.index * 3;
+        normals[base] = normal.x;
+        normals[base + 1] = normal.y;
+        normals[base + 2] = normal.z;
+    }
+}
+
 uint PackSrgb(float3 color, bool hit) {
     const uint r = EncodeUnorm8(EncodeSrgb(color.x));
     const uint g = EncodeUnorm8(EncodeSrgb(color.y));
