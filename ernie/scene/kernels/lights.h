@@ -5,6 +5,7 @@
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
+#include "ernie/scene/kernels/tables/textures.h"
 
 namespace ernie {
 
@@ -122,6 +123,7 @@ struct LightParams {
     Ptr<RenderOrigin> origins;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
+    Ptr<TextureRecord> textures;
     Ptr<uint> tlases;
     Ptr<Float3> spectra;
     uint tlasCount;
@@ -130,7 +132,7 @@ struct LightParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 80);
+ERNIE_CHECK_SIZE(LightParams, 88);
 
 static const uint kLoopedLights = 8;
 

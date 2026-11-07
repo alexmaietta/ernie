@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/store/store.h"
 #include "ernie/scene/systems/textures.h"
+#include "ernie/scene/timeline/changes.h"
 #include "ernie/scene/timeline/timeline.h"
 #include "support/devices.h"
 
@@ -60,11 +62,41 @@ struct Scene {
     }
 
     uint32_t Bindings(uint32_t material) {
-        const uint32_t row = catalog.GetPrims().Row(material, SchemaId::Material);
-        return Items<uint32_t>(
-                   store.Schema(SchemaId::Material).Read(kMaterialTextures.index, row, 1))
-            .front();
+        return textures.Record(material).textures;
     }
+};
+
+class TextureProbe : public System {
+  public:
+    std::string_view Name() const override {
+        return "texture probe";
+    }
+
+    std::span<const ColumnRef> Inputs() const override {
+        return {};
+    }
+
+    std::span<const ColumnRef> Outputs() const override {
+        return {};
+    }
+
+    std::span<const TableId> TableInputs() const override {
+        static constexpr TableId kTables[] = {TableId::Textures};
+        return kTables;
+    }
+
+    bool Structural() const override {
+        return false;
+    }
+
+    device::Operation Run(const ChangeSet& changes, Stream) override {
+        wrote = changes.Wrote(TableId::Textures);
+        worlds = changes.worlds;
+        return {};
+    }
+
+    bool wrote = false;
+    std::vector<uint32_t> worlds;
 };
 
 template <class Test> void ForEachScene(Test test) {
@@ -160,6 +192,43 @@ TEST(TexturesTest, PublishingWithNothingToLoadDoesNothing) {
         EXPECT_EQ(s.textures.Runs(), runs + 1);
         EXPECT_EQ(s.textures.Stats().loaded, 0u);
         EXPECT_EQ(s.textures.Stats().images, 1u);
+    });
+}
+
+TEST(TexturesTest, DomeRecordsCarryTheirImageSizeAndRebindsAreLoggedPerWorld) {
+    const std::string red = WriteImage("red.png", {1, 0, 0, 1});
+    test::ForEachDevice([&](device::Device& device) {
+        Store store(device);
+        Catalog catalog(store);
+        Timeline timeline(catalog);
+        Textures textures(catalog);
+        TextureProbe probe;
+        timeline.Add(textures);
+        timeline.Add(probe);
+        Ordinal ordinal = 0;
+        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env"});
+        const uint32_t dome =
+            catalog.Define(SchemaId::DomeLight, std::vector<std::string>{"/Env/Sky"}).firstPrim;
+        View(catalog, SchemaId::DomeLight, std::vector<uint32_t>{dome})
+            .Get<Token>(kDomeLightTextureFile)
+            .Set(catalog.GetTokens().Intern(red));
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_EQ(textures.Record(dome).textures, kNoTextures);
+
+        textures.Finish();
+        probe.wrote = false;
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_TRUE(probe.wrote);
+        EXPECT_EQ(probe.worlds, (std::vector<uint32_t>{0}));
+        const TextureRecord record = textures.Record(dome);
+        EXPECT_NE(record.textures, kNoTextures);
+        EXPECT_EQ(record.width, 4u);
+        EXPECT_EQ(record.height, 4u);
+
+        catalog.Remove(dome);
+        timeline.Publish(++ordinal).Wait();
+        EXPECT_EQ(textures.Record(dome).textures, kNoTextures);
+        EXPECT_EQ(textures.Record(dome).width, 0u);
     });
 }
 

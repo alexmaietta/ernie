@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <span>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
+#include "ernie/io/image.h"
 #include "ernie/scene/kernels/lights.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
@@ -366,6 +368,20 @@ TEST(LightsTest, RecordsSitRelativeToTheRenderOriginOfTheirViewer) {
         const LightRecord relaid = Find(global, copied);
         EXPECT_NEAR(relaid.position.x, 16, 1e-3);
         EXPECT_NEAR(relaid.position.y, 5, 1e-3);
+    });
+}
+
+TEST(LightsTest, DomeRecordsPickUpTheirTextureOnceItLoads) {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "ernie_scene_lights_sky.png";
+    WritePng(path, Image(4, 4, Rgba{0.2f, 0.4f, 0.8f, 1}));
+    ForEachScene([&](Scene& scene, device::Device& device) {
+        const Prim sky = scene.Define<DomeLight>("/Sky", {.textureFile = path.string()});
+        Records(scene, device);
+        SceneImpl::Get(scene).GetTextures().Finish();
+        const LightRecord loaded = Find(Records(scene, device), sky);
+        EXPECT_NE(loaded.textures, 0u);
+        EXPECT_EQ(loaded.textureFormat, uint32_t(DomeTextureFormat::Angular));
     });
 }
 

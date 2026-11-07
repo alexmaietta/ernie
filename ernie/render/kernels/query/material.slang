@@ -35,7 +35,7 @@ struct MaterialQuery {
     }
 
     uint Textures(uint material) {
-        return hit.scene->schemas.material.textures[PrimRow(hit.scene, material, kSlotMaterial)];
+        return material == kNoPrim ? kNoTextures : hit.tables->textures[material].textures;
     }
 
     Ptr<uint64_t> Bindings(uint textures, uint first) {

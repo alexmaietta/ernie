@@ -122,13 +122,13 @@ void Profile(inout LightRecord record, uint64_t handle, bool hemisphere, bool no
     }
 }
 
-DomeTextureFormat DomeFormat(SceneData* scene, uint row) {
+DomeTextureFormat DomeFormat(SceneData* scene, TextureRecord texture, uint row) {
     DomeLightData* dome = &scene->schemas.domeLight;
     const DomeTextureFormat format = DomeTextureFormat(dome.textureFormat[row]);
     if (format != DomeTextureFormat::Automatic) {
         return format;
     }
-    const uint2 size = uint2(dome.textureSize[row].x, dome.textureSize[row].y);
+    const uint2 size = uint2(texture.width, texture.height);
     if (size.x * 4 == size.y * 3) {
         return DomeTextureFormat::CubeMapVerticalCross;
     }
@@ -144,15 +144,17 @@ void WriteDomeMaps(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         return;
     }
     SceneData* scene = p.scene;
-    const uint row = PrimRow(scene, layout->domePrims[id.y], kSlotDomeLight);
-    const uint binding = scene->schemas.domeLight.textures[row];
+    const uint domePrim = layout->domePrims[id.y];
+    const uint row = PrimRow(scene, domePrim, kSlotDomeLight);
+    const TextureRecord texture = p.textures[domePrim];
+    const uint binding = texture.textures;
     const uint64_t handle = binding != 0 ? scene->textureBindings[binding] : 0;
     const float2 uv = float2((id.x % kDomeMapWidth + 0.5f) / kDomeMapWidth,
                              (id.x / kDomeMapWidth + 0.5f) / kDomeMapHeight);
     float value = 1;
     if (handle != 0) {
         TextureLookup lookup;
-        lookup.st = DomeTextureSt(DomeFormat(scene, row), DomeMapDirection(uv));
+        lookup.st = DomeTextureSt(DomeFormat(scene, texture, row), DomeMapDirection(uv));
         lookup.lod = -0.5f * log2(float(kDomeMapCells));
         lookup.filter = TextureFilter::Linear;
         lookup.u = float3(0);
@@ -357,7 +359,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         record.focusTint = shaping.shapingFocusTint[at];
         record.coneAngle = radians(clamp(shaping.shapingConeAngle[at], 0.0f, 180.0f));
         record.coneSoftness = clamp(shaping.shapingConeSoftness[at], 0.0f, 1.0f);
-        const uint binding = shaping.textures[at];
+        const uint binding = p.textures[prim].shaping;
         ies = binding != 0 ? scene->textureBindings[binding] : 0;
         if (ies != 0) {
             record.ies = binding;
@@ -384,8 +386,8 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
             record.axisY = Float3(z / max(scale.z, 1e-30f));
             record.axisZ = Float3(-y / max(scale.y, 1e-30f));
         }
-        record.textures = dome.textures[at];
-        record.textureFormat = uint(DomeFormat(scene, at));
+        record.textures = p.textures[prim].textures;
+        record.textureFormat = uint(DomeFormat(scene, p.textures[prim], at));
         record.map = layout->maps + layout->domeSlots[slot] * kDomeMapFloats;
         record.portals = dome.portals[at].count;
         domeMean = record.map[kDomeMapCells + kDomeMapHeight];
@@ -430,7 +432,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         projected = area;
         Profile(record, ies, true, iesNormalize);
         flux = area * kPi * EmissionIntegral(record, ies, true, true);
-        record.textures = scene->schemas.rectLight.textures[at];
+        record.textures = p.textures[prim].textures;
         const uint64_t image = record.textures != 0 ? scene->textureBindings[record.textures] : 0;
         if (image != 0) {
             TextureLookup lookup;

@@ -202,10 +202,6 @@ abstract class Material : Typed (
         displayName = "Inputs"
         doc = "Named input values. Define<Material> picks the material by id and sets these on its columns."
     )
-    uint ernie:textures (
-        derived
-        doc = "Where the material's texture handles start in the texture bindings, or 0 without any, written by the texture system."
-    )
 }
 
 class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (

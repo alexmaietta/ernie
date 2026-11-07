@@ -281,6 +281,7 @@ ERNIE_CHECK_SIZE(OverlayGroupParams, 64);
 
 struct OverlayUniteParams {
     Ptr<SceneData> scene;
+    Ptr<RenderTables> tables;
     Ptr<uint> prims;
     Ptr<uint> groups;
     Ptr<uint> boxes;
@@ -290,7 +291,7 @@ struct OverlayUniteParams {
     uint boxCount;
 };
 
-ERNIE_CHECK_SIZE(OverlayUniteParams, 48);
+ERNIE_CHECK_SIZE(OverlayUniteParams, 56);
 
 struct OverlayFill {
     uint64_t pixels;

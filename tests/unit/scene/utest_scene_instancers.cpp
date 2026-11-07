@@ -145,8 +145,9 @@ TEST(InstancersTest, CountChangesAndHiddenIdsKeepTheLayoutAndBoundsFollowCopies)
         ASSERT_TRUE(world.has_value());
         EXPECT_NEAR(world->lower.x, 4.5f, 1e-4f);
         EXPECT_NEAR(world->upper.x, 10.5f, 1e-4f);
-        const Float3 lower = inst.Get(Boundable::kWorldMin);
-        const Float3 upper = inst.Get(Boundable::kWorldMax);
+        const Box box = scene->PrimBounds(std::vector<std::string>{inst.Path()}).front();
+        const Float3 lower = box.lower;
+        const Float3 upper = box.upper;
         EXPECT_NEAR(lower.x, 4.5f, 1e-4f);
         EXPECT_NEAR(upper.x, 10.5f, 1e-4f);
         EXPECT_NEAR(upper.y, 1.5f, 1e-4f);

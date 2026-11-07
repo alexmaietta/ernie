@@ -7,6 +7,7 @@
 
 #include "ernie/io/image.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/profiler.h"
 
@@ -98,10 +99,17 @@ Textures::Textures(Catalog& catalog, unsigned threads)
 Textures::~Textures() = default;
 
 std::span<const ColumnRef> Textures::Outputs() const {
-    static constexpr ColumnRef kOutputs[] = {kMaterialTextures, kDomeLightTextures,
-                                             kDomeLightTextureSize, kShapingAPITextures,
-                                             kRectLightTextures};
-    return kOutputs;
+    return {};
+}
+
+void Textures::Describe(RenderTables& tables) const {
+    tables.textures.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
+}
+
+void Textures::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    if (m_records.Buffer()) {
+        held.emplace_back(m_records.Buffer());
+    }
 }
 
 bool Textures::Pending() const {
@@ -160,54 +168,59 @@ void Textures::Refresh(uint32_t prim) {
     if (!resolved) {
         return;
     }
-    const Prims& prims = m_catalog.GetPrims();
     if (material.bindings == kNoTextures) {
         material.bindings = m_cache.AllocateBindings(uint32_t(material.slots.size()));
-        if (IsA(prims.At(prim).schema, SchemaId::Material)) {
-            m_catalog.GetStore().Stage(kMaterialTextures, prims.Row(prim, SchemaId::Material),
-                                       std::as_bytes(std::span(&material.bindings, 1)));
-        }
     }
     for (uint32_t index = 0; index < material.slots.size(); ++index) {
         m_cache.SetBinding(material.bindings + index, material.slots[index].binding.handle);
     }
-    StageLight(prim, material);
-    m_catalog.GetStore().StampWorld(prims.At(prim).world);
+    Publish(prim, material);
 }
 
-void Textures::StageLight(uint32_t prim, const Material& material) {
+void Textures::Publish(uint32_t prim, const Material& material) {
     const Prims& prims = m_catalog.GetPrims();
-    Store& store = m_catalog.GetStore();
+    const SchemaId schema = prims.At(prim).schema;
+    TextureRecord record{};
+    if (IsA(schema, SchemaId::Material) || schema == SchemaId::DomeLight) {
+        record.textures = material.bindings;
+    }
     for (uint32_t index = 0; index < material.slots.size(); ++index) {
         const SchemaId table = material.slots[index].slot.table;
         const uint32_t binding =
             material.bindings == kNoTextures ? kNoTextures : material.bindings + index;
         if (table == SchemaId::ShapingAPI && prims.HasApi(prim, SchemaId::ShapingAPI)) {
-            store.Stage(kShapingAPITextures, prims.Row(prim, SchemaId::ShapingAPI),
-                        std::as_bytes(std::span(&binding, 1)));
+            record.shaping = binding;
         } else if (table == SchemaId::RectLight) {
-            store.Stage(kRectLightTextures, prims.Row(prim, SchemaId::RectLight),
-                        std::as_bytes(std::span(&binding, 1)));
+            record.textures = binding;
         }
     }
-    if (prims.At(prim).schema != SchemaId::DomeLight) {
-        return;
-    }
-    Uint2 size{0, 0};
-    if (material.bindings != kNoTextures) {
+    if (schema == SchemaId::DomeLight && material.bindings != kNoTextures) {
         if (const auto found = m_cache.Size(material.slots[0].binding.key)) {
-            size = {found->first, found->second};
+            record.width = found->first;
+            record.height = found->second;
         }
     }
-    const uint32_t row = prims.Row(prim, SchemaId::DomeLight);
-    store.Stage(kDomeLightTextures, row, std::as_bytes(std::span(&material.bindings, 1)));
-    store.Stage(kDomeLightTextureSize, row, std::as_bytes(std::span(&size, 1)));
+    m_records.Set(prim, record);
+    Rebound(prims.At(prim).world);
+}
+
+void Textures::Rebound(uint32_t world) {
+    if (std::ranges::find(m_rebound, world) == m_rebound.end()) {
+        m_rebound.push_back(world);
+    }
 }
 
 void Textures::Release(uint32_t prim) {
     const auto found = m_materials.find(prim);
     if (found == m_materials.end()) {
         return;
+    }
+    m_records.Set(prim, TextureRecord{});
+    const Prims& prims = m_catalog.GetPrims();
+    if (prims.Alive(prim)) {
+        Rebound(prims.At(prim).world);
+    } else {
+        Rebound(kGlobalWorld);
     }
     const Material& material = found->second;
     for (const Bound& bound : material.slots) {
@@ -295,11 +308,7 @@ void Textures::Rebind(uint32_t prim, Cells& cells) {
             m_cache.SetBinding(material.bindings + index, material.slots[index].binding.handle);
         }
     }
-    if (IsA(schema, SchemaId::Material)) {
-        m_catalog.GetStore().Stage(kMaterialTextures, prims.Row(prim, SchemaId::Material),
-                                   std::as_bytes(std::span(&material.bindings, 1)));
-    }
-    StageLight(prim, material);
+    Publish(prim, material);
     for (const RowKey& row : material.rows) {
         m_byRow[row] = prim;
     }
@@ -374,6 +383,14 @@ device::Operation Textures::Run(const ChangeSet& changes, Stream) {
         }
     }
     UploadBindings();
+    m_records.Reserve(prims.Size());
+    if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
+        Rebound(kGlobalWorld);
+    }
+    if (changes.log != nullptr && !m_rebound.empty()) {
+        changes.log->Wrote(TableId::Textures, m_rebound);
+    }
+    m_rebound.clear();
 
     m_stats.images = m_cache.Images();
     m_stats.loaded = m_cache.Loaded();

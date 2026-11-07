@@ -431,9 +431,8 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
             if (!PrimBounded(scene, prim)) {
                 return false;
             }
-            const uint boundRow = PrimRow(scene, prim, kSlotBoundable);
-            low = scene->schemas.boundable.worldMin[boundRow].Vector();
-            high = scene->schemas.boundable.worldMax[boundRow].Vector();
+            low = p.tables->boundables[prim].lower.Vector();
+            high = p.tables->boundables[prim].upper.Vector();
             world = scene->prims.world[prim];
             if (low.x == high.x && low.y == high.y && low.z == high.z) {
                 return false;
@@ -1533,9 +1532,8 @@ void UniteOverlayBoxes(uniform OverlayUniteParams u) {
     if (group >= u.boxCount || !PrimBounded(scene, prim)) {
         return;
     }
-    const uint boundRow = PrimRow(scene, prim, kSlotBoundable);
-    const float3 low = scene->schemas.boundable.worldMin[boundRow].Vector();
-    const float3 high = scene->schemas.boundable.worldMax[boundRow].Vector();
+    const float3 low = u.tables->boundables[prim].lower.Vector();
+    const float3 high = u.tables->boundables[prim].upper.Vector();
     if (low.x == high.x && low.y == high.y && low.z == high.z) {
         return;
     }

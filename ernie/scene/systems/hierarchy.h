@@ -48,6 +48,8 @@ class Hierarchy : public System {
         return m_rebuilds;
     }
 
+    device::Download Gather(const Ref<device::Buffer>& source, uint32_t words,
+                            std::span<const uint32_t> rows);
     device::Download ReadTransformsAsync(std::span<const uint32_t> prims);
     std::vector<WorldTransform> Transforms(std::span<const uint32_t> prims);
     std::vector<ResolvedImageable> Imageables(std::span<const uint32_t> prims);
@@ -56,8 +58,6 @@ class Hierarchy : public System {
     void Rebuild();
     bool Apply(const ChangeSet& changes);
     uint32_t ParentRow(uint32_t prim) const;
-    device::Download Gather(const Ref<device::Buffer>& source, uint32_t words,
-                            std::span<const uint32_t> rows);
 
     Catalog& m_catalog;
     device::Program& Kernels();

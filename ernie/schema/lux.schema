@@ -107,10 +107,6 @@ api class ShapingAPI (
         displayName = "IES Normalize"
         doc = "Divides the IES profile by its power, so it changes the light's distribution but not its power."
     )
-    uint ernie:textures (
-        derived
-        doc = "Where the IES profile's texture handle is in the texture bindings, or 0 without one, written by the texture system."
-    )
 }
 
 api class OmniShapingAPI (
@@ -284,14 +280,6 @@ class DomeLight : NonboundableLightBase (
         displayName = "Portals"
         doc = "PortalLights that light from this dome enters through. With portals, direct lighting samples only the directions through them."
     )
-    uint ernie:textures (
-        derived
-        doc = "Where the dome's texture handle is in the texture bindings, or 0 without one, written by the texture system."
-    )
-    uint2 ernie:textureSize (
-        derived
-        doc = "Width and height of the dome's image, or 0 without one, written by the texture system."
-    )
 }
 
 class PortalLight : BoundableLightBase (
@@ -335,10 +323,6 @@ class RectLight : BoundableLightBase (
         group = "Shape"
         displayName = "Texture"
         doc = "An image multiplying the emission across the rectangle, with s along +X and t along +Y, so it reads unmirrored from the +Z side."
-    )
-    uint ernie:textures (
-        derived
-        doc = "Where the rectangle's texture handle is in the texture bindings, or 0 without one, written by the texture system."
     )
 }
 

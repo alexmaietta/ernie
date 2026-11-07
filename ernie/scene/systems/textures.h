@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/tables/textures.h"
 #include "ernie/scene/kernels/textures.h"
+#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
 #include "ernie/texture/cache.h"
 
@@ -49,6 +51,19 @@ class Textures : public System {
     }
 
     std::span<const ColumnRef> Outputs() const override;
+
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Textures};
+        return kTables;
+    }
+
+    void Describe(RenderTables& tables) const override;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
+
+    const TextureRecord& Record(uint32_t prim) const {
+        return m_records.At(prim);
+    }
+
     bool Pending() const override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 
@@ -90,7 +105,8 @@ class Textures : public System {
     std::set<uint32_t> Collect();
     void Refresh(uint32_t prim);
     void Release(uint32_t prim);
-    void StageLight(uint32_t prim, const Material& material);
+    void Publish(uint32_t prim, const Material& material);
+    void Rebound(uint32_t world);
     void Rebind(uint32_t prim, Cells& cells);
     void UploadBindings();
 
@@ -105,6 +121,8 @@ class Textures : public System {
     uint32_t m_checkerUsers = 0;
     TextureStats m_stats;
     uint32_t m_runs = 0;
+    RecordTable<TextureRecord> m_records{"texture records"};
+    std::vector<uint32_t> m_rebound;
 };
 
 }

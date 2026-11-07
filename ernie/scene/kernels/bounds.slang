@@ -50,10 +50,9 @@ void PrimBounds(uniform BoundsParams p) {
             half = (upper - lower) / 2;
         }
     }
-    const uint boundRow = PrimRow(scene, prim, kSlotBoundable);
     if (!bounded) {
-        scene->schemas.boundable.worldMin[boundRow] = Float3(float3(0));
-        scene->schemas.boundable.worldMax[boundRow] = Float3(float3(0));
+        p.boundables[prim].lower = Float3(float3(0));
+        p.boundables[prim].upper = Float3(float3(0));
         return;
     }
 
@@ -64,8 +63,8 @@ void PrimBounds(uniform BoundsParams p) {
     const float3 reach = abs(axes[0]) * half.x + abs(axes[1]) * half.y + abs(axes[2]) * half.z;
     const float3 lower = middle - reach;
     const float3 upper = middle + reach;
-    scene->schemas.boundable.worldMin[boundRow] = Float3(lower);
-    scene->schemas.boundable.worldMax[boundRow] = Float3(upper);
+    p.boundables[prim].lower = Float3(lower);
+    p.boundables[prim].upper = Float3(upper);
 }
 
 void Grow(Ptr<uint> extents, uint lowerAt, uint upperAt, float3 lower, float3 upper) {
@@ -152,9 +151,8 @@ void InstancerBounds(uniform BoundsParams p) {
         upper[axis] = FloatFromOrdered(p.instancerExtents[prim * 6 + 3 + axis]);
     }
     const bool empty = lower.x > upper.x;
-    const uint row = PrimRow(scene, prim, kSlotBoundable);
-    scene->schemas.boundable.worldMin[row] = Float3(empty ? float3(0) : lower);
-    scene->schemas.boundable.worldMax[row] = Float3(empty ? float3(0) : upper);
+    p.boundables[prim].lower = Float3(empty ? float3(0) : lower);
+    p.boundables[prim].upper = Float3(empty ? float3(0) : upper);
 }
 
 [shader("compute")]

@@ -242,6 +242,8 @@ class ERNIE_API Scene : public RefCounted {
     device::Download ReadAllBoundsAsync() const;
     device::Download ReadWorldTransformsAsync(Span<const std::string> paths) const;
     std::vector<ernie::WorldTransform> WorldTransforms(Span<const std::string> paths) const;
+    device::Download ReadPrimBoundsAsync(Span<const std::string> paths) const;
+    std::vector<Box> PrimBounds(Span<const std::string> paths) const;
 
     device::Operation Publish(const PublishDesc& desc = {}, Stream producer = Stream::None());
     bool Pending() const;

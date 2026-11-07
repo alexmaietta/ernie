@@ -1830,6 +1830,7 @@ void OverlayPass::RecordUnions(device::CommandEncoder& encoder, const Snapshot& 
     encoder.Barrier();
     for (OverlayUniteParams& params : m_uniteParams) {
         params.scene = {snapshot.sceneData};
+        params.tables = {snapshot.tables};
         encoder.Dispatch(
             m_program->Entry("ClearOverlayBoxes"), params,
             {.x = device::GroupCount(params.boxCount * kOverlayBoxWords, kOverlayGroup)});

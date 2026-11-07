@@ -44,8 +44,6 @@ constexpr ColumnRef kInputs[] = {kPointBasedPoints,
                                  kPointInstancerInvisibleIds,
                                  kPrototypeAPIPrototype};
 
-constexpr ColumnRef kOutputs[] = {kBoundableWorldMin, kBoundableWorldMax};
-
 uint32_t Ordered(float value) {
     const uint32_t bits = std::bit_cast<uint32_t>(value);
     return (bits & 0x80000000u) != 0 ? ~bits : bits | 0x80000000u;
@@ -58,7 +56,7 @@ std::span<const ColumnRef> Bounds::Inputs() const {
 }
 
 std::span<const ColumnRef> Bounds::Outputs() const {
-    return kOutputs;
+    return {};
 }
 
 void Bounds::Relayout() {
@@ -80,6 +78,12 @@ void Bounds::Relayout() {
         m_boxes = device.CreateBuffer(
             {.bytes = uint64_t(m_slots) * sizeof(BvhBox), .label = "world bounds"});
     }
+    const uint32_t boundables = std::max(m_catalog.GetPrims().Size(), 1u);
+    if (!m_boundables || boundables > m_boundableCapacity) {
+        m_boundableCapacity = boundables;
+        m_boundables = device.CreateBuffer(
+            {.bytes = uint64_t(boundables) * sizeof(BoundableBox), .label = "prim bounds"});
+    }
     m_epoch = m_catalog.Epoch();
 }
 
@@ -100,6 +104,7 @@ device::Operation Bounds::Run(const ChangeSet& changes, Stream) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
+    params.boundables.address = m_boundables->Address();
     params.primCount = m_catalog.GetPrims().Size();
     params.slotCount = m_slots;
     const uint64_t instancerBytes = std::max<uint64_t>(params.primCount, 1) * 6 * sizeof(uint32_t);
@@ -144,9 +149,6 @@ device::Operation Bounds::Run(const ChangeSet& changes, Stream) {
         encoder.Dispatch(Kernels().Entry("FinishBoxes"), params,
                          {.x = device::GroupCount(params.slotCount, kBoundsGroup)});
     }
-    for (const ColumnRef column : kOutputs) {
-        store.Touch(column);
-    }
     return queue.Submit(encoder.Finish());
 }
 
@@ -189,6 +191,7 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
 
 void Bounds::Describe(RenderTables& tables) const {
     tables.bounds = m_boxes ? m_boxes->Address() : 0;
+    tables.boundables.address = m_boundables ? m_boundables->Address() : 0;
 }
 
 void Bounds::Prepare() {

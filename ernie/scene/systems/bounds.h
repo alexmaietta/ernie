@@ -48,9 +48,16 @@ class Bounds : public System {
 
     void Describe(RenderTables& tables) const override;
 
+    const Ref<device::Buffer>& Boundables() const {
+        return m_boundables;
+    }
+
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
         if (m_boxes) {
             held.emplace_back(m_boxes);
+        }
+        if (m_boundables) {
+            held.emplace_back(m_boundables);
         }
     }
 
@@ -69,6 +76,8 @@ class Bounds : public System {
     Ref<device::Buffer> m_origins;
     Ref<device::Buffer> m_extents;
     Ref<device::Buffer> m_boxes;
+    Ref<device::Buffer> m_boundables;
+    uint32_t m_boundableCapacity = 0;
     Ref<device::Buffer> m_instancerExtents;
     uint64_t m_epoch = ~uint64_t(0);
     uint32_t m_slots = 0;

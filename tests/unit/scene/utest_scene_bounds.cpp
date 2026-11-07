@@ -37,8 +37,9 @@ void ExpectBox(const std::optional<Box>& box, Float3 lower, Float3 upper) {
 }
 
 void ExpectPrim(const Prim& prim, Float3 lower, Float3 upper) {
-    ExpectNear(prim.Get<Float3>("worldMin"), lower);
-    ExpectNear(prim.Get<Float3>("worldMax"), upper);
+    const Box box = prim.GetScene().PrimBounds(std::vector<std::string>{prim.Path()}).front();
+    ExpectNear(box.lower, lower);
+    ExpectNear(box.upper, upper);
 }
 
 const std::vector<Float3> kQuad = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}};

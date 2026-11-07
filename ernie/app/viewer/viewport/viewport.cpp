@@ -1062,15 +1062,14 @@ void Viewport::Frame(bool selected) {
         }
     }
     m_framing.clear();
+    m_framingPrims = !bounded.empty();
     if (bounded.empty()) {
         m_framingWorlds = m_session && !m_session->shown.empty();
         m_framing.push_back(m_framingWorlds ? m_scene->ReadAllBoundsAsync()
                                             : m_scene->ReadBoundsAsync());
         return;
     }
-    const View view = m_scene->Select(Span<const std::string>(bounded), SchemaId::Boundable);
-    m_framing.push_back(view.Get("worldMin").ReadHostAsync());
-    m_framing.push_back(view.Get("worldMax").ReadHostAsync());
+    m_framing.push_back(m_scene->ReadPrimBoundsAsync(Span<const std::string>(bounded)));
 }
 
 void Viewport::LandFraming() {
@@ -1090,7 +1089,17 @@ void Viewport::LandFraming() {
         box.upper = {std::max(box.upper.x, upper.x), std::max(box.upper.y, upper.y),
                      std::max(box.upper.z, upper.z)};
     };
-    if (m_framing.size() == 1 && m_framingWorlds) {
+    if (m_framingPrims) {
+        const Span<const std::byte> bytes = m_framing[0].Bytes();
+        for (size_t at = 0; at + sizeof(Box) <= bytes.size(); at += sizeof(Box)) {
+            Box read;
+            std::memcpy(&read, bytes.data() + at, sizeof(Box));
+            if (read.lower.x != read.upper.x || read.lower.y != read.upper.y ||
+                read.lower.z != read.upper.z) {
+                grow(read.lower, read.upper);
+            }
+        }
+    } else if (m_framing.size() == 1 && m_framingWorlds) {
         const Span<const std::byte> bytes = m_framing[0].Bytes();
         const auto stored = [&](size_t slot) {
             Box read{{1, 1, 1}, {0, 0, 0}};
@@ -1121,19 +1130,6 @@ void Viewport::LandFraming() {
             std::memcpy(&whole, m_framing[0].Bytes().data(), sizeof(Box));
         }
         grow(whole.lower, whole.upper);
-    } else {
-        const Span<const std::byte> lows = m_framing[0].Bytes();
-        const Span<const std::byte> highs = m_framing[1].Bytes();
-        for (size_t at = 0; at + sizeof(Float3) <= std::min(lows.size(), highs.size());
-             at += sizeof(Float3)) {
-            Float3 lower;
-            Float3 upper;
-            std::memcpy(&lower, lows.data() + at, sizeof(Float3));
-            std::memcpy(&upper, highs.data() + at, sizeof(Float3));
-            if (lower.x != upper.x || lower.y != upper.y || lower.z != upper.z) {
-                grow(lower, upper);
-            }
-        }
     }
     m_framing.clear();
     if (box.lower.x > box.upper.x) {

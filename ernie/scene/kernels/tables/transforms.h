@@ -14,4 +14,11 @@ struct ResolvedImageable {
 
 ERNIE_CHECK_SIZE(ResolvedImageable, 16);
 
+struct BoundableBox {
+    Float3 lower;
+    Float3 upper;
+};
+
+ERNIE_CHECK_SIZE(BoundableBox, 24);
+
 }

@@ -5,6 +5,7 @@
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
 
@@ -18,13 +19,14 @@ struct BoundsParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
+    Ptr<BoundableBox> boundables;
     uint primCount;
     uint slotCount;
     uint instanceSlots;
     uint tlasCount;
 };
 
-ERNIE_CHECK_SIZE(BoundsParams, 88);
+ERNIE_CHECK_SIZE(BoundsParams, 96);
 
 static const uint kBoundsGroup = 64;
 

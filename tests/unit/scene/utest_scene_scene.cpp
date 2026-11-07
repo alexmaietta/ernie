@@ -267,8 +267,9 @@ TEST(SceneTest, TypedPrimsReadAndWriteEveryKindOfField) {
         EXPECT_EQ(mesh.Primvars()[0].name, "heat");
 
         scene.Publish().Wait();
-        EXPECT_NEAR(ball.WorldMin().x, -3.0f, 1e-4f);
-        EXPECT_NEAR(ball.WorldMax().z, 7.0f, 1e-4f);
+        const Box box = scene.PrimBounds(std::vector<std::string>{ball.Path()}).front();
+        EXPECT_NEAR(box.lower.x, -3.0f, 1e-4f);
+        EXPECT_NEAR(box.upper.z, 7.0f, 1e-4f);
 
         EXPECT_NO_THROW(XformablePrim{ball});
         EXPECT_NO_THROW(MaterialBindingAPIPrim{ball});

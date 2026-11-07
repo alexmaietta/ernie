@@ -163,16 +163,6 @@ class World : Xformable (
 abstract class Boundable : Xformable (
     doc = "A prim with a bounded extent."
 ) {
-    float3 ernie:worldMin (
-        derived
-        unit = meters
-        doc = "Lowest corner of the prim's world space box, relative to its world's origin, written by the bounds system."
-    )
-    float3 ernie:worldMax (
-        derived
-        unit = meters
-        doc = "Highest corner of the prim's world space box, relative to its world's origin, written by the bounds system."
-    )
 }
 
 abstract class Gprim : Boundable (

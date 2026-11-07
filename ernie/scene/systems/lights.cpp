@@ -416,6 +416,7 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     params.origins = changes.tables->origins;
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
+    params.textures = changes.tables->textures;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());

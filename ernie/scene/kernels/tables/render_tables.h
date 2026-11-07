@@ -8,6 +8,7 @@
 #include "ernie/scene/kernels/semantics.h"
 #include "ernie/scene/kernels/tables/meshes.h"
 #include "ernie/scene/kernels/tables/surfaces.h"
+#include "ernie/scene/kernels/tables/textures.h"
 #include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
@@ -18,6 +19,8 @@ struct RenderTables {
     Ptr<MeshRecord> meshes;
     Ptr<TangentRecord> tangents;
     Ptr<SurfaceRecord> surfaces;
+    Ptr<BoundableBox> boundables;
+    Ptr<TextureRecord> textures;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
@@ -27,7 +30,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 112);
+ERNIE_CHECK_SIZE(RenderTables, 128);
 
 #ifdef __SLANG__
 

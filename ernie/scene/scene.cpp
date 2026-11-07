@@ -586,6 +586,32 @@ std::vector<ernie::WorldTransform> Scene::WorldTransforms(Span<const std::string
     return transforms;
 }
 
+static_assert(sizeof(Box) == sizeof(BoundableBox));
+
+device::Download Scene::ReadPrimBoundsAsync(Span<const std::string> paths) const {
+    const Prims& prims = m_impl->GetCatalog().GetPrims();
+    std::vector<uint32_t> rows;
+    for (const std::string& path : paths) {
+        const std::optional<Prim> prim = Find(path);
+        rows.push_back(prim && IsA(prims.At(prim->Index()).schema, SchemaId::Boundable)
+                           ? prim->Index()
+                           : kNoRow);
+    }
+    return m_impl->GetHierarchy().Gather(m_impl->GetBounds().Boundables(),
+                                         sizeof(BoundableBox) / sizeof(uint32_t), rows);
+}
+
+std::vector<Box> Scene::PrimBounds(Span<const std::string> paths) const {
+    std::vector<Box> boxes(paths.size());
+    if (boxes.empty()) {
+        return boxes;
+    }
+    const device::Download download = ReadPrimBoundsAsync(paths);
+    download.Wait();
+    std::memcpy(boxes.data(), download.Bytes().data(), boxes.size() * sizeof(Box));
+    return boxes;
+}
+
 std::optional<Box> Scene::Bounds(uint32_t world) const {
     const std::optional<BvhBox> box = m_impl->GetBounds().World(world);
     if (!box) {
