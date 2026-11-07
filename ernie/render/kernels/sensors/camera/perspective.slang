@@ -49,7 +49,7 @@ struct Perspective : ICamera {
         const float3 local = frame.ToLocal(position);
         FilmPoint point;
         point.film = (local.xy * (focalLength / -local.z) - offset) / (0.5f * aperture);
-        point.visible = no_diff clipping.Contains(detach(local));
+        point.visible = no_diff clipping.Contains(detach(local), length(detach(local)));
         return point;
     }
 

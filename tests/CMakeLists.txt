@@ -88,6 +88,7 @@ ernie_test(
     LINK
         ernie_render_internal
     SOURCES
+        unit/render/utest_render_camera.cpp
         unit/render/utest_render_lidar.cpp
         unit/render/utest_render_overlay.cpp
         unit/render/utest_render_ray_cast.cpp

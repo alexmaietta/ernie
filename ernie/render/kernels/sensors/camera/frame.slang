@@ -15,8 +15,8 @@ struct CameraClipping {
     float4 planes[kMostClippingPlanes];
     uint planeCount;
 
-    bool Contains(float3 local) {
-        if (-local.z < near || -local.z > far) {
+    bool Contains(float3 local, float distance) {
+        if (distance < near || distance > far) {
             return false;
         }
         for (uint i = 0; i < planeCount; ++i) {
@@ -29,9 +29,7 @@ struct CameraClipping {
     }
 
     float2 Clip(float3 origin, float3 direction) {
-        float2 interval = float2(0, kInfinity);
-        Narrow(interval, float3(0, 0, -1), -near, origin, direction);
-        Narrow(interval, float3(0, 0, 1), far, origin, direction);
+        float2 interval = float2(near, far) / length(direction);
         for (uint i = 0; i < planeCount; ++i) {
             const float4 plane = planes[i];
             Narrow(interval, plane.xyz, plane.w, origin, direction);

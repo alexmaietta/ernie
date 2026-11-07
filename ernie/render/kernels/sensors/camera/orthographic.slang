@@ -37,7 +37,7 @@ struct Orthographic : ICamera {
         const float3 local = frame.ToLocal(position);
         FilmPoint point;
         point.film = (local.xy - offset) / (0.5f * size);
-        point.visible = no_diff clipping.Contains(detach(local));
+        point.visible = no_diff clipping.Contains(detach(local), -detach(local).z);
         return point;
     }
 

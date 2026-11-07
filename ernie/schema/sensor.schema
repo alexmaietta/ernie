@@ -129,7 +129,7 @@ class Camera : Sensor, LensDistortionAPI (
         unit = meters
         group = "Clipping"
         displayName = "Clipping Range"
-        doc = "Nearest and farthest distances rendered."
+        doc = "Nearest and farthest distances rendered along each ray, rather than USD's depth planes."
     )
     float4[] clippingPlanes (
         tracked
