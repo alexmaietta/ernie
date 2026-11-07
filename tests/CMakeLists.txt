@@ -90,8 +90,10 @@ ernie_test(
     SOURCES
         unit/render/utest_render_camera.cpp
         unit/render/utest_render_lidar.cpp
+        unit/render/utest_render_origin.cpp
         unit/render/utest_render_overlay.cpp
         unit/render/utest_render_ray_cast.cpp
+        unit/render/utest_render_ray_origin.cpp
         unit/render/utest_render_renderer.cpp
 )
 

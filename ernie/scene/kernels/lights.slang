@@ -280,16 +280,13 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     } else {
         w = PrimWorld(scene, prim);
     }
-    const uint origin = tlas < layout->worldCount ? layout->worldOrigins[tlas] : kNoRow;
     const float3 x = w.x.Vector();
     const float3 y = w.y.Vector();
     const float3 z = w.z.Vector();
     const float3 scale = float3(length(x), length(y), length(z));
 
     LightRecord record;
-    record.position = Float3(origin == kNoRow
-                                 ? w.Translation()
-                                 : w.TranslationFrom(scene->schemas.xformable.worldTransform[origin]));
+    record.position = Float3(RenderTranslation(Ptr<InstanceLayout>(layout->instances), w, tlas));
     const uint shownBase = layout->offsetBases[tlas];
     const uint source = scene->prims.world[instancer != kNoPrim ? instancer : prim];
     if (shownBase != kNoRow && source != kGlobalWorld) {

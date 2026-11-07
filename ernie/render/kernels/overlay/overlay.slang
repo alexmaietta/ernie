@@ -54,17 +54,10 @@ float3 RenderSpace(OverlayParams p, OverlayBatch batch, uint world, float3 point
     InstanceLayout* layout = p.layout;
     if (batch.anchor != kNoPrim) {
         const WorldTransform transform = PrimWorld(scene, batch.anchor);
-        return transform.Apply(point) + TranslationInWorld(scene, layout, transform, world) +
+        return transform.Apply(point) + RenderTranslation(layout, transform, world) +
                ShownOffset(layout, world, scene->prims.world[batch.anchor]);
     }
-    if (world == kGlobalWorld || world >= layout->worldCount) {
-        return point;
-    }
-    const uint origin = layout->worldOrigins[world];
-    if (origin == kNoRow) {
-        return point;
-    }
-    return point - scene->schemas.xformable.worldTransform[origin].Translation();
+    return RenderPoint(layout, point, world);
 }
 
 float RecordRadius(OverlayRecord record) {
@@ -459,10 +452,11 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         if (world == kGlobalWorld) {
             a = RenderSpace(p, batch, viewWorld, a);
             b = RenderSpace(p, batch, viewWorld, b);
-        } else if (world != viewWorld) {
-            const float3 shift = WorldOrigin(scene, p.layout, world) -
-                                 WorldOrigin(scene, p.layout, viewWorld) +
-                                 ShownOffset(p.layout, viewWorld, world);
+        } else {
+            float3 shift = RenderShift(scene, p.layout, world, viewWorld);
+            if (world != viewWorld) {
+                shift += ShownOffset(p.layout, viewWorld, world);
+            }
             a += shift;
             b += shift;
         }
@@ -477,7 +471,7 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         return false;
     }
     const WorldTransform w = PrimWorld(scene, prim);
-    const float3 origin = TranslationInWorld(scene, p.layout, w, viewWorld) +
+    const float3 origin = RenderTranslation(p.layout, w, viewWorld) +
                           ShownOffset(p.layout, viewWorld, world);
     float3 from;
     float3 to;
@@ -836,7 +830,7 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
             const Lens lens = Lens(scene, prim);
             const float distance = batch.length > 0 ? batch.length : 1;
             const WorldTransform w = PrimWorld(scene, prim);
-            const float3 offset = TranslationInWorld(scene, p.layout, w, viewWorld) +
+            const float3 offset = RenderTranslation(p.layout, w, viewWorld) +
                                   ShownOffset(p.layout, viewWorld, world);
             origin = w.Apply(lens.Corner(float2(-1, 1), distance)) + offset;
             right = w.Apply(lens.Corner(float2(1, 1), distance)) + offset;
@@ -1779,7 +1773,8 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     float3 origin;
     float3 direction;
     PickRay(p, view, float2(query.x, query.y), origin, direction);
-    result.origin = {origin.x, origin.y, origin.z};
+    const float3 eye = origin - RenderShift(scene, p.layout, result.world, result.world);
+    result.origin = {eye.x, eye.y, eye.z};
     result.direction = {direction.x, direction.y, direction.z};
     if (result.work == ~0u || p.viewItemCount == 0) {
         p.pickResults[pick] = result;
@@ -1812,6 +1807,8 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
                       : kNoPrim;
     result.distance = measure.distance;
     result.depth = measure.depth;
-    result.position = {position.x, position.y, position.z};
+    const uint world = scene->prims.world[view.camera];
+    const float3 found = position - RenderShift(scene, p.layout, world, world);
+    result.position = {found.x, found.y, found.z};
     p.pickResults[pick] = result;
 }

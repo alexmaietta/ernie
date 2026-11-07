@@ -39,6 +39,18 @@ struct ObjectSpace {
         return local;
     }
 
+    float3 ToWorld(float3 local) {
+        return origin + axes[0] * local.x + axes[1] * local.y + axes[2] * local.z;
+    }
+
+    float3 ErrorToWorld(float3 local, float3 error) {
+        const float3 placed = abs(axes[0] * local.x) + abs(axes[1] * local.y) +
+                              abs(axes[2] * local.z) + abs(origin);
+        const float3 carried =
+            abs(axes[0]) * error.x + abs(axes[1]) * error.y + abs(axes[2]) * error.z;
+        return Gamma(3) * max(placed.x, max(placed.y, placed.z)) + (1 + Gamma(3)) * carried;
+    }
+
     float3 NormalToWorld(float3 normal) {
         const float3 x = axes[0];
         const float3 y = axes[1];

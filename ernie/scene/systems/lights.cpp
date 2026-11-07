@@ -158,7 +158,8 @@ SpectralTables BuildSpectralTables() {
 }
 
 std::vector<ColumnRef> LightInputs() {
-    std::vector<ColumnRef> inputs = {kXformableWorldTransform, kImageableComputedVisibility};
+    std::vector<ColumnRef> inputs = {kXformableWorldTransform, kImageableComputedVisibility,
+                                     kRenderProductCamera};
     const SchemaId schemas[] = {SchemaId::LightAPI,
                                 SchemaId::DistantLight,
                                 SchemaId::SphereLight,
@@ -240,14 +241,12 @@ void Lights::Relayout() {
     m_lights.clear();
     m_worldPrims.clear();
     std::vector<std::vector<uint32_t>> lists(m_worlds + 1);
-    std::vector<uint32_t> origins(std::max(m_worlds, 1u), kNoRow);
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim)) {
             continue;
         }
         const PrimRecord& record = prims.At(prim);
         if (IsA(record.schema, SchemaId::World)) {
-            origins[record.world] = prims.Row(prim, SchemaId::Xformable);
             m_worldPrims.insert(prim);
         }
         if (HasApi(record.apis, SchemaId::LightAPI)) {
@@ -308,7 +307,6 @@ void Lights::Relayout() {
     };
     const uint64_t first = append(starts);
     const uint64_t listed = append(items);
-    const uint64_t origin = append(origins);
     std::vector<uint32_t> slots(items.size(), kNoRow);
     for (size_t slot = 0; slot < items.size(); ++slot) {
         const auto dome = std::ranges::find(domes, items[slot]);
@@ -347,7 +345,6 @@ void Lights::Relayout() {
     layout.records.address = m_records->Address();
     layout.firstLights.address = m_layout->Address() + first;
     layout.prims.address = m_layout->Address() + listed;
-    layout.worldOrigins.address = m_layout->Address() + origin;
     layout.cdf.address = m_cdf->Address();
     layout.maps.address = m_maps->Address();
     layout.domePrims.address = m_layout->Address() + domePrims;
@@ -371,9 +368,12 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     if (relaid) {
         Relayout();
     }
+    Store& store = m_catalog.GetStore();
+    const bool viewed = store.LastWrite(kRenderProductCamera) > m_seen;
+    m_seen = store.WriteSequence();
     std::vector<uint32_t> dirty;
     const bool global =
-        relaid || std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+        relaid || viewed || std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
     std::set<uint32_t> shown;
     for (const uint32_t world : changes.worlds) {
         if (const auto found = m_shownIn.find(world); found != m_shownIn.end()) {
@@ -396,7 +396,6 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
         m_written += m_counts[tlas];
     }
 
-    Store& store = m_catalog.GetStore();
     device::Device& device = store.GetDevice();
     const Ref<device::Buffer> tlases = device.CreateBuffer({.label = "dirty light lists"}, dirty);
     LightParams params{};

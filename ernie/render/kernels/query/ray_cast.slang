@@ -33,14 +33,9 @@ bool LoadRay(RayCastParams params, uint index, out HitQuery query, out Ray ray,
     query = HitQuery(data, layout, world == kGlobalWorld || world < layout->worldCount
                                        ? world
                                        : kGlobalWorld);
-    offset.high = float3(0);
-    offset.low = float3(0);
-    if (world != kGlobalWorld && world < layout->worldCount &&
-        layout->worldOrigins[world] != kNoRow) {
-        const WorldTransform origin = data->schemas.xformable.worldTransform[layout->worldOrigins[world]];
-        offset.high = origin.high.Vector();
-        offset.low = origin.low.Vector();
-    }
+    const RenderOrigin origin = TlasOrigin(layout, query.world);
+    offset.high = origin.high.Vector();
+    offset.low = origin.low.Vector();
     const float3 start = Load3(params.origins, index);
     const float tMin = params.tMins != nullptr ? params.tMins[index] : params.minDistance;
     const float tMax = params.tMaxes != nullptr ? params.tMaxes[index] : params.maxDistance;

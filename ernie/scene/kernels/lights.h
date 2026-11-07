@@ -71,7 +71,6 @@ struct LightLayout {
     Ptr<LightRecord> records;
     Ptr<uint> firstLights;
     Ptr<uint> prims;
-    Ptr<uint> worldOrigins;
     Ptr<float> cdf;
     Ptr<float> maps;
     Ptr<uint> domePrims;
@@ -84,7 +83,7 @@ struct LightLayout {
     uint domeCount;
 };
 
-ERNIE_CHECK_SIZE(LightLayout, 104);
+ERNIE_CHECK_SIZE(LightLayout, 96);
 
 static const uint kDomeMapWidth = 256;
 static const uint kDomeMapHeight = 128;

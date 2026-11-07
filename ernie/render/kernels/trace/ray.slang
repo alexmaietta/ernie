@@ -90,3 +90,37 @@ struct NoIntersector : IIntersector {
         return found;
     }
 }
+
+float Gamma(uint n) {
+    const float epsilon = 0.5f * 1.1920929e-7f;
+    return n * epsilon / (1 - n * epsilon);
+}
+
+float NextFloatUp(float v) {
+    if (isinf(v) && v > 0) {
+        return v;
+    }
+    const uint bits = asuint(v == 0 ? 0.0f : v);
+    return asfloat(v >= 0 ? bits + 1 : bits - 1);
+}
+
+float NextFloatDown(float v) {
+    if (isinf(v) && v < 0) {
+        return v;
+    }
+    const uint bits = asuint(v == 0 ? -0.0f : v);
+    return asfloat(v > 0 ? bits - 1 : bits + 1);
+}
+
+float3 OffsetRayOrigin(float3 position, float3 offset) {
+    float3 origin = position + offset;
+    [ForceUnroll]
+    for (uint i = 0; i < 3; ++i) {
+        if (offset[i] > 0) {
+            origin[i] = NextFloatUp(origin[i]);
+        } else if (offset[i] < 0) {
+            origin[i] = NextFloatDown(origin[i]);
+        }
+    }
+    return origin;
+}

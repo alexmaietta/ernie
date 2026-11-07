@@ -38,8 +38,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     point.prim = prim;
     point.slot = primHit.slot;
     point.distance = primHit.hit.t;
-    point.position = ray.origin + primHit.hit.t * ray.direction;
     point.element = FindSurfaceElement(data, prim, primHit.hit);
+    float3 error;
 
     if (point.element.mesh) {
         const uint pointsRow = PrimRow(data, prim, kSlotPointBased);
@@ -49,10 +49,20 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
         const float3 a = positions[corners.x].Vector();
         const float3 b = positions[corners.y].Vector();
         const float3 c = positions[corners.z].Vector();
+        const float3 weights = point.element.weights;
+        const float3 local = weights.x * a + weights.y * b + weights.z * c;
+        point.position = space.ToWorld(local);
+        const float3 largest = max(max(abs(a), abs(b)), abs(c));
+        error = space.ErrorToWorld(local, Gamma(7) * max(largest.x, max(largest.y, largest.z)));
         point.geometricNormal = space.NormalToWorld(cross(b - a, c - a));
         point.shadingNormal = MeshShadingNormal(data, space, prim, point.element);
     } else {
-        const ShapeHit hit = IntersectUnitShape(primHit.shape, space.ToObject(ray));
+        const Ray local = space.ToObject(ray);
+        const ShapeHit hit = IntersectUnitShape(primHit.shape, local);
+        const float3 along = hit.t * local.direction;
+        const float3 at = local.origin + along;
+        point.position = space.ToWorld(at);
+        error = space.ErrorToWorld(at, Gamma(16) * (abs(local.origin) + abs(along)));
         point.geometricNormal = space.NormalToWorld(hit.normal);
         point.shadingNormal = point.geometricNormal;
     }
@@ -62,6 +72,7 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     if (dot(point.shadingNormal, point.geometricNormal) < 0) {
         point.shadingNormal = -point.shadingNormal;
     }
+    point.offset = dot(abs(point.geometricNormal), error);
 
     point.footprint = spread * primHit.hit.t;
     const float cosine = max(abs(dot(ray.direction, point.geometricNormal)), 0.05f);

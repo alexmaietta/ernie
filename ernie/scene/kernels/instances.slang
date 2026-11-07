@@ -45,7 +45,7 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
         return Inactive(local);
     }
 
-    const float3 translation = TranslationInWorld(scene, p.layout, w, world);
+    const float3 translation = RenderTranslation(p.layout, w, world);
     const float3 x = shape.axes[0];
     const float3 y = shape.axes[1];
     const float3 z = shape.axes[2];
@@ -119,4 +119,49 @@ void WriteInstances(uniform InstanceParams p) {
     p.hits[slot] = Drawn(item, kNoPrim, 0, 0);
     p.instances[slot] = Shift(MakeInstance(p, item, world, thread.x, slot),
                               ShownOffset(layout, world, p.scene->prims.world[item]));
+}
+
+[shader("compute")]
+[numthreads(kInstanceGroup, 1, 1)]
+void GatherViewers(uniform OriginParams p) {
+    const uint index = LinearThreadIndex();
+    if (index >= p.productCount) {
+        return;
+    }
+    SceneData* scene = p.scene;
+    InstanceLayout* layout = p.layout;
+    const uint product = p.products[index];
+    const ArrayRef sensors =
+        scene->schemas.renderProduct.camera[PrimRow(scene, product, kSlotRenderProduct)];
+    for (uint at = 0; at < sensors.count; ++at) {
+        const uint sensor = Ptr<uint>(sensors.address)[at];
+        if (sensor < scene->primCount && (scene->prims.flags[sensor] & kPrimAlive) != 0) {
+            const uint world = scene->prims.world[sensor];
+            InterlockedMin(layout->viewers[min(world, layout->worldCount)], sensor);
+        }
+    }
+}
+
+[shader("compute")]
+[numthreads(kInstanceGroup, 1, 1)]
+void PlaceOrigins(uniform OriginParams p) {
+    const uint tlas = LinearThreadIndex();
+    if (tlas >= p.tlasCount) {
+        return;
+    }
+    SceneData* scene = p.scene;
+    InstanceLayout* layout = p.layout;
+    const uint viewer = layout->viewers[tlas];
+    layout->viewers[tlas] = kNoPrim;
+    RenderOrigin origin;
+    origin.high = Float3(float3(0));
+    origin.low = Float3(float3(0));
+    if (viewer != kNoPrim) {
+        origin = SnapOrigin(PrimWorld(scene, viewer));
+    } else if (tlas < layout->worldCount && layout->worldOrigins[tlas] != kNoRow) {
+        const WorldTransform anchor = scene->schemas.xformable.worldTransform[layout->worldOrigins[tlas]];
+        origin.high = anchor.high;
+        origin.low = anchor.low;
+    }
+    layout->renderOrigins[tlas] = origin;
 }

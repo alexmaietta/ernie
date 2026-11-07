@@ -71,6 +71,7 @@ class Lights : public System {
     uint32_t m_worlds = 0;
     uint32_t m_domes = 0;
     uint32_t m_instancesVersion = ~0u;
+    uint64_t m_seen = 0;
     const Instances& m_instances;
     uint32_t m_runs = 0;
     uint32_t m_written = 0;

@@ -30,11 +30,9 @@ SensorFrame LoadSensorFrame(SceneData* scene, InstanceLayout* layout, uint prim)
     const WorldTransform transform = PrimWorld(scene, prim);
     SensorFrame frame;
     const uint world = scene->prims.world[prim];
-    frame.position = TranslationInWorld(scene, layout, transform, world);
-    frame.origin = world == kGlobalWorld || layout->worldOrigins[world] == kNoRow
-                       ? float3(0)
-                       : scene->schemas.xformable.worldTransform[layout->worldOrigins[world]]
-                             .Translation();
+    const RenderOrigin origin = TlasOrigin(layout, world);
+    frame.position = RenderTranslation(layout, transform, world);
+    frame.origin = origin.high.Vector() + origin.low.Vector();
     frame.x = transform.x.Vector();
     frame.y = transform.y.Vector();
     frame.z = transform.z.Vector();

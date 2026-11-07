@@ -19,6 +19,16 @@ struct InstanceParams {
 
 ERNIE_CHECK_SIZE(InstanceParams, 56);
 
+struct OriginParams {
+    Ptr<SceneData> scene;
+    Ptr<InstanceLayout> layout;
+    Ptr<uint> products;
+    uint productCount;
+    uint tlasCount;
+};
+
+ERNIE_CHECK_SIZE(OriginParams, 32);
+
 static const uint kInstanceGroup = 64;
 
 }

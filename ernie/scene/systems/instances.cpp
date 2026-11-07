@@ -61,7 +61,8 @@ constexpr ColumnRef kLayoutInputs[] = {kPointInstancerPrototypes, kPointInstance
 const std::vector<ColumnRef>& InputColumns() {
     static const std::vector<ColumnRef> inputs = [] {
         std::vector<ColumnRef> columns = {kXformableWorldTransform, kPointBasedPoints,
-                                          kPointInstancerOrientations, kPointInstancerScales};
+                                          kPointInstancerOrientations, kPointInstancerScales,
+                                          kRenderProductCamera};
         columns.insert(columns.end(), std::begin(kActivation), std::end(kActivation));
         columns.insert(columns.end(), std::begin(kLayoutInputs), std::end(kLayoutInputs));
         return columns;
@@ -196,6 +197,7 @@ void Instances::Relayout() {
     m_own.assign(m_worlds, {});
     m_globals.clear();
     m_origins.clear();
+    m_products.clear();
     m_instancers = GatherInstancers();
     m_roots.clear();
     for (const Instancer& instancer : m_instancers) {
@@ -240,7 +242,14 @@ void Instances::Relayout() {
             origins[record.world] = prims.Row(prim, SchemaId::Xformable);
             m_origins.insert(prim);
         }
+        if (record.schema == SchemaId::RenderProduct) {
+            m_products.push_back(prim);
+        }
     }
+    m_productBuffer =
+        device.CreateBuffer({.label = "render products"},
+                            std::span<const uint32_t>(
+                                m_products.empty() ? std::vector<uint32_t>{kNoPrim} : m_products));
 
     BuildInstancing();
 
@@ -302,6 +311,9 @@ void Instances::Relayout() {
     }
     m_offsetBasesOffset = append(bases);
     m_offsetsOffset = append(offsets);
+    m_renderOriginsOffset =
+        append(std::vector<uint32_t>((m_worlds + 1) * sizeof(RenderOrigin) / sizeof(uint32_t), 0));
+    m_viewersOffset = append(std::vector<uint32_t>(m_worlds + 1, kNoPrim));
     m_layout =
         device.CreateBuffer({.bytes = words.size() * sizeof(uint32_t), .label = "instance layout"});
     device.GetQueue().Write(*m_layout, words.data());
@@ -532,6 +544,8 @@ void Instances::WriteLayoutHeader() {
     layout.worldOrigins.address = m_layout->Address() + m_originsOffset;
     layout.offsetBases.address = m_layout->Address() + m_offsetBasesOffset;
     layout.offsets.address = m_layout->Address() + m_offsetsOffset;
+    layout.renderOrigins.address = m_layout->Address() + m_renderOriginsOffset;
+    layout.viewers.address = m_layout->Address() + m_viewersOffset;
     m_catalog.GetStore().GetDevice().GetQueue().Write(m_layout->Slice(0, sizeof(layout)), &layout);
 }
 
@@ -579,7 +593,8 @@ std::optional<std::set<uint32_t>> Instances::Apply(const ChangeSet& changes) {
     }
     for (const StructureEntry& entry : changes.removed) {
         if (m_origins.contains(entry.prim) || m_instancerPrims.contains(entry.prim) ||
-            m_members.contains(entry.prim)) {
+            m_members.contains(entry.prim) ||
+            std::ranges::find(m_products, entry.prim) != m_products.end()) {
             return std::nullopt;
         }
         std::vector<uint32_t>& list = entry.world == kGlobalWorld ? m_globals : m_own[entry.world];
@@ -592,7 +607,8 @@ std::optional<std::set<uint32_t>> Instances::Apply(const ChangeSet& changes) {
             continue;
         }
         const SchemaId schema = prims.At(entry.prim).schema;
-        if (IsA(schema, SchemaId::World) || schema == SchemaId::PointInstancer ||
+        if (IsA(schema, SchemaId::World) || schema == SchemaId::RenderProduct ||
+            schema == SchemaId::PointInstancer ||
             prims.HasApi(entry.prim, SchemaId::PrototypeAPI) || Member(entry.prim)) {
             return std::nullopt;
         }
@@ -662,8 +678,8 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     const uint32_t worlds = m_worlds;
 
     std::vector<uint32_t> dirty;
-    const bool global =
-        relaid || std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+    const bool global = relaid || store.LastWrite(kRenderProductCamera) > m_seen ||
+                        std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
     if (global) {
         dirty.resize(tlases);
         std::iota(dirty.begin(), dirty.end(), 0u);
@@ -750,6 +766,18 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
 
     device::Queue& queue = device.GetQueue();
     device::CommandEncoder encoder = queue.CreateEncoder();
+    OriginParams origins{};
+    origins.scene.address = store.DeviceData();
+    origins.layout.address = m_layout->Address();
+    origins.products.address = m_productBuffer->Address();
+    origins.productCount = uint32_t(m_products.size());
+    origins.tlasCount = tlases;
+    if (!m_products.empty()) {
+        encoder.Dispatch(Kernels().Entry("GatherViewers"), origins,
+                         {.x = device::GroupCount(origins.productCount, kInstanceGroup)});
+    }
+    encoder.Dispatch(Kernels().Entry("PlaceOrigins"), origins,
+                     {.x = device::GroupCount(tlases, kInstanceGroup)});
     if (widest > 0) {
         const device::ZoneScope scope(encoder, zone);
         encoder.Dispatch(
@@ -776,7 +804,7 @@ device::Program& Instances::Kernels() {
         m_program = m_catalog.GetStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.instances"},
              .library = &kSceneKernels,
-             .entries = {"WriteInstances"},
+             .entries = {"WriteInstances", "GatherViewers", "PlaceOrigins"},
              .label = "instances"});
     }
     return *m_program;

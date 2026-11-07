@@ -148,6 +148,10 @@ class Instances : public System {
     uint64_t m_hiddenOffset = 0;
     uint64_t m_offsetBasesOffset = 0;
     uint64_t m_offsetsOffset = 0;
+    uint64_t m_renderOriginsOffset = 0;
+    uint64_t m_viewersOffset = 0;
+    std::vector<uint32_t> m_products;
+    Ref<device::Buffer> m_productBuffer;
     std::map<uint32_t, ComposedWorldDesc> m_composed;
     std::map<uint32_t, std::set<uint32_t>> m_shownIn;
     uint64_t m_compositions = ~uint64_t(0);
