@@ -119,7 +119,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                 continue;
             }
             if (bounce == 0) {
-                result.point = vertex.point;
+                result.point = point;
                 result.albedo = vertex.albedo;
             }
             radiance = radiance + throughput * vertex.radiance;

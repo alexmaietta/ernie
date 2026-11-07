@@ -181,36 +181,60 @@ TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
     });
 }
 
-TEST(RendererTest, NormalMapsTiltAlongTheMeshesTangents) {
+struct Lit {
+    Float3 normal;
+    float red;
+};
+
+Lit RenderLitQuad(Device& device, Float3 tilt, RenderMode mode) {
+    constexpr uint32_t kSide = 9;
+    const Ref<Scene> scene = Scene::Create(device);
+    scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                   .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                   .focalLength = 400});
+    scene->Define<DistantLight>("/Sun", {.orient = LookAlong({0, -1, -1})});
+    scene->Define<Scope>("/Looks");
+    scene->Define<UsdPreviewSurface>("/Looks/Bent", {.normal = tilt});
+    const std::vector<Float2> st = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
+    scene->Define<Mesh>("/Quad", {.materialBinding = {"/Looks/Bent"},
+                                  .primvars = {Primvar::Create("st", Interpolation::Vertex, st)},
+                                  .points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                                  .faceVertexIndices = {0, 1, 2, 3},
+                                  .faceVertexCounts = {4},
+                                  .subdivisionScheme = SubdivisionScheme::None});
+    scene->Define<Scope>("/Render");
+    scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderProduct>("/Render/Roof",
+                                 {.camera = {"/Cam"},
+                                  .resolution = {kSide, kSide},
+                                  .orderedVars = {"/Render/Normal", "/Render/Color"}});
+    scene->Select("/Render/Roof").Get<RenderMode>("renderMode").Set(mode);
+    if (mode == RenderMode::Minimal) {
+        scene->Find("/Render/Roof")->Set(MinimalAPI::kMode, MinimalMode::Full);
+    }
+    Renderer renderer(scene);
+    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Roof"}, 1.0 / 30);
+    output.Wait();
+    const FrameOutput& frame = output["/Render/Roof"].frames.at(0);
+    const std::vector<float> normals = frame.Source("Normal").tensor.ToHost<float>();
+    const std::vector<float> colors = frame.Source("HdrColor").tensor.ToHost<float>();
+    const uint32_t center = ((kSide / 2) * kSide + kSide / 2) * 4;
+    return {{normals[center], normals[center + 1], normals[center + 2]}, colors[center]};
+}
+
+TEST(RendererTest, NormalMapsLightTheSurfaceButLeaveTheNormalOutputGeometric) {
     ForEachDevice([](Device& device) {
-        constexpr uint32_t kSide = 9;
-        const Ref<Scene> scene = Scene::Create(device);
-        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
-                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
-                                       .focalLength = 400});
-        scene->Define<Scope>("/Looks");
-        scene->Define<UsdPreviewSurface>("/Looks/Bent", {.normal = {0.5f, 0, 1}});
-        const std::vector<Float2> st = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
-        scene->Define<Mesh>("/Quad",
-                            {.materialBinding = {"/Looks/Bent"},
-                             .primvars = {Primvar::Create("st", Interpolation::Vertex, st)},
-                             .points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
-                             .faceVertexIndices = {0, 1, 2, 3},
-                             .faceVertexCounts = {4},
-                             .subdivisionScheme = SubdivisionScheme::None});
-        scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
-        scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
-        scene->Define<RenderProduct>("/Render/Roof",
-                                     {.camera = {"/Cam"},
-                                      .resolution = {kSide, kSide},
-                                      .orderedVars = {"/Render/Normal", "/Render/Color"}});
-        scene->Select("/Render/Roof").Get<RenderMode>("renderMode").Set(RenderMode::RealTime);
-        Renderer renderer(scene);
-        const Float3 normal = CenterNormal(renderer, kSide);
-        EXPECT_NEAR(normal.x, 0, 2e-3f);
-        EXPECT_NEAR(normal.y, 0.4472f, 2e-3f);
-        EXPECT_NEAR(normal.z, 0.8944f, 2e-3f);
+        for (const RenderMode mode : {RenderMode::RealTime, RenderMode::Minimal}) {
+            const Lit flat = RenderLitQuad(device, {0, 0, 1}, mode);
+            const Lit bent = RenderLitQuad(device, {0.5f, 0, 1}, mode);
+            for (const Lit& lit : {flat, bent}) {
+                EXPECT_NEAR(lit.normal.x, 0, 1e-4f);
+                EXPECT_NEAR(lit.normal.y, 0, 1e-4f);
+                EXPECT_NEAR(lit.normal.z, 1, 1e-4f);
+            }
+            EXPECT_GT(bent.red, 1.1f * flat.red) << int(mode);
+        }
     });
 }
 

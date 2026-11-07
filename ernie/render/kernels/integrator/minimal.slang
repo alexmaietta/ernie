@@ -110,8 +110,8 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             return result;
         }
         SurfacePoint point = ComputeSurfacePoint(query, ray, primHit, spread);
+        result.point = point;
         if (Mode == MinimalMode::Data) {
-            result.point = point;
             return result;
         }
 
@@ -136,11 +136,13 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
                 }
                 shade = lighting.Shade(ray, point, DiffuseMaterial<RgbSpectrum>(albedo));
             } else if (preview) {
-                shade = lighting.Shade(
-                    ray, point, PreviewSurface<RgbSpectrum>.Load(materials, material, point));
+                const PreviewSurface<RgbSpectrum> loaded =
+                    PreviewSurface<RgbSpectrum>.Load(materials, material, point);
+                shade = lighting.Shade(ray, point, loaded);
             } else {
-                shade = lighting.Shade(
-                    ray, point, DiffuseMaterial<RgbSpectrum>.Load(materials, material, point));
+                const DiffuseMaterial<RgbSpectrum> loaded =
+                    DiffuseMaterial<RgbSpectrum>.Load(materials, material, point);
+                shade = lighting.Shade(ray, point, loaded);
             }
         }
 
@@ -148,7 +150,6 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
         if (shade.testShadow && query.Occluded(shade.shadow)) {
             lit *= lighting.shadowVisibility;
         }
-        result.point = point;
         result.albedo = shade.albedo;
         result.radiance = RgbSpectrum(shade.unlit + lit);
         return result;
