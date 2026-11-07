@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -74,6 +75,10 @@ class Probe : public System {
     }
 
     device::Operation Run(const ChangeSet& changes, Stream) override {
+        if (fail) {
+            fail = false;
+            throw Error("probe failed");
+        }
         ++runs;
         worlds = changes.worlds;
         wrote = changes.Wrote(TableId::Transforms);
@@ -81,6 +86,7 @@ class Probe : public System {
         return {};
     }
 
+    bool fail = false;
     uint32_t runs = 0;
     std::vector<uint32_t> worlds;
     bool wrote = false;
@@ -203,6 +209,111 @@ TEST(TableTrackingTest, MissingPrimsReadAsZeroTransforms) {
         EXPECT_EQ(transforms[1].high.y, 0.0f);
         EXPECT_FLOAT_EQ(transforms[2].high.y + transforms[2].low.y, 4.0f);
         EXPECT_TRUE(scene->WorldTransforms(std::vector<std::string>{}).empty());
+    });
+}
+
+TEST(TableTrackingTest, AFailedPublishLeavesTheTimelineUsable) {
+    test::ForEachDevice([](device::Device& device) {
+        Fixture f(device);
+        const uint32_t ball =
+            f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"}).firstPrim;
+        f.Publish();
+        const Snapshot before = f.timeline.Acquire(Stream::Host());
+        f.timeline.Release(before);
+
+        f.probe.fail = true;
+        f.One(ball, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 0, 9});
+        EXPECT_THROW(f.timeline.Publish(++f.ordinal), Error);
+        EXPECT_EQ(f.timeline.Published(), f.ordinal - 1);
+
+        f.One(ball, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 0, 4});
+        f.Publish();
+        EXPECT_EQ(f.timeline.Published(), f.ordinal);
+        EXPECT_TRUE(f.probe.wrote);
+        const WorldTransform moved = f.hierarchy.Transforms(std::vector<uint32_t>{ball}).front();
+        EXPECT_FLOAT_EQ(moved.high.z + moved.low.z, 4.0f);
+        const Snapshot after = f.timeline.Acquire(Stream::Host());
+        EXPECT_NE(after.tables, 0u);
+        f.timeline.Release(after);
+    });
+}
+
+TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
+    test::ForEachDevice([](device::Device& device) {
+        Fixture f(device);
+        const uint32_t group =
+            f.catalog.Define(SchemaId::Xform, std::vector<std::string>{"/Group"}).firstPrim;
+        std::vector<std::string> pads;
+        for (uint32_t i = 0; i < 150; ++i) {
+            pads.push_back(std::format("/Pad{}", i));
+        }
+        f.catalog.Define(SchemaId::Sphere, pads);
+        f.Publish();
+        const uint32_t rebuilds = f.hierarchy.Rebuilds();
+        const Table& imageables = f.store.Schema(SchemaId::Imageable);
+        const Table& xformables = f.store.Schema(SchemaId::Xformable);
+        const uint32_t room = std::min(imageables.Capacity() - imageables.Rows(),
+                                       xformables.Capacity() - xformables.Rows());
+        ASSERT_GE(room, 70u);
+        std::vector<std::string> paths;
+        for (uint32_t i = 0; i < 70; ++i) {
+            paths.push_back(std::format("/Group/Ball{}", i));
+        }
+        const uint32_t first = f.catalog.Define(SchemaId::Sphere, paths).firstPrim;
+        f.One(group, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 3, 0});
+        f.Publish();
+        EXPECT_EQ(f.hierarchy.Rebuilds(), rebuilds);
+        const std::vector<WorldTransform> transforms = f.hierarchy.Transforms(
+            std::vector<uint32_t>{first, first + uint32_t(paths.size()) - 1});
+        for (const WorldTransform& transform : transforms) {
+            EXPECT_FLOAT_EQ(transform.high.y + transform.low.y, 3.0f);
+        }
+    });
+}
+
+TEST(TableTrackingTest, AcquiringAfterAnIdlePublishStillHasTables) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Publish().Wait();
+        const Snapshot snapshot = scene->Acquire(Stream::Host());
+        EXPECT_NE(snapshot.tables, 0u);
+        EXPECT_NE(snapshot.pinned, nullptr);
+        scene->Release(snapshot);
+    });
+}
+
+RenderOrigin GlobalOrigin(Scene& scene, device::Device& device) {
+    SceneImpl& impl = SceneImpl::Get(scene);
+    const uint32_t global = scene.WorldCount();
+    RenderOrigin origin{};
+    device.GetQueue().Read(
+        impl.GetInstances().Origins()->Slice(global * sizeof(RenderOrigin), sizeof(RenderOrigin)),
+        &origin);
+    return origin;
+}
+
+TEST(TableTrackingTest, OriginsFollowRenderProductsAsTheyComeAndGo) {
+    test::ForEachDevice([](device::Device& device) {
+        constexpr double kFar = 1e9;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {kFar, 0, 0}});
+        scene->Define<Sphere>("/Ball");
+        scene->Publish().Wait();
+        EXPECT_EQ(GlobalOrigin(*scene, device).high.x, 0.0f);
+
+        const Prim product = scene->Define<RenderProduct>("/View", {.camera = {"/Cam"}});
+        scene->Publish().Wait();
+        const RenderOrigin followed = GlobalOrigin(*scene, device);
+        EXPECT_NEAR(double(followed.high.x) + followed.low.x, kFar, kRenderOriginCell);
+
+        scene->Select("/Cam").Get<Double3>("translate").Set(Double3{-kFar, 0, 0});
+        scene->Publish().Wait();
+        const RenderOrigin moved = GlobalOrigin(*scene, device);
+        EXPECT_NEAR(double(moved.high.x) + moved.low.x, -kFar, kRenderOriginCell);
+
+        scene->Remove(product);
+        scene->Publish().Wait();
+        EXPECT_EQ(GlobalOrigin(*scene, device).high.x, 0.0f);
     });
 }
 

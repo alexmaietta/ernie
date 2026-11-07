@@ -121,5 +121,49 @@ TEST(RenderOriginTest, LightsSitWhereTheSurfacesDoFarFromTheOrigin) {
     });
 }
 
+struct Shown {
+    Ref<Scene> scene;
+    ComposedWorld composed;
+};
+
+Shown ShownSite(Device& device, double x, bool composed) {
+    Shown shown{Scene::Create(device), {}};
+    Scene& scene = *shown.scene;
+    const Prim viewer = scene.Define<World>("/Viewer");
+    scene.MarkSession(viewer);
+    DefineCamera(scene, "/Viewer/Cam", {x + 10, -5, 0}, {x + 10, 0, 0});
+    const std::string site = composed ? "/Site" : "/Viewer";
+    const double shift = composed ? 0 : 10;
+    scene.Define<World>("/Site");
+    scene.Define<Sphere>(site + "/Ball", {.translate = {x + shift, 0, 0}, .radius = 1});
+    scene.Define<SphereLight>(
+        site + "/Lamp", {.translate = {x + shift + 1, -2, 1}, .intensity = 100, .radius = 0.1});
+    if (composed) {
+        shown.composed = scene.ComposeWorld(
+            viewer, {.worlds = {scene.Find("/Site")->World()}, .offsets = {{10, 0, 0}}});
+    }
+    DefineProduct(scene, {"/Viewer/Cam"}, RenderMode::RealTime);
+    return shown;
+}
+
+TEST(RenderOriginTest, ShownWorldsAndTheirLightsLandAtTheirOffsetFarFromTheOrigin) {
+    ForEachDevice([](Device& device) {
+        Shown direct = ShownSite(device, 0, false);
+        Renderer directRenderer(direct.scene);
+        const Frames reference = Render(directRenderer);
+        EXPECT_NEAR(reference.Depth(0), 4, 1e-4);
+        EXPECT_GT(reference.Red(0), 0);
+
+        Shown far = ShownSite(device, kAu, true);
+        Renderer renderer(far.scene);
+        const Frames composed = Render(renderer);
+        EXPECT_NEAR(composed.Depth(0), 4, 1e-4);
+        EXPECT_NEAR(composed.Red(0), reference.Red(0), 1e-3 * reference.Red(0));
+
+        far.scene->Select("/Site/Ball").Get<Double3>("translate").Set(Double3{kAu, 1, 0});
+        EXPECT_NEAR(Render(renderer).Depth(0), 5, 1e-4);
+    });
+}
+
 }
 }

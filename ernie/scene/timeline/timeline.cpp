@@ -166,13 +166,16 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
                 m_log.Collect(table, scheduled.tables, changes.worlds);
             }
         }
-        scheduled.writes = store.WriteSequence();
-        scheduled.epoch = m_catalog.Epoch();
-        scheduled.tables = m_log.Sequence();
+        const uint64_t writes = store.WriteSequence();
+        const uint64_t epoch = m_catalog.Epoch();
+        const uint64_t tables = m_log.Sequence();
         changes.tables = &m_tables;
         changes.log = &m_log;
         system.Run(changes, Stream::None());
         system.Describe(m_tables);
+        scheduled.writes = writes;
+        scheduled.epoch = epoch;
+        scheduled.tables = tables;
         scheduled.stamp = stamp;
         scheduled.ran = true;
     }
@@ -210,6 +213,7 @@ device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {
             store.DeviceData();
         } catch (...) {
             queue.EndBatch();
+            store.SetStamp(stamp + 1);
             throw;
         }
         done = queue.EndBatch();
