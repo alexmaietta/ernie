@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -9,11 +10,22 @@
 #include "ernie/device/stream.h"
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/systems/system.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/scene/types.h"
 
 namespace ernie {
+
+struct PinnedTables {
+    Ref<device::Buffer> header;
+    RenderTables tables{};
+    std::vector<Ref<const RefCounted>> held;
+
+    static const PinnedTables& From(const Snapshot& snapshot) {
+        return *static_cast<const PinnedTables*>(snapshot.pinned.get());
+    }
+};
 
 class Timeline {
   public:
@@ -58,6 +70,7 @@ class Timeline {
                     std::span<const ColumnRef> columns,
                     std::vector<Ref<device::Buffer>>* reused = nullptr);
     void RunSystems(Ordinal stamp, Ordinal ordinal);
+    void Seal();
 
     Catalog& m_catalog;
     std::vector<Sealed> m_sealed;
@@ -65,6 +78,8 @@ class Timeline {
     uint64_t m_writes = 0;
     uint64_t m_epoch = 0;
     uint32_t m_outstanding = 0;
+    RenderTables m_tables{};
+    std::shared_ptr<const PinnedTables> m_pinned;
 };
 
 }

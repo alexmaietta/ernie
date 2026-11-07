@@ -13,6 +13,8 @@
 
 namespace ernie {
 
+struct RenderTables;
+
 class ChangedRows {
   public:
     ChangedRows() = default;
@@ -55,6 +57,7 @@ struct ChangeSet {
     std::vector<uint32_t> worlds;
     std::vector<ChangedRows> columns;
     std::vector<std::pair<ColumnRef, std::vector<uint32_t>>> arrays;
+    const RenderTables* tables = nullptr;
 
     const ChangedRows* Rows(ColumnRef column) const;
     std::span<const uint32_t> ArrayRows(ColumnRef column) const;

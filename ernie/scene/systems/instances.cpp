@@ -15,6 +15,7 @@
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/instances.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
@@ -797,6 +798,11 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
         m_builder.Refit(encoder, *m_tlas, *m_records, counts, refit);
     }
     return queue.Submit(encoder.Finish());
+}
+
+void Instances::Describe(RenderTables& tables) const {
+    tables.instances.address = m_layout ? m_layout->Address() : 0;
+    tables.origins.address = m_renderOrigins ? m_renderOrigins->Address() : 0;
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {

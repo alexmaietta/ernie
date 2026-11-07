@@ -3,14 +3,17 @@
 
 #include <span>
 #include <string_view>
+#include <vector>
 
 #include "ernie/device/operation.h"
+#include "ernie/device/ref.h"
 #include "ernie/device/stream.h"
 #include "ernie/scene/kernels/schema/schema.h"
 
 namespace ernie {
 
 struct ChangeSet;
+struct RenderTables;
 
 class System {
   public:
@@ -31,6 +34,10 @@ class System {
     virtual void Prepare() {}
 
     virtual void Finish() {}
+
+    virtual void Describe(RenderTables&) const {}
+
+    virtual void Hold(std::vector<Ref<const RefCounted>>&) const {}
 
     virtual device::Operation Run(const ChangeSet& changes, Stream stream) = 0;
 };

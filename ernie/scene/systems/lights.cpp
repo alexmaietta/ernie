@@ -10,6 +10,7 @@
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/lights.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/profiler.h"
 
@@ -195,6 +196,10 @@ std::span<const ColumnRef> Lights::Inputs() const {
 
 std::span<const ColumnRef> Lights::Outputs() const {
     return {};
+}
+
+void Lights::Describe(RenderTables& tables) const {
+    tables.lights.address = m_layout ? m_layout->Address() : 0;
 }
 
 void Lights::Hold(std::vector<Ref<const RefCounted>>& held) const {
@@ -408,8 +413,8 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     LightParams params{};
     params.scene.address = store.DeviceData();
     params.layout.address = m_layout->Address();
-    params.instances.address = m_instances.Layout() ? m_instances.Layout()->Address() : 0;
-    params.origins.address = m_instances.Origins() ? m_instances.Origins()->Address() : 0;
+    params.instances = changes.tables->instances;
+    params.origins = changes.tables->origins;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());

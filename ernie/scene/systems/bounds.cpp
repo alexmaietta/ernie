@@ -11,6 +11,7 @@
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/bounds.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
@@ -184,6 +185,10 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
         return std::nullopt;
     }
     return box;
+}
+
+void Bounds::Describe(RenderTables& tables) const {
+    tables.bounds = m_boxes ? m_boxes->Address() : 0;
 }
 
 void Bounds::Prepare() {

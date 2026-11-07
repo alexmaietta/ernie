@@ -60,7 +60,8 @@ class Instances : public System {
         return m_renderOrigins;
     }
 
-    void Hold(std::vector<Ref<const RefCounted>>& held) const;
+    void Describe(RenderTables& tables) const override;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
     const Ref<device::Buffer>& Records() const {
         return m_records;

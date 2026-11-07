@@ -39,7 +39,9 @@ class Bounds : public System {
         return m_boxes;
     }
 
-    void Hold(std::vector<Ref<const RefCounted>>& held) const {
+    void Describe(RenderTables& tables) const override;
+
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override {
         if (m_boxes) {
             held.emplace_back(m_boxes);
         }

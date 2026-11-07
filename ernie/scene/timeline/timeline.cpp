@@ -2,6 +2,7 @@
 #include "ernie/scene/timeline/timeline.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
@@ -143,7 +144,9 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
                                   system.Inputs(), &scheduled.changed);
         scheduled.writes = store.WriteSequence();
         scheduled.epoch = m_catalog.Epoch();
+        changes.tables = &m_tables;
         system.Run(changes, Stream::None());
+        system.Describe(m_tables);
         scheduled.stamp = stamp;
         scheduled.ran = true;
     }
@@ -170,6 +173,7 @@ device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {
         try {
             store.Flush();
             RunSystems(stamp, ordinal);
+            Seal();
             store.DeviceData();
         } catch (...) {
             queue.EndBatch();
@@ -192,6 +196,25 @@ ChangeSet Timeline::Changes(Ordinal since, std::span<const ColumnRef> columns) {
     return Build(StampAt(since), until, Published(), columns);
 }
 
+void Timeline::Seal() {
+    RenderTables tables = m_tables;
+    tables.worldCount = m_catalog.GetPrims().WorldCount();
+    m_tables.worldCount = tables.worldCount;
+    auto pinned = std::make_shared<PinnedTables>();
+    if (m_pinned && std::memcmp(&tables, &m_pinned->tables, sizeof(tables)) == 0) {
+        pinned->header = m_pinned->header;
+    } else {
+        pinned->header = m_catalog.GetStore().GetDevice().CreateBuffer(
+            {.label = "render tables"}, std::span<const RenderTables>(&tables, 1));
+    }
+    pinned->tables = tables;
+    pinned->held.emplace_back(pinned->header);
+    for (const Scheduled& scheduled : m_systems) {
+        scheduled.system->Hold(pinned->held);
+    }
+    m_pinned = std::move(pinned);
+}
+
 Snapshot Timeline::Acquire(Stream consumer) {
     if (m_sealed.empty()) {
         throw Error("Nothing is published yet");
@@ -200,6 +223,11 @@ Snapshot Timeline::Acquire(Stream consumer) {
     Snapshot snapshot;
     snapshot.ordinal = Published();
     snapshot.sceneData = store.DeviceData();
+    if (!m_pinned) {
+        Seal();
+    }
+    snapshot.tables = m_pinned->header->Address();
+    snapshot.pinned = m_pinned;
     snapshot.ready = store.GetDevice().GetQueue().Mark();
     snapshot.ready.Wait(consumer);
     ++m_outstanding;

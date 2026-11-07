@@ -12,7 +12,6 @@
 #include "ernie/device/device.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
-#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/store/store.h"
 #include "ernie/scene/systems/bounds.h"
@@ -28,16 +27,6 @@
 namespace ernie {
 
 void SetInputs(RowWriter& writer, SchemaId schema, std::span<const MaterialInput> inputs);
-
-struct PinnedTables {
-    Ref<device::Buffer> header;
-    RenderTables tables{};
-    std::vector<Ref<const RefCounted>> held;
-
-    static const PinnedTables& From(const Snapshot& snapshot) {
-        return *static_cast<const PinnedTables*>(snapshot.pinned.get());
-    }
-};
 
 class SceneImpl {
   public:
@@ -158,8 +147,6 @@ class SceneImpl {
         return !m_commitSteps.empty();
     }
 
-    std::shared_ptr<const PinnedTables> PinTables();
-
   private:
     Scene& m_scene;
     Ref<device::Device> m_device;
@@ -176,8 +163,6 @@ class SceneImpl {
     Instances m_instances;
     Lights m_lights;
     std::vector<std::function<bool()>> m_commitSteps;
-    RenderTables m_tables{};
-    Ref<device::Buffer> m_tablesBuffer;
 };
 
 }

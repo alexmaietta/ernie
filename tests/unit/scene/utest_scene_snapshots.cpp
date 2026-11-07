@@ -127,5 +127,21 @@ TEST(SnapshotTest, HeldSnapshotsKeepRemovedMeshesTraceable) {
     });
 }
 
+TEST(SnapshotTest, AcquiringWithoutAPublishSharesOnePin) {
+    ForEachScene([](Scene& scene, device::Device&) {
+        scene.Define<Sphere>("/Ball");
+        scene.Publish().Wait();
+        const Snapshot first = scene.Acquire(Stream::Host());
+        const Snapshot second = scene.Acquire(Stream::Host());
+        EXPECT_EQ(first.pinned, second.pinned);
+        scene.Publish().Wait();
+        const Snapshot idle = scene.Acquire(Stream::Host());
+        EXPECT_EQ(idle.tables, first.tables);
+        for (const Snapshot* snapshot : {&first, &second, &idle}) {
+            scene.Release(*snapshot);
+        }
+    });
+}
+
 }
 }

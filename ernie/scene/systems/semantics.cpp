@@ -6,6 +6,7 @@
 
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
@@ -61,6 +62,10 @@ std::vector<std::byte> PackIdMap(std::span<const std::pair<StableId, std::string
     const uint32_t count = uint32_t(entries.size());
     std::memcpy(bytes.data() + offset, &count, sizeof(count));
     return bytes;
+}
+
+void Semantics::Describe(RenderTables& tables) const {
+    tables.semantics = Data();
 }
 
 std::span<const ColumnRef> Semantics::Inputs() const {

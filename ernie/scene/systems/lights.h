@@ -51,7 +51,8 @@ class Lights : public System {
 
     const Ref<device::Buffer>& Spectra();
 
-    void Hold(std::vector<Ref<const RefCounted>>& held) const;
+    void Describe(RenderTables& tables) const override;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
   private:
     bool Restructured(const ChangeSet& changes) const;

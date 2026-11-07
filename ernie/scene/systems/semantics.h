@@ -69,7 +69,9 @@ class Semantics : public System {
         return m_stableBuffer;
     }
 
-    void Hold(std::vector<Ref<const RefCounted>>& held) const {
+    void Describe(RenderTables& tables) const override;
+
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override {
         for (const Ref<device::Buffer>& buffer : {m_stableBuffer, m_idBuffer, m_primBuffer}) {
             if (buffer) {
                 held.emplace_back(buffer);

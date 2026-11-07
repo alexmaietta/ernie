@@ -61,7 +61,7 @@ class Geometry : public System {
 
     std::optional<MeshShape> Find(uint32_t prim) const;
 
-    void Hold(std::vector<Ref<const RefCounted>>& held) const;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
   private:
     struct TopologyKey {

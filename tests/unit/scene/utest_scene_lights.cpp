@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -354,6 +355,17 @@ TEST(LightsTest, RecordsSitRelativeToTheRenderOriginOfTheirViewer) {
         const LightRecord copy = Find(records, copied);
         EXPECT_NEAR(copy.position.x, 0, 1e-3);
         EXPECT_NEAR(copy.position.y, 5, 1e-3);
+
+        scene.Define<World>("/Env0");
+        scene.Find("/Lamps")->Set(PointInstancer::kPositions,
+                                  std::vector<Float3>{{float(kFar + 16), 0, 0}});
+        const std::vector<LightRecord> after = Records(scene, device);
+        const std::span<const uint32_t> counts = SceneImpl::Get(scene).GetLights().Counts();
+        const std::vector<LightRecord> global(after.end() - counts.back(), after.end());
+        EXPECT_NEAR(Find(global, lamp).position.x, 3, 1e-3);
+        const LightRecord relaid = Find(global, copied);
+        EXPECT_NEAR(relaid.position.x, 16, 1e-3);
+        EXPECT_NEAR(relaid.position.y, 5, 1e-3);
     });
 }
 
