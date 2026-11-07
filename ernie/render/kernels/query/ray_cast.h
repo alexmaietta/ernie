@@ -6,13 +6,14 @@
 #ifndef __SLANG__
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/scene.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #endif
 
 namespace ernie {
 
 struct RayCastParams {
     Ptr<SceneData> scene;
-    Ptr<InstanceLayout> layout;
+    Ptr<RenderTables> tables;
     Ptr<float> origins;
     Ptr<float> directions;
     Ptr<float> tMins;

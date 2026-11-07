@@ -508,6 +508,14 @@ device::Operation Geometry::Update() {
     return queue.Submit(encoder.Finish());
 }
 
+void Geometry::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    for (const auto& [key, shape] : m_shapes) {
+        if (shape.blas) {
+            held.emplace_back(shape.blas);
+        }
+    }
+}
+
 void Geometry::Prepare() {
     Kernels();
     if (!m_scan) {

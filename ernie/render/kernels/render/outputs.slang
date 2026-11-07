@@ -51,7 +51,7 @@ void WriteSegmentation(RenderParams params, CapturePixel pixel, uint prim) {
         Write(pixel, RenderVarSource::StableIdSegmentation, uint4(0));
         return;
     }
-    const SemanticsData semantics = params.semantics;
+    const SemanticsData semantics = params.tables->semantics;
     const uint row = pixel.capture->taxonomy * semantics.stride + prim;
     const uint labeled = semantics.semanticPrims[row];
     Write(pixel, RenderVarSource::NonStableInstanceSegmentation,
@@ -69,7 +69,7 @@ void WriteInstance(RenderParams params, CapturePixel pixel, uint slot, bool hit)
     }
     SlotHit drawn = Drawn(kNoPrim, kNoPrim, 0, 0);
     if (hit) {
-        drawn = params.layout->hits[slot];
+        drawn = params.tables->instances->hits[slot];
     }
     if (drawn.instancer == kNoPrim) {
         Write(pixel, RenderVarSource::InstanceId, int64_t(-1));
@@ -86,7 +86,7 @@ void WriteInstance(RenderParams params, CapturePixel pixel, uint slot, bool hit)
     }
     Write(pixel, RenderVarSource::InstanceId, id);
     Write(pixel, RenderVarSource::InstancerStableId,
-          StableWords(params.semantics.stableIds[drawn.instancer]));
+          StableWords(params.tables->semantics.stableIds[drawn.instancer]));
 }
 
 void WritePrimId(CapturePixel pixel, uint prim) {

@@ -89,6 +89,7 @@ ernie_test(
         ernie_render_internal
     SOURCES
         unit/render/utest_render_camera.cpp
+        unit/render/utest_render_in_flight.cpp
         unit/render/utest_render_lidar.cpp
         unit/render/utest_render_origin.cpp
         unit/render/utest_render_overlay.cpp
@@ -116,6 +117,7 @@ ernie_test(
         unit/scene/utest_scene_rotation.cpp
         unit/scene/utest_scene_scene.cpp
         unit/scene/utest_scene_semantics.cpp
+        unit/scene/utest_scene_snapshots.cpp
         unit/scene/utest_scene_store.cpp
         unit/scene/utest_scene_tangents.cpp
         unit/scene/utest_scene_textures.cpp

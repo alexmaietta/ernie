@@ -69,6 +69,14 @@ class Semantics : public System {
         return m_stableBuffer;
     }
 
+    void Hold(std::vector<Ref<const RefCounted>>& held) const {
+        for (const Ref<device::Buffer>& buffer : {m_stableBuffer, m_idBuffer, m_primBuffer}) {
+            if (buffer) {
+                held.emplace_back(buffer);
+            }
+        }
+    }
+
     uint32_t SemanticId(Token taxonomy, uint32_t prim) const;
     uint32_t LabeledPrim(Token taxonomy, uint32_t prim) const;
 

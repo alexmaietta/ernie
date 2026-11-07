@@ -13,7 +13,7 @@ ObjectSpace TransformSpace(HitQuery query, uint slot, WorldTransform w) {
     ObjectSpace space;
     const SlotHit hit = query.layout->hits[slot];
     const uint source = query.scene->prims.world[hit.instancer != kNoPrim ? hit.instancer : hit.prim];
-    space.origin = RenderTranslation(query.layout, w, query.world) +
+    space.origin = RenderTranslation(query.tables, w, query.world) +
                    ShownOffset(query.layout, query.world, source);
     space.axes = float3x3(w.x.Vector(), w.y.Vector(), w.z.Vector());
     return space;
@@ -132,7 +132,7 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
             p = space.ToObject(point.position - space.origin);
             n = normalize(mul(space.axes, point.shadingNormal));
         } else {
-            p = point.position - RenderShift(scene, query.layout, query.world, query.world);
+            p = point.position - RenderShift(scene, query.tables, query.world, query.world);
         }
         tile = max(m.tileSize[row], 1e-6f);
         const float3 a = abs(n);

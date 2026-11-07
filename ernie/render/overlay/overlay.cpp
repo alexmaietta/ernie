@@ -1673,7 +1673,7 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
     params.kerning = m_fontKerning ? m_fontKerning->Address() : m_unused->Address();
     params.textHeight = m_fontField ? OverlayTextFont().textHeight : 0;
     params.scene = {snapshot.sceneData};
-    params.layout = {snapshot.instances};
+    params.tables = {snapshot.tables};
     params.views = {m_views->Address()};
     params.batches = {m_batches->Address()};
     params.records = {m_records->Address()};

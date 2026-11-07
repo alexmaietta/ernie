@@ -99,7 +99,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
         integrator.query = context.query;
         integrator.row = ApiRow(context.query.scene, product, kApiMinimalAPI);
         integrator.product = product;
-        integrator.lights = context.params.lights;
+        integrator.lights = context.params.tables->lights;
         return integrator;
     }
 

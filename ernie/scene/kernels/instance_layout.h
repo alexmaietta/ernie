@@ -62,15 +62,6 @@ struct SlotHit {
 
 ERNIE_CHECK_SIZE(SlotHit, 16);
 
-static const float kRenderOriginCell = 64;
-
-struct RenderOrigin {
-    Float3 high;
-    Float3 low;
-};
-
-ERNIE_CHECK_SIZE(RenderOrigin, 24);
-
 struct InstanceLayout {
     Ptr<uint64_t> handles;
     Ptr<uint> firstInstances;
@@ -87,13 +78,11 @@ struct InstanceLayout {
     uint64_t records;
     Ptr<uint> offsetBases;
     Ptr<Float3> offsets;
-    Ptr<RenderOrigin> renderOrigins;
-    Ptr<uint> viewers;
     uint worldCount;
     uint displayColorName;
 };
 
-ERNIE_CHECK_SIZE(InstanceLayout, 144);
+ERNIE_CHECK_SIZE(InstanceLayout, 128);
 
 ERNIE_SHARED uint InstanceTlas(uint world, uint worldCount) {
     return world == kGlobalWorld ? worldCount : world;
@@ -108,40 +97,6 @@ SlotHit Drawn(uint prim, uint instancer, uint instance, uint offset) {
     hit.instance = instance;
     hit.offset = offset;
     return hit;
-}
-
-RenderOrigin TlasOrigin(InstanceLayout* layout, uint world) {
-    return layout->renderOrigins[min(world, layout->worldCount)];
-}
-
-float3 RenderTranslation(InstanceLayout* layout, WorldTransform w, uint world) {
-    const RenderOrigin origin = TlasOrigin(layout, world);
-    return (w.high.Vector() - origin.high.Vector()) + (w.low.Vector() - origin.low.Vector());
-}
-
-float3 RenderPoint(InstanceLayout* layout, float3 point, uint world) {
-    const RenderOrigin origin = TlasOrigin(layout, world);
-    return (point - origin.high.Vector()) - origin.low.Vector();
-}
-
-float3 RenderShift(SceneData* scene, InstanceLayout* layout, uint from, uint world) {
-    const RenderOrigin origin = TlasOrigin(layout, world);
-    if (from >= layout->worldCount || layout->worldOrigins[from] == kNoRow) {
-        return -origin.high.Vector() - origin.low.Vector();
-    }
-    const WorldTransform anchor =
-        scene->schemas.xformable.worldTransform[layout->worldOrigins[from]];
-    return (anchor.high.Vector() - origin.high.Vector()) +
-           (anchor.low.Vector() - origin.low.Vector());
-}
-
-RenderOrigin SnapOrigin(WorldTransform w) {
-    const float3 high = round(w.high.Vector() / kRenderOriginCell) * kRenderOriginCell;
-    const float3 rest = (w.high.Vector() - high) + w.low.Vector();
-    RenderOrigin origin;
-    origin.high = Float3(high);
-    origin.low = Float3(round(rest / kRenderOriginCell) * kRenderOriginCell);
-    return origin;
 }
 
 float3 ShownOffset(InstanceLayout* layout, uint view, uint world) {

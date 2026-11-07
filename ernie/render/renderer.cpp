@@ -808,9 +808,7 @@ device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint3
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
     params.scene.address = snapshot.sceneData;
-    params.layout.address = snapshot.instances;
-    params.lights.address = snapshot.lights;
-    params.semantics = snapshot.semantics;
+    params.tables.address = snapshot.tables;
 
     device::Queue& queue = m_scene->GetDevice().GetQueue();
     device::CommandEncoder encoder = queue.CreateEncoder();
@@ -853,7 +851,7 @@ device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint3
         m_scan->ExclusiveSum(encoder, *cloud.flags, *cloud.offsets, cloud.slots);
         ScatterParams scatter{};
         scatter.cloud.address = cloud.cloud->Address();
-        scatter.semantics = snapshot.semantics;
+        scatter.tables.address = snapshot.tables;
         scatter.slotCount = cloud.slots;
         encoder.Dispatch(m_renderProgram->Entry("RenderScatterPoints"), scatter,
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});

@@ -57,7 +57,7 @@ void ScatterPoints(ScatterParams p) {
         Ptr<float>(cloud->radialVelocity)[at] = record.radialVelocity;
     }
     if (cloud->stableId != 0) {
-        const StableId id = p.semantics.stableIds[record.prim];
+        const StableId id = p.tables->semantics.stableIds[record.prim];
         Ptr<uint4>(cloud->stableId)[at] = uint4(id.words[0], id.words[1], id.words[2], id.words[3]);
     }
     const uint echo = local % cloud->returns;

@@ -336,5 +336,26 @@ TEST(LightsTest, DomesTurnTheirPoleUpAndListTheirPortals) {
     });
 }
 
+TEST(LightsTest, RecordsSitRelativeToTheRenderOriginOfTheirViewer) {
+    ForEachScene([](Scene& scene, device::Device& device) {
+        constexpr double kFar = 1e8;
+        scene.Define<Camera>("/Cam", {.translate = {kFar, 0, 0}});
+        scene.Define<RenderProduct>("/View", {.camera = {"/Cam"}});
+        const Prim lamp = scene.Define<SphereLight>("/Lamp", {.translate = {kFar + 3, 0, 0}});
+        scene.Define<PointInstancer>("/Lamps", {.prototypes = {"/Lamps/Protos/Lamp"},
+                                                .protoIndices = {0},
+                                                .positions = {{float(kFar), 0, 0}}});
+        scene.Define<Scope>("/Lamps/Protos");
+        const Prim copied =
+            scene.Define<SphereLight>("/Lamps/Protos/Lamp", {.translate = {0, 5, 0}});
+        const std::vector<LightRecord> records = Records(scene, device);
+        EXPECT_NEAR(Find(records, lamp).position.x, 3, 1e-3);
+        EXPECT_NEAR(Find(records, lamp).position.y, 0, 1e-3);
+        const LightRecord copy = Find(records, copied);
+        EXPECT_NEAR(copy.position.x, 0, 1e-3);
+        EXPECT_NEAR(copy.position.y, 5, 1e-3);
+    });
+}
+
 }
 }

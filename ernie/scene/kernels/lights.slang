@@ -265,7 +265,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     WorldTransform w;
     if ((item & kInstancerSlot) != 0) {
         const uint pair = item & ~kInstancerSlot;
-        InstanceLayout* instances = Ptr<InstanceLayout>(layout->instances);
+        InstanceLayout* instances = p.instances;
         const uint block = layout->copies[2 * pair];
         const ResolvedCopy copy =
             ResolveCopy(scene, instances, block, layout->copies[2 * pair + 1], true);
@@ -286,7 +286,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     const float3 scale = float3(length(x), length(y), length(z));
 
     LightRecord record;
-    record.position = Float3(RenderTranslation(Ptr<InstanceLayout>(layout->instances), w, tlas));
+    record.position = Float3(RelativeTranslation(p.origins[min(tlas, layout->worldCount)], w));
     const uint shownBase = layout->offsetBases[tlas];
     const uint source = scene->prims.world[instancer != kNoPrim ? instancer : prim];
     if (shownBase != kNoRow && source != kGlobalWorld) {

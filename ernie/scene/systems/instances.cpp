@@ -311,12 +311,15 @@ void Instances::Relayout() {
     }
     m_offsetBasesOffset = append(bases);
     m_offsetsOffset = append(offsets);
-    m_renderOriginsOffset =
-        append(std::vector<uint32_t>((m_worlds + 1) * sizeof(RenderOrigin) / sizeof(uint32_t), 0));
-    m_viewersOffset = append(std::vector<uint32_t>(m_worlds + 1, kNoPrim));
     m_layout =
         device.CreateBuffer({.bytes = words.size() * sizeof(uint32_t), .label = "instance layout"});
     device.GetQueue().Write(*m_layout, words.data());
+    m_renderOrigins =
+        device.CreateBuffer({.label = "render origins"},
+                            std::span<const RenderOrigin>(std::vector<RenderOrigin>(m_worlds + 1)));
+    m_viewers = device.CreateBuffer(
+        {.label = "viewers"},
+        std::span<const uint32_t>(std::vector<uint32_t>(m_worlds + 1, kNoPrim)));
     WriteLayoutHeader();
 
     m_refits.assign(m_worlds + 1, 0);
@@ -544,8 +547,6 @@ void Instances::WriteLayoutHeader() {
     layout.worldOrigins.address = m_layout->Address() + m_originsOffset;
     layout.offsetBases.address = m_layout->Address() + m_offsetBasesOffset;
     layout.offsets.address = m_layout->Address() + m_offsetsOffset;
-    layout.renderOrigins.address = m_layout->Address() + m_renderOriginsOffset;
-    layout.viewers.address = m_layout->Address() + m_viewersOffset;
     m_catalog.GetStore().GetDevice().GetQueue().Write(m_layout->Slice(0, sizeof(layout)), &layout);
 }
 
@@ -762,6 +763,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     params.shapes.address = m_shapes->Address();
     params.tlases.address = dirtyBuffer->Address();
     params.hits.address = m_hits->Address();
+    params.origins.address = m_renderOrigins->Address();
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -770,6 +772,8 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     origins.scene.address = store.DeviceData();
     origins.layout.address = m_layout->Address();
     origins.products.address = m_productBuffer->Address();
+    origins.origins.address = m_renderOrigins->Address();
+    origins.viewers.address = m_viewers->Address();
     origins.productCount = uint32_t(m_products.size());
     origins.tlasCount = tlases;
     if (!m_products.empty()) {
@@ -793,6 +797,21 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
         m_builder.Refit(encoder, *m_tlas, *m_records, counts, refit);
     }
     return queue.Submit(encoder.Finish());
+}
+
+void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    for (const Ref<device::Buffer>& buffer :
+         {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins}) {
+        if (buffer) {
+            held.emplace_back(buffer);
+        }
+    }
+    if (m_tlas) {
+        held.emplace_back(m_tlas);
+    }
+    if (m_unitBox) {
+        held.emplace_back(m_unitBox);
+    }
 }
 
 void Instances::Prepare() {

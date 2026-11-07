@@ -61,6 +61,8 @@ class Geometry : public System {
 
     std::optional<MeshShape> Find(uint32_t prim) const;
 
+    void Hold(std::vector<Ref<const RefCounted>>& held) const;
+
   private:
     struct TopologyKey {
         uint64_t indices = 0;

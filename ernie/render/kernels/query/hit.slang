@@ -83,13 +83,15 @@ struct LinkFilter : IHitFilter {
 
 struct HitQuery {
     SceneData* scene;
+    RenderTables* tables;
     InstanceLayout* layout;
     uint world;
     uint tlas;
 
-    __init(SceneData* scene, InstanceLayout* layout, uint world) {
+    __init(SceneData* scene, RenderTables* tables, uint world) {
         this.scene = scene;
-        this.layout = layout;
+        this.tables = tables;
+        layout = tables->instances;
         this.world = world;
         tlas = InstanceTlas(world, layout->worldCount);
     }

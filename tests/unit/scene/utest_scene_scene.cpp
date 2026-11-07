@@ -136,8 +136,13 @@ TEST(SceneTest, SnapshotsCarryEverySystemsOutput) {
         const Snapshot snapshot = scene.Acquire(Stream::Host());
         EXPECT_EQ(snapshot.ordinal, 1u);
         EXPECT_NE(snapshot.sceneData, 0u);
-        EXPECT_NE(snapshot.instances, 0u);
-        EXPECT_EQ(snapshot.semantics.taxonomyCount, 1u);
+        const PinnedTables& pinned = PinnedTables::From(snapshot);
+        EXPECT_EQ(snapshot.tables, pinned.header->Address());
+        EXPECT_NE(pinned.tables.instances.address, 0u);
+        EXPECT_NE(pinned.tables.lights.address, 0u);
+        EXPECT_NE(pinned.tables.origins.address, 0u);
+        EXPECT_EQ(pinned.tables.semantics.taxonomyCount, 1u);
+        EXPECT_EQ(pinned.tables.worldCount, 1u);
         EXPECT_TRUE(snapshot.ready.Ready());
         scene.Release(snapshot);
         scene.Publish({.ordinal = 10}).Wait();

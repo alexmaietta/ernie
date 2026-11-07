@@ -594,15 +594,38 @@ Ordinal Scene::Published() const {
 }
 
 Snapshot Scene::Acquire(Stream consumer) {
+    std::shared_ptr<const PinnedTables> pinned = m_impl->PinTables();
     Snapshot snapshot = m_impl->GetTimeline().Acquire(consumer);
-    const Ref<device::Buffer>& layout = m_impl->GetInstances().Layout();
-    snapshot.instances = layout ? layout->Address() : 0;
-    const Ref<device::Buffer>& lights = m_impl->GetLights().Layout();
-    snapshot.lights = lights ? lights->Address() : 0;
-    snapshot.semantics = m_impl->GetSemantics().Data();
-    const Ref<device::Buffer>& bounds = m_impl->GetBounds().Boxes();
-    snapshot.bounds = bounds ? bounds->Address() : 0;
+    snapshot.tables = pinned->header->Address();
+    snapshot.pinned = std::move(pinned);
     return snapshot;
+}
+
+std::shared_ptr<const PinnedTables> SceneImpl::PinTables() {
+    const auto at = [](const Ref<device::Buffer>& buffer) {
+        return buffer ? buffer->Address() : 0;
+    };
+    RenderTables tables{};
+    tables.instances.address = at(m_instances.Layout());
+    tables.lights.address = at(m_lights.Layout());
+    tables.origins.address = at(m_instances.Origins());
+    tables.bounds = at(m_bounds.Boxes());
+    tables.semantics = m_semantics.Data();
+    tables.worldCount = m_catalog.GetPrims().WorldCount();
+    if (!m_tablesBuffer || std::memcmp(&tables, &m_tables, sizeof(tables)) != 0) {
+        m_tables = tables;
+        m_tablesBuffer = m_device->CreateBuffer({.label = "render tables"},
+                                                std::span<const RenderTables>(&m_tables, 1));
+    }
+    auto pinned = std::make_shared<PinnedTables>();
+    pinned->header = m_tablesBuffer;
+    pinned->tables = m_tables;
+    m_instances.Hold(pinned->held);
+    m_lights.Hold(pinned->held);
+    m_bounds.Hold(pinned->held);
+    m_semantics.Hold(pinned->held);
+    m_geometry.Hold(pinned->held);
+    return pinned;
 }
 
 void Scene::Release(const Snapshot& snapshot, Stream consumer) {

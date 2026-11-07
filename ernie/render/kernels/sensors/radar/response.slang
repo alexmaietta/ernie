@@ -12,7 +12,7 @@ using namespace ernie;
 struct RadarResponse : IResponse<RadarPattern> {
     HitQuery query;
     SceneData* scene;
-    InstanceLayout* layout;
+    RenderTables* tables;
     float3 sensorVelocity;
     bool hit;
     float3 position;
@@ -27,8 +27,8 @@ struct RadarResponse : IResponse<RadarPattern> {
         RadarResponse response;
         response.query = context.query;
         response.scene = params.scene;
-        response.layout = params.layout;
-        response.sensorVelocity = PointVelocity(params.scene, params.layout,
+        response.tables = params.tables;
+        response.sensorVelocity = PointVelocity(params.scene, params.tables,
                                                 context.capture->sensor, pattern.frame.position);
         response.hit = false;
         response.position = float3(0);
@@ -57,7 +57,7 @@ struct RadarResponse : IResponse<RadarPattern> {
             return;
         }
         const SurfacePoint point = ComputeSurfacePoint(query, ray.ray, primHit, ray.spread);
-        const float3 velocity = PointVelocity(scene, layout, point.prim, point.position);
+        const float3 velocity = PointVelocity(scene, tables, point.prim, point.position);
         hit = true;
         position = point.position;
         distance = point.distance;

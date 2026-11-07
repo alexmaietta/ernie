@@ -56,6 +56,12 @@ class Instances : public System {
         return m_layout;
     }
 
+    const Ref<device::Buffer>& Origins() const {
+        return m_renderOrigins;
+    }
+
+    void Hold(std::vector<Ref<const RefCounted>>& held) const;
+
     const Ref<device::Buffer>& Records() const {
         return m_records;
     }
@@ -148,8 +154,8 @@ class Instances : public System {
     uint64_t m_hiddenOffset = 0;
     uint64_t m_offsetBasesOffset = 0;
     uint64_t m_offsetsOffset = 0;
-    uint64_t m_renderOriginsOffset = 0;
-    uint64_t m_viewersOffset = 0;
+    Ref<device::Buffer> m_renderOrigins;
+    Ref<device::Buffer> m_viewers;
     std::vector<uint32_t> m_products;
     Ref<device::Buffer> m_productBuffer;
     std::map<uint32_t, ComposedWorldDesc> m_composed;

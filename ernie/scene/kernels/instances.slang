@@ -45,7 +45,8 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
         return Inactive(local);
     }
 
-    const float3 translation = RenderTranslation(p.layout, w, world);
+    const float3 translation =
+        RelativeTranslation(p.origins[min(world, p.layout->worldCount)], w);
     const float3 x = shape.axes[0];
     const float3 y = shape.axes[1];
     const float3 z = shape.axes[2];
@@ -137,7 +138,7 @@ void GatherViewers(uniform OriginParams p) {
         const uint sensor = Ptr<uint>(sensors.address)[at];
         if (sensor < scene->primCount && (scene->prims.flags[sensor] & kPrimAlive) != 0) {
             const uint world = scene->prims.world[sensor];
-            InterlockedMin(layout->viewers[min(world, layout->worldCount)], sensor);
+            InterlockedMin(p.viewers[min(world, layout->worldCount)], sensor);
         }
     }
 }
@@ -151,8 +152,8 @@ void PlaceOrigins(uniform OriginParams p) {
     }
     SceneData* scene = p.scene;
     InstanceLayout* layout = p.layout;
-    const uint viewer = layout->viewers[tlas];
-    layout->viewers[tlas] = kNoPrim;
+    const uint viewer = p.viewers[tlas];
+    p.viewers[tlas] = kNoPrim;
     RenderOrigin origin;
     origin.high = Float3(float3(0));
     origin.low = Float3(float3(0));
@@ -163,5 +164,5 @@ void PlaceOrigins(uniform OriginParams p) {
         origin.high = anchor.high;
         origin.low = anchor.low;
     }
-    layout->renderOrigins[tlas] = origin;
+    p.origins[tlas] = origin;
 }

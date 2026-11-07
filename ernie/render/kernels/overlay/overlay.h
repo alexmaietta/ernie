@@ -8,6 +8,7 @@
 #include "ernie/io/kernels/encoding.h"
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/scene.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #endif
 
 namespace ernie {
@@ -330,7 +331,7 @@ ERNIE_CHECK_SIZE(OverlayRecord, 32);
 
 struct OverlayParams {
     Ptr<SceneData> scene;
-    Ptr<InstanceLayout> layout;
+    Ptr<RenderTables> tables;
     Ptr<OverlayView> views;
     Ptr<OverlayBatch> batches;
     Ptr<OverlayRecord> records;

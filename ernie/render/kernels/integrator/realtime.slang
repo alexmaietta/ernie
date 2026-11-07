@@ -78,7 +78,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         integrator.query = context.query;
         integrator.materials = MaterialQuery.Load(context.query, product);
         integrator.bounces = uint(max(scene->schemas.realTimeAPI.maxBounces[row], 0));
-        integrator.lights = context.params.lights;
+        integrator.lights = context.params.tables->lights;
         return integrator;
     }
 

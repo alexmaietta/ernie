@@ -39,6 +39,12 @@ class Bounds : public System {
         return m_boxes;
     }
 
+    void Hold(std::vector<Ref<const RefCounted>>& held) const {
+        if (m_boxes) {
+            held.emplace_back(m_boxes);
+        }
+    }
+
     std::optional<BvhBox> World(uint32_t world) const;
     device::Download ReadWorldAsync(uint32_t world) const;
     device::Download ReadWorldsAsync() const;

@@ -197,6 +197,14 @@ std::span<const ColumnRef> Lights::Outputs() const {
     return {};
 }
 
+void Lights::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    for (const Ref<device::Buffer>& buffer : {m_layout, m_records, m_cdf, m_maps, m_spectra}) {
+        if (buffer) {
+            held.emplace_back(buffer);
+        }
+    }
+}
+
 void Lights::Prepare() {
     Kernels();
     Spectra();
@@ -352,7 +360,6 @@ void Lights::Relayout() {
     layout.offsetBases.address = m_layout->Address() + offsetBases;
     layout.offsets.address = m_layout->Address() + offsets;
     layout.copies.address = m_layout->Address() + copiesAt;
-    layout.instances = m_instances.Layout() ? m_instances.Layout()->Address() : 0;
     layout.worldCount = m_worlds;
     layout.domeCount = m_domes;
     std::memcpy(words.data(), &layout, sizeof(layout));
@@ -401,6 +408,8 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     LightParams params{};
     params.scene.address = store.DeviceData();
     params.layout.address = m_layout->Address();
+    params.instances.address = m_instances.Layout() ? m_instances.Layout()->Address() : 0;
+    params.origins.address = m_instances.Origins() ? m_instances.Origins()->Address() : 0;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());

@@ -190,7 +190,7 @@ struct CameraModel : IDifferentiable {
     no_diff SensorFrame pose;
     no_diff float exposure;
 
-    static CameraModel Load(SceneData* scene, InstanceLayout* layout, uint prim) {
+    static CameraModel Load(SceneData* scene, RenderTables* tables, uint prim) {
         CameraData* data = &scene->schemas.camera;
         const uint row = PrimRow(scene, prim, kSlotCamera);
         CameraModel camera;
@@ -218,7 +218,7 @@ struct CameraModel : IDifferentiable {
         camera.shutter.open = data.shutterOpen[row];
         camera.shutter.close = data.shutterClose[row];
 
-        camera.pose = LoadSensorFrame(scene, layout, prim);
+        camera.pose = LoadSensorFrame(scene, tables, prim);
 
         const float exposureFStop = data.exposureFStop[row];
         const float sensitivity = data.exposureResponsivity[row] * (data.exposureIso[row] / 100);

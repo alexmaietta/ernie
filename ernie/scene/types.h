@@ -58,10 +58,8 @@ struct ERNIE_API Snapshot {
     Ordinal ordinal = 0;
     device::Operation ready;
     uint64_t sceneData = 0;
-    uint64_t instances = 0;
-    uint64_t lights = 0;
-    uint64_t bounds = 0;
-    SemanticsData semantics{};
+    uint64_t tables = 0;
+    std::shared_ptr<const void> pinned;
 };
 
 }

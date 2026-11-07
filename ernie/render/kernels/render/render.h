@@ -8,6 +8,7 @@
 #include "ernie/scene/kernels/lights.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/semantics.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #endif
 
 namespace ernie {
@@ -78,25 +79,23 @@ struct CapturePixel {
 
 struct RenderParams {
     Ptr<SceneData> scene;
-    Ptr<InstanceLayout> layout;
-    Ptr<LightLayout> lights;
+    Ptr<RenderTables> tables;
     Ptr<Capture> captures;
-    SemanticsData semantics;
     uint64_t firstPixel;
     uint captureCount;
     uint pixelCount;
 };
 
-ERNIE_CHECK_SIZE(RenderParams, 80);
+ERNIE_CHECK_SIZE(RenderParams, 40);
 
 struct ScatterParams {
     Ptr<PointCloud> cloud;
-    SemanticsData semantics;
+    Ptr<RenderTables> tables;
     uint slotCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(ScatterParams, 48);
+ERNIE_CHECK_SIZE(ScatterParams, 24);
 
 static const uint kRenderGroup = 64;
 

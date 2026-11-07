@@ -2,6 +2,8 @@
 #pragma once
 
 #include "ernie/io/kernels/ies.h"
+#include "ernie/scene/kernels/instance_layout.h"
+#include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
 
 namespace ernie {
@@ -78,12 +80,11 @@ struct LightLayout {
     Ptr<uint> offsetBases;
     Ptr<Float3> offsets;
     Ptr<uint> copies;
-    uint64_t instances;
     uint worldCount;
     uint domeCount;
 };
 
-ERNIE_CHECK_SIZE(LightLayout, 96);
+ERNIE_CHECK_SIZE(LightLayout, 88);
 
 static const uint kDomeMapWidth = 256;
 static const uint kDomeMapHeight = 128;
@@ -117,6 +118,8 @@ ERNIE_CHECK_SIZE(SpectralTables, 7300);
 struct LightParams {
     Ptr<SceneData> scene;
     Ptr<LightLayout> layout;
+    Ptr<InstanceLayout> instances;
+    Ptr<RenderOrigin> origins;
     Ptr<uint> tlases;
     Ptr<Float3> spectra;
     uint tlasCount;
@@ -125,7 +128,7 @@ struct LightParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 48);
+ERNIE_CHECK_SIZE(LightParams, 64);
 
 static const uint kLoopedLights = 8;
 

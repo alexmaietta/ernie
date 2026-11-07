@@ -148,7 +148,7 @@ device::Operation RayCaster::Cast(const Rays& rays, RayHits& hits, const RayCast
     }
     const Snapshot snapshot = scene.Acquire();
     params.scene.address = snapshot.sceneData;
-    params.layout.address = snapshot.instances;
+    params.tables.address = snapshot.tables;
     device::Queue& queue = device.GetQueue();
     queue.Follow(stream);
     device::CommandEncoder encoder = queue.CreateEncoder();

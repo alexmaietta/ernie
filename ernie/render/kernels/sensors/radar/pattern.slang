@@ -16,7 +16,7 @@ struct RadarPattern : IPattern {
         RadarData* data = &scene->schemas.radar;
         const uint row = PrimRow(scene, capture->sensor, kSlotRadar);
         RadarPattern pattern;
-        pattern.frame = LoadSensorFrame(scene, context.params.layout, capture->sensor);
+        pattern.frame = LoadSensorFrame(scene, context.params.tables, capture->sensor);
         pattern.fieldOfView =
             radians(float2(data.fieldOfView[row].x, data.fieldOfView[row].y));
         pattern.resolution = float2(capture->width, capture->height);
