@@ -15,8 +15,8 @@ struct PrimvarRef {
     }
 }
 
-PrimvarRef FindPrimvar(SceneData* scene, uint prim, uint name) {
-    return FindPrimvarIn(scene->schemas.gprim.primvars[PrimRow(scene, prim, kSlotGprim)], name);
+PrimvarRef FindPrimvar(RenderTables* tables, uint slot, uint name) {
+    return FindPrimvarIn(tables->surfaces[slot].primvars, name);
 }
 
 PrimvarRef FindPrimvarIn(ArrayRef table, uint name) {
@@ -91,20 +91,13 @@ bool ReadPrimvar(PrimvarRef primvar, SurfaceElement element, out float4 value) {
     return true;
 }
 
-bool ReadInstancePrimvar(SceneData* scene, InstanceLayout* layout, uint slot, uint name,
-                         out float4 value) {
+bool ReadInstancePrimvar(RenderTables* tables, uint slot, uint name, out float4 value) {
     value = float4(0);
-    const SlotHit drawn = layout->hits[slot];
-    if (drawn.instancer == kNoPrim ||
-        SchemaId(scene->prims.schema[drawn.instancer]) != SchemaId::PointInstancer) {
-        return false;
-    }
-    const PrimvarRef primvar = FindPrimvarIn(
-        scene->schemas.pointInstancer.primvars[PrimRow(scene, drawn.instancer, kSlotPointInstancer)],
-        name);
+    const PrimvarRef primvar = FindPrimvarIn(tables->surfaces[slot].instancerPrimvars, name);
     if (!primvar.Found()) {
         return false;
     }
+    const SlotHit drawn = tables->instances->hits[slot];
     uint index = Interpolation(primvar.entry.interpolation) == Interpolation::Constant
                      ? 0
                      : drawn.instance;
@@ -121,10 +114,10 @@ bool ReadInstancePrimvar(SceneData* scene, InstanceLayout* layout, uint slot, ui
     return true;
 }
 
-float3 SurfaceDisplayColor(SceneData* scene, InstanceLayout* layout, uint prim, uint slot) {
+float3 SurfaceDisplayColor(RenderTables* tables, uint slot) {
     float4 tint;
-    if (ReadInstancePrimvar(scene, layout, slot, layout->displayColorName, tint)) {
+    if (ReadInstancePrimvar(tables, slot, tables->instances->displayColorName, tint)) {
         return tint.xyz;
     }
-    return scene->schemas.gprim.displayColor[PrimRow(scene, prim, kSlotGprim)].Vector();
+    return tables->surfaces[slot].displayColor.Vector();
 }

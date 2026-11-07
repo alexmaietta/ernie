@@ -53,6 +53,9 @@ constexpr ColumnRef kActivation[] = {kSphereRadius,
                                      kPointInstancerIds,
                                      kPointInstancerInvisibleIds};
 
+constexpr ColumnRef kPlacement[] = {kPointBasedPoints, kPointInstancerOrientations,
+                                    kPointInstancerScales, kRenderProductCamera};
+
 constexpr ColumnRef kLayoutInputs[] = {kPointInstancerPrototypes, kPointInstancerPositions,
                                        kPrototypeAPIPrototype};
 
@@ -61,7 +64,8 @@ const std::vector<ColumnRef>& InputColumns() {
         std::vector<ColumnRef> columns = {
             kPointBasedPoints,      kPointBasedNormals,     kPointBasedNormalsInterpolation,
             kMeshFaceVertexIndices, kMeshSubdivisionScheme, kPointInstancerOrientations,
-            kPointInstancerScales,  kRenderProductCamera};
+            kPointInstancerScales,  kRenderProductCamera,   kGprimPrimvars,
+            kGprimDisplayColor,     kPointInstancerPrimvars};
         columns.insert(columns.end(), std::begin(kActivation), std::end(kActivation));
         columns.insert(columns.end(), std::begin(kLayoutInputs), std::end(kLayoutInputs));
         return columns;
@@ -723,10 +727,15 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
             }
         }
     }
+    const auto written = [&](std::span<const ColumnRef> columns) {
+        return std::ranges::any_of(
+            columns, [&](ColumnRef column) { return store.LastWrite(column) > m_seen; });
+    };
     const bool activated = changes.Wrote(TableId::Imageables) || changes.Wrote(TableId::Meshes) ||
-                           std::ranges::any_of(kActivation, [&](ColumnRef column) {
-                               return store.LastWrite(column) > m_seen;
-                           });
+                           written(kActivation);
+    const bool placed = relaid || restacked || activated || !structural.empty() ||
+                        changes.Wrote(TableId::Transforms) || changes.Wrote(TableId::MeshData) ||
+                        written(kPlacement) || written(kLayoutInputs);
     m_seen = seen;
 
     m_stats = {};
@@ -747,6 +756,9 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
         const uint32_t count = m_regions.Counts()[tlas];
         widest = std::max(widest, m_regions.Capacity(tlas));
         m_stats.written += count;
+        if (!placed) {
+            continue;
+        }
         if (relaid || activated || structural.contains(tlas) || m_refits[tlas] >= m_maxRefits) {
             built.push_back(tlas);
             m_refits[tlas] = 0;

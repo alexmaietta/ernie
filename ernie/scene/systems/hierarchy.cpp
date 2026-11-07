@@ -244,7 +244,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     params.since = changes.sinceStamp;
     params.until = changes.untilStamp;
     params.all = rebuild ? 1 : 0;
-    params.inherit = changes.removed.empty() ? 0 : 1;
+    params.inherit = changes.removed.empty() && changes.apis.empty() ? 0 : 1;
 
     const auto written = [&](std::span<const ColumnRef> inputs) {
         return rebuild || std::ranges::any_of(inputs, [&](ColumnRef input) {
@@ -256,7 +256,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     constexpr ColumnRef kInherited[] = {kImageableVisibility, kImageablePurpose,
                                         kMaterialBindingAPIMaterialBinding};
     const bool moved = written(kTransforms);
-    const bool inherited = written(kInherited) || !changes.removed.empty();
+    const bool inherited = written(kInherited) || !changes.removed.empty() || !changes.apis.empty();
     m_seen = store.WriteSequence();
     std::vector<uint32_t> worlds;
     if (global) {

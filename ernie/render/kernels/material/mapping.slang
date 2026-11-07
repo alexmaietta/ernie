@@ -112,7 +112,7 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
                       point.slot);
     }
     if (uv) {
-        const PrimvarRef primvar = FindPrimvar(scene, point.prim, m.uvPrimvar[row]);
+        const PrimvarRef primvar = FindPrimvar(query.tables, point.slot, m.uvPrimvar[row]);
         float4 value;
         const float2 st = ReadPrimvar(primvar, point.element, value) ? value.xy : float2(0);
         float3 tangent;

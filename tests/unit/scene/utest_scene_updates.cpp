@@ -85,10 +85,20 @@ struct Case {
 const Case kCases[] = {
     {"nothing written does nothing", [](Fixture&) {}, {}},
     {"an attribute no system reads does nothing",
+     [](Fixture& f) { f.One(f.quads[0], SchemaId::Gprim).Get<bool>(kGprimDoubleSided).Set(false); },
+     {}},
+    {"a display color rewrites its world's surfaces without touching the TLAS",
      [](Fixture& f) {
          f.One(f.balls[0], SchemaId::Gprim).Get<Float3>(kGprimDisplayColor).Set(Float3{1, 0, 0});
      },
-     {}},
+     {.instancesWritten = 3}},
+    {"authored normals rewrite their world's surfaces without touching the TLAS",
+     [](Fixture& f) {
+         f.One(f.quads[0], SchemaId::PointBased)
+             .GetArray<Float3>(kPointBasedNormals)
+             .Set(0, std::vector<Float3>(4, Float3{0, 0, 1}));
+     },
+     {.instancesWritten = 3}},
     {"moving a prim refits its world only",
      [](Fixture& f) { f.Move(f.balls[0], {2, 0, 0}); },
      {.hierarchyRows = 3, .tlasRefit = 1, .instancesWritten = 3}},

@@ -15,9 +15,13 @@ struct SurfaceRecord {
     uint normalsInterpolation;
     uint normalsCount;
     uint meshRow;
-    uint padding;
+    uint padding0;
+    ArrayRef primvars;
+    ArrayRef instancerPrimvars;
+    Float3 displayColor;
+    uint padding1;
 };
 
-ERNIE_CHECK_SIZE(SurfaceRecord, 64);
+ERNIE_CHECK_SIZE(SurfaceRecord, 112);
 
 }

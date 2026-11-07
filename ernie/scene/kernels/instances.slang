@@ -26,6 +26,11 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     const UnitShape shape = PlaceShape(scene, prim, w);
     p.shapes[slot] = shape.record;
     SurfaceRecord surface = {};
+    if (SchemaIsA(uint(schema), SchemaId::Gprim)) {
+        const uint gprimRow = PrimRow(scene, prim, kSlotGprim);
+        surface.primvars = scene->schemas.gprim.primvars[gprimRow];
+        surface.displayColor = scene->schemas.gprim.displayColor[gprimRow];
+    }
     if (schema == SchemaId::Mesh) {
         const uint meshRow = PrimRow(scene, prim, kSlotMesh);
         const uint pointsRow = PrimRow(scene, prim, kSlotPointBased);
@@ -104,6 +109,11 @@ InstanceRecord Expand(InstanceParams p, uint item, uint world, uint local, uint 
     }
     const InstanceRecord record =
         PlaceInstance(p, copy.prim, copy.world, copy.shown, world, local, slot);
+    if (SchemaId(p.scene->prims.schema[block.instancer]) == SchemaId::PointInstancer) {
+        p.surfaces[slot].instancerPrimvars =
+            p.scene->schemas.pointInstancer
+                .primvars[PrimRow(p.scene, block.instancer, kSlotPointInstancer)];
+    }
     if (record.blas == 0) {
         p.hits[slot] = Drawn(kNoPrim, block.instancer, copy.instance, local - block.first);
     }

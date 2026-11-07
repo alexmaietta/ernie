@@ -158,6 +158,7 @@ void ResolveRows(uniform ResolveParams p) {
     uint visibility = uint(Visibility::Inherited);
     uint purpose = uint(Purpose::Default);
     uint material = kNoPrim;
+    uint motion = kNoPrim;
     bool purposeFound = false;
     bool materialFound = false;
     at = row;
@@ -168,6 +169,9 @@ void ResolveRows(uniform ResolveParams p) {
         if (!purposeFound && image.purpose[at] != uint(Purpose::Default)) {
             purpose = image.purpose[at];
             purposeFound = true;
+        }
+        if (motion == kNoPrim && HasApi(scene, image.prim[at], kApiMotionAPI)) {
+            motion = image.prim[at];
         }
         if (!materialFound) {
             bool binds;
@@ -183,7 +187,7 @@ void ResolveRows(uniform ResolveParams p) {
     resolved.visibility = visibility;
     resolved.purpose = purpose;
     resolved.material = material;
-    resolved.padding = 0;
+    resolved.motion = motion;
     p.imageables[row] = resolved;
 }
 

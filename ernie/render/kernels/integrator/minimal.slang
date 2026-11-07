@@ -118,7 +118,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
         const MinimalLighting lighting = MinimalLighting.Load(query, row, lights);
         MinimalShade shade;
         if (Mode == MinimalMode::DisplayColor) {
-            const float3 color = SurfaceDisplayColor(query.scene, query.layout, point.prim, point.slot);
+            const float3 color = SurfaceDisplayColor(query.tables, point.slot);
             shade = lighting.Shade(ray, point, DiffuseMaterial<RgbSpectrum>(RgbSpectrum(color)));
         } else {
             MaterialQuery materials = MaterialQuery.Load(query, product);

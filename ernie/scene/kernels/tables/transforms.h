@@ -9,7 +9,7 @@ struct ResolvedImageable {
     uint visibility;
     uint purpose;
     uint material;
-    uint padding;
+    uint motion;
 };
 
 ERNIE_CHECK_SIZE(ResolvedImageable, 16);
