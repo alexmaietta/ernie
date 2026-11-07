@@ -15,6 +15,7 @@ struct LidarPattern : IPattern {
     float2 range;
     float2 divergence;
     uint samples;
+    uint latticeStep;
 
     static LidarPattern Load(RenderParams params, Capture* capture) {
         SceneData* scene = params.scene;
@@ -32,6 +33,20 @@ struct LidarPattern : IPattern {
         pattern.divergence =
             radians(float2(data.beamDivergence[row].x, data.beamDivergence[row].y));
         pattern.samples = max(data.beamSamples[row], 1u);
+        pattern.latticeStep = max(uint(float(pattern.samples) * 0.618034f), 1u);
+        for (;;) {
+            uint a = pattern.latticeStep;
+            uint b = pattern.samples;
+            while (b != 0) {
+                const uint r = a % b;
+                a = b;
+                b = r;
+            }
+            if (a == 1) {
+                break;
+            }
+            ++pattern.latticeStep;
+        }
         return pattern;
     }
 
@@ -48,8 +63,8 @@ struct LidarPattern : IPattern {
         }
         float elevation = radians(Ptr<float>(elevations.address)[emitter]);
         if (samples > 1) {
-            const float2 u = float2((float(sample) + 0.5f) / float(samples),
-                                    float(reversebits(sample)) * 2.3283064365386963e-10f);
+            const float2 u = (float2(sample, sample * latticeStep % samples) + 0.5f) /
+                             float(samples);
             azimuth += (u.x - 0.5f) * divergence.x;
             elevation += (u.y - 0.5f) * divergence.y;
         }
