@@ -5,18 +5,6 @@
 
 namespace ernie {
 
-struct MeshRecord {
-    uint64_t blas;
-    ArrayRef corners;
-    ArrayRef faces;
-    ArrayRef starts;
-    ArrayRef adjacency;
-    ArrayRef normals;
-    ArrayRef bounds;
-};
-
-ERNIE_CHECK_SIZE(MeshRecord, 104);
-
 struct TangentRecord {
     ArrayRef tangents;
     uint primvar;

@@ -12,7 +12,7 @@ enum class TableId : uint32_t {
     Transforms,
     Imageables,
     Meshes,
-    MeshData,
+    MeshPoints,
     Tangents,
     Textures,
 };

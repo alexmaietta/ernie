@@ -35,7 +35,7 @@ template <class T> class RecordTable {
         return true;
     }
 
-    const T& At(uint32_t row) const {
+    const T& Row(uint32_t row) const {
         static const T kEmpty{};
         return row < m_rows.size() ? m_rows[row] : kEmpty;
     }

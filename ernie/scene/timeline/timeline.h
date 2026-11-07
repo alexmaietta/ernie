@@ -61,7 +61,7 @@ class Timeline {
         uint64_t writes = 0;
         uint64_t epoch = 0;
         bool ran = false;
-        uint64_t tables = 0;
+        uint64_t logged = 0;
         std::vector<Ref<device::Buffer>> changed;
     };
 

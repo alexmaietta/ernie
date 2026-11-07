@@ -5,15 +5,6 @@
 
 namespace ernie {
 
-struct ResolvedImageable {
-    uint visibility;
-    uint purpose;
-    uint material;
-    uint motion;
-};
-
-ERNIE_CHECK_SIZE(ResolvedImageable, 16);
-
 struct BoundableBox {
     Float3 lower;
     Float3 upper;

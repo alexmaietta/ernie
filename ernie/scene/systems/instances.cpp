@@ -729,7 +729,7 @@ void Instances::Run(const ChangeSet& changes, TableLog&) {
     const bool activated = changes.Wrote(TableId::Imageables) || changes.Wrote(TableId::Meshes) ||
                            written(kActivation);
     const bool placed = relaid || restacked || activated || !structural.empty() ||
-                        changes.Wrote(TableId::Transforms) || changes.Wrote(TableId::MeshData) ||
+                        changes.Wrote(TableId::Transforms) || changes.Wrote(TableId::MeshPoints) ||
                         written(kPlacement) || written(kLayoutInputs);
     m_seen = seen;
 

@@ -99,7 +99,7 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
-    params.boundables.address = m_boundables->Address();
+    params.primBounds.address = m_boundables->Address();
     params.primCount = m_catalog.GetPrims().Size();
     params.slotCount = m_slots;
     const uint64_t instancerBytes = std::max<uint64_t>(params.primCount, 1) * 6 * sizeof(uint32_t);
@@ -185,8 +185,7 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
 }
 
 void Bounds::Describe(RenderTables& tables) const {
-    tables.bounds = m_boxes ? m_boxes->Address() : 0;
-    tables.boundables.address = m_boundables ? m_boundables->Address() : 0;
+    tables.primBounds.address = m_boundables ? m_boundables->Address() : 0;
 }
 
 void Bounds::Prepare() {

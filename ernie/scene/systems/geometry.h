@@ -18,7 +18,7 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
-#include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/kernels/tables/geometry.h"
 #include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
 
@@ -61,7 +61,7 @@ class Geometry : public System {
     std::optional<MeshShape> Find(uint32_t prim) const;
 
     const MeshRecord& Record(uint32_t meshRow) const {
-        return m_records.At(meshRow);
+        return m_records.Row(meshRow);
     }
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;

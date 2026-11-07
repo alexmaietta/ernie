@@ -78,7 +78,7 @@ ernie_public_files(
     kernels/schema/schema.h
     kernels/schema/types.h
     kernels/semantics.h
-    kernels/tables/transforms.h
+    kernels/tables/hierarchy.h
     kernels/textures.h
     prim.h
     primvar.h

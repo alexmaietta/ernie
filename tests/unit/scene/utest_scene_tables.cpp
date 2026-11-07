@@ -350,14 +350,14 @@ TEST(RecordTableTest, OnlyChangedRowsUploadAndGrowthReplacesTheBuffer) {
 class MeshProbe : public Probe {
   public:
     std::span<const TableId> TableInputs() const override {
-        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshData};
+        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshPoints};
         return kTables;
     }
 
     void Run(const ChangeSet& changes, TableLog&) override {
         ++runs;
         relinked = changes.Wrote(TableId::Meshes);
-        updated = changes.Wrote(TableId::MeshData);
+        updated = changes.Wrote(TableId::MeshPoints);
         worlds = changes.worlds;
     }
 

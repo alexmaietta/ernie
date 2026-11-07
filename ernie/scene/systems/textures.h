@@ -59,7 +59,7 @@ class Textures : public System {
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
     const TextureRecord& Record(uint32_t prim) const {
-        return m_records.At(prim);
+        return m_records.Row(prim);
     }
 
     bool Pending() const override;

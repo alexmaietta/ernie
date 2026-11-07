@@ -3,13 +3,14 @@
 
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/lights.h"
-#include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/semantics.h"
-#include "ernie/scene/kernels/tables/meshes.h"
-#include "ernie/scene/kernels/tables/surfaces.h"
+#include "ernie/scene/kernels/tables/bounds.h"
+#include "ernie/scene/kernels/tables/geometry.h"
+#include "ernie/scene/kernels/tables/hierarchy.h"
+#include "ernie/scene/kernels/tables/instances.h"
+#include "ernie/scene/kernels/tables/tangents.h"
 #include "ernie/scene/kernels/tables/textures.h"
-#include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
 
@@ -19,18 +20,17 @@ struct RenderTables {
     Ptr<MeshRecord> meshes;
     Ptr<TangentRecord> tangents;
     Ptr<SurfaceRecord> surfaces;
-    Ptr<BoundableBox> boundables;
+    Ptr<BoundableBox> primBounds;
     Ptr<TextureRecord> textures;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
-    uint64_t bounds;
     SemanticsData semantics;
     uint worldCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 128);
+ERNIE_CHECK_SIZE(RenderTables, 120);
 
 #ifdef __SLANG__
 

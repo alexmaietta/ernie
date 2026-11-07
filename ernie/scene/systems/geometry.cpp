@@ -22,7 +22,7 @@ constexpr uint32_t kPreparedScan = 1024;
 
 constexpr ColumnRef kInputs[] = {kPointBasedPoints, kMeshFaceVertexIndices, kMeshFaceVertexCounts};
 
-constexpr TableId kTableOutputs[] = {TableId::Meshes, TableId::MeshData};
+constexpr TableId kTableOutputs[] = {TableId::Meshes, TableId::MeshPoints};
 
 void AddWorld(std::vector<uint32_t>& worlds, uint32_t world) {
     if (std::ranges::find(worlds, world) == worlds.end()) {
@@ -426,7 +426,7 @@ void Geometry::Run(const ChangeSet& changes, TableLog& log) {
         log.Wrote(TableId::Meshes, m_relinked);
     }
     if (!updated.empty()) {
-        log.Wrote(TableId::MeshData, updated);
+        log.Wrote(TableId::MeshPoints, updated);
     }
     m_relinked.clear();
 }

@@ -3,10 +3,9 @@
 
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
-#include "ernie/scene/kernels/tables/meshes.h"
-#include "ernie/scene/kernels/tables/surfaces.h"
+#include "ernie/scene/kernels/tables/geometry.h"
+#include "ernie/scene/kernels/tables/instances.h"
 
 namespace ernie {
 

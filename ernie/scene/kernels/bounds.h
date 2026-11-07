@@ -4,8 +4,9 @@
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/kernels/scene.h"
-#include "ernie/scene/kernels/tables/meshes.h"
-#include "ernie/scene/kernels/tables/transforms.h"
+#include "ernie/scene/kernels/tables/bounds.h"
+#include "ernie/scene/kernels/tables/geometry.h"
+#include "ernie/scene/kernels/tables/hierarchy.h"
 
 namespace ernie {
 
@@ -19,7 +20,7 @@ struct BoundsParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
-    Ptr<BoundableBox> boundables;
+    Ptr<BoundableBox> primBounds;
     uint primCount;
     uint slotCount;
     uint instanceSlots;

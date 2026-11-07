@@ -51,8 +51,8 @@ void PrimBounds(uniform BoundsParams p) {
         }
     }
     if (!bounded) {
-        p.boundables[prim].lower = Float3(float3(0));
-        p.boundables[prim].upper = Float3(float3(0));
+        p.primBounds[prim].lower = Float3(float3(0));
+        p.primBounds[prim].upper = Float3(float3(0));
         return;
     }
 
@@ -63,8 +63,8 @@ void PrimBounds(uniform BoundsParams p) {
     const float3 reach = abs(axes[0]) * half.x + abs(axes[1]) * half.y + abs(axes[2]) * half.z;
     const float3 lower = middle - reach;
     const float3 upper = middle + reach;
-    p.boundables[prim].lower = Float3(lower);
-    p.boundables[prim].upper = Float3(upper);
+    p.primBounds[prim].lower = Float3(lower);
+    p.primBounds[prim].upper = Float3(upper);
 }
 
 void Grow(Ptr<uint> extents, uint lowerAt, uint upperAt, float3 lower, float3 upper) {
@@ -151,8 +151,8 @@ void InstancerBounds(uniform BoundsParams p) {
         upper[axis] = FloatFromOrdered(p.instancerExtents[prim * 6 + 3 + axis]);
     }
     const bool empty = lower.x > upper.x;
-    p.boundables[prim].lower = Float3(empty ? float3(0) : lower);
-    p.boundables[prim].upper = Float3(empty ? float3(0) : upper);
+    p.primBounds[prim].lower = Float3(empty ? float3(0) : lower);
+    p.primBounds[prim].upper = Float3(empty ? float3(0) : upper);
 }
 
 [shader("compute")]

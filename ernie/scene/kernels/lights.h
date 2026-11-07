@@ -3,8 +3,8 @@
 
 #include "ernie/io/kernels/ies.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
+#include "ernie/scene/kernels/tables/instances.h"
 #include "ernie/scene/kernels/tables/textures.h"
 
 namespace ernie {

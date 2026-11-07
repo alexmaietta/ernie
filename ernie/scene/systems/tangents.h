@@ -15,7 +15,8 @@
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/schema/schema.h"
-#include "ernie/scene/kernels/tables/meshes.h"
+#include "ernie/scene/kernels/tables/geometry.h"
+#include "ernie/scene/kernels/tables/tangents.h"
 #include "ernie/scene/systems/geometry.h"
 #include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
@@ -94,7 +95,7 @@ class Tangents : public System {
     std::span<const ColumnRef> Inputs() const override;
 
     std::span<const TableId> TableInputs() const override {
-        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshData};
+        static constexpr TableId kTables[] = {TableId::Meshes, TableId::MeshPoints};
         return kTables;
     }
 
@@ -107,7 +108,7 @@ class Tangents : public System {
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
     const TangentRecord& Record(uint32_t meshRow) const {
-        return m_records.At(meshRow);
+        return m_records.Row(meshRow);
     }
 
     void Prepare() override;

@@ -135,7 +135,7 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
         });
         const bool restructured = system.Structural() && m_catalog.Epoch() != scheduled.epoch;
         const bool tabled = std::ranges::any_of(system.TableInputs(), [&](TableId table) {
-            return m_log.Version(table) > scheduled.tables;
+            return m_log.Version(table) > scheduled.logged;
         });
         if (scheduled.ran && !written && !restructured && !tabled && !system.Pending()) {
             continue;
@@ -144,21 +144,21 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
                                   system.Inputs(), &scheduled.changed);
         for (const TableId table : system.TableInputs()) {
-            if (m_log.Version(table) > scheduled.tables) {
+            if (m_log.Version(table) > scheduled.logged) {
                 changes.wrote.push_back(table);
-                m_log.Collect(table, scheduled.tables, changes.worlds);
+                m_log.Collect(table, scheduled.logged, changes.worlds);
             }
         }
         const uint64_t writes = store.WriteSequence();
         const uint64_t epoch = m_catalog.Epoch();
-        const uint64_t tables = m_log.Sequence();
+        const uint64_t logged = m_log.Sequence();
         changes.tables = &m_tables;
         ++system.m_runs;
         system.Run(changes, m_log);
         system.Describe(m_tables);
         scheduled.writes = writes;
         scheduled.epoch = epoch;
-        scheduled.tables = tables;
+        scheduled.logged = logged;
         scheduled.stamp = stamp;
         scheduled.ran = true;
     }
@@ -170,7 +170,7 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
     uint64_t logged = m_log.Sequence();
     for (const Scheduled& scheduled : m_systems) {
         if (!scheduled.system->TableInputs().empty()) {
-            logged = std::min(logged, scheduled.tables);
+            logged = std::min(logged, scheduled.logged);
         }
     }
     m_log.Trim(logged);

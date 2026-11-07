@@ -10,7 +10,7 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
-#include "ernie/scene/kernels/tables/transforms.h"
+#include "ernie/scene/kernels/tables/hierarchy.h"
 #include "ernie/scene/systems/regions.h"
 #include "ernie/scene/systems/system.h"
 
