@@ -75,6 +75,7 @@ std::vector<RuntimeProgram> RuntimePrograms() {
         {&kSceneKernels,
          "ernie.scene.kernels.lights",
          {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights", "WriteLightCdf"}},
+        {&kSceneKernels, "ernie.scene.kernels.readback", {"GatherRows"}},
         {&kSceneKernels, "ernie.scene.kernels.tangents", {"GroupTangents", "CornerTangents"}},
         {&kTextureKernels, "ernie.texture.kernels.mips", {"DownsampleLevels"}},
     };
