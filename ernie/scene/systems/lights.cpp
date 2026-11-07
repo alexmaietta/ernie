@@ -260,7 +260,7 @@ void Lights::Relayout() {
         if (HasApi(record.apis, SchemaId::LightAPI)) {
             m_lights.insert(prim);
             if (!m_instances.Members().contains(prim)) {
-                lists[record.world == kGlobalWorld ? m_worlds : record.world].push_back(prim);
+                lists[TlasIndex(record.world, m_worlds)].push_back(prim);
             }
         }
     }

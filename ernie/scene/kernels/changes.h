@@ -72,7 +72,7 @@ void StampRow(StampTarget target, uint row) {
         return;
     }
     SceneData* scene = target.scene;
-    scene->worldStamps[WorldSlot(scene, scene->prims.world[prim])] = target.stamp;
+    scene->worldStamps[WorldSlot(scene->prims.world[prim])] = target.stamp;
 }
 
 #endif

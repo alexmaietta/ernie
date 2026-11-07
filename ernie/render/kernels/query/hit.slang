@@ -93,7 +93,7 @@ struct HitQuery {
         this.tables = tables;
         layout = tables->instances;
         this.world = world;
-        tlas = InstanceTlas(world, layout->worldCount);
+        tlas = TlasIndex(world, layout->worldCount);
     }
 
     ShapeIntersector Intersector() {

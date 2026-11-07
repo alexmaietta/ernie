@@ -127,7 +127,7 @@ void SlotBounds(uniform BoundsParams p) {
     const float3 z = float3(t[2], t[6], t[10]);
     const float3 middle = float3(t[3], t[7], t[11]) + center.x * x + center.y * y + center.z * z;
     const float3 reach = abs(x) * half.x + abs(y) * half.y + abs(z) * half.z;
-    const uint at = WorldSlot(scene, world);
+    const uint at = WorldSlot(world);
     Grow(p.extents, at * 3, (p.slotCount + at) * 3, middle - reach, middle + reach);
     if (drawn.instancer != kNoPrim) {
         Grow(p.instancerExtents, drawn.instancer * 6, drawn.instancer * 6 + 3, middle - reach,

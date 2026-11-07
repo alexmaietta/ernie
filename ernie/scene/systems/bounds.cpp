@@ -160,7 +160,7 @@ device::Download Bounds::ReadWorldAsync(uint32_t world) const {
     if (!m_boxes) {
         return {};
     }
-    const uint32_t slot = world == kGlobalWorld ? 0 : world + 1;
+    const uint32_t slot = WorldSlot(world);
     if (slot >= m_slots) {
         throw Error("The scene has no world {}", world);
     }
@@ -172,7 +172,7 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
     if (!m_boxes) {
         return std::nullopt;
     }
-    const uint32_t slot = world == kGlobalWorld ? 0 : world + 1;
+    const uint32_t slot = WorldSlot(world);
     if (slot >= m_slots) {
         throw Error("The scene has no world {}", world);
     }

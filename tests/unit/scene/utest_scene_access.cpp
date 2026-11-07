@@ -47,7 +47,7 @@ uint64_t RowStamp(Store& store, Catalog& catalog, ColumnRef column, uint32_t pri
 }
 
 uint64_t WorldStamp(Store& store, uint32_t world) {
-    const uint32_t slot = world == kGlobalWorld ? 0 : world + 1;
+    const uint32_t slot = WorldSlot(world);
     return Items<uint64_t>(store.Worlds().Read(0, slot, 1)).front();
 }
 

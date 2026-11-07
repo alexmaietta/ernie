@@ -217,7 +217,7 @@ StampTarget Store::Stamps(ColumnRef column) {
 }
 
 void Store::StampWorld(uint32_t world) {
-    const uint32_t slot = world == kGlobalWorld ? 0 : world + 1;
+    const uint32_t slot = WorldSlot(world);
     if (slot >= m_worlds.Rows()) {
         throw Error("World {} of a scene of {}", world, m_worldCount);
     }
@@ -226,7 +226,7 @@ void Store::StampWorld(uint32_t world) {
 }
 
 Ordinal Store::WorldStamp(uint32_t world) const {
-    const uint32_t slot = world == kGlobalWorld ? 0 : world + 1;
+    const uint32_t slot = WorldSlot(world);
     if (slot >= m_worldStamps.size()) {
         throw Error("World {} of a scene of {}", world, m_worldCount);
     }

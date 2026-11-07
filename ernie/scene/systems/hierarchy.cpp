@@ -30,10 +30,6 @@ constexpr ColumnRef kInputs[] = {kXformableTranslate,
 
 constexpr TableId kTableOutputs[] = {TableId::Transforms, TableId::Imageables};
 
-uint32_t Segment(uint32_t world) {
-    return world == kGlobalWorld ? 0 : world + 1;
-}
-
 }
 
 std::span<const ColumnRef> Hierarchy::Inputs() const {
@@ -91,7 +87,7 @@ void Hierarchy::Rebuild() {
         if (IsA(record.schema, SchemaId::Xformable)) {
             m_xformRows[row] = prims.Row(prim, SchemaId::Xformable);
         }
-        segments[Segment(record.world)].push_back(row);
+        segments[WorldSlot(record.world)].push_back(row);
         m_rows[prim] = row;
     }
     m_segments.Assign(std::move(segments));
@@ -135,7 +131,7 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
             continue;
         }
         const uint32_t row = found->second;
-        std::erase(segment(Segment(entry.world)), row);
+        std::erase(segment(WorldSlot(entry.world)), row);
         m_parentRows[row] = kNoRow;
         m_xformRows[row] = kNoRow;
         rows.push_back(row);
@@ -158,7 +154,7 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         m_xformRows[row] = IsA(prims.At(entry.prim).schema, SchemaId::Xformable)
                                ? prims.Row(entry.prim, SchemaId::Xformable)
                                : kNoRow;
-        segment(Segment(entry.world)).push_back(row);
+        segment(WorldSlot(entry.world)).push_back(row);
         rows.push_back(row);
         m_rows[entry.prim] = row;
     }
@@ -209,7 +205,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
         std::iota(segments.begin(), segments.end(), 0u);
     } else {
         for (const uint32_t world : changes.worlds) {
-            segments.push_back(Segment(world));
+            segments.push_back(WorldSlot(world));
         }
     }
     std::erase_if(segments, [&](uint32_t segment) {
@@ -259,7 +255,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
         worlds.push_back(kGlobalWorld);
     } else {
         for (const uint32_t segment : segments) {
-            worlds.push_back(segment == 0 ? kGlobalWorld : segment - 1);
+            worlds.push_back(SlotWorld(segment));
         }
     }
     if (moved) {

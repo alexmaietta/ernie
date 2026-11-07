@@ -51,5 +51,5 @@ void CompactWorlds(uniform WorldsParams p) {
     }
     uint index;
     InterlockedAdd(p.out[0], 1u, index);
-    p.out[kChangedRowsOffset + index] = slot == 0 ? kGlobalWorld : slot - 1;
+    p.out[kChangedRowsOffset + index] = SlotWorld(slot);
 }

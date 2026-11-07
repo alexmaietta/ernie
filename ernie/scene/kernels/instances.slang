@@ -66,7 +66,7 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     }
 
     const float3 translation =
-        RelativeTranslation(p.origins[min(world, p.layout->worldCount)], w);
+        RelativeTranslation(p.origins[TlasIndex(world, p.layout->worldCount)], w);
     const float3 x = shape.axes[0];
     const float3 y = shape.axes[1];
     const float3 z = shape.axes[2];
@@ -164,7 +164,7 @@ void GatherViewers(uniform OriginParams p) {
         const uint sensor = Ptr<uint>(sensors.address)[at];
         if (sensor < scene->primCount && (scene->prims.flags[sensor] & kPrimAlive) != 0) {
             const uint world = scene->prims.world[sensor];
-            InterlockedMin(p.viewers[min(world, layout->worldCount)], sensor);
+            InterlockedMin(p.viewers[TlasIndex(world, layout->worldCount)], sensor);
         }
     }
 }

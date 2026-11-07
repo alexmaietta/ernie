@@ -78,7 +78,7 @@ ChangeSet Timeline::Build(Ordinal since, Ordinal until, Ordinal sealing,
     changes.structure = !changes.added.empty() || !changes.removed.empty();
     const uint32_t worlds = m_catalog.GetPrims().WorldCount();
     for (uint32_t slot = 0; slot <= worlds; ++slot) {
-        const uint32_t world = slot == 0 ? kGlobalWorld : slot - 1;
+        const uint32_t world = SlotWorld(slot);
         const Ordinal stamp = store.WorldStamp(world);
         if (stamp > since && stamp <= until) {
             changes.worlds.push_back(world);

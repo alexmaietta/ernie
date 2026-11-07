@@ -84,10 +84,6 @@ struct InstanceLayout {
 
 ERNIE_CHECK_SIZE(InstanceLayout, 128);
 
-ERNIE_SHARED uint InstanceTlas(uint world, uint worldCount) {
-    return world == kGlobalWorld ? worldCount : world;
-}
-
 #ifdef __SLANG__
 
 SlotHit Drawn(uint prim, uint instancer, uint instance, uint offset) {

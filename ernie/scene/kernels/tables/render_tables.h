@@ -35,7 +35,7 @@ ERNIE_CHECK_SIZE(RenderTables, 128);
 #ifdef __SLANG__
 
 RenderOrigin TlasOrigin(RenderTables* tables, uint world) {
-    return tables->origins[min(world, tables->worldCount)];
+    return tables->origins[TlasIndex(world, tables->worldCount)];
 }
 
 float3 RenderTranslation(RenderTables* tables, WorldTransform w, uint world) {

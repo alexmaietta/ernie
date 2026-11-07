@@ -289,7 +289,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     const float3 scale = float3(length(x), length(y), length(z));
 
     LightRecord record;
-    record.position = Float3(RelativeTranslation(p.origins[min(tlas, layout->worldCount)], w));
+    record.position = Float3(RelativeTranslation(p.origins[TlasIndex(tlas, layout->worldCount)], w));
     const uint shownBase = layout->offsetBases[tlas];
     const uint source = scene->prims.world[instancer != kNoPrim ? instancer : prim];
     if (shownBase != kNoRow && source != kGlobalWorld) {

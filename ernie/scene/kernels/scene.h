@@ -35,10 +35,6 @@ ERNIE_CHECK_SIZE(SceneData, 80 + sizeof(Schemas));
 
 #ifdef __SLANG__
 
-uint WorldSlot(SceneData* scene, uint world) {
-    return world == kGlobalWorld ? 0 : world + 1;
-}
-
 uint PrimRow(SceneData* scene, uint prim, uint slot) {
     return scene->rows[scene->prims.slots[prim] + slot];
 }
