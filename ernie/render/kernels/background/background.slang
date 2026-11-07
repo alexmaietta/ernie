@@ -5,18 +5,41 @@ __exported import ernie.render.kernels.background.gradient;
 
 using namespace ernie;
 
-IBackground LoadBackground(SceneData* scene, uint product) {
-    const uint row = ApiRow(scene, product, kApiBackgroundAPI);
-    BackgroundAPIData* data = &scene->schemas.backgroundAPI;
-    const ArrayRef targets = data.background[row];
-    const uint prim = targets.count > 0 ? Ptr<uint>(targets.address)[0] : kNoPrim;
-    const bool alive = prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0;
-    switch (alive ? SchemaId(scene->prims.schema[prim]) : SchemaId::None) {
-    case SchemaId::GradientBackground:
-        return GradientBackground.Load(scene, prim);
-    case SchemaId::ColorBackground:
-        return ColorBackground.Load(scene, prim);
-    default:
-        return ColorBackground(data.backgroundColor[row].Vector());
+struct Background {
+    SceneData* scene;
+    uint prim;
+    SchemaId kind;
+    float3 fallback;
+
+    static Background Load(SceneData* scene, uint product) {
+        BackgroundAPIData* data = &scene->schemas.backgroundAPI;
+        const uint row = ApiRow(scene, product, kApiBackgroundAPI);
+        const ArrayRef targets = data.background[row];
+
+        Background background;
+        background.scene = scene;
+        background.prim = kNoPrim;
+        background.kind = SchemaId::None;
+        background.fallback = data.backgroundColor[row].Vector();
+
+        if (targets.count > 0) {
+            const uint prim = Ptr<uint>(targets.address)[0];
+            if (prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0) {
+                background.prim = prim;
+                background.kind = SchemaId(scene->prims.schema[prim]);
+            }
+        }
+        return background;
+    }
+
+    float3 Radiance(float3 direction) {
+        switch (kind) {
+        case SchemaId::GradientBackground:
+            return GradientBackground.Load(scene, prim).Radiance(direction);
+        case SchemaId::ColorBackground:
+            return ColorBackground.Load(scene, prim).Radiance(direction);
+        default:
+            return fallback;
+        }
     }
 }

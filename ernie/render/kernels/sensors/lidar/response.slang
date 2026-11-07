@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.render.output;
+__exported import ernie.render.kernels.render.outputs;
+__exported import ernie.render.kernels.sensors.lidar.pattern;
 __exported import ernie.render.kernels.sensors.iresponse;
 import ernie.render.kernels.sensors.points;
 import ernie.render.kernels.random;
+import ernie.render.kernels.surface.compute;
 
 using namespace ernie;
 
@@ -15,10 +17,9 @@ struct LidarReturn {
     uint prim;
 }
 
-struct LidarResponse : IResponse {
+struct LidarResponse : IResponse<LidarPattern> {
     HitQuery query;
     SceneData* scene;
-    SensorFrame frame;
     ReturnMode mode;
     uint stride;
     uint returns;
@@ -32,13 +33,13 @@ struct LidarResponse : IResponse {
     float3 normalSum;
     uint firstPrim;
 
-    static LidarResponse Load(RenderParams params, Capture* capture, HitQuery query) {
-        SceneData* scene = params.scene;
+    static LidarResponse Load(SensorContext context, LidarPattern pattern) {
+        SceneData* scene = context.params.scene;
+        Capture* capture = context.capture;
         const uint row = PrimRow(scene, capture->sensor, kSlotLidar);
         LidarResponse response;
-        response.query = query;
+        response.query = context.query;
         response.scene = scene;
-        response.frame = LoadSensorFrame(scene, params.layout, capture->sensor);
         response.mode = ReturnMode(scene->schemas.lidar.returnMode[row]);
         response.stride = max(capture->returns, 1u);
         response.returns = min(response.stride, kMostLidarReturns);
@@ -125,7 +126,8 @@ struct LidarResponse : IResponse {
         Keep(candidate);
     }
 
-    void Write(RenderParams params, CapturePixel target) {
+    void Write(SensorContext context, LidarPattern pattern, CapturePixel pixel) {
+        RenderParams params = context.params;
         LidarReturn results[kMostLidarReturns] = kept;
         uint count = found;
         if (mode == ReturnMode::Mean) {
@@ -135,11 +137,11 @@ struct LidarResponse : IResponse {
                            intensitySum / float(max(samples, 1u)), normalize(normalSum), firstPrim };
         }
         for (uint i = 0; i < stride; ++i) {
-            CapturePixel at = target;
-            at.index = target.index * stride + i;
+            CapturePixel at = pixel;
+            at.index = pixel.index * stride + i;
             const bool returned = i < count && i < kMostLidarReturns;
             const LidarReturn point = results[min(i, kMostLidarReturns - 1)];
-            WritePoint(at, returned, frame, point.position, point.distance, point.intensity, 0,
+            WritePoint(at, returned, pattern.frame, point.position, point.distance, point.intensity, 0,
                        point.prim);
             if (returned) {
                 const LidarReturn result = results[i];
@@ -148,7 +150,7 @@ struct LidarResponse : IResponse {
                 Write(at, RenderVarSource::Normal, float4(result.normal, 1));
                 WriteSegmentation(params, at, result.prim);
             } else {
-                Write(at, RenderVarSource::DistanceToCamera, target.capture->missDistance);
+                Write(at, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
                 Write(at, RenderVarSource::Intensity, 0.0f);
                 Write(at, RenderVarSource::Normal, float4(0));
                 WriteSegmentation(params, at, kNoPrim);

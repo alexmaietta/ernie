@@ -5,29 +5,25 @@ __exported import ernie.render.kernels.sensors.ipattern;
 
 using namespace ernie;
 
-struct CameraPattern : IPattern {
-    ICamera camera;
-    float2 resolution;
-
-    static CameraPattern Load(RenderParams params, Capture* capture) {
-        CameraPattern pattern;
-        pattern.camera = LoadCamera(params.scene, params.layout, capture->sensor);
-        pattern.resolution = float2(capture->width, capture->height);
-        return pattern;
+extension CameraModel : IPattern {
+    static CameraModel Load(SensorContext context) {
+        return CameraModel.Load(context.params.scene, context.params.layout,
+                                context.capture->sensor);
     }
 
     uint SampleCount() {
         return 1;
     }
 
-    SensorRay Generate(CapturePixel target, uint sample) {
-        const float2 ndc = (float2(target.pixel) + 0.5f) / resolution * 2.0f - 1.0f;
+    SensorRay Generate(CapturePixel pixel, uint sample) {
+        const float2 resolution = float2(pixel.capture->width, pixel.capture->height);
+        const float2 ndc = (float2(pixel.coord) + 0.5f) / resolution * 2.0f - 1.0f;
         const CameraRay cameraRay =
-            camera.GenerateRay(CameraSample(float2(ndc.x, -ndc.y), float2(0.5f), 0.5f));
+            GenerateRay(CameraSample(float2(ndc.x, -ndc.y), float2(0.5f), 0.5f));
         SensorRay ray;
         ray.ray = cameraRay.ray;
         ray.weight = cameraRay.weight;
-        ray.spread = camera.PixelSpread(2 / resolution);
+        ray.spread = PixelSpread(2 / resolution);
         return ray;
     }
 }

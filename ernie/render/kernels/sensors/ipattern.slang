@@ -5,9 +5,9 @@ __exported import ernie.render.kernels.sensors.isensor;
 using namespace ernie;
 
 interface IPattern {
-    static This Load(RenderParams params, Capture* capture);
+    static This Load(SensorContext context);
 
     uint SampleCount();
 
-    SensorRay Generate(CapturePixel target, uint sample);
+    SensorRay Generate(CapturePixel pixel, uint sample);
 }

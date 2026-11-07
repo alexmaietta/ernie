@@ -10,12 +10,13 @@ struct RadarPattern : IPattern {
     float2 resolution;
     float2 range;
 
-    static RadarPattern Load(RenderParams params, Capture* capture) {
-        SceneData* scene = params.scene;
+    static RadarPattern Load(SensorContext context) {
+        SceneData* scene = context.params.scene;
+        Capture* capture = context.capture;
         RadarData* data = &scene->schemas.radar;
         const uint row = PrimRow(scene, capture->sensor, kSlotRadar);
         RadarPattern pattern;
-        pattern.frame = LoadSensorFrame(scene, params.layout, capture->sensor);
+        pattern.frame = LoadSensorFrame(scene, context.params.layout, capture->sensor);
         pattern.fieldOfView =
             radians(float2(data.fieldOfView[row].x, data.fieldOfView[row].y));
         pattern.resolution = float2(capture->width, capture->height);
@@ -27,8 +28,8 @@ struct RadarPattern : IPattern {
         return 1;
     }
 
-    SensorRay Generate(CapturePixel target, uint sample) {
-        const float2 cell = (float2(target.pixel) + 0.5f) / resolution;
+    SensorRay Generate(CapturePixel pixel, uint sample) {
+        const float2 cell = (float2(pixel.coord) + 0.5f) / resolution;
         const float azimuth = (0.5f - cell.x) * fieldOfView.x;
         const float elevation = (0.5f - cell.y) * fieldOfView.y;
         SensorRay ray;

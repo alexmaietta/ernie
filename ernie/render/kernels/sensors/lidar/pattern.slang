@@ -17,13 +17,14 @@ struct LidarPattern : IPattern {
     uint samples;
     uint latticeStep;
 
-    static LidarPattern Load(RenderParams params, Capture* capture) {
-        SceneData* scene = params.scene;
+    static LidarPattern Load(SensorContext context) {
+        SceneData* scene = context.params.scene;
+        Capture* capture = context.capture;
         LidarData* data = &scene->schemas.lidar;
         const uint row = PrimRow(scene, capture->sensor, kSlotLidar);
         const float2 sweep = radians(float2(data.azimuthRange[row].x, data.azimuthRange[row].y));
         LidarPattern pattern;
-        pattern.frame = LoadSensorFrame(scene, params.layout, capture->sensor);
+        pattern.frame = LoadSensorFrame(scene, context.params.layout, capture->sensor);
         pattern.rotary = ScanType(data.scanType[row]) == ScanType::Rotary;
         pattern.azimuthStart = sweep.x;
         pattern.azimuthStep = (sweep.y - sweep.x) / float(max(capture->width, 1u));
@@ -54,12 +55,12 @@ struct LidarPattern : IPattern {
         return samples;
     }
 
-    SensorRay Generate(CapturePixel target, uint sample) {
-        const uint emitter = target.pixel.y;
+    SensorRay Generate(CapturePixel pixel, uint sample) {
+        const uint emitter = pixel.coord.y;
         float azimuth =
             radians(emitter < azimuths.count ? Ptr<float>(azimuths.address)[emitter] : 0.0f);
         if (rotary) {
-            azimuth += azimuthStart + azimuthStep * float(target.pixel.x);
+            azimuth += azimuthStart + azimuthStep * float(pixel.coord.x);
         }
         float elevation = radians(Ptr<float>(elevations.address)[emitter]);
         if (samples > 1) {

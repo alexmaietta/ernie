@@ -12,8 +12,8 @@ using namespace ernie;
 ObjectSpace TransformSpace(HitQuery query, uint slot, WorldTransform w) {
     ObjectSpace space;
     const SlotHit hit = query.layout->hits[slot];
-    const uint source = query.data->prims.world[hit.instancer != kNoPrim ? hit.instancer : hit.prim];
-    space.origin = TranslationInWorld(query.data, query.layout, w, query.world) +
+    const uint source = query.scene->prims.world[hit.instancer != kNoPrim ? hit.instancer : hit.prim];
+    space.origin = TranslationInWorld(query.scene, query.layout, w, query.world) +
                    ShownOffset(query.layout, query.world, source);
     space.axes = float3x3(w.x.Vector(), w.y.Vector(), w.z.Vector());
     return space;
@@ -35,7 +35,7 @@ bool UvTangents(HitQuery query, SurfacePoint point, PrimvarRef primvar, uint nam
     if (!element.mesh || !primvar.Found()) {
         return false;
     }
-    SceneData* scene = query.data;
+    SceneData* scene = query.scene;
     const uint pointsRow = PrimRow(scene, point.prim, kSlotPointBased);
     const Ptr<Float3> positions = Ptr<Float3>(scene->schemas.pointBased.points[pointsRow].address);
     const float3 a = positions[element.points.x].Vector();
@@ -96,7 +96,7 @@ Placement ProjectedPlacement(SurfacePoint point, float2 st, float weight, float3
 
 void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point, uint row,
                                        PlacementSettings settings, inout V visitor) {
-    SceneData* scene = query.data;
+    SceneData* scene = query.scene;
     TextureMappingAPIData* m = &scene->schemas.textureMappingAPI;
     const TextureProjection projection = TextureProjection(m.projection[row]);
     const bool uv = projection == TextureProjection::Uv;
@@ -282,7 +282,7 @@ struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
 }
 
 float3 CheckerColor(MaterialQuery query, SurfacePoint point, float3 color) {
-    SceneData* scene = query.hit.data;
+    SceneData* scene = query.hit.scene;
     const uint row = ApiRow(scene, point.prim, kApiCheckerboardAPI);
     CheckerboardAPIData* c = &scene->schemas.checkerboardAPI;
     if (c.checkerboard[row] == 0) {

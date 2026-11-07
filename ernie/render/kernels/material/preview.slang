@@ -137,7 +137,7 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
                                                                 uint material,
                                                                 inout SurfacePoint point,
                                                                 out SurfaceTexels<Inputs> base) {
-        SceneData* scene = query.hit.data;
+        SceneData* scene = query.hit.scene;
         const uint row = PrimRow(scene, material, kSlotUsdPreviewSurface);
         UsdPreviewSurfaceData* d = &scene->schemas.usdPreviewSurface;
         SurfaceDetailAPIData* s = &scene->schemas.surfaceDetailAPI;
@@ -216,7 +216,7 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
 
     static PreviewSurface<Spectrum> Load(MaterialQuery query, uint material,
                                          inout SurfacePoint point) {
-        SceneData* scene = query.hit.data;
+        SceneData* scene = query.hit.scene;
         const uint row = PrimRow(scene, material, kSlotUsdPreviewSurface);
         UsdPreviewSurfaceData* d = &scene->schemas.usdPreviewSurface;
         SurfaceTexels<kTextureInputs> base;

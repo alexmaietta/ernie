@@ -20,7 +20,7 @@ struct DiffuseMaterial<Spectrum : ISpectrum> : IMaterial<Spectrum> {
 
     static DiffuseMaterial<Spectrum> Load(MaterialQuery query, uint material,
                                           inout SurfacePoint point) {
-        SceneData* scene = query.hit.data;
+        SceneData* scene = query.hit.scene;
         const float3 display = SurfaceDisplayColor(scene, query.hit.layout, point.prim, point.slot);
         if (SchemaId(scene->prims.schema[point.prim]) != SchemaId::Plane) {
             return DiffuseMaterial<Spectrum>(Spectrum.FromRgb(display));

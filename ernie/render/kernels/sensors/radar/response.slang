@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.render.output;
+__exported import ernie.render.kernels.render.outputs;
+__exported import ernie.render.kernels.sensors.radar.pattern;
 __exported import ernie.render.kernels.sensors.iresponse;
 import ernie.render.kernels.sensors.points;
 import ernie.render.kernels.random;
+import ernie.render.kernels.surface.compute;
 
 using namespace ernie;
 
-struct RadarResponse : IResponse {
+struct RadarResponse : IResponse<RadarPattern> {
     HitQuery query;
     SceneData* scene;
     InstanceLayout* layout;
-    SensorFrame frame;
     float3 sensorVelocity;
     bool hit;
     float3 position;
@@ -21,14 +22,14 @@ struct RadarResponse : IResponse {
     float3 normal;
     uint prim;
 
-    static RadarResponse Load(RenderParams params, Capture* capture, HitQuery query) {
+    static RadarResponse Load(SensorContext context, RadarPattern pattern) {
+        RenderParams params = context.params;
         RadarResponse response;
-        response.query = query;
+        response.query = context.query;
         response.scene = params.scene;
         response.layout = params.layout;
-        response.frame = LoadSensorFrame(params.scene, params.layout, capture->sensor);
-        response.sensorVelocity =
-            PointVelocity(params.scene, params.layout, capture->sensor, response.frame.position);
+        response.sensorVelocity = PointVelocity(params.scene, params.layout,
+                                                context.capture->sensor, pattern.frame.position);
         response.hit = false;
         response.position = float3(0);
         response.distance = 0;
@@ -66,20 +67,21 @@ struct RadarResponse : IResponse {
         prim = point.prim;
     }
 
-    void Write(RenderParams params, CapturePixel target) {
-        WritePoint(target, hit, frame, position, distance, intensity, radialVelocity, prim);
+    void Write(SensorContext context, RadarPattern pattern, CapturePixel pixel) {
+        RenderParams params = context.params;
+        WritePoint(pixel, hit, pattern.frame, position, distance, intensity, radialVelocity, prim);
         if (!hit) {
-            Write(target, RenderVarSource::DistanceToCamera, target.capture->missDistance);
-            Write(target, RenderVarSource::Intensity, 0.0f);
-            Write(target, RenderVarSource::RadialVelocity, 0.0f);
-            Write(target, RenderVarSource::Normal, float4(0));
-            WriteSegmentation(params, target, kNoPrim);
+            Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
+            Write(pixel, RenderVarSource::Intensity, 0.0f);
+            Write(pixel, RenderVarSource::RadialVelocity, 0.0f);
+            Write(pixel, RenderVarSource::Normal, float4(0));
+            WriteSegmentation(params, pixel, kNoPrim);
             return;
         }
-        Write(target, RenderVarSource::DistanceToCamera, distance);
-        Write(target, RenderVarSource::Intensity, intensity);
-        Write(target, RenderVarSource::RadialVelocity, radialVelocity);
-        Write(target, RenderVarSource::Normal, float4(normal, 1));
-        WriteSegmentation(params, target, prim);
+        Write(pixel, RenderVarSource::DistanceToCamera, distance);
+        Write(pixel, RenderVarSource::Intensity, intensity);
+        Write(pixel, RenderVarSource::RadialVelocity, radialVelocity);
+        Write(pixel, RenderVarSource::Normal, float4(normal, 1));
+        WriteSegmentation(params, pixel, prim);
     }
 }

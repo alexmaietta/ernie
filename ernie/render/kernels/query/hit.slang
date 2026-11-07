@@ -70,13 +70,13 @@ struct LinkFilter : IHitFilter {
 }
 
 struct HitQuery {
-    SceneData* data;
+    SceneData* scene;
     InstanceLayout* layout;
     uint world;
     uint tlas;
 
-    __init(SceneData* data, InstanceLayout* layout, uint world) {
-        this.data = data;
+    __init(SceneData* scene, InstanceLayout* layout, uint world) {
+        this.scene = scene;
         this.layout = layout;
         this.world = world;
         tlas = InstanceTlas(world, layout->worldCount);
@@ -120,7 +120,7 @@ struct HitQuery {
 
     LinkFilter Links(uint row) {
         LinkFilter filter;
-        filter.scene = data;
+        filter.scene = scene;
         filter.hits = layout->hits;
         filter.first = layout->firstInstances[tlas];
         filter.row = row;

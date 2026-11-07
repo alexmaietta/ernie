@@ -20,31 +20,31 @@ struct MaterialQuery {
     }
 
     static MaterialQuery Load(HitQuery hit, uint product) {
-        RenderProductData* products = &hit.data->schemas.renderProduct;
-        const uint row = PrimRow(hit.data, product, kSlotRenderProduct);
+        RenderProductData* products = &hit.scene->schemas.renderProduct;
+        const uint row = PrimRow(hit.scene, product, kSlotRenderProduct);
         return MaterialQuery(hit, products.textureLodBias[row],
                              uint(max(products.maxAnisotropy[row], 1)));
     }
 
     uint BoundMaterial(uint prim) {
-        const uint row = PrimRow(hit.data, prim, kSlotImageable);
-        return hit.data->schemas.imageable.computedMaterial[row];
+        const uint row = PrimRow(hit.scene, prim, kSlotImageable);
+        return hit.scene->schemas.imageable.computedMaterial[row];
     }
 
     SchemaId Schema(uint material) {
-        return material == kNoPrim ? SchemaId::None : SchemaId(hit.data->prims.schema[material]);
+        return material == kNoPrim ? SchemaId::None : SchemaId(hit.scene->prims.schema[material]);
     }
 
     uint Textures(uint material) {
-        return hit.data->schemas.material.textures[PrimRow(hit.data, material, kSlotMaterial)];
+        return hit.scene->schemas.material.textures[PrimRow(hit.scene, material, kSlotMaterial)];
     }
 
     Ptr<uint64_t> Bindings(uint textures, uint first) {
         return textures == kNoTextures ? Ptr<uint64_t>(0)
-                                       : hit.data->textureBindings + (textures + first);
+                                       : hit.scene->textureBindings + (textures + first);
     }
 
     uint64_t Texture(uint textures, uint input) {
-        return textures == kNoTextures ? 0 : hit.data->textureBindings[textures + input];
+        return textures == kNoTextures ? 0 : hit.scene->textureBindings[textures + input];
     }
 }

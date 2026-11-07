@@ -70,7 +70,7 @@ ERNIE_CHECK_SIZE(PointCloud, 128);
 
 struct CapturePixel {
     Capture* capture;
-    uint2 pixel;
+    uint2 coord;
     uint index;
 };
 

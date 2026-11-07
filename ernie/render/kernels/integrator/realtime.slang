@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.render.irender;
-__exported import ernie.render.kernels.spectrum.spectrum;
+__exported import ernie.render.kernels.integrator.iintegrator;
 import ernie.render.kernels.light.area;
 import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.dome;
@@ -63,23 +62,28 @@ struct MaterialBsdf<Spectrum : ISpectrum> : IBsdf<Spectrum> {
     }
 }
 
-struct RealTimeRender<Spectrum : ISpectrum> : IRender {
+struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
+    typealias Spectrum = S;
+
+    HitQuery query;
     MaterialQuery materials;
     uint bounces;
     LightLayout* lights;
 
-    static RealTimeRender<Spectrum> Load(RenderParams params, Capture* capture, HitQuery query) {
-        SceneData* scene = query.data;
-        const uint row = ApiRow(scene, capture->product, kApiRealTimeAPI);
-        RealTimeRender<Spectrum> render;
-        render.materials = MaterialQuery.Load(query, capture->product);
-        render.bounces = uint(max(scene->schemas.realTimeAPI.maxBounces[row], 0));
-        render.lights = params.lights;
-        return render;
+    static RealTimeIntegrator<S> Load(SensorContext context) {
+        SceneData* scene = context.query.scene;
+        const uint product = context.capture->product;
+        const uint row = ApiRow(scene, product, kApiRealTimeAPI);
+        RealTimeIntegrator<S> integrator;
+        integrator.query = context.query;
+        integrator.materials = MaterialQuery.Load(context.query, product);
+        integrator.bounces = uint(max(scene->schemas.realTimeAPI.maxBounces[row], 0));
+        integrator.lights = context.params.lights;
+        return integrator;
     }
 
-    PathSample TracePath(HitQuery query, Ray primary, float spread, inout Rng rng) {
-        PathSample sample = PathSample.Miss();
+    PathResult<S> Trace(Ray primary, float spread, inout Rng rng) {
+        PathResult<S> result = PathResult<S>.Miss();
         Spectrum radiance = Spectrum.Constant(0);
         Spectrum throughput = Spectrum.Constant(1);
         Ray ray = primary;
@@ -93,32 +97,30 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
             const uint mask = kGeometryMask | (bounce == 0 ? kCameraEmitterMask : kEmitterMask);
             const PrimHit primHit = query.Intersect(ray, mask);
             if (!primHit.IsHit()) {
-                radiance = radiance + throughput * Sky(query, origin, ray.direction, originPrim,
+                radiance = radiance + throughput * Sky(origin, ray.direction, originPrim,
                                                        scatteredPdf, scatteredDelta);
                 break;
             }
             const SurfacePoint point = ComputeSurfacePoint(query, ray, primHit, spread);
-            if (IsEmitter(query.data->prims.schema[point.prim])) {
+            if (IsEmitter(query.scene->prims.schema[point.prim])) {
                 if (bounce == 0) {
-                    sample.hit = true;
-                    sample.point = point;
+                    result.point = point;
                 }
-                radiance = radiance + throughput * Emitter(query, origin, originPrim, point,
+                radiance = radiance + throughput * Emitter(origin, originPrim, point,
                                                            scatteredPdf, scatteredDelta);
                 break;
             }
             const uint material = materials.BoundMaterial(point.prim);
             const float3 u = float3(rng.Next2(), rng.Next());
-            const PathVertex<Spectrum> vertex = Shade(query, ray, material, point, u, bounce, rng);
+            const PathVertex<Spectrum> vertex = Shade(ray, material, point, u, bounce, rng);
             if (rng.Next() >= vertex.opacity && passes < kMaxPassThroughs) {
                 ++passes;
                 ray = SpawnRay(point, ray.direction, kBvhFar, ray.time);
                 continue;
             }
             if (bounce == 0) {
-                sample.hit = true;
-                sample.point = vertex.point;
-                sample.albedo = vertex.albedo;
+                result.point = vertex.point;
+                result.albedo = vertex.albedo;
             }
             radiance = radiance + throughput * vertex.radiance;
             if (bounce >= bounces || vertex.next.pdf <= 0) {
@@ -136,8 +138,8 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
             ray = SpawnRay(vertex.point, frame.ToWorld(vertex.next.direction), kBvhFar, ray.time);
             ++bounce;
         }
-        sample.radiance = radiance.ToRgb();
-        return sample;
+        result.radiance = radiance;
+        return result;
     }
 
     float Selection(uint tlas, uint index) {
@@ -156,11 +158,11 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
         return scatteredPdf * scatteredPdf / (scatteredPdf * scatteredPdf + lightPdf * lightPdf);
     }
 
-    Spectrum Sky(HitQuery query, float3 origin, float3 direction, uint originPrim,
+    Spectrum Sky(float3 origin, float3 direction, uint originPrim,
                  float scatteredPdf, bool scatteredDelta) {
         const bool camera = originPrim == kNoPrim;
         Spectrum seen = Spectrum.Constant(0);
-        const LightContext context = LightContext(query.data, lights, query.tlas);
+        const LightContext context = LightContext(query.scene, lights, query.tlas);
         const uint first = lights->firstLights[query.tlas];
         const uint last = lights->firstLights[query.tlas + 1];
         for (uint i = first; i < last; ++i) {
@@ -168,7 +170,7 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
             const LightType type = LightType(record.type);
             if ((type != LightType::Distant && type != LightType::Dome) ||
                 (camera && (record.flags & kLightVisible) == 0) ||
-                (!camera && !InCollection(query.data, record.lightLink, originPrim))) {
+                (!camera && !InCollection(query.scene, record.lightLink, originPrim))) {
                 continue;
             }
             Spectrum emitted;
@@ -192,7 +194,7 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
         return seen;
     }
 
-    Spectrum Emitter(HitQuery query, float3 origin, uint originPrim, SurfacePoint point,
+    Spectrum Emitter(float3 origin, uint originPrim, SurfacePoint point,
               float scatteredPdf, bool scatteredDelta) {
         const bool camera = originPrim == kNoPrim;
         const uint first = lights->firstLights[query.tlas];
@@ -204,11 +206,11 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
                 (drawn.instancer != kNoPrim && candidate.copyOffset != drawn.offset)) {
                 continue;
             }
-            if (!camera && !InCollection(query.data, lights->records[i].lightLink, originPrim)) {
+            if (!camera && !InCollection(query.scene, lights->records[i].lightLink, originPrim)) {
                 return Spectrum.Constant(0);
             }
             const AreaLight<Spectrum> light =
-                AreaLight<Spectrum>.Load(LightContext(query.data, lights, query.tlas), candidate);
+                AreaLight<Spectrum>.Load(LightContext(query.scene, lights, query.tlas), candidate);
             const Spectrum emitted = light.EmittedToward(origin, point.position);
             if (camera) {
                 return emitted;
@@ -219,9 +221,9 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
         return Spectrum.Constant(0);
     }
 
-    LightSample<Spectrum> SampleLight(HitQuery query, LightRecord record, float3 position,
+    LightSample<Spectrum> SampleLight(LightRecord record, float3 position,
                                       float2 u) {
-        const LightContext context = LightContext(query.data, lights, query.tlas);
+        const LightContext context = LightContext(query.scene, lights, query.tlas);
         switch (LightType(record.type)) {
         case LightType::Distant:
             return DistantLight<Spectrum>.Load(context, record).Sample(position, u);
@@ -242,7 +244,7 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
         return vertex;
     }
 
-    PathVertex<Spectrum> Shade(HitQuery query, Ray ray, uint material, SurfacePoint point,
+    PathVertex<Spectrum> Shade(Ray ray, uint material, SurfacePoint point,
                                float3 u, uint bounce, inout Rng rng) {
         const bool primary = bounce == 0;
         const float weighted = bounce < bounces ? 1.0f : 0.0f;
@@ -297,10 +299,10 @@ struct RealTimeRender<Spectrum : ISpectrum> : IRender {
                     continue;
                 }
                 lit = true;
-                if (!InCollection(query.data, record.lightLink, point.prim)) {
+                if (!InCollection(query.scene, record.lightLink, point.prim)) {
                     continue;
                 }
-                sample = SampleLight(query, record, point.position, v);
+                sample = SampleLight(record, point.position, v);
                 shadowing = Shadowing.FromRecord(record);
                 chance = selection;
                 factor = scale;
