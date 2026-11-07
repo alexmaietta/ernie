@@ -14,13 +14,15 @@ struct BoundsParams {
     Ptr<BvhBox> boxes;
     Ptr<InstanceLayout> instances;
     Ptr<uint> instancerExtents;
+    Ptr<WorldTransform> transforms;
+    Ptr<ResolvedImageable> imageables;
     uint primCount;
     uint slotCount;
     uint instanceSlots;
     uint tlasCount;
 };
 
-ERNIE_CHECK_SIZE(BoundsParams, 64);
+ERNIE_CHECK_SIZE(BoundsParams, 80);
 
 static const uint kBoundsGroup = 64;
 

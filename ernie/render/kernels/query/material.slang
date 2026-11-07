@@ -27,8 +27,7 @@ struct MaterialQuery {
     }
 
     uint BoundMaterial(uint prim) {
-        const uint row = PrimRow(hit.scene, prim, kSlotImageable);
-        return hit.scene->schemas.imageable.computedMaterial[row];
+        return PrimImageable(hit.scene, hit.tables->imageables, prim).material;
     }
 
     SchemaId Schema(uint material) {

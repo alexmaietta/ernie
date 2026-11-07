@@ -124,6 +124,26 @@ TEST(RayCastTest, CastsIntoEachRaysWorld) {
     });
 }
 
+TEST(RayCastTest, HidingAPrimOrItsParentRemovesItFromCasts) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Xform>("/Group");
+        scene->Define<Sphere>("/Group/Ball", {.translate = {3, 0, 0}, .radius = 1});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0, 0, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0}, 3);
+        const auto hit = [&] { return caster.Cast(rays).hit.ToHost<uint32_t>().front(); };
+        EXPECT_EQ(hit(), 1u);
+        scene->Select("/Group").Get<Visibility>("visibility").Set(Visibility::Invisible);
+        EXPECT_EQ(hit(), 0u);
+        scene->Select("/Group").Get<Visibility>("visibility").Set(Visibility::Inherited);
+        EXPECT_EQ(hit(), 1u);
+        scene->Select("/Group/Ball").Get<Purpose>("purpose").Set(Purpose::Guide);
+        EXPECT_EQ(hit(), 0u);
+    });
+}
+
 TEST(RayCastTest, RejectsRaysItCannotCast) {
     ForEachDevice([](Device& device) {
         RayCaster caster(TwoBalls(device));

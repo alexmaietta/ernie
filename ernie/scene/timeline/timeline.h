@@ -61,6 +61,7 @@ class Timeline {
         uint64_t writes = 0;
         uint64_t epoch = 0;
         bool ran = false;
+        uint64_t tables = 0;
         std::vector<Ref<device::Buffer>> changed;
     };
 
@@ -79,6 +80,7 @@ class Timeline {
     uint64_t m_epoch = 0;
     uint32_t m_outstanding = 0;
     RenderTables m_tables{};
+    TableLog m_log;
     std::shared_ptr<const PinnedTables> m_pinned;
 };
 

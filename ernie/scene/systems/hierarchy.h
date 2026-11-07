@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -9,6 +10,7 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/tables/transforms.h"
 #include "ernie/scene/systems/regions.h"
 #include "ernie/scene/systems/system.h"
 
@@ -24,6 +26,9 @@ class Hierarchy : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     std::span<const ColumnRef> Outputs() const override;
+    std::span<const TableId> TableOutputs() const override;
+    void Describe(RenderTables& tables) const override;
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override;
     void Prepare() override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;
 
@@ -43,10 +48,16 @@ class Hierarchy : public System {
         return m_rebuilds;
     }
 
+    device::Download ReadTransformsAsync(std::span<const uint32_t> prims);
+    std::vector<WorldTransform> Transforms(std::span<const uint32_t> prims);
+    std::vector<ResolvedImageable> Imageables(std::span<const uint32_t> prims);
+
   private:
     void Rebuild();
     bool Apply(const ChangeSet& changes);
     uint32_t ParentRow(uint32_t prim) const;
+    device::Download Gather(const Ref<device::Buffer>& source, uint32_t words,
+                            std::span<const uint32_t> rows);
 
     Catalog& m_catalog;
     device::Program& Kernels();
@@ -61,6 +72,9 @@ class Hierarchy : public System {
     Ref<device::Buffer> m_segmentRows;
     Ref<device::Buffer> m_segmentStart;
     Ref<device::Buffer> m_segmentCount;
+    Ref<device::Buffer> m_transforms;
+    Ref<device::Buffer> m_imageables;
+    uint32_t m_transformCapacity = 0;
     bool m_built = false;
     uint64_t m_seen = 0;
     uint32_t m_dispatched = 0;

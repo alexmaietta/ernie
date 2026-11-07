@@ -564,6 +564,27 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
     return done;
 }
 
+device::Download Scene::ReadWorldTransformsAsync(Span<const std::string> paths) const {
+    std::vector<uint32_t> prims;
+    for (const std::string& path : paths) {
+        const std::optional<Prim> prim = Find(path);
+        prims.push_back(prim ? prim->Index() : kNoPrim);
+    }
+    return m_impl->GetHierarchy().ReadTransformsAsync(prims);
+}
+
+std::vector<ernie::WorldTransform> Scene::WorldTransforms(Span<const std::string> paths) const {
+    std::vector<ernie::WorldTransform> transforms(paths.size());
+    if (transforms.empty()) {
+        return transforms;
+    }
+    const device::Download download = ReadWorldTransformsAsync(paths);
+    download.Wait();
+    std::memcpy(transforms.data(), download.Bytes().data(),
+                transforms.size() * sizeof(ernie::WorldTransform));
+    return transforms;
+}
+
 std::optional<Box> Scene::Bounds(uint32_t world) const {
     const std::optional<BvhBox> box = m_impl->GetBounds().World(world);
     if (!box) {

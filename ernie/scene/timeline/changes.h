@@ -10,6 +10,7 @@
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/timeline/table_log.h"
 
 namespace ernie {
 
@@ -58,10 +59,13 @@ struct ChangeSet {
     std::vector<ChangedRows> columns;
     std::vector<std::pair<ColumnRef, std::vector<uint32_t>>> arrays;
     const RenderTables* tables = nullptr;
+    TableLog* log = nullptr;
+    std::vector<TableId> wrote;
 
     const ChangedRows* Rows(ColumnRef column) const;
     std::span<const uint32_t> ArrayRows(ColumnRef column) const;
     bool World(uint32_t world) const;
+    bool Wrote(TableId table) const;
 };
 
 }

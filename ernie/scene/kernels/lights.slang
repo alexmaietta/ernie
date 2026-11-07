@@ -268,7 +268,8 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         InstanceLayout* instances = p.instances;
         const uint block = layout->copies[2 * pair];
         const ResolvedCopy copy =
-            ResolveCopy(scene, instances, block, layout->copies[2 * pair + 1], true);
+            ResolveCopy(scene, p.transforms, p.imageables, instances, block,
+                        layout->copies[2 * pair + 1], true);
         instancer = instances->blocks[block].instancer;
         if (!copy.valid || !copy.shown) {
             layout->records[slot] = DarkLight(instancer);
@@ -278,7 +279,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         copyOffset = copy.offset;
         w = copy.world;
     } else {
-        w = PrimWorld(scene, prim);
+        w = PrimWorld(scene, p.transforms, prim);
     }
     const float3 x = w.x.Vector();
     const float3 y = w.y.Vector();
@@ -505,8 +506,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     if (domeMean >= 0) {
         record.power = LinearSrgbLuminance(radiance) * domeMean * kPi;
     }
-    if (scene->schemas.imageable.computedVisibility[PrimRow(scene, prim, kSlotImageable)] ==
-        uint(Visibility::Invisible)) {
+    if (PrimImageable(scene, p.imageables, prim).visibility == uint(Visibility::Invisible)) {
         record.type = uint(LightType::Unsupported);
         record.power = 0;
     }

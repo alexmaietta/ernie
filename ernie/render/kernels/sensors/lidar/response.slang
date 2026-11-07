@@ -20,6 +20,7 @@ struct LidarReturn {
 struct LidarResponse : IResponse<LidarPattern> {
     HitQuery query;
     SceneData* scene;
+    RenderTables* tables;
     ReturnMode mode;
     uint stride;
     uint returns;
@@ -40,6 +41,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         LidarResponse response;
         response.query = context.query;
         response.scene = scene;
+        response.tables = context.params.tables;
         response.mode = ReturnMode(scene->schemas.lidar.returnMode[row]);
         response.stride = max(capture->returns, 1u);
         response.returns = min(response.stride, kMostLidarReturns);
@@ -60,8 +62,7 @@ struct LidarResponse : IResponse<LidarPattern> {
     float Intensity(uint prim, float3 normal, float3 direction) {
         float reflectance = 1;
         bool retroreflective = false;
-        const uint material =
-            scene->schemas.imageable.computedMaterial[PrimRow(scene, prim, kSlotImageable)];
+        const uint material = PrimImageable(scene, tables->imageables, prim).material;
         if (material != kNoPrim && HasApi(scene, material, kApiNonVisualMaterialAPI)) {
             const uint row = ApiRow(scene, material, kApiNonVisualMaterialAPI);
             reflectance = scene->schemas.nonVisualMaterialAPI.nonvisualLidarReflectance[row];

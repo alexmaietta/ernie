@@ -16,10 +16,12 @@ struct InstanceParams {
     Ptr<uint> tlases;
     Ptr<SlotHit> hits;
     Ptr<RenderOrigin> origins;
+    Ptr<WorldTransform> transforms;
+    Ptr<ResolvedImageable> imageables;
     uint64_t unitBox;
 };
 
-ERNIE_CHECK_SIZE(InstanceParams, 64);
+ERNIE_CHECK_SIZE(InstanceParams, 80);
 
 struct OriginParams {
     Ptr<SceneData> scene;
@@ -27,11 +29,12 @@ struct OriginParams {
     Ptr<uint> products;
     Ptr<RenderOrigin> origins;
     Ptr<uint> viewers;
+    Ptr<WorldTransform> transforms;
     uint productCount;
     uint tlasCount;
 };
 
-ERNIE_CHECK_SIZE(OriginParams, 48);
+ERNIE_CHECK_SIZE(OriginParams, 56);
 
 static const uint kInstanceGroup = 64;
 

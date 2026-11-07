@@ -101,3 +101,14 @@ def test_worlds_are_counted_and_selected(scene):
     balls = ernie.Sphere.select(scene, "/env_*/Ball")
     assert len(balls.world(1)) == 1
     assert balls.world(1).paths == ["/env_1/Ball"]
+
+
+def test_world_transforms_compose_the_hierarchy(scene):
+    ernie.Xform.define(scene, "/Group", translate=(1e7, 0, 0))
+    ernie.Sphere.define(scene, "/Group/Ball", translate=(0.25, 2, 0))
+    scene.publish(wait=True)
+    transforms = scene.world_transforms(["/Group/Ball", "/Missing"])
+    assert transforms.shape == (2, 4, 3)
+    assert transforms[0, 3].tolist() == [1e7 + 0.25, 2, 0]
+    assert transforms[0, 0].tolist() == [1, 0, 0]
+    assert not transforms[1].any()

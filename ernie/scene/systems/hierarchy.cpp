@@ -2,6 +2,7 @@
 #include "ernie/scene/systems/hierarchy.h"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <numeric>
 
@@ -10,6 +11,7 @@
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/hierarchy.h"
 #include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/kernels/tables/render_tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
@@ -26,8 +28,7 @@ constexpr ColumnRef kInputs[] = {kXformableTranslate,
                                  kImageablePurpose,
                                  kMaterialBindingAPIMaterialBinding};
 
-constexpr ColumnRef kOutputs[] = {kXformableWorldTransform, kImageableComputedVisibility,
-                                  kImageableComputedPurpose, kImageableComputedMaterial};
+constexpr TableId kTableOutputs[] = {TableId::Transforms, TableId::Imageables};
 
 uint32_t Segment(uint32_t world) {
     return world == kGlobalWorld ? 0 : world + 1;
@@ -40,7 +41,24 @@ std::span<const ColumnRef> Hierarchy::Inputs() const {
 }
 
 std::span<const ColumnRef> Hierarchy::Outputs() const {
-    return kOutputs;
+    return {};
+}
+
+std::span<const TableId> Hierarchy::TableOutputs() const {
+    return kTableOutputs;
+}
+
+void Hierarchy::Describe(RenderTables& tables) const {
+    tables.transforms.address = m_transforms ? m_transforms->Address() : 0;
+    tables.imageables.address = m_imageables ? m_imageables->Address() : 0;
+}
+
+void Hierarchy::Hold(std::vector<Ref<const RefCounted>>& held) const {
+    for (const Ref<device::Buffer>& buffer : {m_transforms, m_imageables}) {
+        if (buffer) {
+            held.emplace_back(buffer);
+        }
+    }
 }
 
 uint32_t Hierarchy::ParentRow(uint32_t prim) const {
@@ -58,6 +76,11 @@ void Hierarchy::Rebuild() {
     Store& store = m_catalog.GetStore();
     device::Device& device = store.GetDevice();
     const uint32_t capacity = std::max(store.Schema(SchemaId::Imageable).Capacity(), 1u);
+    m_transformCapacity = std::max(store.Schema(SchemaId::Xformable).Capacity(), 1u);
+    m_transforms = device.CreateBuffer(
+        {.bytes = uint64_t(m_transformCapacity) * sizeof(WorldTransform), .label = "transforms"});
+    m_imageables = device.CreateBuffer(
+        {.bytes = uint64_t(capacity) * sizeof(ResolvedImageable), .label = "imageables"});
     m_parentRows.assign(capacity, kNoRow);
     m_xformRows.assign(capacity, kNoRow);
     m_rows.clear();
@@ -129,6 +152,10 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         }
         const uint32_t row = prims.Row(entry.prim, SchemaId::Imageable);
         if (row >= m_parentRows.size()) {
+            return false;
+        }
+        if (IsA(prims.At(entry.prim).schema, SchemaId::Xformable) &&
+            prims.Row(entry.prim, SchemaId::Xformable) >= m_transformCapacity) {
             return false;
         }
         m_parentRows[row] = ParentRow(entry.prim);
@@ -212,6 +239,8 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     params.tree.segmentCount.address = m_segmentCount->Address();
     params.scene.address = store.DeviceData();
     params.segments.address = dirty->Address();
+    params.transforms.address = m_transforms->Address();
+    params.imageables.address = m_imageables->Address();
     params.since = changes.sinceStamp;
     params.until = changes.untilStamp;
     params.all = rebuild ? 1 : 0;
@@ -229,13 +258,19 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     const bool moved = written(kTransforms);
     const bool inherited = written(kInherited) || !changes.removed.empty();
     m_seen = store.WriteSequence();
+    std::vector<uint32_t> worlds;
+    if (global) {
+        worlds.push_back(kGlobalWorld);
+    } else {
+        for (const uint32_t segment : segments) {
+            worlds.push_back(segment == 0 ? kGlobalWorld : segment - 1);
+        }
+    }
     if (moved) {
-        store.Touch(kXformableWorldTransform);
+        changes.log->Wrote(TableId::Transforms, worlds);
     }
     if (inherited) {
-        store.Touch(kImageableComputedVisibility);
-        store.Touch(kImageableComputedPurpose);
-        store.Touch(kImageableComputedMaterial);
+        changes.log->Wrote(TableId::Imageables, worlds);
     }
     device::Queue& queue = store.GetDevice().GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Hierarchy/Resolve");
@@ -249,6 +284,70 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     return queue.Submit(encoder.Finish());
 }
 
+device::Download Hierarchy::Gather(const Ref<device::Buffer>& source, uint32_t words,
+                                   std::span<const uint32_t> rows) {
+    device::Device& device = m_catalog.GetStore().GetDevice();
+    const uint64_t bytes = std::max<uint64_t>(rows.size(), 1) * words * sizeof(uint32_t);
+    const Ref<device::Buffer> out = device.CreateBuffer({.bytes = bytes, .label = "gathered rows"});
+    if (rows.empty() || !source) {
+        return {};
+    }
+    const Ref<device::Buffer> list = device.CreateBuffer({.label = "gather rows"}, rows);
+    GatherParams params{};
+    params.source.address = source->Address();
+    params.rows.address = list->Address();
+    params.out.address = out->Address();
+    params.words = words;
+    params.count = uint32_t(rows.size());
+    device::Queue& queue = device.GetQueue();
+    device::CommandEncoder encoder = queue.CreateEncoder();
+    encoder.Dispatch(Kernels().Entry("GatherRows"), params,
+                     {.x = device::GroupCount(params.count, kHierarchyGroup)});
+    queue.Submit(encoder.Finish());
+    return queue.ReadAsync(out->Slice(0, rows.size() * words * sizeof(uint32_t)));
+}
+
+device::Download Hierarchy::ReadTransformsAsync(std::span<const uint32_t> prims) {
+    const Prims& all = m_catalog.GetPrims();
+    std::vector<uint32_t> rows;
+    for (const uint32_t prim : prims) {
+        rows.push_back(all.Alive(prim) && IsA(all.At(prim).schema, SchemaId::Xformable)
+                           ? all.Row(prim, SchemaId::Xformable)
+                           : kNoRow);
+    }
+    return Gather(m_transforms, sizeof(WorldTransform) / sizeof(uint32_t), rows);
+}
+
+std::vector<WorldTransform> Hierarchy::Transforms(std::span<const uint32_t> prims) {
+    std::vector<WorldTransform> transforms(prims.size());
+    const device::Download download = ReadTransformsAsync(prims);
+    if (!transforms.empty()) {
+        download.Wait();
+        std::memcpy(transforms.data(), download.Bytes().data(),
+                    transforms.size() * sizeof(WorldTransform));
+    }
+    return transforms;
+}
+
+std::vector<ResolvedImageable> Hierarchy::Imageables(std::span<const uint32_t> prims) {
+    const Prims& all = m_catalog.GetPrims();
+    std::vector<uint32_t> rows;
+    for (const uint32_t prim : prims) {
+        rows.push_back(all.Alive(prim) && IsA(all.At(prim).schema, SchemaId::Imageable)
+                           ? all.Row(prim, SchemaId::Imageable)
+                           : kNoRow);
+    }
+    std::vector<ResolvedImageable> resolved(prims.size());
+    const device::Download download =
+        Gather(m_imageables, sizeof(ResolvedImageable) / sizeof(uint32_t), rows);
+    if (!resolved.empty()) {
+        download.Wait();
+        std::memcpy(resolved.data(), download.Bytes().data(),
+                    resolved.size() * sizeof(ResolvedImageable));
+    }
+    return resolved;
+}
+
 void Hierarchy::Prepare() {
     Kernels();
 }
@@ -258,7 +357,7 @@ device::Program& Hierarchy::Kernels() {
         m_program = m_catalog.GetStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.hierarchy"},
              .library = &kSceneKernels,
-             .entries = {"ResolveRows"},
+             .entries = {"ResolveRows", "GatherRows"},
              .label = "hierarchy"});
     }
     return *m_program;

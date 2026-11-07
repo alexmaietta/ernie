@@ -6,12 +6,6 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-bool Shown(SceneData* scene, uint imageRow) {
-    const uint purpose = scene->schemas.imageable.computedPurpose[imageRow];
-    return scene->schemas.imageable.computedVisibility[imageRow] != uint(Visibility::Invisible) &&
-           purpose != uint(Purpose::Proxy) && purpose != uint(Purpose::Guide);
-}
-
 InstanceRecord Inactive(uint local) {
     InstanceRecord instance;
     instance.transform = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -22,7 +16,7 @@ InstanceRecord Inactive(uint local) {
 }
 
 InstanceRecord MakeInstance(InstanceParams p, uint prim, uint world, uint local, uint slot) {
-    return PlaceInstance(p, prim, PrimWorld(p.scene, prim), true, world, local, slot);
+    return PlaceInstance(p, prim, PrimWorld(p.scene, p.transforms, prim), true, world, local, slot);
 }
 
 InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool shown, uint world,
@@ -41,7 +35,7 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
          scene->schemas.sphereLight.treatAsPoint[PrimRow(scene, prim, kSlotSphereLight)] != 0) ||
         (schema == SchemaId::CylinderLight &&
          scene->schemas.cylinderLight.treatAsLine[PrimRow(scene, prim, kSlotCylinderLight)] != 0);
-    if (blas == 0 || point || !shown || !Shown(scene, PrimRow(scene, prim, kSlotImageable))) {
+    if (blas == 0 || point || !shown || !ImageableShown(PrimImageable(scene, p.imageables, prim))) {
         return Inactive(local);
     }
 
@@ -80,7 +74,8 @@ InstanceRecord Expand(InstanceParams p, uint item, uint world, uint local, uint 
     InstanceLayout* layout = p.layout;
     const uint index = item & ~kInstancerSlot;
     const InstancerBlock block = layout->blocks[index];
-    const ResolvedCopy copy = ResolveCopy(p.scene, layout, index, local - block.first, false);
+    const ResolvedCopy copy = ResolveCopy(p.scene, p.transforms, p.imageables, layout, index,
+                                          local - block.first, false);
     p.hits[slot] = Drawn(copy.valid ? copy.prim : kNoPrim, block.instancer, copy.instance,
                          local - block.first);
     if (!copy.valid) {
@@ -158,9 +153,9 @@ void PlaceOrigins(uniform OriginParams p) {
     origin.high = Float3(float3(0));
     origin.low = Float3(float3(0));
     if (viewer != kNoPrim) {
-        origin = SnapOrigin(PrimWorld(scene, viewer));
+        origin = SnapOrigin(PrimWorld(scene, p.transforms, viewer));
     } else if (tlas < layout->worldCount && layout->worldOrigins[tlas] != kNoRow) {
-        const WorldTransform anchor = scene->schemas.xformable.worldTransform[layout->worldOrigins[tlas]];
+        const WorldTransform anchor = p.transforms[layout->worldOrigins[tlas]];
         origin.high = anchor.high;
         origin.low = anchor.low;
     }

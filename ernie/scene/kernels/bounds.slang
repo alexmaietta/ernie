@@ -7,12 +7,6 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-bool Shown(SceneData* scene, uint imageRow) {
-    const uint purpose = scene->schemas.imageable.computedPurpose[imageRow];
-    return scene->schemas.imageable.computedVisibility[imageRow] != uint(Visibility::Invisible) &&
-           purpose != uint(Purpose::Proxy) && purpose != uint(Purpose::Guide);
-}
-
 bool Infinite(SceneData* scene, uint prim) {
     if (SchemaId(scene->prims.schema[prim]) != SchemaId::Plane) {
         return false;
@@ -25,7 +19,7 @@ float3 OriginOffset(BoundsParams p, WorldTransform w, uint world) {
     if (world == kGlobalWorld || p.origins[world] == kNoRow) {
         return w.Translation();
     }
-    return w.TranslationFrom(p.scene->schemas.xformable.worldTransform[p.origins[world]]);
+    return w.TranslationFrom(p.transforms[p.origins[world]]);
 }
 
 [shader("compute")]
@@ -41,7 +35,7 @@ void PrimBounds(uniform BoundsParams p) {
         return;
     }
     const SchemaId schema = SchemaId(schemaId);
-    const WorldTransform w = PrimWorld(scene, prim);
+    const WorldTransform w = PrimWorld(scene, p.transforms, prim);
     const UnitShape shape = PlaceShape(scene, prim, w);
     float3 center = float3(0);
     float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);

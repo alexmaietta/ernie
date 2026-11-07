@@ -43,6 +43,21 @@ void Timeline::Add(System& system) {
             }
         }
     }
+    for (const TableId output : system.TableOutputs()) {
+        for (const TableId input : system.TableInputs()) {
+            if (input == output) {
+                throw Error("System {} reads its own table output", system.Name());
+            }
+        }
+        for (const Scheduled& earlier : m_systems) {
+            for (const TableId input : earlier.system->TableInputs()) {
+                if (input == output) {
+                    throw Error("System {} writes a table {} reads, so add {} first", system.Name(),
+                                earlier.system->Name(), system.Name());
+                }
+            }
+        }
+    }
     m_systems.push_back({&system});
 }
 
@@ -136,15 +151,26 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
             return store.LastWrite(input) > scheduled.writes;
         });
         const bool restructured = system.Structural() && m_catalog.Epoch() != scheduled.epoch;
-        if (scheduled.ran && !written && !restructured && !system.Pending()) {
+        const bool tabled = std::ranges::any_of(system.TableInputs(), [&](TableId table) {
+            return m_log.Version(table) > scheduled.tables;
+        });
+        if (scheduled.ran && !written && !restructured && !tabled && !system.Pending()) {
             continue;
         }
         ERNIE_ZONE("Timeline/System");
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
                                   system.Inputs(), &scheduled.changed);
+        for (const TableId table : system.TableInputs()) {
+            if (m_log.Version(table) > scheduled.tables) {
+                changes.wrote.push_back(table);
+                m_log.Collect(table, scheduled.tables, changes.worlds);
+            }
+        }
         scheduled.writes = store.WriteSequence();
         scheduled.epoch = m_catalog.Epoch();
+        scheduled.tables = m_log.Sequence();
         changes.tables = &m_tables;
+        changes.log = &m_log;
         system.Run(changes, Stream::None());
         system.Describe(m_tables);
         scheduled.stamp = stamp;
@@ -155,6 +181,13 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
         seen = std::min(seen, scheduled.stamp);
     }
     store.TrimArrayWrites(seen);
+    uint64_t logged = m_log.Sequence();
+    for (const Scheduled& scheduled : m_systems) {
+        if (!scheduled.system->TableInputs().empty()) {
+            logged = std::min(logged, scheduled.tables);
+        }
+    }
+    m_log.Trim(logged);
 }
 
 device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {

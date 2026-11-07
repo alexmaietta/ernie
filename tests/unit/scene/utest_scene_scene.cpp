@@ -165,8 +165,7 @@ TEST(SceneTest, PosesMoveWhatTheSceneRenders) {
         const View view = scene.Select(balls, SchemaId::Sphere);
         view.WritePoses(tensor);
         scene.Publish().Wait();
-        const std::vector<WorldTransform> worlds =
-            view.Get<WorldTransform>(kXformableWorldTransform).Get();
+        const std::vector<WorldTransform> worlds = scene.WorldTransforms(Paths("/Ball", 2));
         EXPECT_FLOAT_EQ(worlds[1].high.x + worlds[1].low.x, 4.0f);
         EXPECT_FLOAT_EQ(worlds[0].high.z + worlds[0].low.z, 3.0f);
     });
@@ -195,14 +194,13 @@ TEST(SceneTest, AttachedTranslatesMoveWhatTheSceneRenders) {
         UntypedAttribute translate = view.Get(kXformableTranslate);
         translate.Attach(&owned->managed);
         scene.Publish().Wait();
-        std::vector<WorldTransform> worlds =
-            view.Get<WorldTransform>(kXformableWorldTransform).Get();
+        std::vector<WorldTransform> worlds = scene.WorldTransforms(Paths("/Ball", 2));
         EXPECT_FLOAT_EQ(worlds[1].high.y + worlds[1].low.y, 5.0f);
 
         owned->values[4] = 50;
         translate.MarkChanged();
         scene.Publish().Wait();
-        worlds = view.Get<WorldTransform>(kXformableWorldTransform).Get();
+        worlds = scene.WorldTransforms(Paths("/Ball", 2));
         EXPECT_FLOAT_EQ(worlds[1].high.y + worlds[1].low.y, 50.0f);
         translate.Detach();
     });

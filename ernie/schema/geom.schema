@@ -72,23 +72,6 @@ abstract class Imageable : Typed, MaterialBindingAPI (
         displayName = "Purpose"
         doc = "Which renders include the prim. Default inherits the parent's purpose."
     )
-    token ernie:computedVisibility (
-        derived
-        tracked
-        enum = Visibility
-        doc = "Invisible when the prim or any ancestor is, written by the hierarchy system."
-    )
-    token ernie:computedPurpose (
-        derived
-        tracked
-        enum = Purpose
-        doc = "The prim's purpose, or its nearest ancestor's that isn't default."
-    )
-    uint ernie:computedMaterial (
-        derived
-        tracked
-        doc = "The Material bound to the prim or its nearest bound ancestor, or none."
-    )
 }
 
 class Scope : Imageable (
@@ -166,12 +149,6 @@ abstract class Xformable : Imageable (
         group = "Transform"
         displayName = "Reset Transform Stack"
         doc = "Ignore the parent transforms, placing the prim in world space."
-    )
-    transform ernie:worldTransform (
-        derived
-        tracked
-        unit = meters
-        doc = "Transform to world space, written by the hierarchy system."
     )
 }
 

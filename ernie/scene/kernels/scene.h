@@ -3,6 +3,7 @@
 
 #include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
 
@@ -69,8 +70,17 @@ uint ApiInstanceRow(SceneData* scene, uint prim, uint api, uint instance, Paged<
     return row;
 }
 
-WorldTransform PrimWorld(SceneData* scene, uint prim) {
-    return scene->schemas.xformable.worldTransform[PrimRow(scene, prim, kSlotXformable)];
+WorldTransform PrimWorld(SceneData* scene, Ptr<WorldTransform> transforms, uint prim) {
+    return transforms[PrimRow(scene, prim, kSlotXformable)];
+}
+
+ResolvedImageable PrimImageable(SceneData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
+    return imageables[PrimRow(scene, prim, kSlotImageable)];
+}
+
+bool ImageableShown(ResolvedImageable resolved) {
+    return resolved.visibility != uint(Visibility::Invisible) &&
+           resolved.purpose != uint(Purpose::Proxy) && resolved.purpose != uint(Purpose::Guide);
 }
 
 #endif

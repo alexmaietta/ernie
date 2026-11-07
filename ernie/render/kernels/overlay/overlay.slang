@@ -53,7 +53,7 @@ float3 RenderSpace(OverlayParams p, OverlayBatch batch, uint world, float3 point
     SceneData* scene = p.scene;
     InstanceLayout* layout = p.tables->instances;
     if (batch.anchor != kNoPrim) {
-        const WorldTransform transform = PrimWorld(scene, batch.anchor);
+        const WorldTransform transform = PrimWorld(scene, p.tables->transforms, batch.anchor);
         return transform.Apply(point) + RenderTranslation(p.tables, transform, world) +
                ShownOffset(layout, world, scene->prims.world[batch.anchor]);
     }
@@ -470,7 +470,7 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
     if (!WorldShown(p.tables->instances, viewWorld, world)) {
         return false;
     }
-    const WorldTransform w = PrimWorld(scene, prim);
+    const WorldTransform w = PrimWorld(scene, p.tables->transforms, prim);
     const float3 origin = RenderTranslation(p.tables, w, viewWorld) +
                           ShownOffset(p.tables->instances, viewWorld, world);
     float3 from;
@@ -754,7 +754,7 @@ struct Sizing {
             return;
         }
         SceneData* scene = p.scene;
-        const WorldTransform frame = PrimWorld(scene, view.camera);
+        const WorldTransform frame = PrimWorld(scene, p.tables->transforms, view.camera);
         right = normalize(frame.x.Vector());
         up = normalize(frame.y.Vector());
         back = normalize(frame.z.Vector());
@@ -829,7 +829,7 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
             }
             const Lens lens = Lens(scene, prim);
             const float distance = batch.length > 0 ? batch.length : 1;
-            const WorldTransform w = PrimWorld(scene, prim);
+            const WorldTransform w = PrimWorld(scene, p.tables->transforms, prim);
             const float3 offset = RenderTranslation(p.tables, w, viewWorld) +
                                   ShownOffset(p.tables->instances, viewWorld, world);
             origin = w.Apply(lens.Corner(float2(-1, 1), distance)) + offset;
@@ -1024,7 +1024,7 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     float pixelRadius = 0.5f * size;
     if ((batch.flags & kOverlayMeters) != 0) {
         const float3 middle = 0.5f * (a + b);
-        const float3 right = normalize(PrimWorld(scene, view.camera).x.Vector());
+        const float3 right = normalize(PrimWorld(scene, p.tables->transforms, view.camera).x.Vector());
         const float2 centre = Pixel(camera.Project(middle).film, view);
         const float2 side = Pixel(camera.Project(middle + right * (0.5f * size)).film, view);
         pixelRadius = length(side - centre);

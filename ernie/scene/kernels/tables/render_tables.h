@@ -6,10 +6,13 @@
 #include "ernie/scene/kernels/origins.h"
 #include "ernie/scene/kernels/scene.h"
 #include "ernie/scene/kernels/semantics.h"
+#include "ernie/scene/kernels/tables/transforms.h"
 
 namespace ernie {
 
 struct RenderTables {
+    Ptr<WorldTransform> transforms;
+    Ptr<ResolvedImageable> imageables;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
@@ -19,7 +22,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 72);
+ERNIE_CHECK_SIZE(RenderTables, 88);
 
 #ifdef __SLANG__
 
@@ -42,8 +45,7 @@ float3 RenderShift(SceneData* scene, RenderTables* tables, uint from, uint world
     if (from >= tables->worldCount || layout->worldOrigins[from] == kNoRow) {
         return -origin.high.Vector() - origin.low.Vector();
     }
-    const WorldTransform anchor =
-        scene->schemas.xformable.worldTransform[layout->worldOrigins[from]];
+    const WorldTransform anchor = tables->transforms[layout->worldOrigins[from]];
     return (anchor.high.Vector() - origin.high.Vector()) +
            (anchor.low.Vector() - origin.low.Vector());
 }

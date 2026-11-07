@@ -991,9 +991,11 @@ void Viewport::Refresh() {
         m_reads.clear();
     }
     const View camera = m_scene->Select(m_camera);
+    m_reads.push_back(camera.Get(Camera::kTranslate.Column()).ReadHostAsync());
+    m_reads.push_back(camera.Get(Camera::kOrient.Column()).ReadHostAsync());
+    m_reads.push_back(m_scene->ReadWorldTransformsAsync(std::vector<std::string>{m_camera}));
     for (const ColumnRef column :
-         {Camera::kTranslate.Column(), Camera::kOrient.Column(), Camera::kWorldTransform.Column(),
-          Camera::kFocalLength.Column(), Camera::kHorizontalAperture.Column(),
+         {Camera::kFocalLength.Column(), Camera::kHorizontalAperture.Column(),
           Camera::kVerticalAperture.Column(), Camera::kHorizontalApertureOffset.Column(),
           Camera::kVerticalApertureOffset.Column(), Camera::kClippingRange.Column(),
           Camera::kProjection.Column()}) {
@@ -1558,9 +1560,7 @@ void Viewport::RefreshWorlds() {
             paths.push_back(path);
         }
         m_session->boxRead = m_scene->ReadAllBoundsAsync();
-        m_session->originRead = m_scene->Select(Span<const std::string>(paths), SchemaId::World)
-                                    .Get(Xformable::kWorldTransform.Column())
-                                    .ReadHostAsync();
+        m_session->originRead = m_scene->ReadWorldTransformsAsync(Span<const std::string>(paths));
         m_session->requested = now;
     }
     if (m_session->originRead && m_session->originRead->Ready()) {

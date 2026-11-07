@@ -27,7 +27,7 @@ struct SensorFrame {
 }
 
 SensorFrame LoadSensorFrame(SceneData* scene, RenderTables* tables, uint prim) {
-    const WorldTransform transform = PrimWorld(scene, prim);
+    const WorldTransform transform = PrimWorld(scene, tables->transforms, prim);
     SensorFrame frame;
     const uint world = scene->prims.world[prim];
     const RenderOrigin origin = TlasOrigin(tables, world);

@@ -36,6 +36,12 @@ class Instances : public System {
     }
 
     std::span<const ColumnRef> Inputs() const override;
+
+    std::span<const TableId> TableInputs() const override {
+        static constexpr TableId kTables[] = {TableId::Transforms, TableId::Imageables};
+        return kTables;
+    }
+
     std::span<const ColumnRef> Outputs() const override;
     void Prepare() override;
     device::Operation Run(const ChangeSet& changes, Stream stream) override;

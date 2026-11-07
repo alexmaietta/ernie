@@ -26,9 +26,7 @@ namespace ernie {
 
 namespace {
 
-constexpr ColumnRef kActivation[] = {kImageableComputedVisibility,
-                                     kImageableComputedPurpose,
-                                     kMeshBlas,
+constexpr ColumnRef kActivation[] = {kMeshBlas,
                                      kSphereRadius,
                                      kCubeSize,
                                      kPlaneWidth,
@@ -61,9 +59,8 @@ constexpr ColumnRef kLayoutInputs[] = {kPointInstancerPrototypes, kPointInstance
 
 const std::vector<ColumnRef>& InputColumns() {
     static const std::vector<ColumnRef> inputs = [] {
-        std::vector<ColumnRef> columns = {kXformableWorldTransform, kPointBasedPoints,
-                                          kPointInstancerOrientations, kPointInstancerScales,
-                                          kRenderProductCamera};
+        std::vector<ColumnRef> columns = {kPointBasedPoints, kPointInstancerOrientations,
+                                          kPointInstancerScales, kRenderProductCamera};
         columns.insert(columns.end(), std::begin(kActivation), std::end(kActivation));
         columns.insert(columns.end(), std::begin(kLayoutInputs), std::end(kLayoutInputs));
         return columns;
@@ -721,8 +718,10 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
             }
         }
     }
-    const bool activated = std::ranges::any_of(
-        kActivation, [&](ColumnRef column) { return store.LastWrite(column) > m_seen; });
+    const bool activated = changes.Wrote(TableId::Imageables) ||
+                           std::ranges::any_of(kActivation, [&](ColumnRef column) {
+                               return store.LastWrite(column) > m_seen;
+                           });
     m_seen = seen;
 
     m_stats = {};
@@ -765,6 +764,8 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     params.tlases.address = dirtyBuffer->Address();
     params.hits.address = m_hits->Address();
     params.origins.address = m_renderOrigins->Address();
+    params.transforms = changes.tables->transforms;
+    params.imageables = changes.tables->imageables;
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -775,6 +776,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     origins.products.address = m_productBuffer->Address();
     origins.origins.address = m_renderOrigins->Address();
     origins.viewers.address = m_viewers->Address();
+    origins.transforms = changes.tables->transforms;
     origins.productCount = uint32_t(m_products.size());
     origins.tlasCount = tlases;
     if (!m_products.empty()) {

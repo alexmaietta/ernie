@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Release candidates. `ERNIE_PRERELEASE` in `CMakeLists.txt` names one, such as `rc1`, and a matching `v0.1.1rc1` tag publishes `0.1.1rc1` to PyPI and as a GitHub pre-release, with the Docker image tagged `0.1.1rc1` alone and Debian and RPM packages versioned `0.1.1~rc1` so the final release upgrades them. CI also runs on pushes to `release-*` branches.
+- `Scene::WorldTransforms`, `Scene::ReadWorldTransformsAsync` and Python's `scene.world_transforms(paths)` read world transforms as of the latest publish.
+- Snapshots carry `tables`, the device address of the render tables header, and keep every table it points to alive until they're destroyed.
+
+### Changed
+
+- Every TLAS is placed relative to a render origin that follows the first sensor a render product points at, so geometry near a camera stays precise up to solar system distances.
+
+### Removed
+
+- The derived attributes `ernie:worldTransform`, `ernie:computedVisibility`, `ernie:computedPurpose` and `ernie:computedMaterial`. The hierarchy system keeps them in its own tables, and world transforms are read through `WorldTransforms` instead.
 
 ### Fixed
 
@@ -18,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ernie --version`, the viewer's About window and `ernie.build_info().version` show the full version with its patch and any release candidate, such as `0.1.0` or `0.1.1rc1`, instead of `0.1`.
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
 - hipRTC loads from the folder of the HIP runtime Ernie uses, such as the one bundled in PyTorch, instead of from another ROCm install that would pull in a second comgr and HSA runtime. Runtime libraries already in the process are also found under their unversioned names.
+- Contact shadows and occlusion hold far from a world's origin, because new rays start from the hit's own floating point error bound instead of an offset that grew with distance.
 
 ## [0.1.0] - 2026-11-06
 

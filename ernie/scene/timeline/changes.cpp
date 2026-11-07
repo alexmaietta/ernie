@@ -48,6 +48,10 @@ std::span<const uint32_t> ChangeSet::ArrayRows(ColumnRef column) const {
     return {};
 }
 
+bool ChangeSet::Wrote(TableId table) const {
+    return std::ranges::find(wrote, table) != wrote.end();
+}
+
 bool ChangeSet::World(uint32_t world) const {
     return std::ranges::find(worlds, world) != worlds.end() ||
            std::ranges::find(worlds, kGlobalWorld) != worlds.end();

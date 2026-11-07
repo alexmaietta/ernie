@@ -222,14 +222,13 @@ void Gizmo::Read() {
         m_reads.clear();
     }
     const View prim = m_scene->Select(m_path);
-    for (const ColumnRef column :
-         {Xformable::kTranslate.Column(), Xformable::kOrient.Column(), Xformable::kScale.Column(),
-          Xformable::kWorldTransform.Column()}) {
+    for (const ColumnRef column : {Xformable::kTranslate.Column(), Xformable::kOrient.Column(),
+                                   Xformable::kScale.Column()}) {
         m_reads.push_back(prim.Get(column).ReadHostAsync());
     }
+    m_reads.push_back(m_scene->ReadWorldTransformsAsync(std::vector<std::string>{m_path}));
     if (!m_parent.empty()) {
-        m_reads.push_back(
-            m_scene->Select(m_parent).Get(Xformable::kWorldTransform.Column()).ReadHostAsync());
+        m_reads.push_back(m_scene->ReadWorldTransformsAsync(std::vector<std::string>{m_parent}));
     }
 }
 

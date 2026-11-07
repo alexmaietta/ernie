@@ -28,6 +28,7 @@ ernie_object_library(
     systems/tangents.cpp
     systems/textures.cpp
     timeline/changes.cpp
+    timeline/table_log.cpp
     timeline/timeline.cpp
     "${ernie_scene_defines}"
 )
@@ -77,6 +78,7 @@ ernie_public_files(
     kernels/schema/schema.h
     kernels/schema/types.h
     kernels/semantics.h
+    kernels/tables/transforms.h
     kernels/textures.h
     prim.h
     primvar.h

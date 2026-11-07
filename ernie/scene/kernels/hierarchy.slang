@@ -148,8 +148,7 @@ void ResolveRows(uniform ResolveParams p) {
 
     const uint own = p.tree.xform[row];
     if (transform && own != kNoRow) {
-        xform.worldTransform[own] = ComposeWorld(p.tree, xform, row, p.zero);
-        xform.worldTransformStamp[own] = p.until;
+        p.transforms[own] = ComposeWorld(p.tree, xform, row, p.zero);
     }
     if (!inherited) {
         return;
@@ -180,10 +179,23 @@ void ResolveRows(uniform ResolveParams p) {
         }
         at = p.tree.parent[at];
     }
-    image.computedVisibility[row] = visibility;
-    image.computedPurpose[row] = purpose;
-    image.computedMaterial[row] = material;
-    image.computedVisibilityStamp[row] = p.until;
-    image.computedPurposeStamp[row] = p.until;
-    image.computedMaterialStamp[row] = p.until;
+    ResolvedImageable resolved;
+    resolved.visibility = visibility;
+    resolved.purpose = purpose;
+    resolved.material = material;
+    resolved.padding = 0;
+    p.imageables[row] = resolved;
+}
+
+[shader("compute")]
+[numthreads(kHierarchyGroup, 1, 1)]
+void GatherRows(uniform GatherParams p) {
+    const uint index = LinearThreadIndex();
+    if (index >= p.count) {
+        return;
+    }
+    const uint row = p.rows[index];
+    for (uint word = 0; word < p.words; ++word) {
+        p.out[index * p.words + word] = row == kNoRow ? 0 : p.source[row * p.words + word];
+    }
 }

@@ -44,10 +44,7 @@ struct World {
     }
 
     WorldTransform Transform(uint32_t prim) {
-        return One(prim, SchemaId::Xformable)
-            .Get<WorldTransform>(kXformableWorldTransform)
-            .Get()
-            .front();
+        return hierarchy.Transforms(std::vector<uint32_t>{prim}).front();
     }
 
     std::vector<double> Translation(uint32_t prim) {
@@ -57,8 +54,8 @@ struct World {
                 double(world.high.z) + double(world.low.z)};
     }
 
-    uint32_t Derived(uint32_t prim, ColumnRef column) {
-        return Items<uint32_t>(One(prim).Get(column).ReadHost()).front();
+    ResolvedImageable Resolved(uint32_t prim) {
+        return hierarchy.Imageables(std::vector<uint32_t>{prim}).front();
     }
 };
 
@@ -165,20 +162,20 @@ TEST(HierarchyTest, VisibilityPurposeAndMaterialAreInherited) {
         const uint32_t free = w.Define(SchemaId::Sphere, "/Free");
         w.Publish();
         const uint32_t invisible = uint32_t(Visibility::Invisible);
-        EXPECT_EQ(w.Derived(child, kImageableComputedVisibility), invisible);
-        EXPECT_EQ(w.Derived(free, kImageableComputedVisibility), uint32_t(Visibility::Inherited));
-        EXPECT_EQ(w.Derived(child, kImageableComputedPurpose), uint32_t(Purpose::Guide));
-        EXPECT_EQ(w.Derived(child, kImageableComputedMaterial), look);
-        EXPECT_EQ(w.Derived(own, kImageableComputedMaterial), other);
-        EXPECT_EQ(w.Derived(free, kImageableComputedMaterial), kNoPrim);
+        EXPECT_EQ(w.Resolved(child).visibility, invisible);
+        EXPECT_EQ(w.Resolved(free).visibility, uint32_t(Visibility::Inherited));
+        EXPECT_EQ(w.Resolved(child).purpose, uint32_t(Purpose::Guide));
+        EXPECT_EQ(w.Resolved(child).material, look);
+        EXPECT_EQ(w.Resolved(own).material, other);
+        EXPECT_EQ(w.Resolved(free).material, kNoPrim);
 
         w.One(parent).Get<Visibility>(kImageableVisibility).Set(Visibility::Inherited);
         w.Publish();
-        EXPECT_EQ(w.Derived(child, kImageableComputedVisibility), uint32_t(Visibility::Inherited));
+        EXPECT_EQ(w.Resolved(child).visibility, uint32_t(Visibility::Inherited));
 
         w.catalog.Remove(look);
         w.Publish();
-        EXPECT_EQ(w.Derived(child, kImageableComputedMaterial), kNoPrim);
+        EXPECT_EQ(w.Resolved(child).material, kNoPrim);
     });
 }
 

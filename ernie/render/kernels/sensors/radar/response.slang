@@ -41,8 +41,7 @@ struct RadarResponse : IResponse<RadarPattern> {
     }
 
     float Backscatter(uint prim) {
-        const uint material =
-            scene->schemas.imageable.computedMaterial[PrimRow(scene, prim, kSlotImageable)];
+        const uint material = PrimImageable(scene, tables->imageables, prim).material;
         if (material != kNoPrim && HasApi(scene, material, kApiNonVisualMaterialAPI)) {
             return scene->schemas.nonVisualMaterialAPI
                 .nonvisualRadarBackscatter[ApiRow(scene, material, kApiNonVisualMaterialAPI)];

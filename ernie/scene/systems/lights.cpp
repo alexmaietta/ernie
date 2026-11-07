@@ -159,8 +159,7 @@ SpectralTables BuildSpectralTables() {
 }
 
 std::vector<ColumnRef> LightInputs() {
-    std::vector<ColumnRef> inputs = {kXformableWorldTransform, kImageableComputedVisibility,
-                                     kRenderProductCamera};
+    std::vector<ColumnRef> inputs = {kRenderProductCamera};
     const SchemaId schemas[] = {SchemaId::LightAPI,
                                 SchemaId::DistantLight,
                                 SchemaId::SphereLight,
@@ -415,6 +414,8 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     params.layout.address = m_layout->Address();
     params.instances = changes.tables->instances;
     params.origins = changes.tables->origins;
+    params.transforms = changes.tables->transforms;
+    params.imageables = changes.tables->imageables;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());

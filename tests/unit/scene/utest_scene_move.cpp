@@ -21,7 +21,8 @@ template <class Test> void ForEachScene(Test test) {
 
 Double3 WorldPosition(Scene& scene, std::string_view path) {
     scene.Publish();
-    const WorldTransform frame = scene.Select(path).Get(Xformable::kWorldTransform).Get().front();
+    const WorldTransform frame =
+        scene.WorldTransforms(std::vector<std::string>{std::string(path)}).front();
     return {double(frame.high.x) + frame.low.x, double(frame.high.y) + frame.low.y,
             double(frame.high.z) + frame.low.z};
 }

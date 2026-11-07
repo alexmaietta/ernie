@@ -177,12 +177,12 @@ PlaceCopy(SceneData* scene, InstancerBlock block, uint instance) {
     return placement;
 }
 
-WorldTransform CopyWorld(SceneData* scene, InstancerBlock block, InstancePlacement placement,
-                         WorldTransform g, uint parent) {
+WorldTransform CopyWorld(SceneData* scene, Ptr<WorldTransform> transforms, InstancerBlock block,
+                         InstancePlacement placement, WorldTransform g, uint parent) {
     float3 axes[3] = {g.x.Vector(), g.y.Vector(), g.z.Vector()};
     float3 offset = g.Translation();
     if (parent != kNoPrim) {
-        const WorldTransform p = PrimWorld(scene, parent);
+        const WorldTransform p = PrimWorld(scene, transforms, parent);
         const float3 a = p.x.Vector();
         const float3 b = p.y.Vector();
         const float3 c = p.z.Vector();
@@ -197,7 +197,7 @@ WorldTransform CopyWorld(SceneData* scene, InstancerBlock block, InstancePlaceme
     }
     const float3 moved =
         placement.position + RotateByQuat(placement.orientation, placement.scale * offset);
-    const WorldTransform outer = PrimWorld(scene, block.instancer);
+    const WorldTransform outer = PrimWorld(scene, transforms, block.instancer);
     WorldTransform w;
     w.x = Float3(outer.Apply(axes[0]));
     w.y = Float3(outer.Apply(axes[1]));
@@ -227,11 +227,8 @@ bool HiddenCopy(InstanceLayout* layout, InstancerBlock block, int64_t id) {
     return false;
 }
 
-bool ShownPrim(SceneData* scene, uint prim) {
-    const uint row = PrimRow(scene, prim, kSlotImageable);
-    const uint purpose = scene->schemas.imageable.computedPurpose[row];
-    return scene->schemas.imageable.computedVisibility[row] != uint(Visibility::Invisible) &&
-           purpose != uint(Purpose::Proxy) && purpose != uint(Purpose::Guide);
+bool ShownPrim(SceneData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
+    return ImageableShown(PrimImageable(scene, imageables, prim));
 }
 
 struct ResolvedCopy {
@@ -245,7 +242,8 @@ struct ResolvedCopy {
 }
 
 ResolvedCopy
-ResolveCopy(SceneData* scene, InstanceLayout* layout, uint top, uint offset, bool lights) {
+ResolveCopy(SceneData* scene, Ptr<WorldTransform> transforms, Ptr<ResolvedImageable> imageables,
+            InstanceLayout* layout, uint top, uint offset, bool lights) {
 
     ResolvedCopy resolved;
     resolved.valid = false;
@@ -301,7 +299,7 @@ ResolveCopy(SceneData* scene, InstanceLayout* layout, uint top, uint offset, boo
             }
         }
         resolved.offset += instance * block.width + piece.start;
-        resolved.shown = resolved.shown && ShownPrim(scene, block.instancer);
+        resolved.shown = resolved.shown && ShownPrim(scene, imageables, block.instancer);
         blocks[depth] = block;
         placements[depth] = placement;
         parents[depth] = prototype.parent;
@@ -316,22 +314,25 @@ ResolveCopy(SceneData* scene, InstanceLayout* layout, uint top, uint offset, boo
         index = piece.nested;
         at = member - (lights ? piece.lightStart : piece.start);
     }
-    WorldTransform w = PrimWorld(scene, resolved.prim);
+    WorldTransform w = PrimWorld(scene, transforms, resolved.prim);
     for (uint level = depth; level-- > 0;) {
-        w = CopyWorld(scene, blocks[level], placements[level], w, parents[level]);
+        w = CopyWorld(scene, transforms, blocks[level], placements[level], w, parents[level]);
     }
     resolved.world = w;
     resolved.valid = true;
     return resolved;
 }
 
-WorldTransform SlotWorld(SceneData* scene, InstanceLayout* layout, uint slot) {
+WorldTransform SlotWorld(SceneData* scene, Ptr<WorldTransform> transforms,
+                         Ptr<ResolvedImageable> imageables, InstanceLayout* layout, uint slot) {
     const SlotHit drawn = layout->hits[slot];
     const uint item = layout->instancePrims[slot];
     if ((item & kInstancerSlot) == 0) {
-        return PrimWorld(scene, drawn.prim);
+        return PrimWorld(scene, transforms, drawn.prim);
     }
-    return ResolveCopy(scene, layout, item & ~kInstancerSlot, drawn.offset, false).world;
+    return ResolveCopy(scene, transforms, imageables, layout, item & ~kInstancerSlot, drawn.offset,
+                       false)
+        .world;
 }
 
 #endif

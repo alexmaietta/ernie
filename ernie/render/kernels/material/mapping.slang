@@ -109,7 +109,8 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
     float3 blend = float3(0);
     WorldTransform w = {};
     if (uv ? point.element.mesh : object) {
-        w = SlotWorld(scene, query.layout, point.slot);
+        w = SlotWorld(scene, query.tables->transforms, query.tables->imageables, query.layout,
+                      point.slot);
     }
     if (uv) {
         const PrimvarRef primvar = FindPrimvar(scene, point.prim, m.uvPrimvar[row]);
@@ -292,7 +293,9 @@ float3 CheckerColor(MaterialQuery query, SurfacePoint point, float3 color) {
     }
     const uint axis = scene->schemas.plane.axis[PrimRow(scene, point.prim, kSlotPlane)];
     const ObjectSpace space =
-        TransformSpace(query.hit, point.slot, SlotWorld(scene, query.hit.layout, point.slot));
+        TransformSpace(query.hit, point.slot,
+                       SlotWorld(scene, query.hit.tables->transforms, query.hit.tables->imageables,
+                                 query.hit.layout, point.slot));
     const float3 local = space.ToObject(point.position - space.origin);
     const float2 plane = float2(local[(axis + 1) % 3], local[(axis + 2) % 3]);
     const float3 reach = space.ToObject(point.stretch);

@@ -292,7 +292,7 @@ TEST(AttributeTest, DerivedColumnsArentWrittenAndArraysArentFilled) {
     ForEachScene([](device::Device&, Store&, Catalog& catalog) {
         const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 2));
         const View view(catalog, SchemaId::Mesh, block);
-        EXPECT_THROW(view.Get(kXformableWorldTransform).Map(MapAccess::Write), Error);
+        EXPECT_THROW(view.Get(kBoundableWorldMin).Map(MapAccess::Write), Error);
         const ArrayRef none{};
         EXPECT_THROW(view.Get(kPointBasedPoints).Fill(std::as_bytes(std::span(&none, 1))), Error);
         EXPECT_NO_THROW(view.Get(kPointBasedPoints).MarkChanged());

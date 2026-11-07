@@ -635,6 +635,28 @@ void RegisterScene(nb::module_& module) {
                                       nb::make_tuple(box->upper.x, box->upper.y, box->upper.z));
             },
             nb::arg("world") = nb::none())
+        .def(
+            "world_transforms",
+            [](const Scene& scene, const std::vector<std::string>& paths) {
+                std::vector<WorldTransform> transforms;
+                {
+                    const nb::gil_scoped_release release;
+                    transforms = scene.WorldTransforms(Span<const std::string>(paths));
+                }
+                nb::list rows;
+                for (const WorldTransform& t : transforms) {
+                    rows.append(nb::make_tuple(
+                        nb::make_tuple(t.x.x, t.x.y, t.x.z), nb::make_tuple(t.y.x, t.y.y, t.y.z),
+                        nb::make_tuple(t.z.x, t.z.y, t.z.z),
+                        nb::make_tuple(double(t.high.x) + t.low.x, double(t.high.y) + t.low.y,
+                                       double(t.high.z) + t.low.z)));
+                }
+                return nb::module_::import_("numpy").attr("asarray")(rows, "dtype"_a = "float64");
+            },
+            nb::arg("paths"),
+            "World transforms of the prims at paths as an (N, 4, 3) array of the x, y and z axes "
+            "and the translation, as of the latest publish. Prims without a transform read as "
+            "zeros.")
         .def_prop_ro("pending", &Scene::Pending)
         .def_prop_ro("world_count", &Scene::WorldCount)
         .def_prop_ro("prim_count", &Scene::PrimCount)
