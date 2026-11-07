@@ -19,7 +19,8 @@
 #include "ernie/scene/store/store.h"
 #include "ernie/scene/systems/geometry.h"
 #include "ernie/scene/systems/hierarchy.h"
-#include "ernie/scene/systems/record_table.h"
+#include "ernie/scene/systems/readback.h"
+#include "ernie/scene/systems/tables.h"
 #include "ernie/scene/timeline/changes.h"
 #include "ernie/scene/timeline/table_log.h"
 #include "ernie/scene/timeline/timeline.h"
@@ -106,10 +107,11 @@ struct Fixture {
     Timeline timeline;
     Hierarchy hierarchy;
     Probe probe;
+    Readback readback;
     Ordinal ordinal = 0;
 
     explicit Fixture(device::Device& device)
-        : store(device), catalog(store), timeline(catalog), hierarchy(catalog) {
+        : store(device), catalog(store), timeline(catalog), hierarchy(catalog), readback(device) {
         timeline.Add(hierarchy);
         timeline.Add(probe);
     }
@@ -120,6 +122,11 @@ struct Fixture {
 
     View One(uint32_t prim, SchemaId schema) {
         return View(catalog, schema, std::vector<uint32_t>{prim});
+    }
+
+    std::vector<WorldTransform> Transforms(const std::vector<uint32_t>& prims) {
+        return readback.Read<WorldTransform>(
+            hierarchy.Transforms(), TableRows(catalog.GetPrims(), prims, SchemaId::Xformable));
     }
 };
 
@@ -239,7 +246,7 @@ TEST(TableTrackingTest, AFailedPublishLeavesTheTimelineUsable) {
         f.Publish();
         EXPECT_EQ(f.timeline.Published(), f.ordinal);
         EXPECT_TRUE(f.probe.wrote);
-        const WorldTransform moved = f.hierarchy.Transforms(std::vector<uint32_t>{ball}).front();
+        const WorldTransform moved = f.Transforms({ball}).front();
         EXPECT_FLOAT_EQ(moved.high.z + moved.low.z, 4.0f);
         const Snapshot after = f.timeline.Acquire(Stream::Host());
         EXPECT_NE(after.tables, 0u);
@@ -272,8 +279,8 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
         f.One(group, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 3, 0});
         f.Publish();
         EXPECT_EQ(f.hierarchy.Rebuilds(), rebuilds);
-        const std::vector<WorldTransform> transforms = f.hierarchy.Transforms(
-            std::vector<uint32_t>{first, first + uint32_t(paths.size()) - 1});
+        const std::vector<WorldTransform> transforms =
+            f.Transforms({first, first + uint32_t(paths.size()) - 1});
         for (const WorldTransform& transform : transforms) {
             EXPECT_FLOAT_EQ(transform.high.y + transform.low.y, 3.0f);
         }
@@ -344,6 +351,33 @@ TEST(RecordTableTest, OnlyChangedRowsUploadAndGrowthReplacesTheBuffer) {
         EXPECT_EQ(rows[2].z, 3.0f);
         EXPECT_EQ(rows[9].w, 8.0f);
         EXPECT_EQ(rows[1].x, 0.0f);
+    });
+}
+
+TEST(RecordTableTest, DeviceTablesGrowOnlyPastTheirRowsAndAssignRewritesEveryRow) {
+    test::ForEachDevice([](device::Device& device) {
+        DeviceTable<Float4> table("test table");
+        EXPECT_EQ(table.Address(), 0u);
+        EXPECT_TRUE(table.Reserve(device, 0));
+        EXPECT_EQ(table.Rows(), 1u);
+        const uint64_t first = table.Address();
+        EXPECT_FALSE(table.Reserve(device, 1));
+        EXPECT_EQ(table.Address(), first);
+        EXPECT_TRUE(table.Reserve(device, 3));
+        EXPECT_EQ(table.Rows(), 3u);
+        EXPECT_NE(table.Address(), first);
+
+        RecordTable<uint32_t> rows("test rows");
+        rows.Assign(3, kNoRow);
+        rows.Set(1, 7);
+        EXPECT_TRUE(rows.Upload(device));
+        const uint64_t uploaded = rows.Buffer()->Address();
+        rows.Assign(3, kNoRow);
+        EXPECT_TRUE(rows.Upload(device));
+        EXPECT_NE(rows.Buffer()->Address(), uploaded);
+        std::vector<uint32_t> host(3);
+        device.GetQueue().Read(rows.Buffer()->Slice(0, 3 * sizeof(uint32_t)), host.data());
+        EXPECT_EQ(host, std::vector<uint32_t>(3, kNoRow));
     });
 }
 

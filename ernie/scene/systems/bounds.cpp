@@ -67,19 +67,12 @@ void Bounds::Relayout() {
     }
     m_origins =
         device.CreateBuffer({.label = "bounds world origins"}, std::span<const uint32_t>(origins));
-    if (worlds + 1 != m_slots) {
-        m_slots = worlds + 1;
+    if (worlds + 1 != m_boxes.Rows()) {
+        m_boxes.Allocate(device, worlds + 1);
         m_extents = device.CreateBuffer(
-            {.bytes = uint64_t(m_slots) * 6 * sizeof(uint32_t), .label = "world extents"});
-        m_boxes = device.CreateBuffer(
-            {.bytes = uint64_t(m_slots) * sizeof(BvhBox), .label = "world bounds"});
+            {.bytes = uint64_t(m_boxes.Rows()) * 6 * sizeof(uint32_t), .label = "world extents"});
     }
-    const uint32_t boundables = std::max(m_catalog.GetPrims().Size(), 1u);
-    if (!m_boundables || boundables > m_boundableCapacity) {
-        m_boundableCapacity = boundables;
-        m_boundables = device.CreateBuffer(
-            {.bytes = uint64_t(boundables) * sizeof(BoundableBox), .label = "prim bounds"});
-    }
+    m_primBounds.Reserve(device, prims.Size());
     m_epoch = m_catalog.Epoch();
 }
 
@@ -95,13 +88,13 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
     params.scene.address = store.DeviceData();
     params.origins.address = m_origins->Address();
     params.extents.address = m_extents->Address();
-    params.boxes.address = m_boxes->Address();
+    params.boxes.address = m_boxes.Address();
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
-    params.primBounds.address = m_boundables->Address();
+    params.primBounds.address = m_primBounds.Address();
     params.primCount = m_catalog.GetPrims().Size();
-    params.slotCount = m_slots;
+    params.slotCount = m_boxes.Rows();
     const uint64_t instancerBytes = std::max<uint64_t>(params.primCount, 1) * 6 * sizeof(uint32_t);
     if (!m_instancerExtents || m_instancerExtents->Bytes() < instancerBytes) {
         m_instancerExtents = device.CreateBuffer(
@@ -115,7 +108,7 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
         params.tlasCount = uint32_t(m_instances.InstanceCounts().size());
     }
 
-    const uint64_t half = uint64_t(m_slots) * 3 * sizeof(uint32_t);
+    const uint64_t half = uint64_t(m_boxes.Rows()) * 3 * sizeof(uint32_t);
     device::Queue& queue = device.GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Bounds/Compute");
     device::CommandEncoder encoder = queue.CreateEncoder();
@@ -148,36 +141,36 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
 }
 
 device::Download Bounds::ReadWorldsAsync() const {
-    if (!m_boxes) {
+    if (!m_boxes.Buffer()) {
         return {};
     }
     return m_catalog.GetStore().GetDevice().GetQueue().ReadAsync(
-        m_boxes->Slice(0, uint64_t(m_slots) * sizeof(BvhBox)));
+        m_boxes.Buffer()->Slice(0, uint64_t(m_boxes.Rows()) * sizeof(BvhBox)));
 }
 
 device::Download Bounds::ReadWorldAsync(uint32_t world) const {
-    if (!m_boxes) {
+    if (!m_boxes.Buffer()) {
         return {};
     }
     const uint32_t slot = WorldSlot(world);
-    if (slot >= m_slots) {
+    if (slot >= m_boxes.Rows()) {
         throw Error("The scene has no world {}", world);
     }
     return m_catalog.GetStore().GetDevice().GetQueue().ReadAsync(
-        m_boxes->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)));
+        m_boxes.Buffer()->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)));
 }
 
 std::optional<BvhBox> Bounds::World(uint32_t world) const {
-    if (!m_boxes) {
+    if (!m_boxes.Buffer()) {
         return std::nullopt;
     }
     const uint32_t slot = WorldSlot(world);
-    if (slot >= m_slots) {
+    if (slot >= m_boxes.Rows()) {
         throw Error("The scene has no world {}", world);
     }
     BvhBox box{};
     m_catalog.GetStore().GetDevice().GetQueue().Read(
-        m_boxes->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)), &box);
+        m_boxes.Buffer()->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)), &box);
     if (box.lower[0] > box.upper[0]) {
         return std::nullopt;
     }
@@ -185,7 +178,7 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
 }
 
 void Bounds::Describe(RenderTables& tables) const {
-    tables.primBounds.address = m_boundables ? m_boundables->Address() : 0;
+    tables.primBounds.address = m_primBounds.Address();
 }
 
 void Bounds::Prepare() {

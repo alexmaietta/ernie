@@ -151,7 +151,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_geometry(m_catalog, *m_builder), m_bounds(m_catalog, m_instances),
       m_tangents(m_catalog, m_geometry), m_textures(m_catalog, desc.textureThreads),
       m_semantics(m_catalog), m_instances(m_catalog, *m_builder, desc.maxRefits),
-      m_lights(m_catalog, m_instances) {
+      m_lights(m_catalog, m_instances), m_readback(device) {
     m_timeline.Add(m_hierarchy);
     m_timeline.Add(m_geometry);
     m_timeline.Add(m_tangents);
@@ -565,51 +565,53 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
     return done;
 }
 
-device::Download Scene::ReadWorldTransformsAsync(Span<const std::string> paths) const {
+namespace {
+
+std::vector<uint32_t> PathPrims(const Scene& scene, Span<const std::string> paths) {
     std::vector<uint32_t> prims;
     for (const std::string& path : paths) {
-        const std::optional<Prim> prim = Find(path);
+        const std::optional<Prim> prim = scene.Find(path);
         prims.push_back(prim ? prim->Index() : kNoPrim);
     }
-    return m_impl->GetHierarchy().ReadTransformsAsync(prims);
+    return prims;
+}
+
+std::vector<uint32_t> BoundableRows(const Prims& prims, std::vector<uint32_t> indices) {
+    for (uint32_t& prim : indices) {
+        prim = prims.Alive(prim) && IsA(prims.At(prim).schema, SchemaId::Boundable) ? prim : kNoRow;
+    }
+    return indices;
+}
+
+}
+
+device::Download Scene::ReadWorldTransformsAsync(Span<const std::string> paths) const {
+    const std::vector<uint32_t> rows =
+        TableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetReadback().ReadAsync(m_impl->GetHierarchy().Transforms(),
+                                           sizeof(ernie::WorldTransform), rows);
 }
 
 std::vector<ernie::WorldTransform> Scene::WorldTransforms(Span<const std::string> paths) const {
-    std::vector<ernie::WorldTransform> transforms(paths.size());
-    if (transforms.empty()) {
-        return transforms;
-    }
-    const device::Download download = ReadWorldTransformsAsync(paths);
-    download.Wait();
-    std::memcpy(transforms.data(), download.Bytes().data(),
-                transforms.size() * sizeof(ernie::WorldTransform));
-    return transforms;
+    const std::vector<uint32_t> rows =
+        TableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetReadback().Read<ernie::WorldTransform>(m_impl->GetHierarchy().Transforms(),
+                                                             rows);
 }
 
 static_assert(sizeof(Box) == sizeof(BoundableBox));
 
 device::Download Scene::ReadPrimBoundsAsync(Span<const std::string> paths) const {
-    const Prims& prims = m_impl->GetCatalog().GetPrims();
-    std::vector<uint32_t> rows;
-    for (const std::string& path : paths) {
-        const std::optional<Prim> prim = Find(path);
-        rows.push_back(prim && IsA(prims.At(prim->Index()).schema, SchemaId::Boundable)
-                           ? prim->Index()
-                           : kNoRow);
-    }
-    return m_impl->GetHierarchy().Gather(m_impl->GetBounds().Boundables(),
-                                         sizeof(BoundableBox) / sizeof(uint32_t), rows);
+    const std::vector<uint32_t> rows =
+        BoundableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths));
+    return m_impl->GetReadback().ReadAsync(m_impl->GetBounds().PrimBounds(), sizeof(BoundableBox),
+                                           rows);
 }
 
 std::vector<Box> Scene::PrimBounds(Span<const std::string> paths) const {
-    std::vector<Box> boxes(paths.size());
-    if (boxes.empty()) {
-        return boxes;
-    }
-    const device::Download download = ReadPrimBoundsAsync(paths);
-    download.Wait();
-    std::memcpy(boxes.data(), download.Bytes().data(), boxes.size() * sizeof(Box));
-    return boxes;
+    const std::vector<uint32_t> rows =
+        BoundableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths));
+    return m_impl->GetReadback().Read<Box>(m_impl->GetBounds().PrimBounds(), rows);
 }
 
 std::optional<Box> Scene::Bounds(uint32_t world) const {

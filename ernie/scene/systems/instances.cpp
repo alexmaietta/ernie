@@ -267,24 +267,18 @@ void Instances::Relayout() {
     }
 
     m_tlas = m_builder.CreateTlas(capacities);
-    m_records = device.CreateBuffer(
-        {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(InstanceRecord),
-         .usage = device::BufferUsage::AccelBuildInput,
-         .label = "instances"});
-    m_surfaces = device.CreateBuffer(
-        {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(SurfaceRecord),
-         .label = "instance surfaces"});
-    m_shapes = device.CreateBuffer(
-        {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(ShapeRecord),
-         .label = "instance shapes"});
-    m_hits = device.CreateBuffer(
-        {.bytes = std::max<uint64_t>(m_regions.Items().size(), 1) * sizeof(SlotHit),
-         .label = "instance hits"});
+    const uint32_t slots = uint32_t(m_regions.Items().size());
+    m_records.Allocate(device, slots);
+    m_surfaces.Allocate(device, slots);
+    m_shapes.Allocate(device, slots);
+    m_hits.Allocate(device, slots);
+    m_renderOrigins.Allocate(device, m_worlds + 1);
     device::CommandEncoder clear = device.GetQueue().CreateEncoder();
-    clear.Fill(*m_records);
-    clear.Fill(*m_shapes);
-    clear.Fill(*m_surfaces);
-    clear.Fill(*m_hits);
+    for (const Ref<device::Buffer>& buffer :
+         {m_records.Buffer(), m_shapes.Buffer(), m_surfaces.Buffer(), m_hits.Buffer(),
+          m_renderOrigins.Buffer()}) {
+        clear.Fill(*buffer);
+    }
     device.GetQueue().Submit(clear.Finish());
 
     std::vector<uint32_t> words(sizeof(InstanceLayout) / sizeof(uint32_t));
@@ -317,9 +311,6 @@ void Instances::Relayout() {
     m_layout =
         device.CreateBuffer({.bytes = words.size() * sizeof(uint32_t), .label = "instance layout"});
     device.GetQueue().Write(*m_layout, words.data());
-    m_renderOrigins =
-        device.CreateBuffer({.label = "render origins"},
-                            std::span<const RenderOrigin>(std::vector<RenderOrigin>(m_worlds + 1)));
     m_viewers = device.CreateBuffer(
         {.label = "viewers"},
         std::span<const uint32_t>(std::vector<uint32_t>(m_worlds + 1, kNoPrim)));
@@ -534,14 +525,14 @@ void Instances::BuildInstancing() {
 void Instances::WriteLayoutHeader() {
     InstanceLayout layout{};
     layout.handles.address = m_tlas->Handles().Address();
-    layout.shapes.address = m_shapes->Address();
-    layout.hits.address = m_hits->Address();
+    layout.shapes.address = m_shapes.Address();
+    layout.hits.address = m_hits.Address();
     layout.blocks.address = m_instancing->Address() + m_blocksOffset;
     layout.prototypes.address = m_instancing->Address() + m_entriesOffset;
     layout.pieces.address = m_instancing->Address() + m_piecesOffset;
     layout.hiddenRanges.address = m_instancing->Address() + m_rangesOffset;
     layout.hiddenIds = m_instancing->Address() + m_hiddenOffset;
-    layout.records = m_records->Address();
+    layout.records = m_records.Address();
     layout.worldCount = m_worlds;
     layout.displayColorName = m_catalog.GetTokens().Intern("displayColor").id;
     layout.firstInstances.address = m_layout->Address() + m_firstOffset;
@@ -771,15 +762,15 @@ void Instances::Run(const ChangeSet& changes, TableLog&) {
     InstanceParams params{};
     params.scene.address = store.DeviceData();
     params.layout.address = m_layout->Address();
-    params.instances.address = m_records->Address();
-    params.shapes.address = m_shapes->Address();
+    params.instances.address = m_records.Address();
+    params.shapes.address = m_shapes.Address();
     params.tlases.address = dirtyBuffer->Address();
-    params.hits.address = m_hits->Address();
-    params.origins.address = m_renderOrigins->Address();
+    params.hits.address = m_hits.Address();
+    params.origins.address = m_renderOrigins.Address();
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
-    params.surfaces.address = m_surfaces->Address();
+    params.surfaces.address = m_surfaces.Address();
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -788,7 +779,7 @@ void Instances::Run(const ChangeSet& changes, TableLog&) {
     origins.scene.address = store.DeviceData();
     origins.layout.address = m_layout->Address();
     origins.products.address = m_productBuffer->Address();
-    origins.origins.address = m_renderOrigins->Address();
+    origins.origins.address = m_renderOrigins.Address();
     origins.viewers.address = m_viewers->Address();
     origins.transforms = changes.tables->transforms;
     origins.productCount = uint32_t(m_products.size());
@@ -808,23 +799,23 @@ void Instances::Run(const ChangeSet& changes, TableLog&) {
     const device::BufferRange counts =
         m_layout->Slice(m_countsOffset, m_regions.Size() * sizeof(uint32_t));
     if (!built.empty()) {
-        m_builder.Build(encoder, *m_tlas, *m_records, counts, built);
+        m_builder.Build(encoder, *m_tlas, *m_records.Buffer(), counts, built);
     }
     if (!refit.empty()) {
-        m_builder.Refit(encoder, *m_tlas, *m_records, counts, refit);
+        m_builder.Refit(encoder, *m_tlas, *m_records.Buffer(), counts, refit);
     }
     queue.Submit(encoder.Finish());
 }
 
 void Instances::Describe(RenderTables& tables) const {
     tables.instances.address = m_layout ? m_layout->Address() : 0;
-    tables.origins.address = m_renderOrigins ? m_renderOrigins->Address() : 0;
-    tables.surfaces.address = m_surfaces ? m_surfaces->Address() : 0;
+    tables.origins.address = m_renderOrigins.Address();
+    tables.surfaces.address = m_surfaces.Address();
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held,
-                {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins, m_surfaces});
+    HoldBuffers(held, {m_layout, m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(),
+                       m_instancing, m_renderOrigins.Buffer(), m_surfaces.Buffer()});
     if (m_tlas) {
         held.emplace_back(m_tlas);
     }

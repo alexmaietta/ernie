@@ -41,12 +41,12 @@ std::span<const TableId> Hierarchy::TableOutputs() const {
 }
 
 void Hierarchy::Describe(RenderTables& tables) const {
-    tables.transforms.address = m_transforms ? m_transforms->Address() : 0;
-    tables.imageables.address = m_imageables ? m_imageables->Address() : 0;
+    tables.transforms.address = m_transforms.Address();
+    tables.imageables.address = m_imageables.Address();
 }
 
 void Hierarchy::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held, {m_transforms, m_imageables});
+    HoldBuffers(held, {m_transforms.Buffer(), m_imageables.Buffer()});
 }
 
 uint32_t Hierarchy::ParentRow(uint32_t prim) const {
@@ -64,13 +64,10 @@ void Hierarchy::Rebuild() {
     Store& store = m_catalog.GetStore();
     device::Device& device = store.GetDevice();
     const uint32_t capacity = std::max(store.Schema(SchemaId::Imageable).Capacity(), 1u);
-    m_transformCapacity = std::max(store.Schema(SchemaId::Xformable).Capacity(), 1u);
-    m_transforms = device.CreateBuffer(
-        {.bytes = uint64_t(m_transformCapacity) * sizeof(WorldTransform), .label = "transforms"});
-    m_imageables = device.CreateBuffer(
-        {.bytes = uint64_t(capacity) * sizeof(ResolvedImageable), .label = "imageables"});
-    m_parentRows.assign(capacity, kNoRow);
-    m_xformRows.assign(capacity, kNoRow);
+    m_transforms.Allocate(device, store.Schema(SchemaId::Xformable).Capacity());
+    m_imageables.Allocate(device, capacity);
+    m_parents.Assign(capacity, kNoRow);
+    m_xforms.Assign(capacity, kNoRow);
     m_rows.clear();
     std::vector<std::vector<uint32_t>> segments(prims.WorldCount() + 1);
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
@@ -79,17 +76,17 @@ void Hierarchy::Rebuild() {
         }
         const PrimRecord& record = prims.At(prim);
         const uint32_t row = prims.Row(prim, SchemaId::Imageable);
-        m_parentRows[row] = ParentRow(prim);
+        m_parents.Set(row, ParentRow(prim));
         if (IsA(record.schema, SchemaId::Xformable)) {
-            m_xformRows[row] = prims.Row(prim, SchemaId::Xformable);
+            m_xforms.Set(row, prims.Row(prim, SchemaId::Xformable));
         }
         segments[WorldSlot(record.world)].push_back(row);
         m_rows[prim] = row;
     }
     m_segments.Assign(std::move(segments));
 
-    m_parent = device.CreateBuffer({.label = "hierarchy parents"}, m_parentRows);
-    m_xform = device.CreateBuffer({.label = "hierarchy transforms"}, m_xformRows);
+    m_parents.Upload(device);
+    m_xforms.Upload(device);
     m_segmentRows = device.CreateBuffer(
         {.label = "hierarchy segment rows"},
         std::vector<uint32_t>(m_segments.Items().begin(), m_segments.Items().end()));
@@ -120,7 +117,6 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         }
         return entry->second;
     };
-    std::vector<uint32_t> rows;
     for (const StructureEntry& entry : changes.removed) {
         const auto found = m_rows.find(entry.prim);
         if (found == m_rows.end()) {
@@ -128,9 +124,8 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         }
         const uint32_t row = found->second;
         std::erase(segment(WorldSlot(entry.world)), row);
-        m_parentRows[row] = kNoRow;
-        m_xformRows[row] = kNoRow;
-        rows.push_back(row);
+        m_parents.Set(row, kNoRow);
+        m_xforms.Set(row, kNoRow);
         m_rows.erase(found);
     }
     for (const StructureEntry& entry : changes.added) {
@@ -139,19 +134,18 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
             continue;
         }
         const uint32_t row = prims.Row(entry.prim, SchemaId::Imageable);
-        if (row >= m_parentRows.size()) {
+        if (row >= m_parents.Rows()) {
             return false;
         }
         if (IsA(prims.At(entry.prim).schema, SchemaId::Xformable) &&
-            prims.Row(entry.prim, SchemaId::Xformable) >= m_transformCapacity) {
+            prims.Row(entry.prim, SchemaId::Xformable) >= m_transforms.Rows()) {
             return false;
         }
-        m_parentRows[row] = ParentRow(entry.prim);
-        m_xformRows[row] = IsA(prims.At(entry.prim).schema, SchemaId::Xformable)
-                               ? prims.Row(entry.prim, SchemaId::Xformable)
-                               : kNoRow;
+        m_parents.Set(row, ParentRow(entry.prim));
+        m_xforms.Set(row, IsA(prims.At(entry.prim).schema, SchemaId::Xformable)
+                              ? prims.Row(entry.prim, SchemaId::Xformable)
+                              : kNoRow);
         segment(WorldSlot(entry.world)).push_back(row);
-        rows.push_back(row);
         m_rows[entry.prim] = row;
     }
     for (const auto& [index, items] : touched) {
@@ -160,18 +154,10 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         }
     }
 
-    device::Queue& queue = m_catalog.GetStore().GetDevice().GetQueue();
-    if (rows.size() > 64) {
-        queue.Write(*m_parent, m_parentRows.data());
-        queue.Write(*m_xform, m_xformRows.data());
-    } else {
-        for (const uint32_t row : rows) {
-            queue.Write(m_parent->Slice(row * sizeof(uint32_t), sizeof(uint32_t)),
-                        &m_parentRows[row]);
-            queue.Write(m_xform->Slice(row * sizeof(uint32_t), sizeof(uint32_t)),
-                        &m_xformRows[row]);
-        }
-    }
+    device::Device& device = m_catalog.GetStore().GetDevice();
+    m_parents.Upload(device);
+    m_xforms.Upload(device);
+    device::Queue& queue = device.GetQueue();
     for (const auto& [index, items] : touched) {
         const uint32_t start = m_segments.Starts()[index];
         queue.Write(m_segmentRows->Slice(start * sizeof(uint32_t),
@@ -219,15 +205,15 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     const Ref<device::Buffer> dirty =
         store.GetDevice().CreateBuffer({.label = "hierarchy dirty segments"}, segments);
     ResolveParams params{};
-    params.tree.parent.address = m_parent->Address();
-    params.tree.xform.address = m_xform->Address();
+    params.tree.parent.address = m_parents.Buffer()->Address();
+    params.tree.xform.address = m_xforms.Buffer()->Address();
     params.tree.segmentRows.address = m_segmentRows->Address();
     params.tree.segmentStart.address = m_segmentStart->Address();
     params.tree.segmentCount.address = m_segmentCount->Address();
     params.scene.address = store.DeviceData();
     params.segments.address = dirty->Address();
-    params.transforms.address = m_transforms->Address();
-    params.imageables.address = m_imageables->Address();
+    params.transforms.address = m_transforms.Address();
+    params.imageables.address = m_imageables.Address();
     params.since = changes.sinceStamp;
     params.until = changes.untilStamp;
     params.all = rebuild ? 1 : 0;
@@ -271,70 +257,6 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     queue.Submit(encoder.Finish());
 }
 
-device::Download Hierarchy::Gather(const Ref<device::Buffer>& source, uint32_t words,
-                                   std::span<const uint32_t> rows) {
-    device::Device& device = m_catalog.GetStore().GetDevice();
-    const uint64_t bytes = std::max<uint64_t>(rows.size(), 1) * words * sizeof(uint32_t);
-    const Ref<device::Buffer> out = device.CreateBuffer({.bytes = bytes, .label = "gathered rows"});
-    if (rows.empty() || !source) {
-        return {};
-    }
-    const Ref<device::Buffer> list = device.CreateBuffer({.label = "gather rows"}, rows);
-    GatherParams params{};
-    params.source.address = source->Address();
-    params.rows.address = list->Address();
-    params.out.address = out->Address();
-    params.words = words;
-    params.count = uint32_t(rows.size());
-    device::Queue& queue = device.GetQueue();
-    device::CommandEncoder encoder = queue.CreateEncoder();
-    encoder.Dispatch(Kernels().Entry("GatherRows"), params,
-                     {.x = device::GroupCount(params.count, kHierarchyGroup)});
-    queue.Submit(encoder.Finish());
-    return queue.ReadAsync(out->Slice(0, rows.size() * words * sizeof(uint32_t)));
-}
-
-device::Download Hierarchy::ReadTransformsAsync(std::span<const uint32_t> prims) {
-    const Prims& all = m_catalog.GetPrims();
-    std::vector<uint32_t> rows;
-    for (const uint32_t prim : prims) {
-        rows.push_back(all.Alive(prim) && IsA(all.At(prim).schema, SchemaId::Xformable)
-                           ? all.Row(prim, SchemaId::Xformable)
-                           : kNoRow);
-    }
-    return Gather(m_transforms, sizeof(WorldTransform) / sizeof(uint32_t), rows);
-}
-
-std::vector<WorldTransform> Hierarchy::Transforms(std::span<const uint32_t> prims) {
-    std::vector<WorldTransform> transforms(prims.size());
-    const device::Download download = ReadTransformsAsync(prims);
-    if (!transforms.empty()) {
-        download.Wait();
-        std::memcpy(transforms.data(), download.Bytes().data(),
-                    transforms.size() * sizeof(WorldTransform));
-    }
-    return transforms;
-}
-
-std::vector<ResolvedImageable> Hierarchy::Imageables(std::span<const uint32_t> prims) {
-    const Prims& all = m_catalog.GetPrims();
-    std::vector<uint32_t> rows;
-    for (const uint32_t prim : prims) {
-        rows.push_back(all.Alive(prim) && IsA(all.At(prim).schema, SchemaId::Imageable)
-                           ? all.Row(prim, SchemaId::Imageable)
-                           : kNoRow);
-    }
-    std::vector<ResolvedImageable> resolved(prims.size());
-    const device::Download download =
-        Gather(m_imageables, sizeof(ResolvedImageable) / sizeof(uint32_t), rows);
-    if (!resolved.empty()) {
-        download.Wait();
-        std::memcpy(resolved.data(), download.Bytes().data(),
-                    resolved.size() * sizeof(ResolvedImageable));
-    }
-    return resolved;
-}
-
 void Hierarchy::Prepare() {
     Kernels();
 }
@@ -344,7 +266,7 @@ device::Program& Hierarchy::Kernels() {
         m_program = m_catalog.GetStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.hierarchy"},
              .library = &kSceneKernels,
-             .entries = {"ResolveRows", "GatherRows"},
+             .entries = {"ResolveRows"},
              .label = "hierarchy"});
     }
     return *m_program;

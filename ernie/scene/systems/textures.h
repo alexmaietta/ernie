@@ -13,8 +13,8 @@
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/tables/textures.h"
 #include "ernie/scene/kernels/textures.h"
-#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
+#include "ernie/scene/systems/tables.h"
 #include "ernie/texture/cache.h"
 
 namespace ernie {

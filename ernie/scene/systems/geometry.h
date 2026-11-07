@@ -19,8 +19,8 @@
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
 #include "ernie/scene/kernels/tables/geometry.h"
-#include "ernie/scene/systems/record_table.h"
 #include "ernie/scene/systems/system.h"
+#include "ernie/scene/systems/tables.h"
 
 namespace ernie {
 

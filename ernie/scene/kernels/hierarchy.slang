@@ -190,16 +190,3 @@ void ResolveRows(uniform ResolveParams p) {
     resolved.motion = motion;
     p.imageables[row] = resolved;
 }
-
-[shader("compute")]
-[numthreads(kHierarchyGroup, 1, 1)]
-void GatherRows(uniform GatherParams p) {
-    const uint index = LinearThreadIndex();
-    if (index >= p.count) {
-        return;
-    }
-    const uint row = p.rows[index];
-    for (uint word = 0; word < p.words; ++word) {
-        p.out[index * p.words + word] = row == kNoRow ? 0 : p.source[row * p.words + word];
-    }
-}

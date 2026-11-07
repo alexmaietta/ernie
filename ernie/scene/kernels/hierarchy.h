@@ -32,16 +32,6 @@ struct ResolveParams {
 
 ERNIE_CHECK_SIZE(ResolveParams, 104);
 
-struct GatherParams {
-    Ptr<uint> source;
-    Ptr<uint> rows;
-    Ptr<uint> out;
-    uint words;
-    uint count;
-};
-
-ERNIE_CHECK_SIZE(GatherParams, 32);
-
 static const uint kHierarchyGroup = 64;
 static const uint kMaxHierarchyDepth = 256;
 

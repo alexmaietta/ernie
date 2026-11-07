@@ -13,8 +13,10 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/instances.h"
 #include "ernie/scene/systems/regions.h"
 #include "ernie/scene/systems/system.h"
+#include "ernie/scene/systems/tables.h"
 
 namespace ernie {
 
@@ -59,18 +61,18 @@ class Instances : public System {
     }
 
     const Ref<device::Buffer>& Origins() const {
-        return m_renderOrigins;
+        return m_renderOrigins.Buffer();
     }
 
     void Describe(RenderTables& tables) const override;
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
 
     const Ref<device::Buffer>& Records() const {
-        return m_records;
+        return m_records.Buffer();
     }
 
     const Ref<device::Buffer>& Hits() const {
-        return m_hits;
+        return m_hits.Buffer();
     }
 
     const std::set<uint32_t>& Members() const {
@@ -133,10 +135,10 @@ class Instances : public System {
 
     Ref<device::Program> m_program;
     Ref<bvh::Tlas> m_tlas;
-    Ref<device::Buffer> m_records;
-    Ref<device::Buffer> m_shapes;
+    DeviceTable<InstanceRecord> m_records{"instances", device::BufferUsage::AccelBuildInput};
+    DeviceTable<ShapeRecord> m_shapes{"instance shapes"};
     Ref<device::Buffer> m_layout;
-    Ref<device::Buffer> m_hits;
+    DeviceTable<SlotHit> m_hits{"instance hits"};
     Ref<device::Buffer> m_instancing;
     std::vector<Instancer> m_instancers;
     std::set<uint32_t> m_instancerPrims;
@@ -157,8 +159,8 @@ class Instances : public System {
     uint64_t m_hiddenOffset = 0;
     uint64_t m_offsetBasesOffset = 0;
     uint64_t m_offsetsOffset = 0;
-    Ref<device::Buffer> m_renderOrigins;
-    Ref<device::Buffer> m_surfaces;
+    DeviceTable<RenderOrigin> m_renderOrigins{"render origins"};
+    DeviceTable<SurfaceRecord> m_surfaces{"instance surfaces"};
     Ref<device::Buffer> m_viewers;
     std::vector<uint32_t> m_products;
     Ref<device::Buffer> m_productBuffer;

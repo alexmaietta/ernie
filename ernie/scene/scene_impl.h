@@ -19,6 +19,7 @@
 #include "ernie/scene/systems/hierarchy.h"
 #include "ernie/scene/systems/instances.h"
 #include "ernie/scene/systems/lights.h"
+#include "ernie/scene/systems/readback.h"
 #include "ernie/scene/systems/semantics.h"
 #include "ernie/scene/systems/tangents.h"
 #include "ernie/scene/systems/textures.h"
@@ -135,6 +136,10 @@ class SceneImpl {
         return m_lights;
     }
 
+    Readback& GetReadback() {
+        return m_readback;
+    }
+
     void AddCommitStep(std::function<bool()> step) {
         m_commitSteps.push_back(std::move(step));
     }
@@ -162,6 +167,7 @@ class SceneImpl {
     Semantics m_semantics;
     Instances m_instances;
     Lights m_lights;
+    Readback m_readback;
     std::vector<std::function<bool()>> m_commitSteps;
 };
 

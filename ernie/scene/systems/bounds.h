@@ -12,8 +12,10 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/catalog/catalog.h"
+#include "ernie/scene/kernels/tables/bounds.h"
 #include "ernie/scene/systems/instances.h"
 #include "ernie/scene/systems/system.h"
+#include "ernie/scene/systems/tables.h"
 
 namespace ernie {
 
@@ -37,18 +39,14 @@ class Bounds : public System {
     void Prepare() override;
     void Run(const ChangeSet& changes, TableLog& log) override;
 
-    const Ref<device::Buffer>& Boxes() const {
-        return m_boxes;
-    }
-
     void Describe(RenderTables& tables) const override;
 
-    const Ref<device::Buffer>& Boundables() const {
-        return m_boundables;
+    const Ref<device::Buffer>& PrimBounds() const {
+        return m_primBounds.Buffer();
     }
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        HoldBuffers(held, {m_boxes, m_boundables});
+        HoldBuffers(held, {m_boxes.Buffer(), m_primBounds.Buffer()});
     }
 
     std::optional<BvhBox> World(uint32_t world) const;
@@ -65,12 +63,10 @@ class Bounds : public System {
     Ref<device::Program> m_program;
     Ref<device::Buffer> m_origins;
     Ref<device::Buffer> m_extents;
-    Ref<device::Buffer> m_boxes;
-    Ref<device::Buffer> m_boundables;
-    uint32_t m_boundableCapacity = 0;
+    DeviceTable<BvhBox> m_boxes{"world bounds"};
+    DeviceTable<BoundableBox> m_primBounds{"prim bounds"};
     Ref<device::Buffer> m_instancerExtents;
     uint64_t m_epoch = ~uint64_t(0);
-    uint32_t m_slots = 0;
 };
 
 }

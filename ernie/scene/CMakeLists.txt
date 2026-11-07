@@ -23,6 +23,7 @@ ernie_object_library(
     systems/hierarchy.cpp
     systems/instances.cpp
     systems/lights.cpp
+    systems/readback.cpp
     systems/regions.cpp
     systems/semantics.cpp
     systems/tangents.cpp

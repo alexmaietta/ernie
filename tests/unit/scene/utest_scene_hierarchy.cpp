@@ -14,6 +14,7 @@
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/store/store.h"
 #include "ernie/scene/systems/hierarchy.h"
+#include "ernie/scene/systems/readback.h"
 #include "ernie/scene/timeline/timeline.h"
 #include "support/devices.h"
 
@@ -25,6 +26,7 @@ struct World {
     Catalog& catalog;
     Timeline& timeline;
     Hierarchy& hierarchy;
+    Readback readback{store.GetDevice()};
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
@@ -44,7 +46,11 @@ struct World {
     }
 
     WorldTransform Transform(uint32_t prim) {
-        return hierarchy.Transforms(std::vector<uint32_t>{prim}).front();
+        const std::vector<uint32_t> prims = {prim};
+        return readback
+            .Read<WorldTransform>(hierarchy.Transforms(),
+                                  TableRows(catalog.GetPrims(), prims, SchemaId::Xformable))
+            .front();
     }
 
     std::vector<double> Translation(uint32_t prim) {
@@ -55,7 +61,11 @@ struct World {
     }
 
     ResolvedImageable Resolved(uint32_t prim) {
-        return hierarchy.Imageables(std::vector<uint32_t>{prim}).front();
+        const std::vector<uint32_t> prims = {prim};
+        return readback
+            .Read<ResolvedImageable>(hierarchy.Imageables(),
+                                     TableRows(catalog.GetPrims(), prims, SchemaId::Imageable))
+            .front();
     }
 };
 
