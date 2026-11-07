@@ -74,7 +74,7 @@ class Probe : public System {
         return false;
     }
 
-    device::Operation Run(const ChangeSet& changes, Stream) override {
+    void Run(const ChangeSet& changes, TableLog&) override {
         if (fail) {
             fail = false;
             throw Error("probe failed");
@@ -83,7 +83,6 @@ class Probe : public System {
         worlds = changes.worlds;
         wrote = changes.Wrote(TableId::Transforms);
         transforms = changes.tables->transforms.address;
-        return {};
     }
 
     bool fail = false;
@@ -355,12 +354,11 @@ class MeshProbe : public Probe {
         return kTables;
     }
 
-    device::Operation Run(const ChangeSet& changes, Stream) override {
+    void Run(const ChangeSet& changes, TableLog&) override {
         ++runs;
         relinked = changes.Wrote(TableId::Meshes);
         updated = changes.Wrote(TableId::MeshData);
         worlds = changes.worlds;
-        return {};
     }
 
     bool relinked = false;

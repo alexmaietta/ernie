@@ -85,10 +85,9 @@ class TextureProbe : public System {
         return false;
     }
 
-    device::Operation Run(const ChangeSet& changes, Stream) override {
+    void Run(const ChangeSet& changes, TableLog&) override {
         wrote = changes.Wrote(TableId::Textures);
         worlds = changes.worlds;
-        return {};
     }
 
     bool wrote = false;

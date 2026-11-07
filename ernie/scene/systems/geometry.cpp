@@ -324,9 +324,8 @@ void Geometry::Link(const Mesh& mesh) {
     }
 }
 
-device::Operation Geometry::Run(const ChangeSet& changes, Stream) {
+void Geometry::Run(const ChangeSet& changes, TableLog& log) {
     ERNIE_ZONE("Geometry/Run");
-    ++m_runs;
     const Prims& prims = m_catalog.GetPrims();
     m_stats.built = 0;
     m_stats.refit = 0;
@@ -417,25 +416,22 @@ device::Operation Geometry::Run(const ChangeSet& changes, Stream) {
     Settle();
     Prune();
     std::vector<uint32_t> updated;
-    const device::Operation done = Update(updated);
+    Update(updated);
     m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
     const bool replaced = m_records.Upload(m_catalog.GetStore().GetDevice());
     if (replaced) {
         m_relinked = {kGlobalWorld};
     }
-    if (changes.log != nullptr) {
-        if (!m_relinked.empty()) {
-            changes.log->Wrote(TableId::Meshes, m_relinked);
-        }
-        if (!updated.empty()) {
-            changes.log->Wrote(TableId::MeshData, updated);
-        }
+    if (!m_relinked.empty()) {
+        log.Wrote(TableId::Meshes, m_relinked);
+    }
+    if (!updated.empty()) {
+        log.Wrote(TableId::MeshData, updated);
     }
     m_relinked.clear();
-    return done;
 }
 
-device::Operation Geometry::Update(std::vector<uint32_t>& updated) {
+void Geometry::Update(std::vector<uint32_t>& updated) {
     std::vector<Ref<bvh::Blas>> built;
     std::vector<Ref<bvh::Blas>> refit;
     std::vector<NormalsShape> normals;
@@ -444,7 +440,7 @@ device::Operation Geometry::Update(std::vector<uint32_t>& updated) {
         if (!shape.build && !shape.refit) {
             continue;
         }
-        shape.updated = m_runs;
+        shape.updated = Runs();
         (shape.build ? built : refit).push_back(shape.blas);
         const Topology& topology = m_topologies.at(key.topology);
         NormalsShape entry{};
@@ -468,11 +464,11 @@ device::Operation Geometry::Update(std::vector<uint32_t>& updated) {
     m_stats.shapes = uint32_t(m_shapes.size());
     m_stats.topologies = uint32_t(m_topologies.size());
     if (normals.empty()) {
-        return {};
+        return;
     }
     const Prims& prims = m_catalog.GetPrims();
     for (const auto& [prim, mesh] : m_meshes) {
-        if (mesh.shape && mesh.shape->updated == m_runs && prims.Alive(prim)) {
+        if (mesh.shape && mesh.shape->updated == Runs() && prims.Alive(prim)) {
             AddWorld(updated, prims.At(prim).world);
         }
     }
@@ -506,13 +502,11 @@ device::Operation Geometry::Update(std::vector<uint32_t>& updated) {
     encoder.Dispatch(Kernels().Entry("FinishShapeBounds"), params,
                      {.x = device::GroupCount(params.shapeCount, kNormalsGroup)});
     encoder.EndZone();
-    return queue.Submit(encoder.Finish());
+    queue.Submit(encoder.Finish());
 }
 
 void Geometry::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    if (m_records.Buffer()) {
-        held.emplace_back(m_records.Buffer());
-    }
+    HoldBuffers(held, {m_records.Buffer()});
     for (const auto& [key, shape] : m_shapes) {
         if (shape.blas) {
             held.emplace_back(shape.blas);

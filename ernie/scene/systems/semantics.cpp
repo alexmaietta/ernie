@@ -213,9 +213,8 @@ void Semantics::Upload(std::span<const uint32_t> prims) {
     m_data.taxonomyCount = uint32_t(m_taxonomies.size());
 }
 
-device::Operation Semantics::Run(const ChangeSet& changes, Stream) {
+void Semantics::Run(const ChangeSet& changes, TableLog&) {
     ERNIE_ZONE("Semantics/Run");
-    ++m_runs;
     m_stats = {};
     const Prims& prims = m_catalog.GetPrims();
     const Paths& paths = m_catalog.GetPaths();
@@ -294,7 +293,6 @@ device::Operation Semantics::Run(const ChangeSet& changes, Stream) {
         Upload(changed);
     }
     m_built = true;
-    return {};
 }
 
 std::vector<std::vector<std::string>> Semantics::SetTexts(uint32_t taxonomy) const {

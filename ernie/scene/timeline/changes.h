@@ -59,7 +59,6 @@ struct ChangeSet {
     std::vector<ChangedRows> columns;
     std::vector<std::pair<ColumnRef, std::vector<uint32_t>>> arrays;
     const RenderTables* tables = nullptr;
-    TableLog* log = nullptr;
     std::vector<TableId> wrote;
 
     const ChangedRows* Rows(ColumnRef column) const;

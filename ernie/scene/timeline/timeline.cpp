@@ -153,8 +153,8 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
         const uint64_t epoch = m_catalog.Epoch();
         const uint64_t tables = m_log.Sequence();
         changes.tables = &m_tables;
-        changes.log = &m_log;
-        system.Run(changes, Stream::None());
+        ++system.m_runs;
+        system.Run(changes, m_log);
         system.Describe(m_tables);
         scheduled.writes = writes;
         scheduled.epoch = epoch;

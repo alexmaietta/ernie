@@ -198,11 +198,7 @@ void Lights::Describe(RenderTables& tables) const {
 }
 
 void Lights::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    for (const Ref<device::Buffer>& buffer : {m_layout, m_records, m_cdf, m_maps, m_spectra}) {
-        if (buffer) {
-            held.emplace_back(buffer);
-        }
-    }
+    HoldBuffers(held, {m_layout, m_records, m_cdf, m_maps, m_spectra});
 }
 
 void Lights::Prepare() {
@@ -366,9 +362,8 @@ void Lights::Relayout() {
     device.GetQueue().Write(*m_layout, words.data());
 }
 
-device::Operation Lights::Run(const ChangeSet& changes, Stream) {
+void Lights::Run(const ChangeSet& changes, TableLog&) {
     ERNIE_ZONE("Lights/Run");
-    ++m_runs;
     m_written = 0;
     const bool relaid = changes.resync || !m_layout || Restructured(changes) ||
                         m_catalog.CompositionVersion() != m_compositions;
@@ -395,7 +390,7 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
         }
     }
     if (dirty.empty()) {
-        return {};
+        return;
     }
     uint32_t widest = 0;
     for (const uint32_t tlas : dirty) {
@@ -436,7 +431,7 @@ device::Operation Lights::Run(const ChangeSet& changes, Stream) {
     encoder.Barrier();
     encoder.Dispatch(Kernels().Entry("WriteLightCdf"), params,
                      {.x = device::GroupCount(uint32_t(dirty.size()), kLightGroup)});
-    return queue.Submit(encoder.Finish());
+    queue.Submit(encoder.Finish());
 }
 
 device::Program& Lights::Kernels() {

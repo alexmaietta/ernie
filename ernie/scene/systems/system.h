@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstdint>
+#include <initializer_list>
 #include <span>
 #include <string_view>
 #include <vector>
 
-#include "ernie/device/operation.h"
+#include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
-#include "ernie/device/stream.h"
 #include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/timeline/table_log.h"
 
@@ -47,7 +48,25 @@ class System {
 
     virtual void Hold(std::vector<Ref<const RefCounted>>&) const {}
 
-    virtual device::Operation Run(const ChangeSet& changes, Stream stream) = 0;
+    virtual void Run(const ChangeSet& changes, TableLog& log) = 0;
+
+    uint32_t Runs() const {
+        return m_runs;
+    }
+
+  private:
+    friend class Timeline;
+
+    uint32_t m_runs = 0;
 };
+
+inline void HoldBuffers(std::vector<Ref<const RefCounted>>& held,
+                        std::initializer_list<Ref<device::Buffer>> buffers) {
+    for (const Ref<device::Buffer>& buffer : buffers) {
+        if (buffer) {
+            held.emplace_back(buffer);
+        }
+    }
+}
 
 }

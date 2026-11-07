@@ -46,11 +46,7 @@ void Hierarchy::Describe(RenderTables& tables) const {
 }
 
 void Hierarchy::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    for (const Ref<device::Buffer>& buffer : {m_transforms, m_imageables}) {
-        if (buffer) {
-            held.emplace_back(buffer);
-        }
-    }
+    HoldBuffers(held, {m_transforms, m_imageables});
 }
 
 uint32_t Hierarchy::ParentRow(uint32_t prim) const {
@@ -188,9 +184,8 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
     return true;
 }
 
-device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
+void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     ERNIE_ZONE("Hierarchy/Run");
-    ++m_runs;
     Store& store = m_catalog.GetStore();
     const bool rebuild = changes.resync || !m_built || (changes.structure && !Apply(changes));
     if (rebuild) {
@@ -213,7 +208,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
     });
     m_dispatched = 0;
     if (segments.empty()) {
-        return {};
+        return;
     }
     uint32_t widest = 0;
     for (const uint32_t segment : segments) {
@@ -259,10 +254,10 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
         }
     }
     if (moved) {
-        changes.log->Wrote(TableId::Transforms, worlds);
+        log.Wrote(TableId::Transforms, worlds);
     }
     if (inherited) {
-        changes.log->Wrote(TableId::Imageables, worlds);
+        log.Wrote(TableId::Imageables, worlds);
     }
     device::Queue& queue = store.GetDevice().GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Hierarchy/Resolve");
@@ -273,7 +268,7 @@ device::Operation Hierarchy::Run(const ChangeSet& changes, Stream) {
             Kernels().Entry("ResolveRows"), params,
             {.x = device::GroupCount(widest, kHierarchyGroup), .y = uint32_t(segments.size())});
     }
-    return queue.Submit(encoder.Finish());
+    queue.Submit(encoder.Finish());
 }
 
 device::Download Hierarchy::Gather(const Ref<device::Buffer>& source, uint32_t words,

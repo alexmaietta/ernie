@@ -111,11 +111,7 @@ class Tangents : public System {
     }
 
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
-
-    uint32_t Runs() const {
-        return m_runs;
-    }
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     const TangentStats& Stats() const {
         return m_stats;
@@ -178,7 +174,7 @@ class Tangents : public System {
     void Release(Mesh& mesh);
     void Prune();
     void Link(uint32_t prim, const Mesh& mesh);
-    device::Operation Process(const ChangeSet& changes);
+    void Process(const ChangeSet& changes);
 
     Catalog& m_catalog;
     const Geometry& m_geometry;
@@ -194,7 +190,6 @@ class Tangents : public System {
 
     Ref<device::Program> m_program;
     uint64_t m_seen = 0;
-    uint32_t m_runs = 0;
     Cells m_cells;
     TangentStats m_stats;
 };

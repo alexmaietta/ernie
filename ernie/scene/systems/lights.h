@@ -33,7 +33,7 @@ class Lights : public System {
     }
 
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     const Ref<device::Buffer>& Layout() const {
         return m_layout;
@@ -45,10 +45,6 @@ class Lights : public System {
 
     std::span<const uint32_t> Counts() const {
         return m_counts;
-    }
-
-    uint32_t Runs() const {
-        return m_runs;
     }
 
     uint32_t Written() const {
@@ -82,7 +78,6 @@ class Lights : public System {
     uint32_t m_instancesVersion = ~0u;
     uint64_t m_seen = 0;
     const Instances& m_instances;
-    uint32_t m_runs = 0;
     uint32_t m_written = 0;
 };
 

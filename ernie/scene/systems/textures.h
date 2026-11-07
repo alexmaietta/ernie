@@ -63,17 +63,13 @@ class Textures : public System {
     }
 
     bool Pending() const override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     void Finish() override;
     uint64_t Handle(uint32_t prim, std::string_view input) const;
 
     uint64_t Checker() const {
         return m_cache.Binding(kCheckerTextureBinding);
-    }
-
-    uint32_t Runs() const {
-        return m_runs;
     }
 
     const TextureStats& Stats() const {
@@ -118,7 +114,6 @@ class Textures : public System {
     TextureBinding m_checker;
     uint32_t m_checkerUsers = 0;
     TextureStats m_stats;
-    uint32_t m_runs = 0;
     RecordTable<TextureRecord> m_records{"texture records"};
     std::vector<uint32_t> m_rebound;
 };

@@ -56,10 +56,9 @@ class Counter : public System {
         return m_structural;
     }
 
-    device::Operation Run(const ChangeSet& changes, Stream) override {
+    void Run(const ChangeSet& changes, TableLog&) override {
         ++runs;
         last = changes;
-        return {};
     }
 
     uint32_t runs = 0;

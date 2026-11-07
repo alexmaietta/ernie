@@ -48,16 +48,12 @@ class Semantics : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     bool Pending() const override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     void Require(std::span<const Token> taxonomies);
 
     const SemanticsData& Data() const {
         return m_data;
-    }
-
-    uint32_t Runs() const {
-        return m_runs;
     }
 
     const SemanticStats& Stats() const {
@@ -71,11 +67,7 @@ class Semantics : public System {
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        for (const Ref<device::Buffer>& buffer : {m_stableBuffer, m_idBuffer, m_primBuffer}) {
-            if (buffer) {
-                held.emplace_back(buffer);
-            }
-        }
+        HoldBuffers(held, {m_stableBuffer, m_idBuffer, m_primBuffer});
     }
 
     uint32_t SemanticId(Token taxonomy, uint32_t prim) const;
@@ -115,7 +107,6 @@ class Semantics : public System {
     Ref<device::Buffer> m_primBuffer;
     SemanticsData m_data{};
     SemanticStats m_stats;
-    uint32_t m_runs = 0;
     bool m_built = false;
 };
 

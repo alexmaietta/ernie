@@ -163,9 +163,7 @@ void Tangents::Describe(RenderTables& tables) const {
 }
 
 void Tangents::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    if (m_records.Buffer()) {
-        held.emplace_back(m_records.Buffer());
-    }
+    HoldBuffers(held, {m_records.Buffer()});
 }
 
 void Tangents::CacheCells(Mesh& mesh, const Cells& cells) const {
@@ -389,22 +387,20 @@ void Tangents::Forget(uint32_t prim) {
     m_meshes.erase(prim);
 }
 
-device::Operation Tangents::Run(const ChangeSet& changes, Stream) {
-    const device::Operation done = Process(changes);
+void Tangents::Run(const ChangeSet& changes, TableLog& log) {
+    Process(changes);
     m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
     if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
         m_relinked = {kGlobalWorld};
     }
-    if (changes.log != nullptr && !m_relinked.empty()) {
-        changes.log->Wrote(TableId::Tangents, m_relinked);
+    if (!m_relinked.empty()) {
+        log.Wrote(TableId::Tangents, m_relinked);
     }
     m_relinked.clear();
-    return done;
 }
 
-device::Operation Tangents::Process(const ChangeSet& changes) {
+void Tangents::Process(const ChangeSet& changes) {
     ERNIE_ZONE("Tangents/Run");
-    ++m_runs;
     m_stats.computed = 0;
     Store& store = m_catalog.GetStore();
     const Prims& prims = m_catalog.GetPrims();
@@ -560,9 +556,8 @@ device::Operation Tangents::Process(const ChangeSet& changes) {
     if (encoder) {
         scope.reset();
         store.Flush();
-        return device.GetQueue().Submit(encoder->Finish());
+        device.GetQueue().Submit(encoder->Finish());
     }
-    return {};
 }
 
 void Tangents::Prepare() {

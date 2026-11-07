@@ -103,9 +103,7 @@ void Textures::Describe(RenderTables& tables) const {
 }
 
 void Textures::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    if (m_records.Buffer()) {
-        held.emplace_back(m_records.Buffer());
-    }
+    HoldBuffers(held, {m_records.Buffer()});
 }
 
 bool Textures::Pending() const {
@@ -312,9 +310,8 @@ void Textures::Rebind(uint32_t prim, Cells& cells) {
     m_materials[prim] = std::move(material);
 }
 
-device::Operation Textures::Run(const ChangeSet& changes, Stream) {
+void Textures::Run(const ChangeSet& changes, TableLog& log) {
     ERNIE_ZONE("Textures/Run");
-    ++m_runs;
     const Prims& prims = m_catalog.GetPrims();
     const auto textured = [&](uint32_t prim) {
         return prims.Alive(prim) && (m_slots.contains(prims.At(prim).schema) ||
@@ -383,8 +380,8 @@ device::Operation Textures::Run(const ChangeSet& changes, Stream) {
     if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
         Rebound(kGlobalWorld);
     }
-    if (changes.log != nullptr && !m_rebound.empty()) {
-        changes.log->Wrote(TableId::Textures, m_rebound);
+    if (!m_rebound.empty()) {
+        log.Wrote(TableId::Textures, m_rebound);
     }
     m_rebound.clear();
 
@@ -398,7 +395,6 @@ device::Operation Textures::Run(const ChangeSet& changes, Stream) {
             m_stats.bound += bound.binding.handle != 0 ? 1 : 0;
         }
     }
-    return {};
 }
 
 }

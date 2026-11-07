@@ -83,9 +83,8 @@ void Bounds::Relayout() {
     m_epoch = m_catalog.Epoch();
 }
 
-device::Operation Bounds::Run(const ChangeSet& changes, Stream) {
+void Bounds::Run(const ChangeSet& changes, TableLog&) {
     ERNIE_ZONE("Bounds/Run");
-    ++m_runs;
     Store& store = m_catalog.GetStore();
     device::Device& device = store.GetDevice();
     if (changes.resync || changes.structure || m_epoch != m_catalog.Epoch()) {
@@ -145,7 +144,7 @@ device::Operation Bounds::Run(const ChangeSet& changes, Stream) {
         encoder.Dispatch(Kernels().Entry("FinishBoxes"), params,
                          {.x = device::GroupCount(params.slotCount, kBoundsGroup)});
     }
-    return queue.Submit(encoder.Finish());
+    queue.Submit(encoder.Finish());
 }
 
 device::Download Bounds::ReadWorldsAsync() const {

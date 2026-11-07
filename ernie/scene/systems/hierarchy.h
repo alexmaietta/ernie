@@ -29,14 +29,10 @@ class Hierarchy : public System {
     void Describe(RenderTables& tables) const override;
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     uint32_t Segments() const {
         return m_segments.Size();
-    }
-
-    uint32_t Runs() const {
-        return m_runs;
     }
 
     uint32_t Dispatched() const {
@@ -78,7 +74,6 @@ class Hierarchy : public System {
     uint64_t m_seen = 0;
     uint32_t m_dispatched = 0;
     uint32_t m_rebuilds = 0;
-    uint32_t m_runs = 0;
 };
 
 }

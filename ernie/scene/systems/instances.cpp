@@ -641,9 +641,8 @@ std::optional<std::set<uint32_t>> Instances::Apply(const ChangeSet& changes) {
     return touched;
 }
 
-device::Operation Instances::Run(const ChangeSet& changes, Stream) {
+void Instances::Run(const ChangeSet& changes, TableLog&) {
     ERNIE_ZONE("Instances/Run");
-    ++m_runs;
     Store& store = m_catalog.GetStore();
     const uint64_t seen = store.WriteSequence();
     bool relaid = changes.resync || !m_tlas || m_catalog.CompositionVersion() != m_compositions;
@@ -742,7 +741,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     }
     m_stats.relaid = relaid;
     if (dirty.empty()) {
-        return {};
+        return;
     }
 
     std::vector<uint32_t> built;
@@ -814,7 +813,7 @@ device::Operation Instances::Run(const ChangeSet& changes, Stream) {
     if (!refit.empty()) {
         m_builder.Refit(encoder, *m_tlas, *m_records, counts, refit);
     }
-    return queue.Submit(encoder.Finish());
+    queue.Submit(encoder.Finish());
 }
 
 void Instances::Describe(RenderTables& tables) const {
@@ -824,12 +823,8 @@ void Instances::Describe(RenderTables& tables) const {
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    for (const Ref<device::Buffer>& buffer :
-         {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins, m_surfaces}) {
-        if (buffer) {
-            held.emplace_back(buffer);
-        }
-    }
+    HoldBuffers(held,
+                {m_layout, m_records, m_shapes, m_hits, m_instancing, m_renderOrigins, m_surfaces});
     if (m_tlas) {
         held.emplace_back(m_tlas);
     }

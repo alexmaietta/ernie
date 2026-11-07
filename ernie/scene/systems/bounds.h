@@ -35,11 +35,7 @@ class Bounds : public System {
     }
 
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
-
-    uint32_t Runs() const {
-        return m_runs;
-    }
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     const Ref<device::Buffer>& Boxes() const {
         return m_boxes;
@@ -52,12 +48,7 @@ class Bounds : public System {
     }
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        if (m_boxes) {
-            held.emplace_back(m_boxes);
-        }
-        if (m_boundables) {
-            held.emplace_back(m_boundables);
-        }
+        HoldBuffers(held, {m_boxes, m_boundables});
     }
 
     std::optional<BvhBox> World(uint32_t world) const;
@@ -80,7 +71,6 @@ class Bounds : public System {
     Ref<device::Buffer> m_instancerExtents;
     uint64_t m_epoch = ~uint64_t(0);
     uint32_t m_slots = 0;
-    uint32_t m_runs = 0;
 };
 
 }

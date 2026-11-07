@@ -52,11 +52,7 @@ class Geometry : public System {
     std::span<const TableId> TableOutputs() const override;
     void Describe(RenderTables& tables) const override;
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
-
-    uint32_t Runs() const {
-        return m_runs;
-    }
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     const GeometryStats& Stats() const {
         return m_stats;
@@ -127,7 +123,7 @@ class Geometry : public System {
     void Release(Mesh& mesh);
     ShapeKey Key(const Mesh& mesh) const;
     void Link(const Mesh& mesh);
-    device::Operation Update(std::vector<uint32_t>& updated);
+    void Update(std::vector<uint32_t>& updated);
 
     Catalog& m_catalog;
     bvh::Builder& m_builder;
@@ -147,7 +143,6 @@ class Geometry : public System {
     GeometryStats m_stats;
     RecordTable<MeshRecord> m_records{"mesh records"};
     std::vector<uint32_t> m_relinked;
-    uint32_t m_runs = 0;
     bool m_stale = false;
 };
 

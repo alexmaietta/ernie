@@ -44,11 +44,7 @@ class Instances : public System {
     }
 
     void Prepare() override;
-    device::Operation Run(const ChangeSet& changes, Stream stream) override;
-
-    uint32_t Runs() const {
-        return m_runs;
-    }
+    void Run(const ChangeSet& changes, TableLog& log) override;
 
     const InstanceStats& Stats() const {
         return m_stats;
@@ -179,7 +175,6 @@ class Instances : public System {
     uint64_t m_seen = 0;
     uint32_t m_worlds = 0;
     uint32_t m_relayouts = 0;
-    uint32_t m_runs = 0;
     InstanceStats m_stats;
 };
 
