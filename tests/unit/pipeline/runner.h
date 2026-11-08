@@ -25,14 +25,16 @@ struct Frame {
     std::vector<float> parameters;
     uint32_t capture = 0;
     uint32_t identity = 7;
+    uint32_t captures = 1;
+    Fusion fusion = Fusion::Fused;
 };
 
 inline std::map<std::string, std::vector<float>>
 RunPipeline(device::Device& device, const NodeRegistry& registry, const PipelineDesc& desc,
             const CameraRecord& camera, const DetectorRecord& detector, const Frame& frame) {
     const ResolvedPipeline pipeline = ResolvePipeline(desc, registry);
-    const PipelineDefinition definition =
-        BuildDefinition(uint32_t(pipeline.key.Hash() % 100000), pipeline, registry);
+    const uint32_t id = uint32_t(pipeline.key.Hash() % 100000) * 2 + uint32_t(frame.fusion);
+    const PipelineDefinition definition = BuildDefinition(id, pipeline, registry, frame.fusion);
     const GeneratedPipeline generated = GeneratePipeline(definition, registry);
     const Ref<device::Program> program =
         device.CreateProgram({.modules = {generated.module},
@@ -42,7 +44,12 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
                               .label = "test pipeline"});
     const std::vector<SignalLayout> layouts =
         PropagateLayouts(pipeline, registry, {.channels = frame.channels});
-    const uint32_t elements = frame.width * frame.height;
+    const uint32_t perCapture = frame.width * frame.height;
+    const uint32_t elements = perCapture * frame.captures;
+    std::vector<float> rates;
+    for (uint32_t capture = 0; capture < frame.captures; ++capture) {
+        rates.insert(rates.end(), frame.rates.begin(), frame.rates.end());
+    }
 
     std::vector<Ref<device::Buffer>> held;
     std::vector<PipelineValue> values;
@@ -54,7 +61,7 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
         const bool source =
             registry[pipeline.nodes[pipeline.values[value].node].def].kind == NodeKind::Source;
         const Ref<device::Buffer> buffer =
-            source ? device.CreateBuffer({.label = "rates"}, frame.rates)
+            source ? device.CreateBuffer({.label = "rates"}, rates)
                    : device.CreateBuffer({.label = "value"},
                                          std::vector<float>(size_t(elements) * channels));
         if (slot >= storedCount) {
@@ -63,12 +70,27 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
         values.push_back({buffer->Address(), channels, 0});
         held.push_back(buffer);
     }
+    std::vector<PipelineValue> slots;
+    std::vector<PipelineCapture> captures;
     std::vector<uint32_t> words;
     for (const float parameter : frame.parameters) {
         words.push_back(std::bit_cast<uint32_t>(parameter));
     }
     words.push_back(0);
     const Ref<device::Buffer> wordBuffer = device.CreateBuffer({.label = "words"}, words);
+    for (uint32_t capture = 0; capture < frame.captures; ++capture) {
+        for (PipelineValue value : values) {
+            value.address += uint64_t(capture) * perCapture * value.channels * sizeof(float);
+            slots.push_back(value);
+        }
+        captures.push_back({.firstElement = uint64_t(capture) * perCapture,
+                            .words = {wordBuffer->Address()},
+                            .width = frame.width,
+                            .height = frame.height,
+                            .capture = frame.capture + capture,
+                            .identity = frame.identity,
+                            .firstValue = uint32_t(capture * values.size())});
+    }
     const Ref<device::Buffer> cameras =
         device.CreateBuffer({.label = "cameras"}, std::vector<CameraRecord>{camera});
     const Ref<device::Buffer> detectors =
@@ -78,19 +100,13 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
     tables.detectors.address = detectors->Address();
     const Ref<device::Buffer> tableBuffer =
         device.CreateBuffer({.label = "tables"}, std::vector<RenderTables>{tables});
-    const Ref<device::Buffer> valueBuffer = device.CreateBuffer({.label = "values"}, values);
-    const std::vector<PipelineCapture> captures = {{.firstElement = 0,
-                                                    .words = {wordBuffer->Address()},
-                                                    .width = frame.width,
-                                                    .height = frame.height,
-                                                    .capture = frame.capture,
-                                                    .identity = frame.identity}};
+    const Ref<device::Buffer> valueBuffer = device.CreateBuffer({.label = "values"}, slots);
     const Ref<device::Buffer> captureBuffer = device.CreateBuffer({.label = "captures"}, captures);
     const PipelineParams params{.tables = {tableBuffer->Address()},
                                 .captures = {captureBuffer->Address()},
                                 .values = {valueBuffer->Address()},
                                 .elementCount = elements,
-                                .captureCount = 1};
+                                .captureCount = frame.captures};
     device::CommandEncoder encoder = device.GetQueue().CreateEncoder();
     for (const std::string& entry : generated.entries) {
         device::Kernel& kernel = program->Entry(entry);

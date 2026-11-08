@@ -34,7 +34,13 @@ struct ArenaLayout {
     uint64_t bytes = 0;
 };
 
-SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& registry);
+enum class Fusion : uint8_t {
+    Fused,
+    PerNode,
+};
+
+SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& registry,
+                          Fusion fusion = Fusion::Fused);
 
 ArenaLayout LayoutArena(const SegmentPlan& plan, std::span<const SignalLayout> layouts,
                         uint64_t elements);

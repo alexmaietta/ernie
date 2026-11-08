@@ -21,6 +21,6 @@ using PipelineLibrary = graph::DefinitionLibrary<PipelineDefinition>;
 using PipelineSet = graph::DefinitionSet<PipelineDefinition>;
 
 PipelineDefinition BuildDefinition(uint32_t id, const ResolvedPipeline& pipeline,
-                                   const NodeRegistry& registry);
+                                   const NodeRegistry& registry, Fusion fusion = Fusion::Fused);
 
 }

@@ -13,7 +13,8 @@ int64_t Start(uint32_t first) {
 
 }
 
-SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& registry) {
+SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& registry,
+                          Fusion fusion) {
     SegmentPlan plan;
     std::vector<uint32_t> segmentOfNode(pipeline.nodes.size(), kBeforeSegments);
     bool open = false;
@@ -22,7 +23,7 @@ SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& 
         if (kind == NodeKind::Source) {
             continue;
         }
-        if (!(open && kind == NodeKind::Point)) {
+        if (!(open && kind == NodeKind::Point && fusion == Fusion::Fused)) {
             plan.segments.push_back({kind, {}});
             open = kind == NodeKind::Point || kind == NodeKind::Stencil;
         }
