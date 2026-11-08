@@ -67,7 +67,7 @@ std::vector<RuntimeProgram> RuntimePrograms() {
           "RenderMinimalFull", "RenderRealTime", "RenderRealTimeBands", "RenderLidar",
           "RenderScatterPoints", "RenderRadar"}},
         {&kSceneKernels,
-         "ernie.scene.columns.kernels.attributes",
+         "ernie.scene.columns.kernels.cells",
          {"CopyWords", "ScatterCells", "GatherCells", "CloneRows", "FillCells", "WritePoses",
           "ReadPoses", "GatherRows"}},
         {&kSceneKernels,

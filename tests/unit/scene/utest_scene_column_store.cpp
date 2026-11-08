@@ -15,7 +15,7 @@
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/columns/column_table.h"
 #include "ernie/scene/columns/device_heap.h"
-#include "ernie/scene/columns/kernels/attributes.h"
+#include "ernie/scene/columns/kernels/cells.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/schema/columns.h"
 #include "support/devices.h"
@@ -43,7 +43,7 @@ std::vector<uint32_t> Sequence(uint32_t count, uint32_t first) {
 
 void Dispatch(device::Device& device, const char* entry, const CellsParams& params) {
     const Ref<device::Program> program =
-        device.CreateProgram({.modules = {"ernie.scene.columns.kernels.attributes"},
+        device.CreateProgram({.modules = {"ernie.scene.columns.kernels.cells"},
                               .library = &kSceneKernels,
                               .label = "store test"});
     device::Queue& queue = device.GetQueue();

@@ -22,7 +22,7 @@
 #include "ernie/scene/columns/array_pool.h"
 #include "ernie/scene/columns/column_table.h"
 #include "ernie/scene/columns/device_heap.h"
-#include "ernie/scene/columns/kernels/attributes.h"
+#include "ernie/scene/columns/kernels/cells.h"
 #include "ernie/scene/columns/kernels/changes.h"
 #include "ernie/scene/schema/schema.h"
 #include "ernie/scene/tables/kernels/authored.h"

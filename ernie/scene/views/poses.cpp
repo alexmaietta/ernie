@@ -6,7 +6,7 @@
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/columns/column_store.h"
-#include "ernie/scene/columns/kernels/attributes.h"
+#include "ernie/scene/columns/kernels/cells.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/views/layout.h"
 #include "ernie/scene/views/view_state.h"
