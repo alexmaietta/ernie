@@ -24,13 +24,13 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
         return false;
     }
 
-    const uint colorAt = slice * batch.colorWorldStride + row * batch.colorStride;
+    const uint colorIndex = slice * batch.colorWorldStride + row * batch.colorStride;
     float4 color = DecodeOverlayColor(batch.color);
     if ((batch.flags & kOverlayHasColors) != 0) {
         color = (batch.flags & kOverlayByteColors) != 0
-                    ? DecodeOverlayColor(batch.colors[colorAt])
-                    : float4(asfloat(batch.colors[colorAt]), asfloat(batch.colors[colorAt + 1]),
-                             asfloat(batch.colors[colorAt + 2]), asfloat(batch.colors[colorAt + 3]));
+                    ? DecodeOverlayColor(batch.colors[colorIndex])
+                    : float4(asfloat(batch.colors[colorIndex]), asfloat(batch.colors[colorIndex + 1]),
+                             asfloat(batch.colors[colorIndex + 2]), asfloat(batch.colors[colorIndex + 3]));
     }
     const float loadedSize = batch.sizes[slice * batch.sizeWorldStride + row * batch.sizeStride];
     const float size = (batch.flags & kOverlayHasSizes) != 0 ? loadedSize : batch.size;

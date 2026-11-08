@@ -138,15 +138,15 @@ class SoftwareBuilder final : public Builder {
             sourceOffsets.push_back(offsets[w]);
         }
         Tables tables;
-        const uint64_t sourceAt = tables.Add(sourceOffsets);
-        const uint64_t offsetsAt = tables.Add(Offsets(capacities));
-        const uint64_t worldsAt = tables.Add(selected);
+        const uint64_t sourceStart = tables.Add(sourceOffsets);
+        const uint64_t offsetsStart = tables.Add(Offsets(capacities));
+        const uint64_t worldsStart = tables.Add(selected);
         const Ref<Buffer> table = tables.Upload(m_device, "tlas world gather");
         const GatherWorldsParams params = {.source = {instances.Address()},
                                            .destination = {compact.Address()},
-                                           .sourceOffsets = {table->Address() + sourceAt},
-                                           .offsets = {table->Address() + offsetsAt},
-                                           .worlds = {table->Address() + worldsAt},
+                                           .sourceOffsets = {table->Address() + sourceStart},
+                                           .offsets = {table->Address() + offsetsStart},
+                                           .worlds = {table->Address() + worldsStart},
                                            .counts = {counts ? counts->Address() : 0},
                                            .gatheredCounts = {compactCounts.Address()},
                                            .total = uint32_t(Total(capacities)),
@@ -221,21 +221,21 @@ class SoftwareBuilder final : public Builder {
         const uint32_t nodes = nodeOffsets.back();
 
         Tables tables;
-        const uint64_t headersAt = tables.Add(headers);
-        const uint64_t geometriesAt = tables.Add(geometries);
-        const uint64_t instanceOffsetsAt = tables.Add(instanceOffsets);
-        const uint64_t nodeOffsetsAt = tables.Add(nodeOffsets);
+        const uint64_t headersStart = tables.Add(headers);
+        const uint64_t geometriesStart = tables.Add(geometries);
+        const uint64_t instanceOffsetsStart = tables.Add(instanceOffsets);
+        const uint64_t nodeOffsetsStart = tables.Add(nodeOffsets);
         const Ref<Buffer> table = tables.Upload(m_device, "bvh refit tables");
 
         const uint64_t bytes = uint64_t(nodes) * 16 * sizeof(uint32_t);
         const uint64_t base =
             Reserve(m_device, m_refitScratch, {.bytes = bytes, .label = "bvh refit scratch"})
                 .Address();
-        const RefitParams params = {.headers = {table->Address() + headersAt},
+        const RefitParams params = {.headers = {table->Address() + headersStart},
                                     .instances = {instances},
-                                    .instanceOffsets = {table->Address() + instanceOffsetsAt},
-                                    .geometries = {table->Address() + geometriesAt},
-                                    .nodeOffsets = {table->Address() + nodeOffsetsAt},
+                                    .instanceOffsets = {table->Address() + instanceOffsetsStart},
+                                    .geometries = {table->Address() + geometriesStart},
+                                    .nodeOffsets = {table->Address() + nodeOffsetsStart},
                                     .parents = {base},
                                     .arrivals = {base + uint64_t(nodes) * sizeof(uint32_t)},
                                     .boxes = {base + uint64_t(nodes) * 2 * sizeof(uint32_t)},

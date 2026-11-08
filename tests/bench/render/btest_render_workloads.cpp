@@ -32,7 +32,7 @@ double Since(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
-device::Traversal TraversalOf(int64_t hardware) {
+device::Traversal SelectTraversal(int64_t hardware) {
     return hardware != 0 ? device::Traversal::Hardware : device::Traversal::Software;
 }
 
@@ -199,7 +199,7 @@ void Run(benchmark::State& state, const std::string& key, const std::function<Se
 void Cameras(benchmark::State& state) {
     const auto cameras = uint32_t(state.range(0));
     const auto side = uint32_t(state.range(1));
-    const device::Traversal traversal = TraversalOf(state.range(2));
+    const device::Traversal traversal = SelectTraversal(state.range(2));
     Run(state, fmt::format("cameras/{}/{}/{}", cameras, side, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
@@ -250,7 +250,7 @@ const Mix kMixes[] = {
 
 void Mixed(benchmark::State& state, const Mix& mix) {
     const auto worlds = uint32_t(state.range(0));
-    const device::Traversal traversal = TraversalOf(state.range(1));
+    const device::Traversal traversal = SelectTraversal(state.range(1));
     Run(state, fmt::format("mixed/{}/{}/{}", mix.name, worlds, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
@@ -290,7 +290,7 @@ void Mixed(benchmark::State& state, const Mix& mix) {
 
 void Lights(benchmark::State& state) {
     const auto lights = uint32_t(state.range(0));
-    const device::Traversal traversal = TraversalOf(state.range(1));
+    const device::Traversal traversal = SelectTraversal(state.range(1));
     Run(state, fmt::format("lights/{}/{}", lights, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
@@ -316,7 +316,7 @@ constexpr uint32_t kTiles = 4;
 void SceneSize(benchmark::State& state) {
     const auto triangles = uint64_t(state.range(0));
     const bool instanced = state.range(1) != 0;
-    const device::Traversal traversal = TraversalOf(state.range(2));
+    const device::Traversal traversal = SelectTraversal(state.range(2));
     const auto cells = uint32_t(std::lround(std::sqrt(double(triangles) / (kTiles * kTiles * 2))));
     state.counters["triangles"] = double(kTiles * kTiles) * cells * cells * 2;
     Run(state, fmt::format("size/{}/{}/{}", triangles, instanced, int(traversal)), [&] {
@@ -379,7 +379,7 @@ std::string TextureFile(uint32_t index) {
 void Materials(benchmark::State& state) {
     const auto materials = uint32_t(state.range(0));
     const bool textured = state.range(1) != 0;
-    const device::Traversal traversal = TraversalOf(state.range(2));
+    const device::Traversal traversal = SelectTraversal(state.range(2));
     Run(state, fmt::format("materials/{}/{}/{}", materials, textured, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<Scope>("/Looks");

@@ -216,10 +216,10 @@ void InstanceTable::Relayout() {
         words.insert(words.end(), values.begin(), values.end());
         return at;
     };
-    const uint64_t firstAt = append(m_regions.Starts());
-    const uint64_t countsAt = append(m_regions.Counts());
-    const uint64_t primsAt = append(m_regions.Items());
-    const uint64_t originsAt = append(origins);
+    const uint64_t firstInstancesStart = append(m_regions.Starts());
+    const uint64_t countsStart = append(m_regions.Counts());
+    const uint64_t primsStart = append(m_regions.Items());
+    const uint64_t originsStart = append(origins);
     std::vector<uint32_t> bases(m_worlds + 1, kNoRow);
     std::vector<uint32_t> offsets;
     for (const auto& [world, desc] : m_composed) {
@@ -235,18 +235,18 @@ void InstanceTable::Relayout() {
         const auto* words32 = reinterpret_cast<const uint32_t*>(shifts.data());
         offsets.insert(offsets.end(), words32, words32 + shifts.size() * 3);
     }
-    const uint64_t basesAt = append(bases);
-    const uint64_t offsetsAt = append(offsets);
+    const uint64_t basesStart = append(bases);
+    const uint64_t offsetsStart = append(offsets);
     m_layout =
         device.CreateBuffer({.bytes = words.size() * sizeof(uint32_t), .label = "instance layout"});
     device.GetQueue().Write(*m_layout, words.data());
     const uint64_t layout = m_layout->Address();
-    m_header.firstInstances.address = layout + firstAt;
-    m_header.instanceCounts.address = layout + countsAt;
-    m_header.instancePrims.address = layout + primsAt;
-    m_header.worldOrigins.address = layout + originsAt;
-    m_header.offsetBases.address = layout + basesAt;
-    m_header.offsets.address = layout + offsetsAt;
+    m_header.firstInstances.address = layout + firstInstancesStart;
+    m_header.instanceCounts.address = layout + countsStart;
+    m_header.instancePrims.address = layout + primsStart;
+    m_header.worldOrigins.address = layout + originsStart;
+    m_header.offsetBases.address = layout + basesStart;
+    m_header.offsets.address = layout + offsetsStart;
     m_viewers = device.CreateBuffer(
         {.label = "viewers"},
         std::span<const uint32_t>(std::vector<uint32_t>(m_worlds + 1, kNoPrim)));
@@ -447,20 +447,20 @@ void InstanceTable::BuildInstancing() {
         tables.insert(tables.end(), bytes.begin(), bytes.end());
         return at;
     };
-    const uint64_t blocksAt = table(blocks);
-    const uint64_t entriesAt = table(entries);
-    const uint64_t piecesAt = table(pieces);
-    const uint64_t rangesAt = table(ranges);
-    const uint64_t hiddenAt = table(hidden);
+    const uint64_t blocksStart = table(blocks);
+    const uint64_t entriesStart = table(entries);
+    const uint64_t piecesStart = table(pieces);
+    const uint64_t rangesStart = table(ranges);
+    const uint64_t hiddenStart = table(hidden);
     tables.resize(std::max<size_t>(RoundUp(tables.size(), 16), 16));
     m_instancing =
         store.GetDevice().CreateBuffer({.label = "instancers"}, std::span<const std::byte>(tables));
     const uint64_t instancing = m_instancing->Address();
-    m_header.blocks.address = instancing + blocksAt;
-    m_header.prototypes.address = instancing + entriesAt;
-    m_header.pieces.address = instancing + piecesAt;
-    m_header.hiddenRanges.address = instancing + rangesAt;
-    m_header.hiddenIds = instancing + hiddenAt;
+    m_header.blocks.address = instancing + blocksStart;
+    m_header.prototypes.address = instancing + entriesStart;
+    m_header.pieces.address = instancing + piecesStart;
+    m_header.hiddenRanges.address = instancing + rangesStart;
+    m_header.hiddenIds = instancing + hiddenStart;
 }
 
 void InstanceTable::WriteLayoutHeader() {

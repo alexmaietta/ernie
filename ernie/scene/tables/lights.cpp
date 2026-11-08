@@ -337,7 +337,7 @@ void LightTable::Relayout() {
             }
         }
     }
-    const uint64_t copiesAt = append(copies);
+    const uint64_t copiesStart = append(copies);
     const uint64_t offsetBases = append(bases);
     const uint64_t offsets =
         append(std::span(reinterpret_cast<const uint32_t*>(shifts.data()), shifts.size() * 3));
@@ -356,7 +356,7 @@ void LightTable::Relayout() {
     layout.domeSlots.address = m_layout->Address() + domeSlots;
     layout.offsetBases.address = m_layout->Address() + offsetBases;
     layout.offsets.address = m_layout->Address() + offsets;
-    layout.copies.address = m_layout->Address() + copiesAt;
+    layout.copies.address = m_layout->Address() + copiesStart;
     layout.worldCount = m_worlds;
     layout.domeCount = m_domes;
     std::memcpy(words.data(), &layout, sizeof(layout));

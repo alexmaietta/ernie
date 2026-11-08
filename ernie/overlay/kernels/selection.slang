@@ -60,8 +60,8 @@ void OutlineOverlays(uniform OverlayParams p) {
         return;
     }
     const uint index = view.PixelIndex(uint2(pixel));
-    const uint centreAt = MaskIndex(view, uint2(pixel));
-    const uint centreMask = view.mask[centreAt];
+    const uint centreIndex = MaskIndex(view, uint2(pixel));
+    const uint centreMask = view.mask[centreIndex];
     float4 under = float4(0);
     for (uint at = 0; at < min(p.outlineCount, 32u); ++at) {
         const OverlayOutline outline = p.outlines[at];
@@ -81,15 +81,15 @@ void OutlineOverlays(uniform OverlayParams p) {
                     continue;
                 }
                 const uint2 other = uint2(clamp(pixel + int2(dx, dy), int2(0), size - 1));
-                const uint otherAt = MaskIndex(view, other);
-                if (((view.mask[otherAt] & bit) != 0) == centre) {
+                const uint otherIndex = MaskIndex(view, other);
+                if (((view.mask[otherIndex] & bit) != 0) == centre) {
                     continue;
                 }
                 const uint2 inside = centre ? uint2(pixel) : other;
                 const float sceneDepth = view.depth[view.PixelIndex(inside)];
                 nearest = distance;
                 hidden = sceneDepth != view.missDistance &&
-                         view.maskDepth[centre ? centreAt : otherAt] >
+                         view.maskDepth[centre ? centreIndex : otherIndex] >
                              sceneDepth * (1 + kDepthSlack);
             }
         }

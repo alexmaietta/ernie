@@ -126,9 +126,9 @@ void ArrayPool::Free(const ArrayRef& array) {
     if (--entry.references > 0) {
         return;
     }
-    if (const auto staged = m_stagedAt.find(array.address); staged != m_stagedAt.end()) {
+    if (const auto staged = m_stagedIndices.find(array.address); staged != m_stagedIndices.end()) {
         m_staged[staged->second].bytes = 0;
-        m_stagedAt.erase(staged);
+        m_stagedIndices.erase(staged);
     }
     Run& run = m_runs[entry.run];
     if (--run.live == 0) {
@@ -168,10 +168,10 @@ void ArrayPool::Stage(const ArrayRef& array, std::span<const std::byte> bytes) {
         throw Error("{} bytes for an array of {} {}-byte items", bytes.size(), array.capacity,
                     m_itemBytes);
     }
-    if (const auto staged = m_stagedAt.find(array.address); staged != m_stagedAt.end()) {
+    if (const auto staged = m_stagedIndices.find(array.address); staged != m_stagedIndices.end()) {
         m_staged[staged->second].bytes = 0;
     }
-    m_stagedAt[array.address] = m_staged.size();
+    m_stagedIndices[array.address] = m_staged.size();
     m_staged.push_back({array, m_stagedBytes.size(), bytes.size()});
     m_stagedBytes.insert(m_stagedBytes.end(), bytes.begin(), bytes.end());
 }
@@ -186,7 +186,7 @@ std::vector<ArrayPool::StagedCopy> ArrayPool::TakeStaged(uint64_t base) {
     }
     m_staged.clear();
     m_stagedBytes.clear();
-    m_stagedAt.clear();
+    m_stagedIndices.clear();
     return copies;
 }
 
@@ -198,7 +198,7 @@ std::vector<std::byte> ArrayPool::Read(const ArrayRef& array) {
     }
     m_staged.clear();
     m_stagedBytes.clear();
-    m_stagedAt.clear();
+    m_stagedIndices.clear();
     std::vector<std::byte> bytes(size_t(array.count) * m_itemBytes);
     if (!bytes.empty()) {
         m_heap.GetDevice().GetQueue().Read(Range(array).Slice(0, bytes.size()), bytes.data());

@@ -79,7 +79,7 @@ class ArrayPool {
     std::unordered_map<uint64_t, Entry> m_arrays;
     std::vector<Staged> m_staged;
     std::vector<std::byte> m_stagedBytes;
-    std::unordered_map<uint64_t, size_t> m_stagedAt;
+    std::unordered_map<uint64_t, size_t> m_stagedIndices;
 };
 
 }

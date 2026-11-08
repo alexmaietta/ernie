@@ -760,7 +760,7 @@ Prim Scene::Paste(const PrimCopy& copy, std::string_view path) {
         throw Error("Pasting an empty copy at \"{}\"", path);
     }
     const PrimCopy::State& state = *copy.m_state;
-    const auto pathOf = [&](const CopiedPrim& copied) {
+    const auto pastedPath = [&](const CopiedPrim& copied) {
         return copied.relative.empty() ? std::string(path)
                                        : std::string(path) + "/" + copied.relative;
     };
@@ -768,7 +768,7 @@ Prim Scene::Paste(const PrimCopy& copy, std::string_view path) {
     std::vector<Prim> pasted;
     try {
         for (const CopiedPrim& copied : state.prims) {
-            const Prim prim = Define(pathOf(copied), copied.schema);
+            const Prim prim = Define(pastedPath(copied), copied.schema);
             pasted.push_back(prim);
             for (const SchemaId api : kApiSchemas) {
                 if (HasApi(copied.apis, api) && !IsMultipleApi(api) && !prim.HasApi(api)) {

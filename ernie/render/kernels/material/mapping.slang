@@ -234,17 +234,17 @@ struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
         maxAnisotropy = query.maxAnisotropy;
     }
 
-    uint64_t HandleAt(Ptr<TextureInput> input) {
+    uint64_t TextureHandle(Ptr<TextureInput> input) {
         return uint64_t(input) == 0 ? 0 : input.handle;
     }
 
     uint64_t Handle(uint input) {
-        return uint64_t(inputs) == 0 ? 0 : HandleAt(inputs + input);
+        return uint64_t(inputs) == 0 ? 0 : TextureHandle(inputs + input);
     }
 
     [mutating]
     void SetNormal(Ptr<TextureInput> input, float3 value, float strength) {
-        normalHandle = HandleAt(input);
+        normalHandle = TextureHandle(input);
         normalValue = value;
         normalStrength = strength;
         if (normalHandle != 0) {

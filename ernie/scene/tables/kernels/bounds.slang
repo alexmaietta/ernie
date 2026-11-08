@@ -76,10 +76,10 @@ void PrimBounds(uniform BoundsParams p) {
     p.primBounds[prim].upper = Float3(upper);
 }
 
-void Grow(Ptr<uint> extents, uint lowerAt, uint upperAt, float3 lower, float3 upper) {
+void Grow(Ptr<uint> extents, uint lowerIndex, uint upperIndex, float3 lower, float3 upper) {
     for (uint axis = 0; axis < 3; ++axis) {
-        InterlockedMin(extents[lowerAt + axis], OrderedFloat(lower[axis]));
-        InterlockedMax(extents[upperAt + axis], OrderedFloat(upper[axis]));
+        InterlockedMin(extents[lowerIndex + axis], OrderedFloat(lower[axis]));
+        InterlockedMax(extents[upperIndex + axis], OrderedFloat(upper[axis]));
     }
 }
 
