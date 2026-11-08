@@ -24,6 +24,8 @@ constexpr uint32_t kCells = 32;
 constexpr uint32_t kFrames = 2;
 constexpr uint32_t kWarmup = 3;
 constexpr size_t kHistory = 32;
+constexpr double kMinTime = 0.2;
+constexpr int64_t kEditedPlans = 20;
 
 std::vector<Float3> Wave(double phase) {
     std::vector<Float3> points;
@@ -203,7 +205,7 @@ const Edit kEdits[] = {
      }},
     {"spawn",
      [](Setup& s) {
-         if (s.step % 2 == 1) {
+         if (!s.scene->Find(s.spawned.front())) {
              s.scene->Define<Cube>(Span<const std::string>(s.spawned), {.size = 0.5});
          } else {
              for (const std::string& path : s.spawned) {
@@ -337,21 +339,36 @@ const bool kCore =
     bench::Core("^Scene/Plan/products:64/");
 
 const bool kRegistered = [] {
-    for (const Edit& edit : kEdits) {
-        benchmark::RegisterBenchmark(std::format("Scene/Publish/{}", edit.name), Publish, edit)
-            ->ArgNames({"worlds", "dome"})
-            ->ArgsProduct({{1, 64, 1024, 4096}, {0, 1}})
-            ->UseRealTime()
-            ->Unit(benchmark::kMillisecond);
+    for (const int64_t worlds : {1, 64, 1024, 4096}) {
+        for (const int64_t dome : {0, 1}) {
+            for (const Edit& edit : kEdits) {
+                benchmark::RegisterBenchmark(std::format("Scene/Publish/{}", edit.name), Publish,
+                                             edit)
+                    ->ArgNames({"worlds", "dome"})
+                    ->Args({worlds, dome})
+                    ->MinTime(kMinTime)
+                    ->UseRealTime()
+                    ->Unit(benchmark::kMillisecond);
+            }
+        }
     }
-    benchmark::RegisterBenchmark("Scene/Plan", Plan)
-        ->ArgNames({"products", "edited"})
-        ->ArgsProduct({{1, 64, 1024}, {0, 1}})
-        ->Unit(benchmark::kMicrosecond);
-    benchmark::RegisterBenchmark("Scene/Schedule", Schedule)
-        ->ArgNames({"products"})
-        ->ArgsProduct({{1, 64, 1024}})
-        ->Unit(benchmark::kMicrosecond);
+    for (const int64_t products : {1, 64, 256}) {
+        benchmark::RegisterBenchmark("Scene/Plan", Plan)
+            ->ArgNames({"products", "edited"})
+            ->Args({products, 0})
+            ->MinTime(kMinTime)
+            ->Unit(benchmark::kMicrosecond);
+        benchmark::RegisterBenchmark("Scene/Plan", Plan)
+            ->ArgNames({"products", "edited"})
+            ->Args({products, 1})
+            ->Iterations(kEditedPlans)
+            ->Unit(benchmark::kMicrosecond);
+        benchmark::RegisterBenchmark("Scene/Schedule", Schedule)
+            ->ArgNames({"products"})
+            ->Args({products})
+            ->MinTime(kMinTime)
+            ->Unit(benchmark::kMicrosecond);
+    }
     return true;
 }();
 
