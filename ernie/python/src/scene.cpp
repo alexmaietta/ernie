@@ -19,6 +19,7 @@
 #include <nanobind/stl/vector.h>
 
 #include "ernie/device/queue.h"
+#include "ernie/render/shaders.h"
 #include "ernie/scene/views/poses.h"
 #include "values.h"
 
@@ -405,13 +406,6 @@ SchemaId DefinedSchema(std::string_view name, const std::optional<nb::dict>& val
     return shader;
 }
 
-ScenePrim Define(Ref<Scene> scene, std::string_view path, std::string_view name,
-                 std::optional<nb::dict> values, std::optional<nb::dict> apis) {
-    const Prim prim = DefineSchema(*scene, path, DefinedSchema(name, values),
-                                   values ? *values : nb::dict(), apis ? *apis : nb::dict());
-    return {std::move(scene), prim};
-}
-
 std::vector<Prim> Handles(std::span<const ScenePrim> prims) {
     std::vector<Prim> handles;
     handles.reserve(prims.size());
@@ -440,6 +434,19 @@ SceneSelection DefineBatch(Ref<Scene> scene, const std::vector<std::string>& pat
         }
     }
     return defined;
+}
+
+ScenePrim Define(Ref<Scene> scene, std::string_view path, std::string_view name,
+                 std::optional<nb::dict> values, std::optional<nb::dict> apis) {
+    const SchemaId schema = DefinedSchema(name, values);
+    if (IsRuntime(schema)) {
+        DefineBatch(scene, {std::string(path)}, name, values, apis, false);
+        const std::optional<Prim> prim = scene->Find(path);
+        return {std::move(scene), *prim};
+    }
+    const Prim prim = DefineSchema(*scene, path, schema, values ? *values : nb::dict(),
+                                   apis ? *apis : nb::dict());
+    return {std::move(scene), prim};
 }
 
 Interpolation FindInterpolation(std::string_view name) {
@@ -523,6 +530,10 @@ void RegisterScene(nb::module_& module) {
              nb::arg("device") = nb::none(), nb::kw_only(),
              nb::arg("traversal") = device::Traversal::Auto,
              nb::arg("max_refits") = SceneDesc{}.maxRefits, nb::arg("wait_for_kernels") = true)
+        .def(
+            "load_shaders",
+            [](Ref<Scene> scene, const std::string& path) { return LoadShaders(*scene, path); },
+            nb::arg("path"))
         .def("define", &Define, nb::arg("path"), nb::arg("schema"), nb::arg("values") = nb::none(),
              nb::kw_only(), nb::arg("apis") = nb::none())
         .def("define", &DefineBatch, nb::arg("paths"), nb::arg("schema"),

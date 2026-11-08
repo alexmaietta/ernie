@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <span>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/material/definition.h"
+#include "ernie/material/node.h"
 #include "ernie/scene/records/materials.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"
@@ -79,9 +81,20 @@ class MaterialTable : public Table {
         uint32_t destination = 0;
     };
 
+    struct Carry {
+        uint32_t from = 0;
+        uint32_t to = 0;
+        uint32_t words = 0;
+    };
+
     void Resolve();
     void ResolveMaterial(uint32_t material);
     void ResolvePreview(uint32_t material, uint32_t shader);
+    void ResolveNode(uint32_t material, uint32_t shader, const NodeDefinition& node);
+    bool BindTexture(uint32_t shader, const Connection& connection, std::string_view input,
+                     bool color, uint32_t slot, TextureChannel& channel);
+    void CarryPrevious(const std::vector<MaterialRecord>& before);
+    void Define(uint32_t material, uint32_t definition, uint32_t words);
     void ResolvePlacement(uint32_t placement, uint32_t mapping);
     std::vector<Connection> Connections(uint32_t prim);
     void CopyCell(ColumnRef column, uint32_t prim, uint32_t destination);
@@ -97,6 +110,16 @@ class MaterialTable : public Table {
     std::vector<Copy> m_copies;
     std::vector<Literal> m_literals;
     std::vector<Binding> m_bindings;
+    std::vector<Carry> m_carries;
+    Ref<device::Buffer> m_carried;
+    std::map<std::string, DefinitionModule, std::less<>> m_library;
+    std::map<uint32_t, uint32_t> m_definitionWords = {
+        {kDefinitionPreviewConstant, uint32_t(sizeof(PreviewParams) / sizeof(uint32_t))},
+        {kDefinitionPreviewTextured, uint32_t(sizeof(PreviewParams) / sizeof(uint32_t))}};
+    uint32_t m_nextDefinition = kFirstGeneratedDefinition;
+    std::vector<uint32_t> m_generations;
+    mutable std::vector<ColumnRef> m_inputs;
+    mutable uint32_t m_inputSchemas = 0;
     uint32_t m_wordCount = 0;
     uint32_t m_resolves = 0;
     DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();

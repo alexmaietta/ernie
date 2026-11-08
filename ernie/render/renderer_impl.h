@@ -65,7 +65,7 @@ class RendererImpl {
         std::vector<OwnedVar> vars;
         std::vector<OwnedOverlay> overlays;
         std::vector<OwnedCloud> clouds;
-        std::map<uint32_t, uint64_t> traced;
+        std::map<uint32_t, std::pair<uint64_t, uint64_t>> traced;
         bool outlined = false;
     };
 
@@ -97,6 +97,7 @@ class RendererImpl {
     std::chrono::steady_clock::time_point m_pendingStart;
     std::set<std::string, std::less<>> m_usedEntries;
     uint64_t m_failedHash = 0;
+    uint64_t m_kernels = 0;
 
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;

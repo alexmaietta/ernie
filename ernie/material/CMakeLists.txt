@@ -3,6 +3,7 @@ ernie_object_library(
     ernie_material
     codegen.cpp
     definition.cpp
+    node.cpp
 )
 target_link_libraries(ernie_material PUBLIC ernie_util)
 

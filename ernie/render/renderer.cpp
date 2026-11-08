@@ -72,6 +72,16 @@ device::Kernel& RendererImpl::RenderEntry(std::string_view name) {
     if (!m_usedEntries.contains(name)) {
         m_usedEntries.emplace(name);
     }
+    if (m_pendingProgram) {
+        device::Kernel& pending = m_pendingProgram->Entry(name);
+        if (SceneImpl::Get(*m_scene).WaitsForKernels() || pending.Ready()) {
+            try {
+                pending.Wait();
+                return pending;
+            } catch (const std::exception&) {
+            }
+        }
+    }
     return m_renderProgram->Entry(name);
 }
 
@@ -91,6 +101,10 @@ void RendererImpl::UpdateRenderProgram() {
             Counted(definitions->Definitions().size(), "generated material definition"));
     }
     if (!m_pendingProgram) {
+        return;
+    }
+    ++m_kernels;
+    if (m_usedEntries.empty()) {
         return;
     }
     const bool wait = SceneImpl::Get(*m_scene).WaitsForKernels();
@@ -200,7 +214,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    const uint64_t runs = snapshot.Version();
+    const std::pair<uint64_t, uint64_t> runs = {snapshot.Version(), m_kernels};
     std::set<uint32_t> stale;
     for (const uint32_t prim : due) {
         if (const auto traced = set.traced.find(prim);

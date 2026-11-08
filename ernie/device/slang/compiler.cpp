@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/slang/compiler.h"
+#include "ernie/device/slang/reflection.h"
 
 #include <algorithm>
 #include <charconv>
@@ -346,6 +347,136 @@ LinkedKernel Link(slang::ISession& session, std::span<slang::IComponentType* con
     }
     return kernel;
 }
+
+std::optional<FieldType> ReflectedType(slang::TypeReflection* type) {
+    const slang::TypeReflection::Kind kind = type->getKind();
+    const SlangScalarType scalar = SlangScalarType(type->getScalarType());
+    if (kind == slang::TypeReflection::Kind::Scalar) {
+        switch (scalar) {
+        case SLANG_SCALAR_TYPE_BOOL:
+            return FieldType::Bool;
+        case SLANG_SCALAR_TYPE_INT32:
+            return FieldType::Int;
+        case SLANG_SCALAR_TYPE_FLOAT32:
+            return FieldType::Float;
+        default:
+            return std::nullopt;
+        }
+    }
+    if (kind == slang::TypeReflection::Kind::Vector && scalar == SLANG_SCALAR_TYPE_FLOAT32) {
+        switch (type->getElementCount()) {
+        case 2:
+            return FieldType::Float2;
+        case 3:
+            return FieldType::Float3;
+        case 4:
+            return FieldType::Float4;
+        default:
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+uint32_t FieldBytes(FieldType type) {
+    switch (type) {
+    case FieldType::Float2:
+        return 8;
+    case FieldType::Float3:
+        return 12;
+    case FieldType::Float4:
+        return 16;
+    default:
+        return 4;
+    }
+}
+
+bool IsMaterialMethod(slang::DeclReflection* decl) {
+    if (decl->getKind() != slang::DeclReflection::Kind::Func) {
+        return false;
+    }
+    slang::FunctionReflection* function = decl->asFunction();
+    return function != nullptr && std::string_view(function->getName()) == "Material" &&
+           function->getParameterCount() == 2;
+}
+
+std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::DeclReflection* decl,
+                                         std::string_view label) {
+    bool material = false;
+    for (slang::DeclReflection* child : decl->getChildren()) {
+        material = material || IsMaterialMethod(child);
+    }
+    if (!material) {
+        return std::nullopt;
+    }
+    ReflectedNode node{.name = decl->getName()};
+    for (slang::DeclReflection* child : decl->getChildren()) {
+        if (child->getKind() != slang::DeclReflection::Kind::Variable) {
+            continue;
+        }
+        slang::VariableReflection* variable = child->asVariable();
+        if (variable->findModifier(slang::Modifier::Static) != nullptr ||
+            variable->findModifier(slang::Modifier::Const) != nullptr) {
+            continue;
+        }
+        const std::optional<FieldType> type = ReflectedType(variable->getType());
+        if (!type) {
+            throw Error("{}'s input {} in {} has type {}, but material inputs are bool, int, "
+                        "float, float2, float3 or float4",
+                        node.name, variable->getName(), label, variable->getType()->getName());
+        }
+        ReflectedField field{.name = variable->getName(), .type = *type};
+        field.fallback.assign(FieldBytes(*type), std::byte{0});
+        ComPtr<ISlangBlob> fallback;
+        if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(fallback.writeRef())) && fallback &&
+            fallback->getBufferSize() >= field.fallback.size()) {
+            std::memcpy(field.fallback.data(), fallback->getBufferPointer(), field.fallback.size());
+        }
+        SlangSession* session = &global;
+        field.color = variable->findUserAttributeByName(session, "Color") != nullptr;
+        if (slang::Attribute* input = variable->findUserAttributeByName(session, "Input")) {
+            input->getArgumentValueFloat(0, &field.minimum);
+            input->getArgumentValueFloat(1, &field.maximum);
+        }
+        if (slang::Attribute* named = variable->findUserAttributeByName(session, "DisplayName")) {
+            size_t size = 0;
+            if (const char* text = named->getArgumentValueString(0, &size)) {
+                field.displayName.assign(text, size);
+            }
+        }
+        node.fields.push_back(std::move(field));
+    }
+    return node;
+}
+
+}
+
+std::vector<ReflectedNode> ReflectMaterialNodes(Backend backend, const KernelLibrary* library,
+                                                const SourceFiles& sources, std::string_view module,
+                                                std::string_view label) {
+    slang::IGlobalSession& global = GlobalSession();
+    ModuleFiles files(library, sources);
+    ComPtr<slang::ISession> session = CreateSession(global, backend, Traversal::Software,
+                                                    Sampling::Software, false, files, label, false);
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* loaded =
+        session->loadModule(std::string(module).c_str(), diagnostics.writeRef());
+    if (loaded == nullptr) {
+        Fail(std::format("Loading {}", label), label, diagnostics);
+    }
+    std::vector<ReflectedNode> nodes;
+    for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
+        if (decl->getKind() != slang::DeclReflection::Kind::Struct) {
+            continue;
+        }
+        if (std::optional<ReflectedNode> node = ReflectNode(global, decl, label)) {
+            nodes.push_back(std::move(*node));
+        }
+    }
+    return nodes;
+}
+
+namespace {
 
 KernelCode CompileWithSlang(Backend backend, Traversal traversal, Sampling sampling, bool debugInfo,
                             const KernelLibrary* library, const SourceFiles& sources,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/tables/materials.h"
 
+#include <set>
+
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -8,6 +10,7 @@
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
+#include "ernie/material/codegen.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
@@ -89,8 +92,18 @@ bool Restructured(const ChangeSet& changes) {
 }
 
 std::span<const ColumnRef> MaterialTable::Inputs() const {
-    static const std::vector<ColumnRef> inputs = MaterialInputs();
-    return inputs;
+    if (m_inputSchemas != SchemaCount()) {
+        m_inputs = MaterialInputs();
+        for (uint32_t index = uint32_t(SchemaId::Count); index < SchemaCount(); ++index) {
+            const SchemaId schema = SchemaId(index);
+            const Span<const ColumnInfo> columns = Columns(schema);
+            for (uint32_t column = 0; column < columns.size(); ++column) {
+                m_inputs.push_back({schema, &columns[column], column});
+            }
+        }
+        m_inputSchemas = SchemaCount();
+    }
+    return m_inputs;
 }
 
 void MaterialTable::Describe(RenderTables& tables) const {
@@ -255,27 +268,12 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
             continue;
         }
         const uint32_t texture = found->source;
-        if (texture == kNoPrim || prims.Record(texture).schema != SchemaId::UsdUVTexture) {
-            Log(LogLevel::Warning,
-                "{}'s {} connects to {}, which isn't a UsdUVTexture; the input keeps its value",
-                paths.Path(shader), kPreviewInputNames[input],
-                texture == kNoPrim ? std::string("nothing") : paths.Path(texture));
-            unbound();
-            continue;
-        }
         TextureChannel channel = TextureChannel::Rgb;
-        if (!Channel(found->output, ColorInput(input), channel)) {
-            Log(LogLevel::Warning,
-                "{}'s {} reads output {} of {}, which isn't rgb, r, g, b or a; the input keeps "
-                "its value",
-                paths.Path(shader), kPreviewInputNames[input], found->output, paths.Path(texture));
+        if (!BindTexture(shader, *found, kPreviewInputNames[input], ColorInput(input), at(slot),
+                         channel)) {
             unbound();
             continue;
         }
-        m_bindings.push_back({texture, at(slot + offsetof(TextureInput, handle))});
-        m_literals.push_back({at(slot + offsetof(TextureInput, channel)), uint32_t(channel)});
-        CopyCell(kUsdUVTextureScale, texture, at(slot + offsetof(TextureInput, scale)));
-        CopyCell(kUsdUVTextureBias, texture, at(slot + offsetof(TextureInput, bias)));
         ++textured;
         if (input == uint32_t(PreviewInput::DetailNormal) ||
             input == uint32_t(PreviewInput::DetailAlbedo)) {
@@ -298,15 +296,123 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
         }
     }
     ResolvePlacement(placement, at(offsetof(PreviewParams, mapping)));
-    const uint32_t definition =
-        textured > 0 ? kDefinitionPreviewTextured : kDefinitionPreviewConstant;
-    m_records.Set(material, {.definition = definition,
-                             .words = base,
-                             .previousDefinition = kDefinitionPlaceholder,
-                             .previousWords = 0});
+    Define(material, textured > 0 ? kDefinitionPreviewTextured : kDefinitionPreviewConstant, base);
     Log(LogLevel::Debug, "{} shades with {} through {}, with {} textures in {} words",
         paths.Path(material), textured > 0 ? "a textured UsdPreviewSurface" : "UsdPreviewSurface",
         paths.Path(shader), textured, Word(sizeof(PreviewParams)));
+}
+
+bool MaterialTable::BindTexture(uint32_t shader, const Connection& connection,
+                                std::string_view input, bool color, uint32_t slot,
+                                TextureChannel& channel) {
+    const Prims& prims = m_structure.GetPrims();
+    const Paths& paths = m_structure.GetPaths();
+    const uint32_t texture = connection.source;
+    if (texture == kNoPrim || prims.Record(texture).schema != SchemaId::UsdUVTexture) {
+        Log(LogLevel::Warning,
+            "{}'s {} connects to {}, which isn't a UsdUVTexture; the input keeps its value",
+            paths.Path(shader), input,
+            texture == kNoPrim ? std::string("nothing") : paths.Path(texture));
+        return false;
+    }
+    if (!Channel(connection.output, color, channel)) {
+        Log(LogLevel::Warning,
+            "{}'s {} reads output {} of {}, which isn't rgb, r, g, b or a; the input keeps "
+            "its value",
+            paths.Path(shader), input, connection.output, paths.Path(texture));
+        return false;
+    }
+    if (slot == kNoPrim) {
+        return true;
+    }
+    m_bindings.push_back({texture, slot + Word(offsetof(TextureInput, handle))});
+    m_literals.push_back({slot + Word(offsetof(TextureInput, channel)), uint32_t(channel)});
+    CopyCell(kUsdUVTextureScale, texture, slot + Word(offsetof(TextureInput, scale)));
+    CopyCell(kUsdUVTextureBias, texture, slot + Word(offsetof(TextureInput, bias)));
+    return true;
+}
+
+void MaterialTable::Define(uint32_t material, uint32_t definition, uint32_t words) {
+    m_records.Set(material, {.definition = definition,
+                             .words = words,
+                             .previousDefinition = kDefinitionPlaceholder,
+                             .previousWords = 0});
+}
+
+void MaterialTable::ResolveNode(uint32_t material, uint32_t shader, const NodeDefinition& node) {
+    const Paths& paths = m_structure.GetPaths();
+    const std::vector<Connection> connections = Connections(shader);
+    std::vector<const Connection*> sources(node.inputs.size(), nullptr);
+    std::vector<uint8_t> textured(node.inputs.size(), 0);
+    for (size_t i = 0; i < node.inputs.size(); ++i) {
+        const NodeInput& input = node.inputs[i];
+        const auto found = std::ranges::find(connections, input.name, &Connection::input);
+        if (found == connections.end()) {
+            continue;
+        }
+        if (!Texturable(input.type)) {
+            Log(LogLevel::Warning,
+                "{}'s {} connects to a texture, but only float and float3 inputs take textures; "
+                "the input keeps its value",
+                paths.Path(shader), input.name);
+            continue;
+        }
+        TextureChannel channel = TextureChannel::Rgb;
+        if (BindTexture(shader, *found, input.name, input.type == NodeInputType::Float3, kNoPrim,
+                        channel)) {
+            sources[i] = &*found;
+            textured[i] = 1;
+        }
+    }
+    const NodeLayout layout = LayOut(node, textured);
+    std::string key = node.module + "/" + node.name + "/";
+    for (const uint8_t sampled : textured) {
+        key += sampled ? 't' : 'v';
+    }
+    auto known = m_library.find(key);
+    if (known == m_library.end()) {
+        const uint32_t id = m_nextDefinition++;
+        known = m_library.emplace(key, GenerateNodeDefinition(id, node, textured)).first;
+        m_definitionWords[id] = Word(layout.bytes);
+        Log(LogLevel::Debug,
+            "new material definition {} for {}, with {} in {} words and {} bytes of generated "
+            "Slang",
+            id, node.name, Counted(layout.textureCount, "texture"), Word(layout.bytes),
+            known->second.source.size());
+    }
+    m_wordCount = (m_wordCount + 1) & ~1u;
+    const uint32_t base = m_wordCount;
+    m_wordCount += Word(layout.bytes);
+    const SchemaId schema = SchemaId(node.schema);
+    const Span<const ColumnInfo> columns = Columns(schema);
+    uint32_t coordinates = kNoPrim;
+    bool placed = false;
+    for (uint32_t i = 0; i < node.inputs.size(); ++i) {
+        CopyCell({schema, &columns[i], i}, shader, base + Word(layout.cells[i]));
+        if (!textured[i]) {
+            continue;
+        }
+        TextureChannel channel = TextureChannel::Rgb;
+        BindTexture(shader, *sources[i], node.inputs[i].name,
+                    node.inputs[i].type == NodeInputType::Float3,
+                    base + Word(layout.textures[i] * kTextureInputBytes), channel);
+        uint32_t read = kNoPrim;
+        for (const Connection& connection : Connections(sources[i]->source)) {
+            if (connection.input == "st") {
+                read = connection.source;
+            }
+        }
+        if (!placed) {
+            coordinates = read;
+            placed = true;
+        }
+    }
+    if (layout.textureCount > 0) {
+        ResolvePlacement(coordinates, base + Word(layout.mapping));
+    }
+    Define(material, known->second.id, base);
+    Log(LogLevel::Debug, "{} shades with node {} through {} as definition {}, in {} words",
+        paths.Path(material), node.name, paths.Path(shader), known->second.id, Word(layout.bytes));
 }
 
 void MaterialTable::ResolveMaterial(uint32_t material) {
@@ -324,6 +430,13 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
         ResolvePreview(material, surface);
         return;
     }
+    if (surface != kNoPrim && IsRuntime(prims.Record(surface).schema)) {
+        if (const std::shared_ptr<const NodeDefinition> node =
+                FindNode(Info(prims.Record(surface).schema).name)) {
+            ResolveNode(material, surface, *node);
+            return;
+        }
+    }
     if (!connected) {
         Log(LogLevel::Debug, "{} has no surface connected, so it shades as plain diffuse",
             paths.Path(material));
@@ -334,10 +447,7 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
             paths.Path(material),
             surface == kNoPrim ? std::string("nothing") : paths.Path(surface));
     }
-    m_records.Set(material, {.definition = kDefinitionDiffuse,
-                             .words = 0,
-                             .previousDefinition = kDefinitionPlaceholder,
-                             .previousWords = 0});
+    Define(material, kDefinitionDiffuse, 0);
 }
 
 void MaterialTable::Resolve() {
@@ -348,6 +458,10 @@ void MaterialTable::Resolve() {
     m_literals.clear();
     m_bindings.clear();
     m_wordCount = 0;
+    std::vector<MaterialRecord> before;
+    for (uint32_t prim = 0; prim < m_generations.size(); ++prim) {
+        before.push_back(m_records.Row(prim));
+    }
     m_records.Assign(std::max(prims.Size(), 1u), MaterialRecord{});
     ColumnTable& shaders = m_structure.GetColumnStore().Schema(SchemaId::Shader);
     const std::vector<uint32_t> ids =
@@ -370,6 +484,7 @@ void MaterialTable::Resolve() {
             }
         }
     }
+    CarryPrevious(before);
     std::vector<uint32_t> written;
     for (const Copy& copy : m_copies) {
         const uint32_t words = ElementBytes(copy.column.column->type) / sizeof(uint32_t);
@@ -390,6 +505,69 @@ void MaterialTable::Resolve() {
     }
     Log(LogLevel::Debug, "resolved {} materials into {} words, {} copies and {} textures",
         materials, m_wordCount, m_copies.size(), m_bindings.size());
+}
+
+void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
+    const Prims& prims = m_structure.GetPrims();
+    m_carries.clear();
+    std::vector<uint32_t> generations(prims.Size(), 0);
+    std::set<uint32_t> used;
+    for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
+        if (!prims.Alive(prim) || !IsA(prims.Record(prim).schema, SchemaId::Material)) {
+            continue;
+        }
+        generations[prim] = prims.Generation(prim) + 1;
+        MaterialRecord record = m_records.Row(prim);
+        if (prim < before.size() && m_generations[prim] == generations[prim]) {
+            const MaterialRecord& old = before[prim];
+            const bool changed = old.definition != record.definition;
+            const uint32_t previous = changed ? old.definition : old.previousDefinition;
+            const uint32_t from = changed ? old.words : old.previousWords;
+            const auto words = m_definitionWords.find(previous);
+            record.previousDefinition = previous;
+            record.previousWords = 0;
+            if (words != m_definitionWords.end() && words->second > 0) {
+                m_wordCount = (m_wordCount + 1) & ~1u;
+                record.previousWords = m_wordCount;
+                m_carries.push_back({from, m_wordCount, words->second});
+                m_wordCount += words->second;
+            }
+            if (changed) {
+                Log(LogLevel::Debug,
+                    "{} changes from definition {} to {}, and shows {} until the renderer links it",
+                    m_structure.GetPaths().Path(prim), old.definition, record.definition,
+                    old.definition);
+            }
+            m_records.Set(prim, record);
+        }
+        used.insert(record.definition);
+        used.insert(record.previousDefinition);
+    }
+    m_generations = std::move(generations);
+    if (!m_carries.empty() && m_words.Buffer()) {
+        const Ref<device::Buffer>& arena = m_words.Buffer();
+        device::Device& device = m_structure.GetColumnStore().GetDevice();
+        m_carried =
+            device.CreateBuffer({.bytes = arena->Bytes(), .label = "carried material words"});
+        device::Queue& queue = device.GetQueue();
+        device::CommandEncoder encoder = queue.CreateEncoder();
+        encoder.Copy(arena->Slice(0), m_carried->Slice(0));
+        queue.Submit(encoder.Finish());
+    } else if (m_carries.empty()) {
+        m_carried = nullptr;
+    }
+    std::vector<DefinitionModule> definitions;
+    for (const auto& [key, definition] : m_library) {
+        if (used.contains(definition.id)) {
+            definitions.push_back(definition);
+        }
+    }
+    auto set = std::make_shared<const DefinitionSet>(std::move(definitions));
+    if (set->Hash() != m_definitions->Hash()) {
+        Log(LogLevel::Debug, "the scene now uses {}",
+            Counted(set->Definitions().size(), "generated material definition"));
+        m_definitions = std::move(set);
+    }
 }
 
 void MaterialTable::Pack() {
@@ -415,6 +593,17 @@ void MaterialTable::Pack() {
             {.words = 1, .destination = binding.destination + 1, .value = uint32_t(handle >> 32)});
     }
     m_words.Reserve(device, std::max(m_wordCount, 1u));
+    if (m_carried && !m_carries.empty()) {
+        device::Queue& queue = device.GetQueue();
+        device::CommandEncoder encoder = queue.CreateEncoder();
+        for (const Carry& carry : m_carries) {
+            encoder.Copy(m_carried->Slice(uint64_t(carry.from) * sizeof(uint32_t),
+                                          uint64_t(carry.words) * sizeof(uint32_t)),
+                         m_words.Buffer()->Slice(uint64_t(carry.to) * sizeof(uint32_t),
+                                                 uint64_t(carry.words) * sizeof(uint32_t)));
+        }
+        queue.Submit(encoder.Finish());
+    }
     if (entries.empty()) {
         return;
     }

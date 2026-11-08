@@ -105,6 +105,7 @@ ernie_test(
         unit/render/utest_render_ray_cast.cpp
         unit/render/utest_render_ray_origin.cpp
         unit/render/utest_render_materials.cpp
+        unit/render/utest_render_nodes.cpp
         unit/render/utest_render_products.cpp
         unit/render/utest_render_renderer.cpp
         unit/render/utest_render_surfaces.cpp

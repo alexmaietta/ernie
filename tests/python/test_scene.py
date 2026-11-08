@@ -159,3 +159,21 @@ def test_shaders_are_defined_by_their_info_id(scene):
     with pytest.raises(RuntimeError):
         surface["id"] = "NoSuchNode"
     assert surface["id"] == "UsdUVTexture"
+
+
+def test_material_nodes_load_from_slang_files(scene, tmp_path):
+    source = tmp_path / "glow.slang"
+    source.write_text(
+        "import ernie.material;\n"
+        "struct PyGlow {\n"
+        "    [Color] float3 tint = float3(1, 0.5, 0);\n"
+        "    float strength = 2;\n"
+        "    void Material(inout SurfaceInputs m, ShadeContext c) {\n"
+        "        m.emission = SpectralValue.Rgb(tint * strength);\n"
+        "    }\n"
+        "}\n"
+    )
+    assert scene.load_shaders(str(source)) == ["PyGlow"]
+    glow = scene.define("/Glow", "Shader", {"id": "PyGlow", "strength": 4.0})
+    assert glow["strength"] == 4.0
+    assert glow["tint"] == (1, 0.5, 0)

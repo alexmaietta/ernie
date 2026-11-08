@@ -4,6 +4,7 @@ ernie_object_library(
     ray_cast/ray_cast.cpp
     render_output.cpp
     renderer.cpp
+    shaders.cpp
 )
 target_link_libraries(
     ernie_render
@@ -20,6 +21,7 @@ ernie_embed(
     ROOTS
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/render/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/render/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/language|ernie/|*.slang"
 )
 
 ernie_static_library(
@@ -35,4 +37,5 @@ ernie_public_files(
     ray_cast/ray_cast.h
     render_output.h
     renderer.h
+    shaders.h
 )

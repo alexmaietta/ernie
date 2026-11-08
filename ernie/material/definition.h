@@ -5,6 +5,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ernie {
@@ -16,6 +17,7 @@ struct DefinitionModule {
     std::string type;
     std::string module;
     std::string source;
+    std::vector<std::pair<std::string, std::string>> files;
 };
 
 class DefinitionSet {

@@ -24,6 +24,10 @@ DefinitionSet::DefinitionSet(std::vector<DefinitionModule> definitions)
         m_hash = Mix(m_hash, std::to_string(definition.id));
         m_hash = Mix(m_hash, definition.type);
         m_hash = Mix(m_hash, definition.source);
+        for (const auto& [path, source] : definition.files) {
+            m_hash = Mix(m_hash, path);
+            m_hash = Mix(m_hash, source);
+        }
     }
 }
 
