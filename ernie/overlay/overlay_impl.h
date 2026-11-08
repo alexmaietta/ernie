@@ -70,6 +70,7 @@ struct OverlayData {
 
 struct OverlayTarget {
     uint32_t camera = kNoPrim;
+    uint32_t product = kNoPrim;
     uint32_t layer = 0;
     uint32_t width = 0;
     uint32_t height = 0;

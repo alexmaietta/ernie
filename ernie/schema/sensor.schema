@@ -3,16 +3,16 @@ api class LensDistortionAPI (
 ) {
     token distortion:model = none (
         tracked
-        allowed = [none, brownConrady, kannalaBrandt, lut]
+        allowed = [none, brownConrady, kannalaBrandt, fTheta, lut]
         group = "Distortion"
         displayName = "Model"
-        doc = "none keeps the ideal projection. brownConrady distorts a perspective image by its radius, as OpenCV's pinhole model does. kannalaBrandt maps the angle from the axis to the image radius, as OpenCV's fisheye model does, and reaches past 180 degrees. lut reads every pixel's ray from lookup textures."
+        doc = "none keeps the ideal projection. brownConrady distorts a perspective image by its radius, as OpenCV's pinhole model does. kannalaBrandt maps the angle from the axis to the image radius, as OpenCV's fisheye model does, and reaches past 180 degrees. fTheta maps the angle from the axis to the image radius by a polynomial, as automotive f-theta lenses do, and also reaches past 180 degrees. lut reads every pixel's ray from lookup textures. Distortion bends perspective cameras only."
     )
     float4 distortion:radial = (0, 0, 0, 0) (
         tracked
         group = "Distortion"
         displayName = "Radial"
-        doc = "k1 to k4, scaling the radius by 1 + k1 x^2 + k2 x^4 + k3 x^6 + k4 x^8, where x is the undistorted image radius under brownConrady and the angle from the axis under kannalaBrandt. OpenCV's pinhole model has no k4 here, so leave it 0."
+        doc = "k1 to k4, scaling the radius by 1 + k1 x^2 + k2 x^4 + k3 x^6 + k4 x^8, where x is the undistorted image radius over the focal length under brownConrady, as in OpenCV's normalized coordinates, and the angle from the axis in radians under kannalaBrandt. OpenCV's pinhole model has no k4 here, so leave it 0."
     )
     float3 distortion:radialDivisor = (0, 0, 0) (
         tracked
@@ -32,6 +32,12 @@ api class LensDistortionAPI (
         displayName = "Thin Prism"
         doc = "brownConrady's thin-prism coefficients s1 to s4."
     )
+    float[] distortion:fTheta (
+        tracked
+        group = "Distortion"
+        displayName = "F-Theta"
+        doc = "fTheta's coefficients c0, c1, c2 and on, giving the image radius in millimeters as c0 + c1 a + c2 a^2 + ... for a ray at angle a in radians from the axis. The radius must grow with the angle up to maxFieldOfView. Empty is an equidistant lens, a radius of focalLength a."
+    )
     float distortion:maxFieldOfView = 180 (
         tracked
         unit = degrees
@@ -39,7 +45,7 @@ api class LensDistortionAPI (
         displayName = "Max Field of View"
         min = 0
         max = 360
-        doc = "The widest kannalaBrandt renders. Film points mapping past it see nothing."
+        doc = "The widest kannalaBrandt and fTheta render. Film points mapping past it see nothing."
     )
     asset distortion:lutRayDirections = @@ (
         tracked
@@ -52,6 +58,127 @@ api class LensDistortionAPI (
         group = "Distortion"
         displayName = "Ray Origins"
         doc = "Under lut, an RGB image whose red and green hold where on the film, from 0 to 1, the pixel's ray starts."
+    )
+}
+
+api class DetectorAPI (
+    doc = "The camera's image sensor, what its pixels see of the spectrum and how they turn light into a signal. The values follow EMVA 1288, so a datasheet carries over one to one. Every camera has it built in, and only sensor pipelines whose nodes read them use them, so the display pipeline renders the same whatever they hold."
+) {
+    token detector:pattern = rgb (
+        tracked
+        allowed = [mono, rgb, rggb, bggr, grbg, gbrg, rccb, rccc, bands]
+        group = "Detector"
+        displayName = "Pattern"
+        doc = "The channels the pixels measure and how they're laid out. mono is one clear channel on every pixel. rgb is red, green and blue on every pixel, as an ideal or three-chip camera sees. rggb, bggr, grbg and gbrg are Bayer mosaics named by their top-left 2 by 2 block. rccb is red, clear and blue with clear on the diagonal, and rccc is red on one pixel of each block and clear on the rest, as automotive cameras use. bands is one channel per spectral band on every pixel, a multispectral camera."
+    )
+    float2 detector:spectralRange = (380, 780) (
+        tracked
+        group = "Detector"
+        displayName = "Spectral Range"
+        doc = "The shortest and longest wavelengths in nanometers the camera renders, split evenly into its bands. Lights and materials are evaluated at the band centres."
+    )
+    float2[] detector:qe:red (
+        tracked
+        group = "Quantum Efficiency"
+        displayName = "Red"
+        doc = "Wavelength and quantum efficiency pairs with increasing wavelengths in nanometers, the electrons a red pixel collects per photon reaching it, including its colour filter. Nothing is collected outside the first and last wavelength. Empty uses a typical Bayer red dye on silicon."
+    )
+    float2[] detector:qe:green (
+        tracked
+        group = "Quantum Efficiency"
+        displayName = "Green"
+        doc = "Like red, for green pixels. Empty uses a typical Bayer green dye on silicon."
+    )
+    float2[] detector:qe:blue (
+        tracked
+        group = "Quantum Efficiency"
+        displayName = "Blue"
+        doc = "Like red, for blue pixels. Empty uses a typical Bayer blue dye on silicon."
+    )
+    float2[] detector:qe:clear (
+        tracked
+        group = "Quantum Efficiency"
+        displayName = "Clear"
+        doc = "Like red, for pixels without a colour filter, which mono, bands and the clear pixels of rccb and rccc have. Empty uses typical front-side illuminated silicon."
+    )
+    float detector:fullWell = 10000 (
+        tracked
+        group = "Detector"
+        displayName = "Full Well"
+        min = 0
+        doc = "The most electrons a pixel holds before it saturates, EMVA 1288's saturation capacity."
+    )
+    float detector:readNoise = 2 (
+        tracked
+        group = "Noise"
+        displayName = "Read Noise"
+        min = 0
+        doc = "The temporal dark noise in electrons rms, EMVA 1288's dark noise."
+    )
+    float detector:darkCurrent = 1 (
+        tracked
+        group = "Noise"
+        displayName = "Dark Current"
+        min = 0
+        doc = "Electrons per second a pixel collects in the dark at 20 degrees Celsius, EMVA 1288's dark current."
+    )
+    float detector:darkCurrentDoubling = 7 (
+        tracked
+        unit = kelvin
+        group = "Noise"
+        displayName = "Dark Current Doubling"
+        min = 0
+        doc = "How much warmer the sensor must get to double its dark current, EMVA 1288's doubling temperature."
+    )
+    float detector:temperature = 293.15 (
+        tracked
+        unit = kelvin
+        group = "Noise"
+        displayName = "Temperature"
+        min = 0
+        doc = "The sensor's temperature, which a simulation may write every step."
+    )
+    float detector:prnu = 0.005 (
+        tracked
+        group = "Noise"
+        displayName = "PRNU"
+        min = 0
+        doc = "The spread of the pixels' sensitivity as a fraction of their mean, EMVA 1288's photo response non-uniformity."
+    )
+    float detector:dsnu = 0.5 (
+        tracked
+        group = "Noise"
+        displayName = "DSNU"
+        min = 0
+        doc = "The spread of the pixels' dark signal in electrons, EMVA 1288's dark signal non-uniformity."
+    )
+    float detector:systemGain = 0.25 (
+        tracked
+        group = "Conversion"
+        displayName = "System Gain"
+        min = 0
+        doc = "Digital numbers per electron at ISO 100, EMVA 1288's overall system gain. exposure:iso scales it."
+    )
+    int detector:bitDepth = 12 (
+        tracked
+        group = "Conversion"
+        displayName = "Bit Depth"
+        min = 1
+        max = 32
+        doc = "The bits each digitized pixel has."
+    )
+    float detector:blackLevel = 0 (
+        tracked
+        group = "Conversion"
+        displayName = "Black Level"
+        min = 0
+        doc = "The digital numbers a pixel reads in the dark, EMVA 1288's dark signal offset."
+    )
+    int detector:seed = 0 (
+        tracked
+        group = "Noise"
+        displayName = "Seed"
+        doc = "Picks which physical unit the fixed noise patterns come from. They follow the camera's stable id too, so two cameras differ unless they share both."
     )
 }
 
@@ -79,15 +206,15 @@ abstract class Sensor : Xformable, SensorAPI (
     doc = "A prim that captures the scene. Render products render sensors, and each kind of sensor shapes its own rays and outputs."
 ) {}
 
-class Camera : Sensor, LensDistortionAPI (
+class Camera : Sensor, LensDistortionAPI, DetectorAPI (
     doc = "A camera looking down its local -z axis, with +y up, following UsdGeomCamera."
 ) {
     token projection = perspective (
         tracked
-        allowed = [perspective, orthographic]
+        allowed = [perspective, orthographic, spherical]
         group = "Projection"
         displayName = "Projection"
-        doc = "Perspective rays leave one point and spread by the focal length and apertures. Orthographic rays run parallel along -z from a film whose width and height are the apertures in tenths of a scene unit, as in USD."
+        doc = "Perspective rays leave one point and spread by the focal length and apertures. Orthographic rays run parallel along -z from a film whose width and height are the apertures in tenths of a scene unit, as in USD. Spherical rays leave one point in an equirectangular grid, with the film's width spanning 360 degrees of azimuth and its height 180 degrees of elevation, so a 2 by 1 resolution keeps pixels square. Spherical ignores the focal length."
     )
     float focalLength = 50 (
         tracked
@@ -165,6 +292,14 @@ class Camera : Sensor, LensDistortionAPI (
         group = "Shutter"
         displayName = "Shutter Close"
         doc = "When the shutter closes, relative to the frame's time. Equal to the opening, nothing blurs."
+    )
+    float shutter:readout = 0 (
+        tracked
+        unit = seconds
+        group = "Shutter"
+        displayName = "Readout"
+        min = 0
+        doc = "How long after the top row's exposure the bottom row's starts, as a rolling shutter reads rows in turn. Each row keeps the window from shutter:open to shutter:close, shifted by its share of the readout. 0 is a global shutter. Rendering doesn't move prims across the shutter yet, so it changes nothing."
     )
     float exposure = 0 (
         tracked

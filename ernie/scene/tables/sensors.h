@@ -29,7 +29,8 @@ class SensorTable : public Table {
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        HoldBuffers(held, {m_cameras.Buffer(), m_lidars.Buffer(), m_radars.Buffer()});
+        HoldBuffers(held, {m_cameras.Buffer(), m_distortions.Buffer(), m_detectors.Buffer(),
+                           m_lidars.Buffer(), m_radars.Buffer()});
     }
 
   private:
@@ -38,6 +39,8 @@ class SensorTable : public Table {
     Structure& m_structure;
     Ref<device::Program> m_program;
     DeviceTable<CameraRecord> m_cameras{"camera records"};
+    DeviceTable<DistortionRecord> m_distortions{"distortion records"};
+    DeviceTable<DetectorRecord> m_detectors{"detector records"};
     DeviceTable<LidarRecord> m_lidars{"lidar records"};
     DeviceTable<RadarRecord> m_radars{"radar records"};
 };

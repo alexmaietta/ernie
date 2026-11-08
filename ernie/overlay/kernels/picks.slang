@@ -149,7 +149,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     const OverlayView view = p.views[query.view];
     RenderTables* tables = p.tables;
     result.world = tables->prims.world[view.camera];
-    const CameraModel camera = CameraModel.Load(tables, view.camera);
+    const CameraModel camera = CameraModel.Load(tables, view.camera, view.product);
     float3 origin;
     float3 direction;
     PickRay(camera, view, float2(query.x, query.y), origin, direction);

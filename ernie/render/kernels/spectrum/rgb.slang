@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.spectrum.ispectrum;
+__exported import ernie.render.kernels.spectrum.band;
 
 struct RgbSpectrum : ISpectrum {
     float3 values;
@@ -29,6 +29,11 @@ struct RgbSpectrum : ISpectrum {
     [Differentiable]
     float3 ToRgb() {
         return values;
+    }
+
+    [Differentiable]
+    BandValues Bands() {
+        return BandSpectrum.FromRgb(values).Bands();
     }
 
     [Differentiable]

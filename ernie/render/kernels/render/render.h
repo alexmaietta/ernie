@@ -18,7 +18,7 @@ struct Capture {
     uint64_t primIds;
 };
 
-ERNIE_CHECK_SIZE(Capture, 184);
+ERNIE_CHECK_SIZE(Capture, 192);
 
 struct PointRecord {
     float x;

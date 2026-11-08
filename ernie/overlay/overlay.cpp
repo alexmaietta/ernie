@@ -1753,6 +1753,7 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
         view.overlay = {target.overlay};
         view.depth = {target.depth};
         view.camera = target.camera;
+        view.product = target.product;
         view.layer = target.layer;
         view.width = target.width;
         view.height = target.height;

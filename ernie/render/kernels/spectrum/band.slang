@@ -1,17 +1,29 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 __exported import ernie.render.kernels.spectrum.ispectrum;
+import ernie.scene.records.render_tables;
+
+using namespace ernie;
 
 static const uint kSpectrumBands = 8;
-static const float kSpectrumFirstNm = 380;
-static const float kSpectrumBandNm = 45;
 
-static const float4x3 kLowBandRgb = {
-    0.05f, 0.00f, 0.60f, 0.00f, 0.05f, 1.00f, 0.00f, 0.45f, 0.70f, 0.05f, 1.00f, 0.15f,
-};
-static const float4x3 kHighBandRgb = {
-    0.45f, 0.85f, 0.00f, 1.00f, 0.35f, 0.00f, 0.80f, 0.05f, 0.00f, 0.25f, 0.00f, 0.00f,
-};
+static Ptr<DetectorRecord> gBandDetector;
+
+void UseBands(Ptr<DetectorRecord> detector) {
+    gBandDetector = detector;
+}
+
+float4 FromRgbBands(uint row) {
+    return gBandDetector->bands.fromRgb[row].Vector();
+}
+
+float4 ToRgbBands(uint row) {
+    return gBandDetector->bands.toRgb[row].Vector();
+}
+
+float BandCenter(uint band) {
+    return gBandDetector->bands.first + (float(band) + 0.5f) * gBandDetector->bands.width;
+}
 
 struct BandSpectrum : ISpectrum {
     float4 low;
@@ -30,8 +42,10 @@ struct BandSpectrum : ISpectrum {
 
     [Differentiable]
     static BandSpectrum FromRgb(float3 rgb) {
-        return BandSpectrum(mul(kLowBandRgb, rgb) / mul(kLowBandRgb, float3(1)),
-                            mul(kHighBandRgb, rgb) / mul(kHighBandRgb, float3(1)));
+        return BandSpectrum(rgb.x * no_diff FromRgbBands(0) + rgb.y * no_diff FromRgbBands(2) +
+                                rgb.z * no_diff FromRgbBands(4),
+                            rgb.x * no_diff FromRgbBands(1) + rgb.y * no_diff FromRgbBands(3) +
+                                rgb.z * no_diff FromRgbBands(5));
     }
 
     [Differentiable]
@@ -40,16 +54,25 @@ struct BandSpectrum : ISpectrum {
         float4 high;
         [ForceUnroll]
         for (uint band = 0; band < 4; ++band) {
-            low[band] = Planck(kSpectrumFirstNm + (band + 0.5f) * kSpectrumBandNm, kelvin);
-            high[band] = Planck(kSpectrumFirstNm + (band + 4.5f) * kSpectrumBandNm, kelvin);
+            low[band] = Planck(no_diff BandCenter(band), kelvin);
+            high[band] = Planck(no_diff BandCenter(band + 4), kelvin);
         }
         return BandSpectrum(low, high);
     }
 
     [Differentiable]
     float3 ToRgb() {
-        return (mul(low, kLowBandRgb) + mul(high, kHighBandRgb)) /
-               (mul(float4(1), kLowBandRgb) + mul(float4(1), kHighBandRgb));
+        return float3(dot(low, no_diff ToRgbBands(0)) + dot(high, no_diff ToRgbBands(1)),
+                      dot(low, no_diff ToRgbBands(2)) + dot(high, no_diff ToRgbBands(3)),
+                      dot(low, no_diff ToRgbBands(4)) + dot(high, no_diff ToRgbBands(5)));
+    }
+
+    [Differentiable]
+    BandValues Bands() {
+        BandValues values;
+        values.low = low;
+        values.high = high;
+        return values;
     }
 
     [Differentiable]

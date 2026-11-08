@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.sensors.camera.iprojection;
+__exported import ernie.render.kernels.sensors.camera.projection.iprojection;
 
 using namespace ernie;
 
@@ -16,6 +16,7 @@ struct OrthographicProjection : IProjection {
         LensRay ray;
         ray.origin = float3(film * kOrthographicApertureUnits, 0);
         ray.direction = float3(0, 0, -1);
+        ray.visible = true;
         return ray;
     }
 

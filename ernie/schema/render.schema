@@ -21,11 +21,12 @@ class RenderVar : Typed (
             RadialVelocity
             InstanceId
             InstancerStableId
+            ElectronRate
         ]
         enum = RenderVarSource
         group = "Render Var"
         displayName = "Source Name"
-        doc = "The output this variable holds: display color, linear color, distance from the camera, distance from the image plane, the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits, the world-space surface normal facing the camera, interpolated from the geometry's normals before materials and normal maps, so minimal and real-time modes agree, the unlit diffuse color of the bound material, or displayColor where there's none, the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, the ids and labels of SemanticSegmentation, the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, the stable id of the hit prim, the stable ids and paths of every prim the segmentations name, the intensity of a lidar or radar return, a lidar's or radar's returns packed into a point cloud with the fields channels names, how fast a radar's hit moves away from it in meters per second, the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, or the stable id of that copy's instancer, with 0 where there's none."
+        doc = "The output this variable holds: display color, linear color, distance from the camera, distance from the image plane, the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits, the world-space surface normal facing the camera, interpolated from the geometry's normals before materials and normal maps, so minimal and real-time modes agree, the unlit diffuse color of the bound material, or displayColor where there's none, the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, the ids and labels of SemanticSegmentation, the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, the stable id of the hit prim, the stable ids and paths of every prim the segmentations name, the intensity of a lidar or radar return, a lidar's or radar's returns packed into a point cloud with the fields channels names, how fast a radar's hit moves away from it in meters per second, the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, or the stable id of that copy's instancer, with 0 where there's none, or the photoelectrons per second each of a camera's detector channels collects before any noise, one channel per pixel for mono and as many as the pattern has otherwise."
     )
     token[] channels (
         tracked
@@ -95,7 +96,14 @@ api class RealTimeAPI (
         max = 64
         group = "Real Time"
         displayName = "Max Bounces"
-        doc = "Indirect bounces after the first hit, one path per pixel. 0 lights only by direct light."
+        doc = "Indirect bounces after the first hit, one path per sample. 0 lights only by direct light."
+    )
+    int pixelSamples = 1 (
+        min = 1
+        max = 1024
+        group = "Real Time"
+        displayName = "Pixel Samples"
+        doc = "Samples per pixel, each a path from a stratified point on the pixel, lens and shutter. 1 traces the pixel's center at the middle of the shutter."
     )
 }
 
@@ -182,6 +190,20 @@ class RenderProduct : Typed, MinimalAPI, BackgroundAPI, RealTimeAPI (
         group = "Product"
         displayName = "Resolution"
         doc = "Width and height of each image in pixels."
+    )
+    token aspectRatioConformPolicy = expandAperture (
+        tracked
+        allowed = [expandAperture, cropAperture, adjustApertureWidth, adjustApertureHeight, adjustPixelAspectRatio]
+        group = "Product"
+        displayName = "Aspect Ratio Conform Policy"
+        doc = "How a camera whose apertures don't match the image's aspect ratio is fitted to it, as in UsdRender. expandAperture widens or heightens the film until it matches, so the image sees at least what the camera does. cropAperture narrows or shortens it, so the camera sees at least what the image does. adjustApertureWidth and adjustApertureHeight change only that side. adjustPixelAspectRatio keeps the film and stretches the pixels instead. The camera's prim isn't edited, and spherical cameras always span the full sphere."
+    )
+    float pixelAspectRatio = 1 (
+        tracked
+        group = "Product"
+        displayName = "Pixel Aspect Ratio"
+        min = 0
+        doc = "Width over height of each pixel, so the image's aspect ratio is its width times this over its height."
     )
     token semanticTaxonomy = class (
         tracked

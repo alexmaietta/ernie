@@ -22,7 +22,7 @@ namespace {
 
 std::vector<ColumnRef> ProductInputs() {
     std::vector<ColumnRef> inputs = {kLidarFiringsPerScan, kLidarEmitterElevations,
-                                     kLidarMaxReturns, kRadarRays};
+                                     kLidarMaxReturns, kRadarRays, kDetectorAPIDetectorPattern};
     for (const SchemaId schema :
          {SchemaId::RenderProduct, SchemaId::RenderVar, SchemaId::MinimalAPI,
           SchemaId::BackgroundAPI, SchemaId::RealTimeAPI, SchemaId::SensorAPI,
@@ -60,6 +60,19 @@ Shape SensorShape(const Prim& sensor, Uint2 resolution) {
         return {sensor.Get(Radar::kRays)};
     }
     return {resolution};
+}
+
+int64_t DetectorChannels(const Prim& camera) {
+    switch (camera.Get(DetectorAPI::kDetectorPattern)) {
+    case DetectorPattern::Mono:
+        return 1;
+    case DetectorPattern::Rccc:
+        return 2;
+    case DetectorPattern::Bands:
+        return kDetectorBands;
+    default:
+        return 3;
+    }
 }
 
 struct VarFormat {
@@ -141,7 +154,8 @@ const SensorKind& FindSensorKind(SchemaId schema) {
     throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
 }
 
-ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind) {
+ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
+                       int64_t channels) {
     const RenderVarSource source = prim.Get(RenderVar::kSourceName);
     const std::string_view name = kRenderVarSourceTokens[uint32_t(source)];
     ResolvedVar var{.prim = prim.Index(),
@@ -175,7 +189,15 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
         }
         return var;
     }
-    const VarFormat format = SourceFormat(source);
+    VarFormat format = SourceFormat(source);
+    if (source == RenderVarSource::ElectronRate) {
+        if (channels == 0) {
+            throw Error("{} writes ElectronRate from cameras whose detector patterns have "
+                        "different channel counts",
+                        var.path);
+        }
+        format = {device::DType::Float32, channels};
+    }
     if (format.channels == 0) {
         return var;
     }
@@ -196,7 +218,8 @@ RenderEntry SelectEntry(const ResolvedProduct& product, const SensorKind& kind) 
     }
     const bool shaded = std::ranges::any_of(product.vars, [](const ResolvedVar& var) {
         return var.source == RenderVarSource::LdrColor || var.source == RenderVarSource::HdrColor ||
-               var.source == RenderVarSource::DiffuseAlbedo;
+               var.source == RenderVarSource::DiffuseAlbedo ||
+               var.source == RenderVarSource::ElectronRate;
     });
     if (!shaded) {
         return RenderEntry::MinimalData;
@@ -265,6 +288,12 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
     record.textureLodBias = prim.Get(RenderProduct::kTextureLodBias);
     record.maxAnisotropy = uint32_t(std::max(prim.Get(RenderProduct::kMaxAnisotropy), 1));
     record.maxBounces = uint32_t(std::max(prim.Get(RealTimeAPI::kMaxBounces), 0));
+    record.pixelSamples = uint32_t(std::max(prim.Get(RealTimeAPI::kPixelSamples), 1));
+    record.conform = uint32_t(prim.Get(RenderProduct::kAspectRatioConformPolicy));
+    record.pixelAspect = prim.Get(RenderProduct::kPixelAspectRatio);
+    if (!(record.pixelAspect > 0)) {
+        record.pixelAspect = 1;
+    }
     record.castShadows = prim.Get(MinimalAPI::kCastShadows) ? 1 : 0;
     record.shadowVisibility = prim.Get(MinimalAPI::kShadowVisibility);
     record.hemispheric = prim.Get(MinimalAPI::kAmbientHemispheric) ? 1 : 0;
@@ -332,9 +361,16 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
             throw Error("{} has a resolution of {} x {}", path, product.width, product.height);
         }
         const SensorKind& kind = FindSensorKind(schema);
+        int64_t channels = 0;
+        if (lead.IsA<Camera>()) {
+            channels = DetectorChannels(lead);
+            for (const uint32_t sensor : product.sensors) {
+                channels = DetectorChannels(m_scene.ByIndex(sensor)) == channels ? channels : 0;
+            }
+        }
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
-            const ResolvedVar& added =
-                product.vars.emplace_back(ResolveVar(m_scene.ByIndex(var), product, kind));
+            const ResolvedVar& added = product.vars.emplace_back(
+                ResolveVar(m_scene.ByIndex(var), product, kind, channels));
             product.semantic |= added.semantic;
         }
         product.entry = SelectEntry(product, kind);

@@ -138,9 +138,11 @@ struct OverlayView {
     uint columnCount;
     float missDistance;
     uint outlined;
+    uint product;
+    uint padding0;
 };
 
-ERNIE_CHECK_SIZE(OverlayView, 72);
+ERNIE_CHECK_SIZE(OverlayView, 80);
 
 struct OverlayOutline {
     Ptr<uint> bits;

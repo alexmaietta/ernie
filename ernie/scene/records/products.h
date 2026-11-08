@@ -29,11 +29,11 @@ struct ProductRecord {
     Float3 ground;
     uint backgroundKind;
     Float3 backgroundColor;
-    uint padding0;
+    uint pixelSamples;
     Float3 backgroundLow;
-    uint padding1;
+    uint conform;
     Float3 backgroundHigh;
-    uint padding2;
+    float pixelAspect;
 };
 
 ERNIE_CHECK_SIZE(ProductRecord, 176);

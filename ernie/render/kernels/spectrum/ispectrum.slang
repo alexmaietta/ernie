@@ -11,6 +11,11 @@ float Planck(no_diff float nanometers, float kelvin) {
            (exp(kPlanckSecond / (nanometers * max(kelvin, 1e-6f))) - 1);
 }
 
+struct BandValues : IDifferentiable {
+    float4 low;
+    float4 high;
+}
+
 interface ISpectrum : IDifferentiable {
     [Differentiable]
     static This Constant(float value);
@@ -23,6 +28,9 @@ interface ISpectrum : IDifferentiable {
 
     [Differentiable]
     float3 ToRgb();
+
+    [Differentiable]
+    BandValues Bands();
 
     [Differentiable]
     This Add(This other);

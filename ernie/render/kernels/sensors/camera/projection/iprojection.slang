@@ -7,6 +7,7 @@ using namespace ernie;
 struct LensRay : IDifferentiable {
     float3 origin;
     float3 direction;
+    no_diff bool visible;
 }
 
 interface IProjection : IDifferentiable {

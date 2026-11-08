@@ -55,7 +55,7 @@ void MaskOutlines(uniform OverlayParams p) {
         return;
     }
     RenderTables* tables = p.tables;
-    const CameraModel camera = CameraModel.Load(tables, view.camera);
+    const CameraModel camera = CameraModel.Load(tables, view.camera, view.product);
     const float2 film = float2((float(pixel.x) + 0.5f) / float(view.width) * 2 - 1,
                                1 - (float(pixel.y) + 0.5f) / float(view.height) * 2);
     const CameraRay generated = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));

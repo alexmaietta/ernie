@@ -210,16 +210,6 @@ const AovInfo* FindAov(std::string_view name) {
     return found == std::end(kAovs) ? nullptr : &*found;
 }
 
-Extent FitAspect(Extent bounds, double aspect) {
-    if (!(aspect > 0) || bounds.width == 0 || bounds.height == 0) {
-        return bounds;
-    }
-    if (double(bounds.width) > aspect * double(bounds.height)) {
-        return {std::max(1u, uint32_t(std::lround(aspect * double(bounds.height)))), bounds.height};
-    }
-    return {bounds.width, std::max(1u, uint32_t(std::lround(double(bounds.width) / aspect)))};
-}
-
 void CheckPixels(const device::Tensor& pixels) {
     const Span<const int64_t> shape = pixels.Shape();
     const Span<const int64_t> strides = pixels.Strides();
@@ -432,9 +422,6 @@ void Viewport::Advance(const device::Operation& lastDraw) {
     const float scale = std::clamp(resolution.scale, 0.01f, 8.0f);
     Extent size{std::max(1u, uint32_t(std::lround(float(base.width) * scale))),
                 std::max(1u, uint32_t(std::lround(float(base.height) * scale)))};
-    if (m_view && !OwnsCamera()) {
-        size = FitAspect(size, double(m_view->width) / double(std::max(m_view->height, 1e-6f)));
-    }
     m_renderSize = size;
     if (!Fit(size)) {
         return;

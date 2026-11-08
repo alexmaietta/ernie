@@ -459,6 +459,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
             OverlayOutput{plan.paths[overlay.product], &product.overlays, &overlay.tensor, {}});
         for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
             view.targets.push_back({.camera = product.sensors[layer],
+                                    .product = product.prim,
                                     .layer = layer,
                                     .width = product.width,
                                     .height = product.height,

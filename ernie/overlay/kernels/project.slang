@@ -38,7 +38,7 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
         return false;
     }
     const ShapeRow shape = {batch, slice, row};
-    const OverlayCamera camera = OverlayCamera(tables, view.camera);
+    const OverlayCamera camera = OverlayCamera(tables, view.camera, view.product);
     if (batch.kind >= uint(OverlayKind::Labels) && batch.kind <= uint(OverlayKind::Numbers)) {
         return ProjectText(p, shape, view, camera, viewWorld, item, piece, color, size, record);
     }

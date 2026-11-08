@@ -63,6 +63,65 @@ TEST(SensorsTest, RecordsHoldResolvedParametersAndFollowEdits) {
     });
 }
 
+TEST(SensorsTest, DetectorRecordsAverageQeOverTheCamerasBands) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim automotive =
+            scene->Define<Camera>("/Automotive", {.detectorPattern = DetectorPattern::Rccc,
+                                                  .detectorSpectralRange = {400, 800},
+                                                  .detectorQeRed = {{400, 0}, {800, 1}},
+                                                  .detectorQeClear = {{500, 0.5f}, {600, 0.5f}},
+                                                  .detectorTemperature = 300});
+        const Prim generic = scene->Define<Camera>("/Generic", {});
+        const Prim spectral =
+            scene->Define<Camera>("/Spectral", {.detectorPattern = DetectorPattern::Bands});
+        scene->Publish().Wait();
+        const Prims& prims = SceneImpl::Get(*scene).GetStructure().GetPrims();
+        const auto detector = [&](const Prim& camera) {
+            const Snapshot snapshot = scene->Acquire(Stream::Host());
+            const DetectorRecord record = ReadRecord<DetectorRecord>(
+                device, snapshot, PinnedTables::From(snapshot).tables.detectors.address,
+                prims.Row(camera.Index(), SchemaId::DetectorAPI));
+            scene->Release(snapshot);
+            return record;
+        };
+        const auto band = [](const DetectorRecord& record, uint32_t channel, uint32_t index) {
+            const Float4& four = record.qe[2 * channel + index / 4];
+            const float values[] = {four.x, four.y, four.z, four.w};
+            return values[index % 4];
+        };
+
+        const DetectorRecord rccc = detector(automotive);
+        EXPECT_EQ(rccc.channels, 2u);
+        EXPECT_FLOAT_EQ(rccc.bands.first, 400);
+        EXPECT_FLOAT_EQ(rccc.bands.width, 50);
+        EXPECT_FLOAT_EQ(rccc.temperature, 300);
+        for (uint32_t index = 0; index < kDetectorBands; ++index) {
+            EXPECT_NEAR(band(rccc, 0, index), (50.0f * index + 25) / 400, 1e-5f) << index;
+            EXPECT_NEAR(band(rccc, 1, index), index == 2 || index == 3 ? 0.5f : 0, 1e-6f) << index;
+            EXPECT_EQ(band(rccc, 2, index), 0) << index;
+        }
+
+        const DetectorRecord rgb = detector(generic);
+        EXPECT_EQ(rgb.channels, 3u);
+        const uint32_t peaks[] = {4, 3, 1};
+        for (uint32_t channel = 0; channel < 3; ++channel) {
+            uint32_t peak = 0;
+            for (uint32_t index = 1; index < kDetectorBands; ++index) {
+                peak = band(rgb, channel, index) > band(rgb, channel, peak) ? index : peak;
+            }
+            EXPECT_EQ(peak, peaks[channel]) << channel;
+        }
+
+        EXPECT_EQ(detector(spectral).channels, kDetectorBands);
+        EXPECT_GT(band(detector(spectral), 0, 7), 0);
+        automotive.Set(Camera::kDetectorPattern, DetectorPattern::Mono);
+        scene->Publish().Wait();
+        EXPECT_EQ(detector(automotive).channels, 1u);
+        EXPECT_NEAR(band(detector(automotive), 0, 2), 0.5f, 1e-6f);
+    });
+}
+
 TEST(SensorsTest, LightShapesKeepAuthoredSizesForGuides) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

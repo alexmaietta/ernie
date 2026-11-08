@@ -71,37 +71,37 @@ void RenderPixel<P : IPattern, R : IResponse<P>>(RenderParams params) {
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalData(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<MinimalIntegrator<MinimalMode::Data>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::Data>>>(params);
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalDisplayColor(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<MinimalIntegrator<MinimalMode::DisplayColor>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::DisplayColor>>>(params);
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalTextureDiffuse(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<MinimalIntegrator<MinimalMode::TextureDiffuse>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::TextureDiffuse>>>(params);
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalFull(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<MinimalIntegrator<MinimalMode::Full>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::Full>>>(params);
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderRealTime(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<RealTimeIntegrator<RgbSpectrum>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<RealTimeIntegrator<RgbSpectrum>>>(params);
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderRealTimeBands(uniform RenderParams params) {
-    RenderPixel<CameraModel, CameraResponse<RealTimeIntegrator<BandSpectrum>>>(params);
+    RenderPixel<CameraPattern, CameraResponse<RealTimeIntegrator<BandSpectrum>>>(params);
 }
 
 [shader("compute")]

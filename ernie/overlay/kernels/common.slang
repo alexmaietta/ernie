@@ -232,8 +232,8 @@ struct OverlayCamera {
     float near;
     bool perspective;
 
-    __init(RenderTables* tables, uint prim) {
-        model = CameraModel.Load(tables, prim);
+    __init(RenderTables* tables, uint prim, uint product) {
+        model = CameraModel.Load(tables, prim, product);
         const CameraRecord record = tables->cameras[PrimRow(tables, prim, kSlotCamera)];
         near = record.clipping.x;
         perspective = Projection(record.projection) != Projection::Orthographic;

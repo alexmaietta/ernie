@@ -92,8 +92,6 @@ struct AovDisplay {
 
 void CheckPixels(const device::Tensor& pixels);
 
-Extent FitAspect(Extent bounds, double aspect);
-
 struct GridGuide {
     bool shown = false;
     bool fixed = false;

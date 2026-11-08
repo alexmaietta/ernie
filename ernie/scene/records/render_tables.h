@@ -38,6 +38,8 @@ struct RenderTables {
     Ptr<RenderOrigin> origins;
     Ptr<WorldTransform> slotWorlds;
     Ptr<CameraRecord> cameras;
+    Ptr<DistortionRecord> distortions;
+    Ptr<DetectorRecord> detectors;
     Ptr<LidarRecord> lidars;
     Ptr<RadarRecord> radars;
     Ptr<ProductRecord> products;
@@ -50,6 +52,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 296);
+ERNIE_CHECK_SIZE(RenderTables, 312);
 
 }

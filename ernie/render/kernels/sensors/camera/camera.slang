@@ -1,24 +1,36 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-__exported import ernie.render.kernels.sensors.camera.idistortion;
-__exported import ernie.render.kernels.sensors.camera.orthographic;
-__exported import ernie.render.kernels.sensors.camera.perspective;
+__exported import ernie.render.kernels.sensors.camera.distortion.brown_conrady;
+__exported import ernie.render.kernels.sensors.camera.distortion.f_theta;
+__exported import ernie.render.kernels.sensors.camera.distortion.kannala_brandt;
+__exported import ernie.render.kernels.sensors.camera.projection.orthographic;
+__exported import ernie.render.kernels.sensors.camera.projection.perspective;
+__exported import ernie.render.kernels.sensors.camera.projection.spherical;
 __exported import ernie.render.kernels.trace.ray;
 import ernie.device.kernels.device;
 
 using namespace ernie;
 
-
 struct CameraSample : IDifferentiable {
     float2 film;
     no_diff float2 lens;
     no_diff float time;
+    no_diff float row;
 
     [Differentiable]
     __init(float2 film, no_diff float2 lens, no_diff float time) {
         this.film = film;
         this.lens = lens;
         this.time = time;
+        this.row = 0;
+    }
+
+    [Differentiable]
+    __init(float2 film, no_diff float2 lens, no_diff float time, no_diff float row) {
+        this.film = film;
+        this.lens = lens;
+        this.time = time;
+        this.row = row;
     }
 }
 
@@ -50,37 +62,86 @@ struct CameraSensor : IDifferentiable {
 struct CameraLens : IDifferentiable {
     RenderTables* tables;
     no_diff uint row;
+    no_diff uint distortion;
     no_diff Projection projection;
+    no_diff DistortionModel model;
+
+    float FocalLength() {
+        return tables->cameras[row].focalLength;
+    }
 
     [Differentiable]
     LensRay Trace(float2 film) {
-        const float2 ideal = NoDistortion.Load(tables, row).Undistort(film);
         switch (projection) {
         case Projection::Orthographic:
-            return OrthographicProjection.Load(tables, row).Trace(ideal);
+            return OrthographicProjection.Load(tables, row).Trace(film);
+        case Projection::Spherical:
+            return SphericalProjection.Load(tables, row).Trace(film);
         default:
-            return PerspectiveProjection.Load(tables, row).Trace(ideal);
+            break;
+        }
+        const PerspectiveProjection perspective = PerspectiveProjection.Load(tables, row);
+        const float focal = no_diff FocalLength();
+        switch (model) {
+        case DistortionModel::BrownConrady:
+            return perspective.Trace(no_diff BrownConrady.Load(tables, distortion, focal).Undistort(film));
+        case DistortionModel::KannalaBrandt:
+            return AngularLens<KannalaBrandt>(no_diff KannalaBrandt.Load(tables, distortion, focal), focal)
+                .Trace(film);
+        case DistortionModel::FTheta:
+            return AngularLens<FTheta>(no_diff FTheta.Load(tables, distortion, focal), focal).Trace(film);
+        default:
+            return perspective.Trace(film);
         }
     }
 
     [Differentiable]
     float2 Image(float3 local) {
-        float2 ideal;
         switch (projection) {
         case Projection::Orthographic:
-            ideal = OrthographicProjection.Load(tables, row).Image(local);
-            break;
+            return OrthographicProjection.Load(tables, row).Image(local);
+        case Projection::Spherical:
+            return SphericalProjection.Load(tables, row).Image(local);
         default:
-            ideal = PerspectiveProjection.Load(tables, row).Image(local);
             break;
         }
-        return NoDistortion.Load(tables, row).Distort(ideal);
+        const PerspectiveProjection perspective = PerspectiveProjection.Load(tables, row);
+        const float focal = no_diff FocalLength();
+        switch (model) {
+        case DistortionModel::BrownConrady:
+            return no_diff BrownConrady.Load(tables, distortion, focal).Distort(perspective.Image(local));
+        case DistortionModel::KannalaBrandt:
+            return AngularLens<KannalaBrandt>(no_diff KannalaBrandt.Load(tables, distortion, focal), focal)
+                .Image(local);
+        case DistortionModel::FTheta:
+            return AngularLens<FTheta>(no_diff FTheta.Load(tables, distortion, focal), focal).Image(local);
+        default:
+            return perspective.Image(local);
+        }
+    }
+
+    bool Sees(float3 local) {
+        if (projection != Projection::Perspective) {
+            return true;
+        }
+        const float focal = FocalLength();
+        switch (model) {
+        case DistortionModel::KannalaBrandt:
+            return AngularLens<KannalaBrandt>(KannalaBrandt.Load(tables, distortion, focal), focal)
+                .Sees(local);
+        case DistortionModel::FTheta:
+            return AngularLens<FTheta>(FTheta.Load(tables, distortion, focal), focal).Sees(local);
+        default:
+            return true;
+        }
     }
 
     float Distance(float3 local) {
         switch (projection) {
         case Projection::Orthographic:
             return OrthographicProjection.Load(tables, row).Distance(local);
+        case Projection::Spherical:
+            return SphericalProjection.Load(tables, row).Distance(local);
         default:
             return PerspectiveProjection.Load(tables, row).Distance(local);
         }
@@ -90,6 +151,8 @@ struct CameraLens : IDifferentiable {
         switch (projection) {
         case Projection::Orthographic:
             return OrthographicProjection.Load(tables, row).Spread(filmStep);
+        case Projection::Spherical:
+            return SphericalProjection.Load(tables, row).Spread(filmStep);
         default:
             return PerspectiveProjection.Load(tables, row).Spread(filmStep);
         }
@@ -122,6 +185,7 @@ struct CameraAperture {
         LensRay ray;
         ray.origin = chief.origin + float3(radius * no_diff SampleUniformDisk(u), 0);
         ray.direction = focus - ray.origin;
+        ray.visible = chief.visible;
         return ray;
     }
 }
@@ -180,9 +244,10 @@ struct CameraClipping {
 struct CameraShutter {
     float open;
     float close;
+    float readout;
 
-    float Time(float u) {
-        return lerp(open, close, u);
+    float Time(float u, float row) {
+        return lerp(open, close, u) + readout * row;
     }
 }
 
@@ -204,6 +269,8 @@ struct CameraModel : IDifferentiable {
         camera.lens.tables = tables;
         camera.lens.row = row;
         camera.lens.projection = Projection(record.projection);
+        camera.lens.distortion = ApiRow(tables, prim, kApiLensDistortionAPI);
+        camera.lens.model = DistortionModel(tables->distortions[camera.lens.distortion].model);
         camera.aperture.radius = record.apertureRadius;
         camera.aperture.focusDistance = record.focusDistance;
         camera.clipping.near = record.clipping.x;
@@ -211,8 +278,39 @@ struct CameraModel : IDifferentiable {
         camera.clipping.planes = record.clippingPlanes;
         camera.shutter.open = record.shutter.x;
         camera.shutter.close = record.shutter.y;
+        camera.shutter.readout = record.readout;
         camera.pose = LoadSensorFrame(tables, prim);
         camera.exposure = record.exposure;
+        return camera;
+    }
+
+    static CameraModel Load(RenderTables* tables, uint prim, uint product) {
+        CameraModel camera = Load(tables, prim);
+        if (product == kNoPrim || camera.lens.projection == Projection::Spherical) {
+            return camera;
+        }
+        const Ptr<ProductRecord> record = tables->products + PrimRow(tables, product, kSlotRenderProduct);
+        const float image = float(record->width) * record->pixelAspect / float(max(record->height, 1));
+        const float2 aperture = camera.sensor.aperture;
+        const float2 wide = float2(aperture.y * image, aperture.y);
+        const float2 tall = float2(aperture.x, aperture.x / image);
+        const bool wider = aperture.x > aperture.y * image;
+        switch (AspectRatioConformPolicy(record->conform)) {
+        case AspectRatioConformPolicy::ExpandAperture:
+            camera.sensor.aperture = wider ? tall : wide;
+            break;
+        case AspectRatioConformPolicy::CropAperture:
+            camera.sensor.aperture = wider ? wide : tall;
+            break;
+        case AspectRatioConformPolicy::AdjustApertureWidth:
+            camera.sensor.aperture = wide;
+            break;
+        case AspectRatioConformPolicy::AdjustApertureHeight:
+            camera.sensor.aperture = tall;
+            break;
+        default:
+            break;
+        }
         return camera;
     }
 
@@ -224,8 +322,9 @@ struct CameraModel : IDifferentiable {
         const float scale = length(detach(world));
         CameraRay result;
         result.ray = Ray(pose.position + pose.ToWorld(ray.origin), world / length(world),
-                         interval.x * scale, interval.y * scale, shutter.Time(sample.time));
-        result.weight = interval.x < interval.y ? 1.0f : 0.0f;
+                         interval.x * scale, interval.y * scale,
+                         shutter.Time(sample.time, sample.row));
+        result.weight = ray.visible && interval.x < interval.y ? 1.0f : 0.0f;
         return result;
     }
 
@@ -234,7 +333,8 @@ struct CameraModel : IDifferentiable {
         const float3 local = pose.ToLocal(position);
         FilmPoint point;
         point.film = sensor.Ndc(lens.Image(local));
-        point.visible = no_diff clipping.Contains(detach(local), lens.Distance(detach(local)));
+        point.visible = no_diff lens.Sees(detach(local)) &&
+                        no_diff clipping.Contains(detach(local), lens.Distance(detach(local)));
         return point;
     }
 
