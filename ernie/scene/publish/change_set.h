@@ -19,13 +19,15 @@ enum class TableId : uint32_t {
     Imageables,
     Meshes,
     MeshPoints,
+    Points,
+    PointsMoved,
     Tangents,
     Textures,
     Instances,
     Slots,
 };
 
-inline constexpr uint32_t kTableCount = 8;
+inline constexpr uint32_t kTableCount = 10;
 
 class TableVersions {
   public:

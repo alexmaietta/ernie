@@ -23,6 +23,7 @@ ernie_object_library(
     tables/materials.cpp
     tables/meshes.cpp
     tables/plans.cpp
+    tables/points.cpp
     tables/products.cpp
     tables/regions.cpp
     tables/semantics.cpp

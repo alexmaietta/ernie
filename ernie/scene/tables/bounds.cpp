@@ -91,6 +91,7 @@ void BoundsTable::Run(const ChangeSet& changes, TableVersions&) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
+    params.points = changes.tables->points;
     params.primBounds.address = m_primBounds.Address();
     params.primCount = m_structure.GetPrims().Size();
     params.slotCount = m_boxes.Rows();

@@ -22,6 +22,7 @@
 #include "ernie/scene/tables/materials.h"
 #include "ernie/scene/tables/meshes.h"
 #include "ernie/scene/tables/plans.h"
+#include "ernie/scene/tables/points.h"
 #include "ernie/scene/tables/products.h"
 #include "ernie/scene/tables/semantics.h"
 #include "ernie/scene/tables/sensors.h"
@@ -32,7 +33,6 @@
 
 namespace ernie {
 
-void SetInputs(RowWriter& writer, SchemaId schema, std::span<const MaterialInput> inputs);
 
 class SceneImpl {
   public:
@@ -117,6 +117,10 @@ class SceneImpl {
         return m_meshes;
     }
 
+    PointsTable& GetPoints() {
+        return m_points;
+    }
+
     ernie::BoundsTable& GetBounds() {
         return m_bounds;
     }
@@ -186,6 +190,7 @@ class SceneImpl {
     std::unique_ptr<bvh::Builder> m_builder;
     TransformTable m_transforms;
     MeshTable m_meshes;
+    PointsTable m_points;
     ernie::BoundsTable m_bounds;
     TangentTable m_tangents;
     TextureTable m_textures;

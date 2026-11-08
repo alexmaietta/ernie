@@ -15,6 +15,14 @@ bool Infinite(AuthoredData* scene, uint prim) {
     return scene->schemas.plane.width[row] <= 0 || scene->schemas.plane.length[row] <= 0;
 }
 
+ArrayRef GeometryExtent(BoundsParams p, uint prim) {
+    AuthoredData* scene = p.scene;
+    if (SchemaId(scene->prims.schema[prim]) == SchemaId::Points) {
+        return p.points[PrimRow(scene, prim, kSlotPoints)].bounds;
+    }
+    return p.meshes[PrimRow(scene, prim, kSlotMesh)].bounds;
+}
+
 float3 OriginOffset(BoundsParams p, WorldTransform w, uint world) {
     if (world == kGlobalWorld || p.origins[world] == kNoRow) {
         return w.Translation();
@@ -39,9 +47,10 @@ void PrimBounds(uniform BoundsParams p) {
     const UnitShape shape = PlaceShape(scene, prim, w);
     float3 center = float3(0);
     float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
-    bool bounded = ShapeKind(shape.record.kind) != ShapeKind::Mesh && !Infinite(scene, prim);
-    if (schema == SchemaId::Mesh) {
-        const ArrayRef extent = p.meshes[PrimRow(scene, prim, kSlotMesh)].bounds;
+    const ShapeKind kind = ShapeKind(shape.record.kind);
+    bool bounded = kind != ShapeKind::Mesh && kind != ShapeKind::Points && !Infinite(scene, prim);
+    if (schema == SchemaId::Mesh || schema == SchemaId::Points) {
+        const ArrayRef extent = GeometryExtent(p, prim);
         bounded = extent.count >= 2;
         if (bounded) {
             const float3 lower = Ptr<Float3>(extent.address)[0].Vector();
@@ -111,8 +120,8 @@ void SlotBounds(uniform BoundsParams p) {
     const SchemaId schema = SchemaId(scene->prims.schema[drawn.prim]);
     float3 center = float3(0);
     float3 half = float3(1, 1, schema == SchemaId::Plane ? 0 : 1);
-    if (schema == SchemaId::Mesh) {
-        const ArrayRef extent = p.meshes[PrimRow(scene, drawn.prim, kSlotMesh)].bounds;
+    if (schema == SchemaId::Mesh || schema == SchemaId::Points) {
+        const ArrayRef extent = GeometryExtent(p, drawn.prim);
         if (extent.count < 2) {
             return;
         }

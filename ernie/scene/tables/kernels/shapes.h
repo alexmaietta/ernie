@@ -21,6 +21,8 @@ UnitShape PlaceAlong(WorldTransform w, ShapeKind kind, uint axis, float3 scale, 
                           axes[axis] * scale.z);
     shape.record.kind = uint(kind);
     shape.record.param = param;
+    shape.record.row = 0;
+    shape.record.padding = 0;
     return shape;
 }
 
@@ -61,6 +63,11 @@ UnitShape PlaceShape(AuthoredData* scene, uint prim, WorldTransform w) {
         const float3 scale = float3(radius, radius, reach);
         return PlaceAlong(w, ShapeKind::Capsule, scene->schemas.capsule.axis[row], scale,
                           reach / radius);
+    }
+    case SchemaId::Points: {
+        UnitShape shape = PlaceAlong(w, ShapeKind::Points, uint(Axis::Z), float3(1), 0);
+        shape.record.row = PrimRow(scene, prim, kSlotPoints);
+        return shape;
     }
     case SchemaId::SphereLight: {
         const float radius =

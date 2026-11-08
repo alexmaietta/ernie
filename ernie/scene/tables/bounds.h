@@ -31,9 +31,9 @@ class BoundsTable : public Table {
     std::span<const ColumnRef> Inputs() const override;
 
     std::span<const TableId> TableInputs() const override {
-        static constexpr TableId kTables[] = {TableId::Transforms, TableId::Imageables,
-                                              TableId::Meshes, TableId::MeshPoints,
-                                              TableId::Instances};
+        static constexpr TableId kTables[] = {
+            TableId::Transforms, TableId::Imageables,  TableId::Meshes,   TableId::MeshPoints,
+            TableId::Points,     TableId::PointsMoved, TableId::Instances};
         return kTables;
     }
 

@@ -6,6 +6,7 @@
 #include "ernie/scene/records/lights.h"
 #include "ernie/scene/records/materials.h"
 #include "ernie/scene/records/meshes.h"
+#include "ernie/scene/records/points.h"
 #include "ernie/scene/records/prims.h"
 #include "ernie/scene/records/products.h"
 #include "ernie/scene/records/semantics.h"
@@ -24,6 +25,7 @@ struct RenderTables {
     Ptr<ResolvedImageable> imageables;
     Ptr<MotionRecord> motions;
     Ptr<MeshRecord> meshes;
+    Ptr<PointsRecord> points;
     Ptr<TangentRecord> tangents;
     Ptr<SurfaceRecord> surfaces;
     Ptr<BoundableBox> primBounds;
@@ -48,6 +50,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 288);
+ERNIE_CHECK_SIZE(RenderTables, 296);
 
 }

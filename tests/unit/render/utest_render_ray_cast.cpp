@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/queue.h"
+#include "ernie/scene/records/points.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
@@ -165,6 +166,75 @@ TEST(RayCastTest, ReshapedMeshesHitTheirNewPoints) {
         const RayHits hits = caster.Cast(rays, options);
         EXPECT_NEAR(hits.distance.ToHost<float>().front(), 3, 1e-4);
         EXPECT_NEAR(hits.position.ToHost<float>()[2], 2, 1e-4);
+    });
+}
+
+TEST(RayCastTest, HitsEachPointAsASphereAsWideAsItsWidth) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Points>(
+            "/Spread", {.points = {{3, 0, 0}, {3, 5, 0}, {3, 10, 0}}, .widths = {2, 1, 0.5f}});
+        scene->Define<Points>(
+            "/Shared", {.translate = {0, 15, 0}, .points = {{3, 0, 0}, {3, 2, 0}}, .widths = {1}});
+        scene->Define<Points>("/Default", {.translate = {0, 20, 0}, .points = {{3, 0, 0}}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins =
+            Floats(device, {0, 0, 0, 0, 5, 0, 0, 10, 0, 0, 2.5f, 0, 0, 17, 0, 0, 20, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0}, 3);
+        const RayHits hits =
+            caster.Cast(rays, {.outputs = RayOutput::Distance | RayOutput::Prim |
+                                          RayOutput::Normal | RayOutput::Position});
+        const std::vector<uint32_t> hit = hits.hit.ToHost<uint32_t>();
+        const std::vector<float> distance = hits.distance.ToHost<float>();
+        const std::vector<uint32_t> prim = hits.prim.ToHost<uint32_t>();
+        const std::vector<float> normal = hits.normal.ToHost<float>();
+        const std::vector<float> position = hits.position.ToHost<float>();
+        EXPECT_EQ(hit, (std::vector<uint32_t>{1, 1, 1, 0, 1, 1}));
+        EXPECT_NEAR(distance[0], 2, 1e-4);
+        EXPECT_NEAR(distance[1], 2.5, 1e-4);
+        EXPECT_NEAR(distance[2], 2.75, 1e-4);
+        EXPECT_NEAR(distance[4], 2.5, 1e-4);
+        EXPECT_NEAR(distance[5], 3 - kDefaultPointWidth / 2, 1e-4);
+        EXPECT_EQ(prim[0], prim[1]);
+        EXPECT_NE(prim[0], prim[4]);
+        EXPECT_NEAR(normal[3], -1, 1e-4);
+        EXPECT_NEAR(position[3], 2.5, 1e-4);
+        EXPECT_NEAR(position[4], 5, 1e-4);
+    });
+}
+
+TEST(RayCastTest, MovedAndRecountedPointsHitWhereTheyAre) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim cloud =
+            scene->Define<Points>("/Cloud", {.points = {{3, 0, 0}, {3, 4, 0}}, .widths = {1}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0, 0, 0, 0, 4, 0, 0, 8, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0}, 3);
+        const auto cast = [&] { return caster.Cast(rays).distance.ToHost<float>(); };
+        std::vector<float> distance = cast();
+        EXPECT_NEAR(distance[0], 2.5, 1e-4);
+        EXPECT_NEAR(distance[1], 2.5, 1e-4);
+        EXPECT_TRUE(std::isinf(distance[2]));
+
+        cloud.Set(Points::kPoints, std::vector<Float3>{{6, 0, 0}, {3, 8, 0}});
+        distance = cast();
+        EXPECT_NEAR(distance[0], 5.5, 1e-4);
+        EXPECT_TRUE(std::isinf(distance[1]));
+        EXPECT_NEAR(distance[2], 2.5, 1e-4);
+
+        cloud.Set(Points::kPoints, std::vector<Float3>{{3, 0, 0}, {4, 4, 0}, {5, 8, 0}});
+        cloud.Set(Points::kWidths, std::vector<float>{2, 1, 3});
+        distance = cast();
+        EXPECT_NEAR(distance[0], 2, 1e-4);
+        EXPECT_NEAR(distance[1], 3.5, 1e-4);
+        EXPECT_NEAR(distance[2], 3.5, 1e-4);
+
+        cloud.Set(Points::kPoints, std::vector<Float3>{});
+        distance = cast();
+        EXPECT_TRUE(std::isinf(distance[0]) && std::isinf(distance[1]) && std::isinf(distance[2]));
     });
 }
 

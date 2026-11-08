@@ -12,10 +12,12 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-ShapeHit CenteredShapeHit(ShapeRecord record, Ray ray) {
+ShapeHit CenteredShapeHit(ShapeRecord record, float radius, Ray ray) {
     switch (ShapeKind(record.kind)) {
     case ShapeKind::Sphere:
         return Sphere(1).Intersect(ray);
+    case ShapeKind::Points:
+        return Sphere(radius).Intersect(ray);
     case ShapeKind::Plane:
         return Plane(2, 2).Intersect(ray);
     case ShapeKind::Cylinder:
@@ -44,12 +46,19 @@ ShapeHit CenteredShapeHit(ShapeRecord record, Ray ray) {
     }
 }
 
-ShapeHit UnitShapeHit(ShapeRecord record, Ray ray) {
-    const float closest = -dot(ray.origin, ray.direction) / dot(ray.direction, ray.direction);
-    Ray centered = ray;
-    centered.origin = ray.origin + closest * ray.direction;
-    centered.tMin = ray.tMin - closest;
-    ShapeHit hit = CenteredShapeHit(record, centered);
+ShapeHit LocalShapeHit(ShapeRecord record, Ptr<PointsRecord> points, uint primitive, Ray ray) {
+    Ray local = ray;
+    float radius = 1;
+    if (ShapeKind(record.kind) == ShapeKind::Points) {
+        const PointsRecord cloud = points[record.row];
+        local.origin -= Ptr<Float3>(cloud.points)[primitive].Vector();
+        radius = PointRadius(cloud, primitive);
+    }
+    const float closest = -dot(local.origin, local.direction) / dot(local.direction, local.direction);
+    Ray centered = local;
+    centered.origin = local.origin + closest * local.direction;
+    centered.tMin = local.tMin - closest;
+    ShapeHit hit = CenteredShapeHit(record, radius, centered);
     hit.t += closest;
     return hit;
 }
@@ -57,26 +66,27 @@ ShapeHit UnitShapeHit(ShapeRecord record, Ray ray) {
 #if !ERNIE_VULKAN
 [noinline]
 #endif
-ShapeHit IntersectUnitShape(ShapeRecord record, Ray ray) {
-    return UnitShapeHit(record, ray);
+ShapeHit IntersectShape(ShapeRecord record, Ptr<PointsRecord> points, uint primitive, Ray ray) {
+    return LocalShapeHit(record, points, primitive, ray);
 }
 
 #if !ERNIE_VULKAN
 [noinline]
 #endif
-float UnitShapeDistance(ShapeRecord record, Ray ray) {
-    const ShapeHit hit = UnitShapeHit(record, ray);
+float ShapeDistance(ShapeRecord record, Ptr<PointsRecord> points, uint primitive, Ray ray) {
+    const ShapeHit hit = LocalShapeHit(record, points, primitive, ray);
     return hit.inside ? hit.t : kInfinity;
 }
 
 struct ShapeIntersector : IIntersector {
     Ptr<ShapeRecord> shapes;
+    Ptr<PointsRecord> points;
     uint first;
 
     bool Intersect(Ray ray, uint instance, uint geometry, uint primitive, inout float t,
                    out float2 attributes) {
         attributes = float2(0);
-        const float distance = UnitShapeDistance(shapes[first + instance], ray);
+        const float distance = ShapeDistance(shapes[first + instance], points, primitive, ray);
         if (distance >= t) {
             return false;
         }

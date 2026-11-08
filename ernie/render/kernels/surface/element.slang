@@ -7,6 +7,7 @@ using namespace ernie;
 
 struct SurfaceElement {
     bool mesh;
+    bool indexed;
     uint triangle;
     uint face;
     uint3 corners;
@@ -16,11 +17,21 @@ struct SurfaceElement {
     static SurfaceElement Shape(uint primitive) {
         SurfaceElement element;
         element.mesh = false;
+        element.indexed = false;
         element.triangle = primitive;
         element.face = 0;
         element.corners = uint3(0);
         element.points = uint3(0);
         element.weights = float3(1, 0, 0);
+        return element;
+    }
+
+    static SurfaceElement Point(uint index) {
+        SurfaceElement element = Shape(index);
+        element.indexed = true;
+        element.face = index;
+        element.corners = uint3(index);
+        element.points = uint3(index);
         return element;
     }
 }
@@ -31,6 +42,7 @@ SurfaceElement FindSurfaceElement(SurfaceRecord surface, Hit hit) {
         return element;
     }
     element.mesh = true;
+    element.indexed = true;
     const Ptr<uint> corners = Ptr<uint>(surface.corners);
     const Ptr<int> indices = Ptr<int>(surface.indices);
     element.corners = uint3(corners[hit.primitive * 3 + 0], corners[hit.primitive * 3 + 1],

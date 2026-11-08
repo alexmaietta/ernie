@@ -39,6 +39,8 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     if (ShapeKind(shape.record.kind) == ShapeKind::Mesh) {
         blas = schema == SchemaId::Mesh ? p.meshes[PrimRow(scene, prim, kSlotMesh)].blas
                                         : 0;
+    } else if (ShapeKind(shape.record.kind) == ShapeKind::Points) {
+        blas = p.points[shape.record.row].blas;
     }
     const bool point =
         (schema == SchemaId::SphereLight &&

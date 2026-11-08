@@ -31,7 +31,9 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     point.slot = primHit.slot;
     point.distance = primHit.hit.t;
     const SurfaceRecord surface = query.tables->surfaces[primHit.slot];
-    point.element = FindSurfaceElement(surface, primHit.hit);
+    const bool cloud = ShapeKind(primHit.shape.kind) == ShapeKind::Points;
+    point.element = cloud ? SurfaceElement.Point(primHit.hit.primitive)
+                          : FindSurfaceElement(surface, primHit.hit);
     float3 error;
 
     if (point.element.mesh) {
@@ -49,7 +51,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
         point.shadingNormal = MeshShadingNormal(surface, space, point.element);
     } else {
         const Ray local = space.ToObject(ray);
-        const ShapeHit hit = IntersectUnitShape(primHit.shape, local);
+        const ShapeHit hit =
+            IntersectShape(primHit.shape, query.tables->points, primHit.hit.primitive, local);
         const float3 along = hit.t * local.direction;
         const float3 at = local.origin + along;
         point.position = space.ToWorld(at);

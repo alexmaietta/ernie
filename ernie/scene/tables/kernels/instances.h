@@ -4,6 +4,7 @@
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/scene/records/instances.h"
 #include "ernie/scene/records/meshes.h"
+#include "ernie/scene/records/points.h"
 #include "ernie/scene/tables/kernels/authored.h"
 #include "ernie/scene/tables/kernels/instance_layout.h"
 
@@ -20,11 +21,12 @@ struct InstanceParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
+    Ptr<PointsRecord> points;
     Ptr<WorldTransform> slotWorlds;
     uint64_t unitBox;
 };
 
-ERNIE_CHECK_SIZE(InstanceParams, 96);
+ERNIE_CHECK_SIZE(InstanceParams, 104);
 
 struct OriginParams {
     Ptr<AuthoredData> scene;

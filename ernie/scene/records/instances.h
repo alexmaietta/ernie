@@ -47,6 +47,7 @@ ERNIE_ENUM(ShapeKind){
     Capsule,
     Disk,
     Tube,
+    Points,
 };
 
 static const uint kGeometryMask = 1u;
@@ -56,9 +57,11 @@ static const uint kEmitterMask = 4u;
 struct ShapeRecord {
     uint kind;
     float param;
+    uint row;
+    uint padding;
 };
 
-ERNIE_CHECK_SIZE(ShapeRecord, 8);
+ERNIE_CHECK_SIZE(ShapeRecord, 16);
 
 ERNIE_SHARED bool IsEmitter(uint schema) {
     switch (SchemaId(schema)) {

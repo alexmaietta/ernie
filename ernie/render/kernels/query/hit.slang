@@ -97,6 +97,7 @@ struct HitQuery {
     ShapeIntersector Intersector() {
         ShapeIntersector intersector;
         intersector.shapes = layout->shapes;
+        intersector.points = tables->points;
         intersector.first = layout->firstInstances[tlas];
         return intersector;
     }
@@ -114,6 +115,8 @@ struct HitQuery {
         primHit.slot = 0;
         primHit.shape.kind = uint(ShapeKind::Mesh);
         primHit.shape.param = 0;
+        primHit.shape.row = 0;
+        primHit.shape.padding = 0;
         if (primHit.IsHit()) {
             const uint slot = layout->firstInstances[tlas] + primHit.hit.instance;
             primHit.slot = slot;

@@ -64,7 +64,7 @@ bool ReadPrimvar(PrimvarRef primvar, SurfaceElement element, out float4 value) {
         return false;
     }
     const Interpolation interpolation = Interpolation(primvar.entry.interpolation);
-    if (!element.mesh && interpolation != Interpolation::Constant) {
+    if (!element.indexed && interpolation != Interpolation::Constant) {
         return false;
     }
     uint3 indices = InterpolationIndices(element, interpolation);

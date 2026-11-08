@@ -136,10 +136,11 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
             columns, [&](ColumnRef column) { return store.LastWrite(column) > m_seen; });
     };
     const bool activated = changes.Wrote(TableId::Imageables) || changes.Wrote(TableId::Meshes) ||
-                           written(kActivation);
+                           changes.Wrote(TableId::Points) || written(kActivation);
     const bool placed = relaid || restacked || activated || !structural.empty() ||
                         changes.Wrote(TableId::Transforms) || changes.Wrote(TableId::MeshPoints) ||
-                        written(kPlacement) || written(kLayoutInputs);
+                        changes.Wrote(TableId::PointsMoved) || written(kPlacement) ||
+                        written(kLayoutInputs);
     m_seen = seen;
 
     m_stats = {};
@@ -195,6 +196,7 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
+    params.points = changes.tables->points;
     params.slotWorlds.address = m_slotWorlds.Address();
     params.unitBox = m_unitBox->Handle();
 

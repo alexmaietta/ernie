@@ -407,6 +407,18 @@ class Mesh : PointBased (
     bool doubleSided = true
 }
 
+class Points : PointBased (
+    doc = "Particles, each drawn as a sphere at its point as wide as its width."
+) {
+    float[] widths (
+        tracked
+        unit = meters
+        group = "Geometry"
+        displayName = "Widths"
+        doc = "The diameter of each point, or a single diameter for every point. Empty draws each point 1 cm wide."
+    )
+}
+
 class PointInstancer : Boundable (
     doc = "Copies of prototype prims, one per entry of positions, each placed by its position, orientation and scale."
 ) {
