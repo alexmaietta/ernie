@@ -19,6 +19,8 @@ void ResolveFunctions(SymbolResolver& resolve, Api& api) {
     resolve("hipGetDeviceCount", api.hipGetDeviceCount);
     resolve("hipGetErrorName", api.hipGetErrorName);
     resolve("hipGetErrorString", api.hipGetErrorString);
+    resolve("hipGetLastError", api.hipGetLastError);
+    resolve("hipPeekAtLastError", api.hipPeekAtLastError);
     resolve("hipDeviceGetName", api.hipDeviceGetName);
     resolve("hipDeviceGetUuid", api.hipDeviceGetUuid);
     resolve("hipDeviceTotalMem", api.hipDeviceTotalMem);
