@@ -889,7 +889,6 @@ void RegisterMapping(nb::module_& module) {
 void RegisterSnapshot(nb::module_& module) {
     nb::class_<Snapshot>(module, "Snapshot")
         .def_ro("ordinal", &Snapshot::ordinal)
-        .def_ro("scene_data", &Snapshot::sceneData)
         .def_ro("tables", &Snapshot::tables)
         .def_prop_ro("ready", [](const Snapshot& snapshot) { return snapshot.ready.Ready(); });
 }

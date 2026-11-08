@@ -57,7 +57,6 @@ struct ERNIE_API Box {
 struct ERNIE_API Snapshot {
     Ordinal ordinal = 0;
     device::Operation ready;
-    uint64_t sceneData = 0;
     uint64_t tables = 0;
     std::shared_ptr<const void> pinned;
 };

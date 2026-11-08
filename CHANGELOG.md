@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `Snapshot::sceneData` and Python's `snapshot.scene_data`. Render kernels read only the render tables a snapshot's `tables` points at, so the authored columns no longer travel with a snapshot.
 - The derived attributes `ernie:worldTransform`, `ernie:computedVisibility`, `ernie:computedPurpose` and `ernie:computedMaterial`. The hierarchy system keeps them in its own tables, and world transforms are read through `WorldTransforms` instead.
 - The derived mesh attributes `ernie:blas`, `ernie:triangleCorners`, `ernie:triangleFaces`, `ernie:pointTriangleStarts`, `ernie:pointTriangles`, `ernie:pointBounds`, `ernie:smoothNormals`, `ernie:tangents` and `ernie:tangentPrimvar`. The geometry and tangents systems keep them in mesh and tangent records.
 - The derived attributes `ernie:worldMin` and `ernie:worldMax` on boundable prims, and `ernie:textures` and `ernie:textureSize` on materials and lights. The bounds and textures systems keep them in their own tables, and prim boxes are read through `PrimBounds`. No derived attributes remain in the schemas, and the `derived` schema keyword is gone, so a schema that uses it fails to build. The catalog's `instance` and `next` columns on multiple-apply APIs are flagged `Internal` and no longer show in the viewer's properties panel.

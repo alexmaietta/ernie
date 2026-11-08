@@ -135,7 +135,7 @@ TEST(SceneTest, SnapshotsCarryEverySystemsOutput) {
         EXPECT_EQ(scene.Published(), 1u);
         const Snapshot snapshot = scene.Acquire(Stream::Host());
         EXPECT_EQ(snapshot.ordinal, 1u);
-        EXPECT_NE(snapshot.sceneData, 0u);
+        EXPECT_NE(snapshot.tables, 0u);
         const PinnedTables& pinned = PinnedTables::From(snapshot);
         EXPECT_EQ(snapshot.tables, pinned.header->Address());
         EXPECT_NE(pinned.tables.instances.address, 0u);

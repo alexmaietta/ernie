@@ -251,7 +251,7 @@ Snapshot Timeline::Acquire(Stream consumer) {
     Store& store = m_catalog.GetStore();
     Snapshot snapshot;
     snapshot.ordinal = Published();
-    snapshot.sceneData = store.DeviceData();
+    store.DeviceData();
     if (!m_pinned) {
         Seal();
     }

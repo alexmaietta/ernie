@@ -218,7 +218,7 @@ TEST(TimelineTest, SnapshotsAreCountedAndOrdered) {
         timeline.Publish(1);
         const Snapshot snapshot = timeline.Acquire(Stream::Host());
         EXPECT_EQ(snapshot.ordinal, 1u);
-        EXPECT_NE(snapshot.sceneData, 0u);
+        EXPECT_NE(snapshot.tables, 0u);
         EXPECT_TRUE(snapshot.ready.Ready());
         EXPECT_EQ(timeline.Outstanding(), 1u);
         timeline.Release(snapshot);
