@@ -470,7 +470,6 @@ void ProductTable::Resolve() {
 }
 
 void ProductTable::ScheduleCaptures() {
-    m_scheduled = m_clock.steps;
     if (m_clock.resets != m_resets) {
         m_resets = m_clock.resets;
         m_schedules.clear();
@@ -490,8 +489,14 @@ void ProductTable::ScheduleCaptures() {
             const double first = std::ceil((m_clock.start - start) * rate - kCaptureTolerance);
             schedule = {rate, start, std::max<int64_t>(0, int64_t(first))};
         }
+        if (schedule.step == m_clock.steps) {
+            product.due = schedule.due;
+            continue;
+        }
+        schedule.step = m_clock.steps;
         const double reached = (m_clock.end - start) * rate + kCaptureTolerance;
-        product.due = double(schedule.next) <= reached;
+        schedule.due = double(schedule.next) <= reached;
+        product.due = schedule.due;
         if (!product.due) {
             continue;
         }

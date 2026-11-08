@@ -1213,6 +1213,107 @@ OverlayPick Overlays::Pick(std::string_view product, Float2 pixel, float radius,
     return OverlayPick(std::move(state));
 }
 
+bool OverlaysImpl::Outlined() const {
+    const std::lock_guard lock(mutex);
+    return std::ranges::any_of(layers, [](const auto& entry) { return entry.second->Outlined(); });
+}
+
+std::vector<std::shared_ptr<OverlayPickState>>
+OverlaysImpl::TakePicks(std::span<const std::string> products) {
+    const std::lock_guard lock(mutex);
+    std::vector<std::shared_ptr<OverlayPickState>> taken;
+    std::vector<std::shared_ptr<OverlayPickState>> waiting;
+    for (std::shared_ptr<OverlayPickState>& pick : picks) {
+        const bool served = std::ranges::find(products, pick->product) != products.end();
+        (served ? taken : waiting).push_back(std::move(pick));
+    }
+    picks = std::move(waiting);
+    return taken;
+}
+
+void OverlayPass::Serve(std::span<const std::shared_ptr<OverlayPickState>> picks,
+                        const device::Operation& done) {
+    for (const std::shared_ptr<OverlayPickState>& pick : picks) {
+        {
+            const std::lock_guard lock(pick->mutex);
+            pick->recorded = true;
+            pick->done = done;
+        }
+        pick->served.notify_all();
+    }
+}
+
+std::vector<OverlayContents>
+OverlayPass::Draw(device::CommandEncoder& encoder, const Snapshot& snapshot, uint32_t worldCount,
+                  const OverlaysImpl& overlays, std::span<const OverlayOutput> outputs,
+                  std::span<const OverlayCameraSource> cameraImages,
+                  std::span<const std::shared_ptr<OverlayPickState>> picks) {
+    std::vector<std::pair<std::string, OverlayContents>> named;
+    {
+        const std::lock_guard lock(overlays.mutex);
+        named.assign(overlays.layers.begin(), overlays.layers.end());
+    }
+    const auto matches = [](const std::vector<std::string>& patterns, std::string_view name) {
+        return std::ranges::any_of(patterns, [&](const std::string& pattern) {
+            return pattern.ends_with('*')
+                       ? name.starts_with(std::string_view(pattern).substr(0, pattern.size() - 1))
+                       : name == pattern;
+        });
+    };
+
+    std::vector<OverlayContents> used;
+    std::vector<std::string> names;
+    std::vector<uint32_t> slots(named.size(), ~0u);
+    std::vector<OverlayTarget> targets;
+    std::vector<std::pair<std::string_view, uint32_t>> keys;
+    for (const OverlayOutput& view : outputs) {
+        encoder.Fill(view.image->GetBuffer());
+        uint64_t mask = 0;
+        for (size_t at = 0; at < named.size(); ++at) {
+            if (!matches(*view.layers, named[at].first)) {
+                continue;
+            }
+            if (slots[at] == ~0u) {
+                slots[at] = uint32_t(used.size());
+                used.push_back(named[at].second);
+                names.push_back(named[at].first);
+            }
+            if (slots[at] < kMostOverlays) {
+                mask |= uint64_t(1) << slots[at];
+            }
+        }
+        for (OverlayTarget target : view.targets) {
+            target.overlays = mask;
+            targets.push_back(target);
+            keys.emplace_back(view.product, target.layer);
+        }
+    }
+    if (targets.empty() || used.empty()) {
+        return used;
+    }
+    std::vector<OverlayPickRequest> requests;
+    std::vector<std::shared_ptr<OverlayPickState>> answered;
+    for (const std::shared_ptr<OverlayPickState>& pick : picks) {
+        const auto target = std::ranges::find(
+            keys, std::pair<std::string_view, uint32_t>(pick->product, pick->layer));
+        if (target == keys.end()) {
+            continue;
+        }
+        pick->readback = m_device.CreateBuffer({.bytes = sizeof(OverlayPickResult),
+                                                .memory = device::Memory::Readback,
+                                                .label = "overlay pick"});
+        requests.push_back(
+            {uint32_t(target - keys.begin()), pick->pixel, pick->radius, pick->readback});
+        answered.push_back(pick);
+    }
+    Record(encoder, snapshot, worldCount, targets, used, cameraImages, requests);
+    for (const std::shared_ptr<OverlayPickState>& pick : answered) {
+        pick->names = names;
+        pick->sources = m_batchSources;
+    }
+    return used;
+}
+
 OverlayContents OverlayPass::Share(const Overlay& overlay) {
     return overlay.Empty() ? nullptr : overlay.m_data;
 }

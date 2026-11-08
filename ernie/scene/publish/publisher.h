@@ -31,6 +31,10 @@ class Publisher {
   public:
     explicit Publisher(Structure& structure) : m_structure(structure) {}
 
+    uint64_t TableRuns() const {
+        return m_tableRuns;
+    }
+
     Ordinal Published() const {
         return m_sealed.empty() ? 0 : m_sealed.back().ordinal;
     }
@@ -81,6 +85,7 @@ class Publisher {
     uint32_t m_outstanding = 0;
     RenderTables m_tables{};
     TableVersions m_versions;
+    uint64_t m_tableRuns = 0;
     std::shared_ptr<const PinnedTables> m_pinned;
 };
 

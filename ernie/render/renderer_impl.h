@@ -62,6 +62,7 @@ class RendererImpl {
         std::vector<OwnedVar> vars;
         std::vector<OwnedOverlay> overlays;
         std::vector<OwnedCloud> clouds;
+        std::map<uint32_t, uint64_t> traced;
         bool outlined = false;
     };
 
@@ -76,11 +77,8 @@ class RendererImpl {
     uint64_t AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
                           const ResolvedProduct& product, const ResolvedVar& var, uint64_t next);
     device::Operation Trace(const ProductPlan& plan, const OutputSet& set,
-                            const std::set<uint32_t>& due, const Snapshot& snapshot);
-    std::vector<OverlayContents> RecordOverlays(device::CommandEncoder& encoder,
-                                                const ProductPlan& plan, const OutputSet& set,
-                                                const std::set<uint32_t>& due,
-                                                const Snapshot& snapshot);
+                            const std::set<uint32_t>& due, const std::set<uint32_t>& stale,
+                            const Snapshot& snapshot);
 
     Ref<Scene> m_scene;
     uint64_t m_maxPixelsPerLaunch;
@@ -93,7 +91,6 @@ class RendererImpl {
 
     std::mutex m_stepMutex;
     std::optional<OverlayPass> m_overlayPass;
-    std::vector<std::shared_ptr<OverlayPickState>> m_servedPicks;
 };
 
 }

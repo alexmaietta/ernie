@@ -99,7 +99,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         published = m_scene->Publish({}, stream);
     }
     const Snapshot snapshot = m_scene->Acquire();
-    const OutputSet& set = AcquireSet(plan);
+    OutputSet& set = AcquireSet(plan);
     SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
     for (size_t index = 0; index < planned.products.size(); ++index) {
         const ResolvedProduct& product = planned.products[index];
@@ -142,7 +142,16 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    result.m_done = planned.captureCount > 0 ? Trace(planned, set, due, snapshot) : published;
+    const uint64_t runs = SceneImpl::Get(*m_scene).GetPublisher().TableRuns();
+    std::set<uint32_t> stale;
+    for (const uint32_t prim : due) {
+        if (const auto traced = set.traced.find(prim);
+            traced == set.traced.end() || traced->second != runs) {
+            stale.insert(prim);
+            set.traced[prim] = runs;
+        }
+    }
+    result.m_done = Trace(planned, set, due, stale, snapshot);
     m_scene->Release(snapshot);
     return result;
 }
@@ -174,13 +183,7 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
 }
 
 RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
-    bool outlined = false;
-    {
-        const OverlaysImpl& overlays = OverlaysImpl::Get(*m_overlays);
-        const std::lock_guard lock(overlays.mutex);
-        outlined = std::ranges::any_of(overlays.layers,
-                                       [](const auto& entry) { return entry.second->Outlined(); });
-    }
+    const bool outlined = OverlaysImpl::Get(*m_overlays).Outlined();
     for (OutputSet& set : plan.sets) {
         if (set.outlined == outlined &&
             std::ranges::all_of(
@@ -338,7 +341,8 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::s
 }
 
 device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& set,
-                                      const std::set<uint32_t>& due, const Snapshot& snapshot) {
+                                      const std::set<uint32_t>& due,
+                                      const std::set<uint32_t>& stale, const Snapshot& snapshot) {
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
     params.tables.address = snapshot.tables;
@@ -351,7 +355,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
         std::vector<Capture> captures;
         uint64_t pixelCount = 0;
         for (Capture capture : set.captures[entry]) {
-            if (due.contains(capture.product)) {
+            if (stale.contains(capture.product)) {
                 capture.firstPixel = pixelCount;
                 pixelCount += uint64_t(capture.width) * capture.height;
                 captures.push_back(capture);
@@ -374,7 +378,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
     }
     encoder.Concurrent(false);
     for (const OwnedCloud& cloud : set.clouds) {
-        if (!due.contains(cloud.product)) {
+        if (!stale.contains(cloud.product)) {
             continue;
         }
         if (cloud.slots > m_scanCapacity) {
@@ -390,137 +394,63 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});
     }
     encoder.EndZone();
-    auto overlays = std::make_shared<std::vector<OverlayContents>>(
-        RecordOverlays(encoder, plan, set, due, snapshot));
-    const device::Operation done = queue.Submit(encoder.Finish());
-    if (!overlays->empty()) {
-        queue.Retire(std::move(overlays), done);
-    }
-    for (const std::shared_ptr<OverlayPickState>& pick : m_servedPicks) {
-        {
-            const std::lock_guard lock(pick->mutex);
-            pick->recorded = true;
-            pick->done = done;
+    std::vector<std::string> stepped;
+    std::vector<OverlayOutput> views;
+    for (size_t index = 0; index < plan.products.size(); ++index) {
+        if (due.contains(plan.products[index].prim)) {
+            stepped.push_back(plan.paths[index]);
         }
-        pick->served.notify_all();
     }
-    m_servedPicks.clear();
-    return done;
-}
-
-std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder& encoder,
-                                                          const ProductPlan& plan,
-                                                          const OutputSet& set,
-                                                          const std::set<uint32_t>& due,
-                                                          const Snapshot& snapshot) {
-    std::vector<std::pair<std::string, OverlayContents>> named;
-    {
-        OverlaysImpl& overlays = OverlaysImpl::Get(*m_overlays);
-        const std::lock_guard lock(overlays.mutex);
-        named.assign(overlays.layers.begin(), overlays.layers.end());
-        std::vector<std::shared_ptr<OverlayPickState>> waiting;
-        for (std::shared_ptr<OverlayPickState>& pick : overlays.picks) {
-            const auto path = std::ranges::find(plan.paths, pick->product);
-            const bool served = path != plan.paths.end() &&
-                                due.contains(plan.products[size_t(path - plan.paths.begin())].prim);
-            (served ? m_servedPicks : waiting).push_back(std::move(pick));
-        }
-        overlays.picks = std::move(waiting);
-    }
-    if (set.overlays.empty()) {
-        return {};
-    }
-    const auto matches = [](const std::vector<std::string>& patterns, std::string_view name) {
-        return std::ranges::any_of(patterns, [&](const std::string& pattern) {
-            return pattern.ends_with('*')
-                       ? name.starts_with(std::string_view(pattern).substr(0, pattern.size() - 1))
-                       : name == pattern;
-        });
-    };
-
-    std::vector<OverlayContents> used;
-    std::vector<std::string> names;
-    std::vector<uint32_t> slots(named.size(), ~0u);
-    std::vector<OverlayTarget> targets;
-    std::vector<std::pair<std::string, uint32_t>> targetKeys;
     for (const OwnedOverlay& overlay : set.overlays) {
         const ResolvedProduct& product = plan.products[overlay.product];
         if (!due.contains(product.prim)) {
             continue;
         }
-        encoder.Fill(overlay.tensor.GetBuffer());
-        const std::vector<std::string>& patterns = product.overlays;
-        uint64_t mask = 0;
-        for (size_t at = 0; at < named.size(); ++at) {
-            if (!matches(patterns, named[at].first)) {
+        OverlayOutput& view = views.emplace_back(
+            OverlayOutput{plan.paths[overlay.product], &product.overlays, &overlay.tensor, {}});
+        for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
+            view.targets.push_back({.camera = product.sensors[layer],
+                                    .layer = layer,
+                                    .width = product.record.width,
+                                    .height = product.record.height,
+                                    .missDistance = product.record.missDistance,
+                                    .overlay = overlay.tensor.Address(),
+                                    .depth = overlay.depth,
+                                    .primIds = overlay.primIds ? overlay.primIds->Address() : 0});
+        }
+    }
+    OverlaysImpl& overlays = OverlaysImpl::Get(*m_overlays);
+    const std::vector<std::shared_ptr<OverlayPickState>> picks = overlays.TakePicks(stepped);
+    std::vector<OverlayContents> drawn;
+    if (!views.empty()) {
+        std::vector<OverlayCameraSource> cameraImages;
+        for (const OwnedVar& var : set.vars) {
+            const ResolvedProduct& product = plan.products[var.product];
+            const auto source =
+                std::ranges::find_if(product.vars, [&](const ResolvedVar& candidate) {
+                    return candidate.path == var.renderVar &&
+                           candidate.source == RenderVarSource::LdrColor;
+                });
+            if (!due.contains(product.prim) || source == product.vars.end() ||
+                !IsA(SchemaId(product.record.sensorSchema), SchemaId::Camera)) {
                 continue;
             }
-            if (slots[at] == ~0u) {
-                slots[at] = uint32_t(used.size());
-                used.push_back(named[at].second);
-                names.push_back(named[at].first);
-            }
-            if (slots[at] < kMostOverlays) {
-                mask |= uint64_t(1) << slots[at];
+            for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
+                cameraImages.push_back({product.sensors[layer], var.tensor.Select(layer)});
             }
         }
-        for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
-            targets.push_back({.camera = product.sensors[layer],
-                               .layer = layer,
-                               .width = product.record.width,
-                               .height = product.record.height,
-                               .missDistance = product.record.missDistance,
-                               .overlay = overlay.tensor.Address(),
-                               .depth = overlay.depth,
-                               .overlays = mask,
-                               .primIds = overlay.primIds ? overlay.primIds->Address() : 0});
-            targetKeys.emplace_back(plan.paths[overlay.product], layer);
+        if (!m_overlayPass) {
+            m_overlayPass.emplace(m_scene->GetDevice());
         }
+        drawn = m_overlayPass->Draw(encoder, snapshot, m_scene->WorldCount(), overlays, views,
+                                    cameraImages, picks);
     }
-    if (targets.empty() || used.empty()) {
-        return {};
+    const device::Operation done = queue.Submit(encoder.Finish());
+    if (!drawn.empty()) {
+        queue.Retire(std::make_shared<std::vector<OverlayContents>>(std::move(drawn)), done);
     }
-    std::vector<OverlayCameraSource> cameraImages;
-    for (const OwnedVar& var : set.vars) {
-        const ResolvedProduct& product = plan.products[var.product];
-        if (!due.contains(product.prim) ||
-            !IsA(SchemaId(product.record.sensorSchema), SchemaId::Camera)) {
-            continue;
-        }
-        const auto source = std::ranges::find_if(product.vars, [&](const ResolvedVar& candidate) {
-            return candidate.path == var.renderVar && candidate.source == RenderVarSource::LdrColor;
-        });
-        if (source == product.vars.end()) {
-            continue;
-        }
-        for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
-            cameraImages.push_back({product.sensors[layer], var.tensor.Select(layer)});
-        }
-    }
-    std::vector<OverlayPickRequest> picks;
-    std::vector<std::shared_ptr<OverlayPickState>> answered;
-    for (const std::shared_ptr<OverlayPickState>& pick : m_servedPicks) {
-        const auto target = std::ranges::find(targetKeys, std::pair(pick->product, pick->layer));
-        if (target == targetKeys.end()) {
-            continue;
-        }
-        pick->readback = m_scene->GetDevice().CreateBuffer({.bytes = sizeof(OverlayPickResult),
-                                                            .memory = device::Memory::Readback,
-                                                            .label = "overlay pick"});
-        picks.push_back(
-            {uint32_t(target - targetKeys.begin()), pick->pixel, pick->radius, pick->readback});
-        answered.push_back(pick);
-    }
-    if (!m_overlayPass) {
-        m_overlayPass.emplace(m_scene->GetDevice());
-    }
-    m_overlayPass->Record(encoder, snapshot, m_scene->WorldCount(), targets, used, cameraImages,
-                          picks);
-    for (const std::shared_ptr<OverlayPickState>& pick : answered) {
-        pick->names = names;
-        pick->sources = m_overlayPass->BatchSources();
-    }
-    return used;
+    OverlayPass::Serve(picks, done);
+    return done;
 }
 
 Renderer::Renderer(Ref<Scene> scene, const RendererDesc& desc)

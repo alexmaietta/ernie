@@ -155,6 +155,7 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         const uint64_t logged = m_versions.Sequence();
         changes.tables = &m_tables;
         ++table.m_runs;
+        ++m_tableRuns;
         table.Run(changes, m_versions);
         table.Describe(m_tables);
         scheduled.writes = writes;

@@ -113,6 +113,13 @@ struct OverlayCameraSource {
 
 using OverlayContents = std::shared_ptr<const OverlayData>;
 
+struct OverlayOutput {
+    std::string_view product;
+    const std::vector<std::string>* layers = nullptr;
+    const device::Tensor* image = nullptr;
+    std::vector<OverlayTarget> targets;
+};
+
 struct OverlayFont {
     std::array<OverlayGlyph, 256> glyphs{};
     std::vector<int8_t> kerning;
@@ -124,6 +131,9 @@ struct OverlaysImpl {
     static OverlaysImpl& Get(Overlays& overlays) {
         return *overlays.m_impl;
     }
+
+    bool Outlined() const;
+    std::vector<std::shared_ptr<OverlayPickState>> TakePicks(std::span<const std::string> products);
 
     device::Device& device;
     mutable std::mutex mutex;
@@ -139,6 +149,14 @@ class OverlayPass {
     explicit OverlayPass(device::Device& device);
 
     static OverlayContents Share(const Overlay& overlay);
+    static void Serve(std::span<const std::shared_ptr<OverlayPickState>> picks,
+                      const device::Operation& done);
+
+    std::vector<OverlayContents> Draw(device::CommandEncoder& encoder, const Snapshot& snapshot,
+                                      uint32_t worldCount, const OverlaysImpl& overlays,
+                                      std::span<const OverlayOutput> outputs,
+                                      std::span<const OverlayCameraSource> cameraImages,
+                                      std::span<const std::shared_ptr<OverlayPickState>> picks);
     static void CheckDevice(const OverlayData& overlay, device::Device& device);
 
     void Record(device::CommandEncoder& encoder, const Snapshot& snapshot, uint32_t worldCount,

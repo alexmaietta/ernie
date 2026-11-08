@@ -128,10 +128,6 @@ class ProductTable : public Table {
 
     std::span<const ColumnRef> Inputs() const override;
 
-    bool Pending() const override {
-        return m_clock.steps != m_scheduled;
-    }
-
     void Run(const ChangeSet& changes, TableVersions& versions) override;
     void Describe(RenderTables& tables) const override;
 
@@ -141,17 +137,19 @@ class ProductTable : public Table {
 
     const ResolvedProduct* Find(uint32_t prim) const;
     std::shared_ptr<const ProductPlan> Plan(std::span<const std::string> paths);
+    void ScheduleCaptures();
 
   private:
     struct Schedule {
         float frameRate = 0;
         float startTime = 0;
         int64_t next = 0;
+        uint64_t step = ~uint64_t(0);
+        bool due = true;
     };
 
     ResolvedProduct Resolve(uint32_t prim) const;
     void Resolve();
-    void ScheduleCaptures();
 
     Scene& m_scene;
     Structure& m_structure;
@@ -160,7 +158,6 @@ class ProductTable : public Table {
     uint64_t m_versions = 0;
     const SimulationClock& m_clock;
     std::map<uint32_t, Schedule> m_schedules;
-    uint64_t m_scheduled = ~uint64_t(0);
     uint64_t m_resets = 0;
     uint64_t m_seen = 0;
     std::mutex m_planMutex;

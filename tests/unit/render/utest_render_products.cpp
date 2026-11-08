@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include "ernie/device/commands.h"
+#include "ernie/device/queue.h"
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/scene.h"
@@ -93,6 +95,31 @@ TEST(ProductsTest, ABrokenProductFailsOnlyWhenSteppedAndRecoversOnceFixed) {
         RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Broken"}, 0);
         output.Wait();
         EXPECT_EQ(output["/Render/Broken"].frames.size(), 1u);
+    });
+}
+
+TEST(ProductsTest, StepsKeepTracedPixelsUntilTheSceneChanges) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = OneCamera(device);
+        Renderer renderer(scene);
+        const auto depth = [&] {
+            RenderOutput output = renderer.Step(kProducts, 0);
+            output.Wait();
+            return output["/Render/View"].frames.at(0).Source("DistanceToCamera").tensor;
+        };
+        device::Tensor traced = depth();
+        const uint64_t address = traced.Address();
+        device::CommandEncoder encoder = device.GetQueue().CreateEncoder();
+        encoder.Fill(traced.GetBuffer());
+        device.GetQueue().Submit(encoder.Finish()).Wait();
+        traced = {};
+
+        device::Tensor kept = depth();
+        ASSERT_EQ(kept.Address(), address);
+        EXPECT_EQ(kept.ToHost<float>()[0], 0.0f);
+        kept = {};
+        scene->Find("/Ball")->Set(Xformable::kTranslate, Double3{0, 0, -6});
+        EXPECT_NE(depth().ToHost<float>()[0], 0.0f);
     });
 }
 

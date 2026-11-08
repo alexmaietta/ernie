@@ -574,6 +574,7 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
         m_impl->RunCommitSteps();
         done = m_impl->GetPublisher().Publish(Published() + 1, producer);
     }
+    m_impl->GetProducts().ScheduleCaptures();
     return done;
 }
 

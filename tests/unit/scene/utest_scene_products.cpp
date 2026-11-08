@@ -71,6 +71,23 @@ TEST(ProductsTest, PlanningAProductItsSensorCannotOutputThrows) {
     });
 }
 
+TEST(ProductsTest, PublishingAgainInAStepKeepsItsCapturesDue) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = TwoProducts(device);
+        scene->Find("/Cam")->Set(SensorAPI::kSensorFrameRate, 10.0f);
+        scene->Find("/Second")->Set(SensorAPI::kSensorFrameRate, 10.0f);
+        scene->Publish({.dt = 0.1}).Wait();
+        const ProductTable& products = SceneImpl::Get(*scene).GetProducts();
+        const uint32_t depths = scene->Find("/Render/Depths")->Index();
+        EXPECT_TRUE(products.Find(depths)->due);
+        scene->Find("/Render/Depths")->Set(RealTimeAPI::kMaxBounces, 2);
+        scene->Publish().Wait();
+        EXPECT_TRUE(products.Find(depths)->due);
+        scene->Publish({.dt = 0.05}).Wait();
+        EXPECT_FALSE(products.Find(depths)->due);
+    });
+}
+
 TEST(ProductsTest, OnlyCameraProductsDrawOverlays) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = TwoProducts(device);
