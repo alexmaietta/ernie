@@ -101,7 +101,17 @@ Still open from this milestone.
 
     BLAS time falls about k-fold (3.8 to 0.33 ms at 4M) and memory more than halves, but trace time grows nearly as fast, since each box hit tests up to k spheres and dense clusters overlap. So it pays only where the BLAS rebuild dominates the step, a single large moving cloud on hardware traversal at 4 points per box, and loses for batched worlds, stationary clouds and software traversal. The default stays 1.
 
-    Two follow-ups would shift the balance. The box pass slows from 0.5 to 1.5 ms at 4M because sorted order scatters point reads, which a sorted copy of the points would fix. Testing each point's own box before its sphere would cut the trace cost of loose clusters.
+    Two follow-ups since then (done). Clustered clouds keep a packed copy of each sorted point's center and radius, written by the box pass, so the intersector reads a box's points from one contiguous run, and it culls each point by its closest approach to the ray, with a slack that grows with distance, before the exact sphere or disk test and the order, normal and opacity lookups. Compared on the same base, back to back, on hardware traversal:
+
+    | Case | Before | After |
+    | --- | --- | --- |
+    | Box, 4M moving, 8 per box | 2.91 ms (trace 0.59) | 3.02 ms (trace 0.28) |
+    | Splash, 4M moving, 8 per box | 4.53 ms (trace 2.03) | 3.74 ms (trace 0.87) |
+    | Box, 1024 worlds × 10k moving, 8 per box | 82.1 ms | 53.4 ms |
+    | Splash, 1024 worlds × 10k moving, 8 per box | 64.4 ms | 24.1 ms |
+    | Box, 1M moving, software, 8 per box | 1.88 ms | 1.39 ms |
+
+    Trace time roughly halves and software traversal now gains from clustering (1.39 ms at 8 per box against 1.83 ms at 1). The packed copy costs 16 bytes per point and its writes grow the box pass from 1.4 to 1.8 ms at 4M. One point per box is still best for batched worlds (21.6 ms) and stationary clouds, so the default stays 1, and 4 to 8 per box suits single large moving clouds.
 - Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path.
 
 ### 5. Simulation handoff and motion

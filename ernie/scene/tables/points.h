@@ -68,6 +68,7 @@ class PointsTable : public Table {
         Ref<bvh::Blas> blas;
         Ref<device::Buffer> boxes;
         Ref<device::Buffer> order;
+        Ref<device::Buffer> packed;
         ArrayRef bounds{};
         bool update = false;
         bool fresh = false;

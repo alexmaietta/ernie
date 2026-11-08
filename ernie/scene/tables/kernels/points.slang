@@ -147,6 +147,9 @@ void WritePointBoxes(uniform PointsParams p, uint thread: SV_GroupIndex) {
                 const uint point = perBox == 1 ? at : Ptr<uint>(record.order)[at];
                 const float3 center = PointCenter(record, point);
                 const float radius = PointRadius(record, point);
+                if (perBox > 1) {
+                    Ptr<float4>(record.packed)[at] = float4(center, radius);
+                }
                 lower = min(lower, center - radius);
                 upper = max(upper, center + radius);
             }

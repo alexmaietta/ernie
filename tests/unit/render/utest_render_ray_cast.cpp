@@ -457,6 +457,31 @@ TEST(RayCastTest, TranslucentPointsBlockRaysInProportionToTheirOpacity) {
     });
 }
 
+TEST(RayCastTest, SmallPointsFarAwayHitAtTheirEdges) {
+    ForEachDevice([](Device& device) {
+        for (const auto& [traversal, perBox] : kPointLayouts) {
+            SCOPED_TRACE(
+                std::format("traversal {} with {} points per box", int(traversal), perBox));
+            const Ref<Scene> scene =
+                Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
+            scene->Define<Points>(
+                "/Far",
+                {.points = {{10000, 0, 0}, {10000, 0.05f, 0}, {10000, 0.1f, 0}, {10000, 0.15f, 0}},
+                 .widths = {0.02f}});
+            RayCaster caster(scene);
+            Rays rays;
+            rays.origins =
+                Floats(device, {0, 0, 0, 0, 0.0095f, 0, 0, 0.0105f, 0, 0, 0.15f, 0.0095f}, 3);
+            rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0}, 3);
+            const std::vector<float> distance = caster.Cast(rays).distance.ToHost<float>();
+            EXPECT_NEAR(distance[0], 9999.99f, 2e-3f);
+            EXPECT_LT(distance[1], 10000.01f);
+            EXPECT_TRUE(std::isinf(distance[2]));
+            EXPECT_LT(distance[3], 10000.01f);
+        }
+    });
+}
+
 TEST(RayCastTest, InstancedMeshCopiesHitAtTheirOwnPlaces) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

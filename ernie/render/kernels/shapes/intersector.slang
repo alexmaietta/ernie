@@ -149,7 +149,17 @@ struct ShapeIntersector : IIntersector {
         const uint start = box * perBox;
         const uint end = min(start + perBox, cloud.pointCount);
         bool found = false;
+        const float reach = perBox > 1 ? 1 / dot(ray.direction, ray.direction) : 0;
         for (uint at = start; at < end; ++at) {
+            if (perBox > 1) {
+                const float4 sphere = Ptr<float4>(cloud.packed)[at];
+                const float3 offset = ray.origin - sphere.xyz;
+                const float3 miss = offset - dot(offset, ray.direction) * reach * ray.direction;
+                const float slack = sphere.w * 1.001f + 1e-5f * (abs(offset.x) + abs(offset.y) + abs(offset.z));
+                if (dot(miss, miss) > slack * slack) {
+                    continue;
+                }
+            }
             const uint point = perBox == 1 ? at : Ptr<uint>(cloud.order)[at];
             const ShapeHit hit = PointHit(cloud, point, ray);
             if (!hit.inside || hit.t >= t || !PointBlocks(surface, opacityName, point, ray)) {

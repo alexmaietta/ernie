@@ -71,6 +71,7 @@ void PointsTable::Link(Cloud& cloud) {
         cloud.blas = nullptr;
         cloud.boxes = nullptr;
         cloud.order = nullptr;
+        cloud.packed = nullptr;
         if (cloud.capacity > 0) {
             device::Device& device = store.GetDevice();
             const uint32_t boxes = (cloud.capacity + m_pointsPerBox - 1) / m_pointsPerBox;
@@ -82,6 +83,9 @@ void PointsTable::Link(Cloud& cloud) {
             if (m_pointsPerBox > 1) {
                 cloud.order = device.CreateBuffer(
                     {.bytes = uint64_t(cloud.capacity) * sizeof(uint32_t), .label = "point order"});
+                cloud.packed =
+                    device.CreateBuffer({.bytes = uint64_t(cloud.capacity) * 4 * sizeof(float),
+                                         .label = "packed points"});
             }
         }
         cloud.fresh = true;
@@ -106,6 +110,7 @@ void PointsTable::Link(Cloud& cloud) {
         record.ids = ids.address;
         record.idCount = ids.count;
         record.order = cloud.order ? cloud.order->Address() : 0;
+        record.packed = cloud.packed ? cloud.packed->Address() : 0;
         record.perBox = m_pointsPerBox;
         record.bounds = cloud.bounds;
     }
@@ -303,6 +308,7 @@ void PointsTable::Hold(std::vector<Ref<const RefCounted>>& held) const {
             held.emplace_back(cloud.boxes);
             if (cloud.order) {
                 held.emplace_back(cloud.order);
+                held.emplace_back(cloud.packed);
             }
         }
     }
