@@ -70,7 +70,6 @@ void Instances::Compose() {
 std::vector<Instances::Instancer> Instances::GatherInstancers() const {
     const Prims& prims = m_catalog.GetPrims();
     Store& store = m_catalog.GetStore();
-    store.Flush();
     const auto targets = [&](ColumnRef column, uint32_t row) {
         const ArrayRef array = store.Array(column, row);
         std::vector<uint32_t> found =

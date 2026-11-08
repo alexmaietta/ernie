@@ -83,7 +83,6 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
     if (changes.resync || changes.structure || m_epoch != m_catalog.Epoch()) {
         Relayout();
     }
-    store.Flush();
     BoundsParams params{};
     params.scene.address = store.DeviceData();
     params.origins.address = m_origins->Address();
@@ -119,13 +118,11 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
         encoder.Dispatch(Kernels().Entry("PrimBounds"), params,
                          {.x = device::GroupCount(params.primCount, kBoundsGroup)});
         if (slots && params.instanceSlots > 0) {
-            std::vector<uint32_t> empty(size_t(params.primCount) * 6);
-            for (size_t at = 0; at < empty.size(); ++at) {
-                empty[at] = at % 6 < 3 ? Ordered(std::numeric_limits<float>::infinity())
-                                       : Ordered(-std::numeric_limits<float>::infinity());
-            }
-            queue.Write(m_instancerExtents->Slice(0, empty.size() * sizeof(uint32_t)),
-                        empty.data());
+            const uint64_t lowers = uint64_t(params.primCount) * 3 * sizeof(uint32_t);
+            encoder.Fill(m_instancerExtents->Slice(0, lowers),
+                         Ordered(std::numeric_limits<float>::infinity()));
+            encoder.Fill(m_instancerExtents->Slice(lowers, lowers),
+                         Ordered(-std::numeric_limits<float>::infinity()));
             encoder.Barrier();
             encoder.Dispatch(Kernels().Entry("SlotBounds"), params,
                              {.x = device::GroupCount(params.instanceSlots, kBoundsGroup)});

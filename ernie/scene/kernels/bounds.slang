@@ -130,8 +130,8 @@ void SlotBounds(uniform BoundsParams p) {
     const uint at = WorldSlot(world);
     Grow(p.extents, at * 3, (p.slotCount + at) * 3, middle - reach, middle + reach);
     if (drawn.instancer != kNoPrim) {
-        Grow(p.instancerExtents, drawn.instancer * 6, drawn.instancer * 6 + 3, middle - reach,
-             middle + reach);
+        Grow(p.instancerExtents, drawn.instancer * 3, (p.primCount + drawn.instancer) * 3,
+             middle - reach, middle + reach);
     }
 }
 
@@ -147,8 +147,8 @@ void InstancerBounds(uniform BoundsParams p) {
     float3 lower;
     float3 upper;
     for (uint axis = 0; axis < 3; ++axis) {
-        lower[axis] = FloatFromOrdered(p.instancerExtents[prim * 6 + axis]);
-        upper[axis] = FloatFromOrdered(p.instancerExtents[prim * 6 + 3 + axis]);
+        lower[axis] = FloatFromOrdered(p.instancerExtents[prim * 3 + axis]);
+        upper[axis] = FloatFromOrdered(p.instancerExtents[(p.primCount + prim) * 3 + axis]);
     }
     const bool empty = lower.x > upper.x;
     p.primBounds[prim].lower = Float3(empty ? float3(0) : lower);
