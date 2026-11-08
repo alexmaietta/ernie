@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/viewer/shell/editor.h"
 
+#include <cstddef>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -145,6 +147,53 @@ TEST_F(EditorTest, SetsPosesAndVisibilityWithUndo) {
         EXPECT_EQ(*session.history.NextUndo(), "Hide Ball");
         session.history.Undo();
         EXPECT_EQ(session.history.NextUndo(), nullptr);
+    }
+}
+
+TEST_F(EditorTest, SetsCellsAcrossPrimsAndRestoresEachOnUndo) {
+    {
+        Session session(*s_device);
+        session.scene->Define<Sphere>("/A", {.radius = 1});
+        session.scene->Define<Sphere>("/B", {.radius = 2});
+        const std::vector<std::string> paths = {"/A", "/B"};
+        const auto cells = [](std::vector<float> values) {
+            std::vector<std::byte> bytes(values.size() * sizeof(float));
+            std::memcpy(bytes.data(), values.data(), bytes.size());
+            return bytes;
+        };
+        session.editor.SetCells(
+            "Set Radius",
+            [scene = session.scene, paths] {
+                return scene->Select(Span<const std::string>(paths), SchemaId::Sphere);
+            },
+            Sphere::kRadius.Column(), cells({1, 2}), cells({5}));
+        EXPECT_EQ(session.scene->Find("/A")->Get(Sphere::kRadius), 5);
+        EXPECT_EQ(session.scene->Find("/B")->Get(Sphere::kRadius), 5);
+        session.history.Undo();
+        EXPECT_EQ(session.scene->Find("/A")->Get(Sphere::kRadius), 1);
+        EXPECT_EQ(session.scene->Find("/B")->Get(Sphere::kRadius), 2);
+        session.history.Redo();
+        EXPECT_EQ(session.scene->Find("/B")->Get(Sphere::kRadius), 5);
+    }
+}
+
+TEST_F(EditorTest, SetsRelationshipTargetsWithUndo) {
+    {
+        Session session(*s_device);
+        session.scene->Define<UsdPreviewSurface>("/Red");
+        session.scene->Define<UsdPreviewSurface>("/Blue");
+        session.scene->Define<Sphere>("/Ball", {.materialBinding = {"/Red"}});
+        const auto target = [scene = session.scene] { return scene->Select("/Ball"); };
+        const ColumnRef binding = Sphere::kMaterialBinding.Column();
+        session.editor.SetTargets("Set Material", target, binding, {{"/Red"}}, {"/Blue"});
+        EXPECT_EQ(session.scene->Find("/Ball")->Get(Sphere::kMaterialBinding),
+                  std::vector<std::string>{"/Blue"});
+        session.history.Undo();
+        EXPECT_EQ(session.scene->Find("/Ball")->Get(Sphere::kMaterialBinding),
+                  std::vector<std::string>{"/Red"});
+        session.editor.SetTargets("Clear Material", target, binding, {{"/Red"}}, {});
+        EXPECT_TRUE(session.scene->Find("/Ball")->Get(Sphere::kMaterialBinding).empty());
+        EXPECT_EQ(*session.history.NextUndo(), "Clear Material");
     }
 }
 

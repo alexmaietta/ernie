@@ -210,7 +210,10 @@ if(ERNIE_BUILD_VIEWER)
             ernie_viewer_internal
         SOURCES
             unit/app/viewer/utest_viewer_editor.cpp
+            unit/app/viewer/utest_viewer_gizmo.cpp
+            unit/app/viewer/utest_viewer_helpers.cpp
             unit/app/viewer/utest_viewer_history.cpp
+            unit/app/viewer/utest_viewer_offscreen.cpp
             unit/app/viewer/utest_viewer_orbit_camera.cpp
             unit/app/viewer/utest_viewer_viewport.cpp
     )
