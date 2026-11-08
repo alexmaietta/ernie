@@ -15,7 +15,6 @@
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/publish/publisher.h"
-#include "ernie/scene/publish/table_versions.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/structure/structure.h"

@@ -22,7 +22,6 @@ ernie_object_library(
     prim.cpp
     publish/change_set.cpp
     publish/publisher.cpp
-    publish/table_versions.cpp
     rotation.cpp
     scene.cpp
     structure/packing.cpp
