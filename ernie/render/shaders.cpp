@@ -76,26 +76,52 @@ NodeInputType InputType(device::FieldType type) {
     }
 }
 
+std::string Replaced(std::string text, std::string_view from, std::string_view to) {
+    for (size_t at = text.find(from); at != std::string::npos; at = text.find(from, at)) {
+        text.replace(at, from.size(), to);
+        at += to.size();
+    }
+    return text;
 }
 
-std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& file) {
+const bool kLoaderRegistered = [] {
+    SetShaderLoader(
+        [](Scene& scene, const std::filesystem::path& file) { return LoadShaders(scene, file); });
+    return true;
+}();
+
+}
+
+std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& requested) {
+    const std::filesystem::path file = std::filesystem::weakly_canonical(requested);
     std::ifstream stream(file, std::ios::binary);
     if (!stream) {
-        throw Error("Can't read shaders from {}", file.string());
+        throw Error("Can't read shaders from {}", requested.string());
     }
     const std::string source((std::istreambuf_iterator<char>(stream)), {});
     const std::string module = "ernie.material.nodes.n" + Digest(source);
     std::string path = module;
     std::replace(path.begin(), path.end(), '.', '/');
     path += ".slang";
-    const std::vector<device::ReflectedNode> nodes =
-        device::ReflectMaterialNodes(scene.GetDevice().Adapter().backend, &kRenderKernels,
-                                     {{path, source}}, module, file.string());
+    std::vector<device::ReflectedNode> nodes;
+    try {
+        nodes = device::ReflectMaterialNodes(scene.GetDevice().Adapter().backend, &kRenderKernels,
+                                             {{path, source}}, module, file.string());
+    } catch (const Error& error) {
+        std::string message = Replaced(error.what(), "./" + path, file.string());
+        message =
+            Replaced(Replaced(message, path, file.string()), module + ".slang", file.string());
+        throw Error("{}", message);
+    }
     std::vector<std::string> names;
     for (const device::ReflectedNode& reflected : nodes) {
-        RuntimeSchemaDesc desc{.name = reflected.name,
-                               .base = SchemaId::Shader,
-                               .doc = "A material node from " + file.string() + "."};
+        RuntimeSchemaDesc desc{
+            .name = reflected.name,
+            .base = SchemaId::Shader,
+            .doc = "A material node from " + file.string() + ".",
+            .inherited = {{"implementationSource", int32_t(ImplementationSource::SourceAsset)},
+                          {"slangSourceAsset", file.string()},
+                          {"slangSourceAssetSubIdentifier", reflected.name}}};
         NodeDefinition node{
             .name = reflected.name, .file = file.string(), .module = module, .source = source};
         std::vector<std::string> inputs;

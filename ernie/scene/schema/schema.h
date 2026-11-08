@@ -198,6 +198,14 @@ ERNIE_API Span<const ColumnInfo> RuntimeColumns(SchemaId schema);
 ERNIE_API Span<const SchemaId> RuntimeSlots(SchemaId schema);
 ERNIE_API const RuntimeValue& RuntimeFallback(SchemaId schema, uint32_t column);
 
+struct RuntimeInheritance {
+    SchemaId owner;
+    uint32_t index;
+    RuntimeValue value;
+};
+
+ERNIE_API Span<const RuntimeInheritance> RuntimeInherited(SchemaId schema);
+
 }
 
 #endif
@@ -403,6 +411,10 @@ template <class W> void WriteRuntimeFallbacks(SchemaId schema, W& w) {
     if (IsA(schema, SchemaId::Shader)) {
         w.Set(SchemaId::Shader, FindOwnColumn(SchemaId::Shader, "id").index,
               std::string(Info(schema).name));
+    }
+    for (const RuntimeInheritance& inherited : RuntimeInherited(schema)) {
+        std::visit([&](const auto& value) { w.Set(inherited.owner, inherited.index, value); },
+                   inherited.value);
     }
     for (uint32_t column = 0; column < Info(schema).columnCount; ++column) {
         std::visit([&](const auto& value) { w.Set(schema, column, value); },

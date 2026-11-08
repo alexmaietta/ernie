@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ernie/export.h"
@@ -26,6 +27,7 @@ struct RuntimeSchemaDesc {
     SchemaId base = SchemaId::None;
     std::string doc;
     std::vector<RuntimeColumnDesc> columns;
+    std::vector<std::pair<std::string, RuntimeValue>> inherited;
 };
 
 ERNIE_API SchemaId RegisterSchema(const RuntimeSchemaDesc& desc);

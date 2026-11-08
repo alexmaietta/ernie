@@ -177,3 +177,25 @@ def test_material_nodes_load_from_slang_files(scene, tmp_path):
     glow = scene.define("/Glow", "Shader", {"id": "PyGlow", "strength": 4.0})
     assert glow["strength"] == 4.0
     assert glow["tint"] == (1, 0.5, 0)
+
+
+def test_material_nodes_load_from_their_source_asset(scene, tmp_path):
+    source = tmp_path / "asset.slang"
+    source.write_text(
+        "import ernie.material;\n"
+        "struct PyAsset {\n"
+        "    float strength = 3;\n"
+        "    void Material(inout SurfaceInputs m, ShadeContext c) {}\n"
+        "}\n"
+    )
+    asset = scene.define(
+        "/Asset",
+        "Shader",
+        {
+            "implementationSource": "sourceAsset",
+            "slangSourceAsset": str(source),
+            "slangSourceAssetSubIdentifier": "PyAsset",
+        },
+    )
+    assert asset["id"] == "PyAsset"
+    assert asset["strength"] == 3.0

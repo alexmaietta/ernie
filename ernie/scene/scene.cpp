@@ -128,35 +128,72 @@ void SceneImpl::Check(const Prim& prim) const {
 
 namespace {
 
-SchemaId KnownShader(std::string_view id) {
-    const SchemaId schema = ShaderSchema(id);
-    if (schema == SchemaId::None) {
-        throw Error("no shader has info:id \"{}\"", id);
-    }
-    return schema;
+ShaderLoader& Loader() {
+    static ShaderLoader loader;
+    return loader;
 }
 
+SchemaId DefinedShader(Scene& scene, const Shader::Desc& desc) {
+    if (desc.implementationSource != ImplementationSource::SourceAsset) {
+        const SchemaId schema = ShaderSchema(desc.id);
+        if (schema == SchemaId::None) {
+            throw Error("no shader has info:id \"{}\"", desc.id);
+        }
+        return schema;
+    }
+    const std::string& file = desc.slangSourceAsset;
+    const std::string& name = desc.slangSourceAssetSubIdentifier;
+    if (file.empty() || name.empty()) {
+        throw Error("A shader loaded from a source asset needs info:slang:sourceAsset and "
+                    "info:slang:sourceAsset:subIdentifier");
+    }
+    if (const SchemaId known = ShaderSchema(name); known != SchemaId::None) {
+        return known;
+    }
+    if (!Loader()) {
+        throw Error("{} can't load {}, because nothing has registered a shader loader", name, file);
+    }
+    Loader()(scene, file);
+    const SchemaId loaded = ShaderSchema(name);
+    if (loaded == SchemaId::None) {
+        throw Error("{} has no material node called {}", file, name);
+    }
+    return loaded;
+}
+
+void WriteShader(RowWriter& writer, SchemaId schema, const Shader::Desc& desc) {
+    WriteFallbacks(schema, writer);
+    writer.Set(SchemaId::Connectable, Shader::kConnectionsSources.index, desc.connectionsSources);
+    writer.Set(SchemaId::Connectable, Shader::kConnectionsInputs.index, desc.connectionsInputs);
+    writer.Set(SchemaId::Connectable, Shader::kConnectionsOutputs.index, desc.connectionsOutputs);
+    writer.Set(SchemaId::Shader, Shader::kId.index, std::string(Info(schema).name));
+    if (desc.implementationSource == ImplementationSource::SourceAsset) {
+        writer.Set(SchemaId::Shader, Shader::kImplementationSource.index,
+                   desc.implementationSource);
+        writer.Set(SchemaId::Shader, Shader::kSlangSourceAsset.index, desc.slangSourceAsset);
+        writer.Set(SchemaId::Shader, Shader::kSlangSourceAssetSubIdentifier.index,
+                   desc.slangSourceAssetSubIdentifier);
+    }
+}
+
+}
+
+void SetShaderLoader(ShaderLoader loader) {
+    Loader() = std::move(loader);
 }
 
 ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc) {
-    const SchemaId schema = KnownShader(desc.id);
-    Log(LogLevel::Debug, "{} is a {} shader", path, desc.id);
-    return ShaderPrim(SceneImpl::Get(scene).Define(path, schema, [&](RowWriter& writer) {
-        WriteFallbacks(schema, writer);
-        Shader::Write(writer, desc);
-    }));
+    const SchemaId schema = DefinedShader(scene, desc);
+    Log(LogLevel::Debug, "{} is a {} shader", path, Info(schema).name);
+    return ShaderPrim(SceneImpl::Get(scene).Define(
+        path, schema, [&](RowWriter& writer) { WriteShader(writer, schema, desc); }));
 }
 
 PrimRange Define(Scene& scene, Span<const std::string> paths, const Shader::Desc& desc,
                  const BatchDesc& batch) {
-    const SchemaId schema = KnownShader(desc.id);
+    const SchemaId schema = DefinedShader(scene, desc);
     return SceneImpl::Get(scene).Define(
-        paths, schema,
-        [&](RowWriter& writer) {
-            WriteFallbacks(schema, writer);
-            Shader::Write(writer, desc);
-        },
-        batch);
+        paths, schema, [&](RowWriter& writer) { WriteShader(writer, schema, desc); }, batch);
 }
 
 Ref<Scene> Scene::Create(const SceneDesc& desc) {

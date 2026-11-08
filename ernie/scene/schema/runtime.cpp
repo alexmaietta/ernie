@@ -23,6 +23,7 @@ struct RuntimeSchema {
     std::vector<ColumnInfo> columns;
     std::vector<SchemaId> slots;
     std::vector<RuntimeValue> fallbacks;
+    std::vector<RuntimeInheritance> inherited;
 
     std::string_view Keep(std::string text) {
         return strings.emplace_back(std::move(text));
@@ -54,6 +55,7 @@ bool Accepts(ColumnType type, const RuntimeValue& value) {
     case ColumnType::Bool:
         return std::holds_alternative<bool>(value);
     case ColumnType::Int:
+    case ColumnType::Enum:
         return std::holds_alternative<int32_t>(value);
     case ColumnType::Float:
         return std::holds_alternative<float>(value);
@@ -73,7 +75,7 @@ bool Accepts(ColumnType type, const RuntimeValue& value) {
 
 bool Same(const RuntimeSchemaDesc& a, const RuntimeSchemaDesc& b) {
     if (a.name != b.name || a.base != b.base || a.doc != b.doc ||
-        a.columns.size() != b.columns.size()) {
+        a.columns.size() != b.columns.size() || a.inherited != b.inherited) {
         return false;
     }
     for (size_t i = 0; i < a.columns.size(); ++i) {
@@ -114,6 +116,16 @@ void Check(const RuntimeSchemaDesc& desc) {
             throw Error("{}'s input {} has a fallback of the wrong type", desc.name, column.field);
         }
     }
+    for (const auto& [field, value] : desc.inherited) {
+        const ColumnRef column = FindColumn(desc.base, field);
+        if (!column) {
+            throw Error("{} sets {}, which {} doesn't have", desc.name, field,
+                        Info(desc.base).name);
+        }
+        if (!Accepts(column.column->type, value)) {
+            throw Error("{} sets {} to a value of the wrong type", desc.name, field);
+        }
+    }
 }
 
 std::unique_ptr<RuntimeSchema> Build(const RuntimeSchemaDesc& desc, SchemaId id) {
@@ -145,6 +157,10 @@ std::unique_ptr<RuntimeSchema> Build(const RuntimeSchemaDesc& desc, SchemaId id)
             .maximum = column.maximum,
         });
         schema->fallbacks.push_back(column.fallback);
+    }
+    for (const auto& [field, value] : desc.inherited) {
+        const ColumnRef column = FindColumn(desc.base, field);
+        schema->inherited.push_back({column.schema, column.index, value});
     }
     schema->info = {
         .name = schema->Keep(desc.name),
@@ -188,6 +204,11 @@ Span<const SchemaId> RuntimeSlots(SchemaId schema) {
 
 const RuntimeValue& RuntimeFallback(SchemaId schema, uint32_t column) {
     return Lookup(schema).fallbacks.at(column);
+}
+
+Span<const RuntimeInheritance> RuntimeInherited(SchemaId schema) {
+    const RuntimeSchema& found = Lookup(schema);
+    return Span<const RuntimeInheritance>(found.inherited.data(), found.inherited.size());
 }
 
 SchemaId FindSchemaByName(std::string_view name) {

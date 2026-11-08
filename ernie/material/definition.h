@@ -18,6 +18,7 @@ struct DefinitionModule {
     std::string module;
     std::string source;
     std::vector<std::pair<std::string, std::string>> files;
+    std::vector<std::pair<std::string, std::string>> origins;
 };
 
 class DefinitionSet {

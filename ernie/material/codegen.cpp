@@ -207,7 +207,8 @@ struct {0} : IStandardMaterial {{
             .type = type,
             .module = std::format("ernie.material.generated.d{}", id),
             .source = std::move(source),
-            .files = {{ModuleFile(node.module), node.source}}};
+            .files = {{ModuleFile(node.module), node.source}},
+            .origins = {{ModuleFile(node.module), node.file}, {node.module + ".slang", node.file}}};
 }
 
 std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set) {

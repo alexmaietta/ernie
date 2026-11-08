@@ -123,13 +123,30 @@ abstract class Connectable : Typed (
 }
 
 abstract class Shader : Connectable (
-    doc = "A shading node. A built-in node names itself with info:id."
+    doc = "A shading node. A built-in node names itself with info:id, and a node written in Slang also records the file and struct it came from."
 ) {
     token info:id (
         tracked
         group = "Shader"
         displayName = "Shader Type"
         doc = "The node this shader runs."
+    )
+    token info:implementationSource = id (
+        allowed = [id, sourceAsset]
+        enum = ImplementationSource
+        group = "Shader"
+        displayName = "Implementation"
+        doc = "Whether the node is named by info:id or loaded from info:slang:sourceAsset."
+    )
+    asset info:slang:sourceAsset (
+        group = "Shader"
+        displayName = "Slang File"
+        doc = "The Slang file the node is written in."
+    )
+    token info:slang:sourceAsset:subIdentifier (
+        group = "Shader"
+        displayName = "Slang Node"
+        doc = "The struct or function in the Slang file that is the node."
     )
 }
 

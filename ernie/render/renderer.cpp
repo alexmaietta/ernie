@@ -120,9 +120,20 @@ void RendererImpl::UpdateRenderProgram() {
             }
         }
     } catch (const std::exception& error) {
+        std::string message = error.what();
+        for (const DefinitionModule& definition : m_pendingDefinitions->Definitions()) {
+            for (const auto& [generated, origin] : definition.origins) {
+                for (size_t at = message.find(generated); at != std::string::npos;
+                     at = message.find(generated, at + origin.size())) {
+                    const bool dotted = at >= 2 && message.compare(at - 2, 2, "./") == 0;
+                    at -= dotted ? 2 : 0;
+                    message.replace(at, generated.size() + (dotted ? 2 : 0), origin);
+                }
+            }
+        }
         Log(LogLevel::Error,
             "relinking the render kernels failed, so materials keep their previous look: {}",
-            error.what());
+            message);
         m_failedHash = hash;
         m_pendingProgram = nullptr;
         m_pendingDefinitions = nullptr;

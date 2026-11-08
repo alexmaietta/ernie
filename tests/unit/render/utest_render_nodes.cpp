@@ -156,6 +156,63 @@ TEST(MaterialNodeTest, NewMaterialsShowThePlaceholderAndChangedOnesTheirPrevious
     });
 }
 
+TEST(MaterialNodeTest, ShadersDefinedBySourceAssetLoadTheirFile) {
+    const std::filesystem::path file =
+        WriteFile("ernie_render_nodes_asset.slang",
+                  std::regex_replace(std::string(kTint), std::regex("TestTint"), "TestAsset"));
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim asset = scene->Define<Shader>(
+            "/Asset", {.implementationSource = ImplementationSource::SourceAsset,
+                       .slangSourceAsset = file.string(),
+                       .slangSourceAssetSubIdentifier = "TestAsset"});
+        EXPECT_EQ(Info(asset.Schema()).name, "TestAsset");
+        EXPECT_EQ(asset.Get(Shader::kId), "TestAsset");
+        EXPECT_EQ(asset.Get<float>("gain"), 1.0f);
+        const Prim byId = scene->Define<Shader>("/ById", {.id = "TestAsset"});
+        EXPECT_EQ(byId.Get(Shader::kImplementationSource), ImplementationSource::SourceAsset);
+        EXPECT_EQ(byId.Get(Shader::kSlangSourceAsset),
+                  std::filesystem::weakly_canonical(file).string());
+        EXPECT_EQ(byId.Get(Shader::kSlangSourceAssetSubIdentifier), "TestAsset");
+        EXPECT_THROW(scene->Define<Shader>(
+                         "/Missing", {.implementationSource = ImplementationSource::SourceAsset,
+                                      .slangSourceAsset = file.string(),
+                                      .slangSourceAssetSubIdentifier = "NoSuchNode"}),
+                     Error);
+        EXPECT_THROW(scene->Define<Shader>(
+                         "/NoFile", {.implementationSource = ImplementationSource::SourceAsset,
+                                     .slangSourceAsset = "/no/such/file.slang",
+                                     .slangSourceAssetSubIdentifier = "TestNoFile"}),
+                     Error);
+        EXPECT_FALSE(scene->Find("/Missing"));
+    });
+}
+
+TEST(MaterialNodeTest, ErrorsNameTheUsersFileAndLine) {
+    const std::filesystem::path broken = WriteFile("ernie_render_nodes_lines.slang", R"(
+import ernie.material;
+
+struct TestLines {
+    void Material(inout SurfaceInputs m, ShadeContext c) {
+        m.roughness = NoSuchFunction();
+    }
+}
+)");
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        try {
+            LoadShaders(*scene, broken);
+            ADD_FAILURE() << "loading a broken file succeeded";
+        } catch (const Error& error) {
+            const std::string message = error.what();
+            EXPECT_NE(message.find(std::filesystem::weakly_canonical(broken).string() + ":6"),
+                      std::string::npos)
+                << message;
+            EXPECT_EQ(message.find("ernie/material/nodes"), std::string::npos) << message;
+        }
+    });
+}
+
 TEST(MaterialNodeTest, FilesWithoutNodesOrWithBadInputsAreReported) {
     const std::filesystem::path empty = WriteFile("ernie_render_nodes_empty.slang", R"(
 import ernie.material;
