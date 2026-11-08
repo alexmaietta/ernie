@@ -206,7 +206,8 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             }
             RenderVarOutput& output = frame.renderVars[var.path];
             output.renderVarPath = var.path;
-            output.sourceName = var.output.empty()
+            output.sourceName = var.tap ? std::string(kTapSource)
+                                : var.output.empty()
                                     ? std::string(kRenderVarSourceTokens[uint32_t(var.source)])
                                     : var.output;
             if (var.semantic && var.source != RenderVarSource::PointCloud) {
@@ -716,8 +717,9 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
             const uint32_t value = generated.slots[slot];
             const pipeline::SignalLayout& layout = product.layouts[value];
             PipelineValue entry{0, layout.channels, layout.mosaic ? kSignalMosaic : 0u};
-            if (registry[resolved.nodes[resolved.values[value].node].def].kind ==
-                pipeline::NodeKind::Source) {
+            if (slot < storedCount &&
+                registry[resolved.nodes[resolved.values[value].node].def].kind ==
+                    pipeline::NodeKind::Source) {
                 const uint32_t stride = std::max(product.channels, 1u);
                 entry.address = set.rates.at(source) +
                                 layer(source, planned.sensor) * elements * stride * sizeof(float);

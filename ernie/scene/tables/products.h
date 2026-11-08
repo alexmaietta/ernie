@@ -77,6 +77,7 @@ struct ResolvedVar {
     std::vector<int64_t> shape;
     std::vector<PointChannel> channels;
     std::string output;
+    bool tap = false;
     bool semantic = false;
 
     bool operator==(const ResolvedVar&) const = default;

@@ -138,5 +138,19 @@ TEST(PipelineStandaloneTest, InputsMustBeGivenAndShapedForTheDetector) {
     });
 }
 
+TEST(PipelineStandaloneTest, OutputsReadStraightFromASourceCopyIt) {
+    ernie::test::ForEachDevice([](device::Device& device) {
+        PipelineDesc desc = Chain();
+        desc.outputs.push_back({"rate", 1, "/Pipe/node1", "electronRate"});
+        const ernie::Pipeline pipeline(device, desc);
+        const std::vector<float> rates = Rates();
+        const device::Tensor input = Input(device, rates, 3);
+        const PipelineOutputs outputs = pipeline.Run(
+            {.inputs = {{"CameraSignal1", input}}, .detector = Detector(), .exposureTime = 0.01f});
+        EXPECT_NE(outputs.at("rate").Address(), input.Address());
+        EXPECT_EQ(outputs.at("rate").ToHost<float>(), rates);
+        EXPECT_EQ(input.ToHost<float>(), rates);
+    });
+}
 }
 }

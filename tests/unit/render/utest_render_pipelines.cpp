@@ -139,6 +139,11 @@ TEST(PipelinesTest, ProductsShareRunsSampleMosaicsAndOverrideTheirSensors) {
         scene->Define<RenderVar>("/Render/Mosaic", {.sourceName = "mosaic"});
         scene->Define<RenderVar>("/Render/Color", {.sourceName = "color"});
         scene->Define<RenderVar>("/Render/Stat", {.sourceName = "stat"});
+        scene->Define<RenderVar>("/Render/Electrons",
+                                 {.sourceName = "Tap", .tap = {"/Pipes/Mosaic/Integrate"}});
+        scene->Define<RenderVar>(
+            "/Render/Source",
+            {.sourceName = "Tap", .tap = {"/Pipes/Mosaic/Mosaic"}, .tapOutput = "electronRate"});
         const auto product = [&](const char* path, std::vector<std::string> vars,
                                  std::vector<std::string> binding) {
             scene->Define<RenderProduct>(path, {.renderMode = RenderMode::RealTime,
@@ -147,7 +152,9 @@ TEST(PipelinesTest, ProductsShareRunsSampleMosaicsAndOverrideTheirSensors) {
                                                 .pipelineBinding = std::move(binding),
                                                 .orderedVars = std::move(vars)});
         };
-        product("/Render/A", {"/Render/Rate", "/Render/Mosaic", "/Render/Color", "/Render/Stat"},
+        product("/Render/A",
+                {"/Render/Rate", "/Render/Mosaic", "/Render/Color", "/Render/Stat",
+                 "/Render/Electrons", "/Render/Source"},
                 {});
         product("/Render/B", {"/Render/Mosaic"}, {});
         product("/Render/C", {"/Render/Raw"}, {"/Pipes/Raw"});
@@ -168,6 +175,18 @@ TEST(PipelinesTest, ProductsShareRunsSampleMosaicsAndOverrideTheirSensors) {
             }
         }
         EXPECT_GT(electrons[0], 0);
+        EXPECT_EQ(a.RenderVar("/Render/Source").sourceName, "Tap");
+        const std::vector<float> source = a.RenderVar("/Render/Source").tensor.ToHost<float>();
+        const std::vector<float> integrated =
+            a.RenderVar("/Render/Electrons").tensor.ToHost<float>();
+        ASSERT_EQ(source.size(), electrons.size());
+        ASSERT_EQ(integrated.size(), rates.size());
+        for (size_t i = 0; i < electrons.size(); ++i) {
+            EXPECT_FLOAT_EQ(source[i] * kExposureTime, electrons[i]) << i;
+        }
+        for (size_t i = 0; i < rates.size(); ++i) {
+            EXPECT_FLOAT_EQ(integrated[i], rates[i] * kExposureTime) << i;
+        }
         EXPECT_EQ(Host(output["/Render/B"].frames.at(0), "mosaic"), electrons);
 
         const std::vector<float> colors = Host(a, "color");

@@ -41,12 +41,6 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
         generated.slots.push_back(stored.value);
     }
     for (const ResolvedOutput& output : pipeline.outputs) {
-        const ResolvedNode& node = pipeline.nodes[pipeline.values[output.value].node];
-        if (registry[node.def].kind == NodeKind::Source) {
-            throw Error("Output {} reads {} straight from its source, which generated pipelines "
-                        "don't copy yet",
-                        output.name, node.path);
-        }
         generated.slots.push_back(output.value);
     }
     const auto storedValues = uint32_t(plan.stored.size());
@@ -251,6 +245,24 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                 update, NodeType(def, resolved), node, definition.parameterOffsets[node],
                 definition.stateOffsets[node], stats);
         }
+    }
+    std::string copies;
+    for (uint32_t output = 0; output < pipeline.outputs.size(); ++output) {
+        const uint32_t value = pipeline.outputs[output].value;
+        if (registry[pipeline.nodes[pipeline.values[value].node].def].kind == NodeKind::Source) {
+            copies +=
+                std::format("    WriteSignal(p, element, {}, ReadSignal<{}>(p, element, {}));\n",
+                            storedValues + output, signalType(value), storedSlot[value]);
+        }
+    }
+    if (!copies.empty()) {
+        generated.entries.push_back("CopySources");
+        generated.shapes.push_back(DispatchShape::Elements);
+        source += std::format("\n[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\nvoid "
+                              "CopySources(uniform PipelineParams p) {{\n"
+                              "    PipelineElement element;\n    if (!FindElement(p, element)) "
+                              "{{\n        return;\n    }}\n{}}}\n",
+                              copies);
     }
     generated.source = std::move(source);
     return generated;

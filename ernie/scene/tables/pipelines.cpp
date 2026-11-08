@@ -25,7 +25,8 @@ std::vector<ColumnRef> PipelineInputs() {
     for (uint32_t id = 0; id < uint32_t(SchemaId::Count); ++id) {
         const auto schema = SchemaId(id);
         if (schema != SchemaId::Connectable && schema != SchemaId::Shader &&
-            !IsA(schema, SchemaId::SensorNode) && schema != SchemaId::SensorPipeline) {
+            !IsA(schema, SchemaId::SensorNode) && schema != SchemaId::SensorPipeline &&
+            schema != SchemaId::RenderVar) {
             continue;
         }
         const Span<const ColumnInfo> columns = Columns(schema);
@@ -168,10 +169,52 @@ pipeline::NodeDesc PipelineTable::GatherNode(uint32_t prim) const {
     return node;
 }
 
-pipeline::PipelineDesc PipelineTable::Gather(uint32_t pipeline) const {
+std::vector<PipelineTable::Tap> PipelineTable::GatherTaps() const {
+    const Prims& prims = m_structure.GetPrims();
+    const Tokens& tokens = m_structure.GetTokens();
+    std::vector<Tap> taps;
+    for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
+        if (!prims.Alive(prim) || prims.Record(prim).schema != SchemaId::RenderVar) {
+            continue;
+        }
+        const View view(m_structure, SchemaId::RenderVar, std::vector<uint32_t>{prim});
+        if (tokens.Text(view.Get<Token>(kRenderVarSourceName).Get().front()) != kTapSource) {
+            continue;
+        }
+        const std::vector<uint32_t> targets = view.GetArray<uint32_t>(kRenderVarTap).Get(0);
+        if (targets.empty() || !prims.Alive(targets.front())) {
+            continue;
+        }
+        taps.push_back(
+            {m_structure.GetPaths().Path(prim), targets.front(),
+             std::string(tokens.Text(view.Get<Token>(kRenderVarTapOutput).Get().front()))});
+    }
+    return taps;
+}
+
+pipeline::PipelineDesc PipelineTable::Gather(uint32_t pipeline, std::span<const Tap> taps) const {
     const Prims& prims = m_structure.GetPrims();
     pipeline::PipelineDesc desc{.prim = pipeline, .path = m_structure.GetPaths().Path(pipeline)};
     desc.outputs = Connections(pipeline);
+    for (const Tap& tap : taps) {
+        const std::string node = m_structure.GetPaths().Path(tap.node);
+        if (!node.starts_with(desc.path + "/") ||
+            !IsA(prims.Record(tap.node).schema, SchemaId::SensorNode)) {
+            continue;
+        }
+        std::string output = tap.output;
+        if (output.empty()) {
+            const pipeline::NodeDesc described = GatherNode(tap.node);
+            const uint32_t def = Registry().Find(described.id);
+            if (def == pipeline::kNoDef || Registry()[def].outputs.size() != 1) {
+                throw Error("{} taps {}, so its tapOutput must name one of the node's outputs",
+                            tap.name, node);
+            }
+            output = Registry()[def].outputs.front().name;
+        }
+        desc.outputs.push_back(
+            {.input = tap.name, .source = tap.node, .sourcePath = node, .output = output});
+    }
     std::vector<uint32_t> pending;
     std::vector<uint32_t> seen;
     for (const pipeline::ConnectionDesc& output : desc.outputs) {
@@ -209,6 +252,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
     const Prims& prims = m_structure.GetPrims();
     const pipeline::NodeRegistry& registry = Registry();
     std::map<uint32_t, std::shared_ptr<const PipelineInstance>> resolved;
+    const std::vector<Tap> taps = GatherTaps();
     bool changed = false;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim) || !IsA(prims.Record(prim).schema, SchemaId::SensorPipeline)) {
@@ -218,7 +262,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
         instance->prim = prim;
         instance->path = m_structure.GetPaths().Path(prim);
         try {
-            instance->resolved = pipeline::ResolvePipeline(Gather(prim), registry);
+            instance->resolved = pipeline::ResolvePipeline(Gather(prim, taps), registry);
             instance->definition = m_library.Intern(instance->resolved.key, [&](uint32_t id) {
                 return pipeline::BuildDefinition(id, instance->resolved, registry);
             });

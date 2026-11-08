@@ -175,7 +175,7 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, device::Tensor& state
     int64_t height = 0;
     int64_t width = 0;
     std::vector<const device::Tensor*> sources(generated.slots.size(), nullptr);
-    for (uint32_t slot = 0; slot < generated.slots.size(); ++slot) {
+    for (uint32_t slot = 0; slot < definition.segments.stored.size(); ++slot) {
         const pipeline::Value& value = instance.values[generated.slots[slot]];
         const pipeline::ResolvedNode& node = instance.nodes[value.node];
         if (registry[node.def].kind != pipeline::NodeKind::Source) {

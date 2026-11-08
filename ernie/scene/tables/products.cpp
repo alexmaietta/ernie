@@ -161,9 +161,14 @@ struct BoundPipeline {
 
 ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
                         const BoundPipeline& bound, const std::string& name) {
-    const auto found =
-        std::ranges::find(bound.instance->resolved.outputs, name, &pipeline::ResolvedOutput::name);
+    const bool tap = name == kTapSource;
+    const std::string output = tap ? prim.Path() : name;
+    const auto found = std::ranges::find(bound.instance->resolved.outputs, output,
+                                         &pipeline::ResolvedOutput::name);
     if (found == bound.instance->resolved.outputs.end()) {
+        if (tap) {
+            throw Error("{} taps no node of {}", prim.Path(), bound.instance->path);
+        }
         throw Error("{} reads {}, which isn't an output the renderer writes or {} makes",
                     prim.Path(), name, bound.instance->path);
     }
@@ -172,7 +177,8 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
                     .path = prim.Path(),
                     .frame = prim.Get(RenderVar::kFrameOfReference),
                     .type = device::DType::Float32,
-                    .output = name};
+                    .output = output,
+                    .tap = tap};
     var.shape = {int64_t(product.sensors.size())};
     if (layout.perCapture) {
         var.shape.push_back(pipeline::kStatWords);
@@ -190,6 +196,9 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
     const std::string name = prim.Get(RenderVar::kSourceName);
     const std::optional<RenderVarSource> builtIn = FindRenderVarSource(name);
     if (!builtIn) {
+        if (!bound.instance && name == kTapSource) {
+            throw Error("{} taps a pipeline node, but its product binds no pipeline", prim.Path());
+        }
         if (!bound.instance) {
             throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(),
                         name);

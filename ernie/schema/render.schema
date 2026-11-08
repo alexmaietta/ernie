@@ -5,7 +5,7 @@ class RenderVar : Typed (
         tracked
         group = "Render Var"
         displayName = "Source Name"
-        doc = "The output this variable holds. A name one of the product's sensor pipelines outputs reads that output. Any other name is one the renderer writes itself. LdrColor is display color and HdrColor linear color. DistanceToCamera and DistanceToImagePlane are distances from the camera and from its image plane. NonStableInstanceSegmentation is the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits. Normal is the world-space surface normal facing the camera, interpolated from the geometry's normals before materials and normal maps, so minimal and real-time modes agree. DiffuseAlbedo is the unlit diffuse color of the bound material, or displayColor where there's none. SemanticSegmentation is the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, and SemanticIdMap holds its ids and labels. SemanticInstanceSegmentation is the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, StableIdSegmentation the stable id of the hit prim, and StableIdMap the stable ids and paths of every prim the segmentations name. Intensity is the intensity of a lidar or radar return, PointCloud a lidar's or radar's returns packed into a point cloud with the fields channels names, and RadialVelocity how fast a radar's hit moves away from it in meters per second. InstanceId is the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, and InstancerStableId the stable id of that copy's instancer, with 0 where there's none. ElectronRate is the photoelectrons per second each of a camera's detector channels collects before any noise, one channel per pixel for mono and as many as the pattern has otherwise."
+        doc = "The output this variable holds. A name one of the product's sensor pipelines outputs reads that output, and Tap reads the output of the node tap targets. Any other name is one the renderer writes itself. LdrColor is display color and HdrColor linear color. DistanceToCamera and DistanceToImagePlane are distances from the camera and from its image plane. NonStableInstanceSegmentation is the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits. Normal is the world-space surface normal facing the camera, interpolated from the geometry's normals before materials and normal maps, so minimal and real-time modes agree. DiffuseAlbedo is the unlit diffuse color of the bound material, or displayColor where there's none. SemanticSegmentation is the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, and SemanticIdMap holds its ids and labels. SemanticInstanceSegmentation is the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, StableIdSegmentation the stable id of the hit prim, and StableIdMap the stable ids and paths of every prim the segmentations name. Intensity is the intensity of a lidar or radar return, PointCloud a lidar's or radar's returns packed into a point cloud with the fields channels names, and RadialVelocity how fast a radar's hit moves away from it in meters per second. InstanceId is the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, and InstancerStableId the stable id of that copy's instancer, with 0 where there's none. ElectronRate is the photoelectrons per second each of a camera's detector channels collects before any noise, one channel per pixel for mono and as many as the pattern has otherwise."
     )
     token[] channels (
         tracked
@@ -19,6 +19,18 @@ class RenderVar : Typed (
         group = "Render Var"
         displayName = "Frame of Reference"
         doc = "The space a PointCloud's Coordinates are in. sensor is the sensor's own frame, looking down -z with +y up. world is the space prims' world transforms are in."
+    )
+    prim[] tap (
+        tracked
+        group = "Render Var"
+        displayName = "Tap"
+        doc = "With sourceName Tap, the node of the product's sensor pipeline whose output this variable holds, to look at any stage while debugging. Only the first target is used."
+    )
+    token tapOutput (
+        tracked
+        group = "Render Var"
+        displayName = "Tap Output"
+        doc = "The output of the tapped node this variable holds. Empty means the node's only output."
     )
 }
 

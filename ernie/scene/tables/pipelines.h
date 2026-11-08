@@ -16,6 +16,8 @@
 
 namespace ernie {
 
+inline constexpr std::string_view kTapSource = "Tap";
+
 struct PipelineInstance {
     uint32_t prim = kNoPrim;
     std::string path;
@@ -45,7 +47,14 @@ class PipelineTable : public RenderTable {
     }
 
   private:
-    pipeline::PipelineDesc Gather(uint32_t pipeline) const;
+    struct Tap {
+        std::string name;
+        uint32_t node = kNoPrim;
+        std::string output;
+    };
+
+    std::vector<Tap> GatherTaps() const;
+    pipeline::PipelineDesc Gather(uint32_t pipeline, std::span<const Tap> taps) const;
     pipeline::NodeDesc GatherNode(uint32_t prim) const;
     std::vector<pipeline::ConnectionDesc> Connections(uint32_t prim) const;
 

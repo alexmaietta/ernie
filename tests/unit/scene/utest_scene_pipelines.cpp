@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <string>
@@ -151,6 +152,33 @@ TEST(PipelinesTest, MinimalProductsCantMeasureElectronRates) {
         rig.scene->Publish().Wait();
         const auto product = SceneImpl::Get(*rig.scene).GetProducts().Find(a.Index());
         EXPECT_NE(product->error.find("RealTime"), std::string::npos) << product->error;
+    });
+}
+
+TEST(PipelinesTest, TapsBecomeOutputsOfThePipelineHoldingTheirNode) {
+    test::ForEachDevice([](device::Device& device) {
+        Rig rig = MakeRig(device);
+        Scene& scene = *rig.scene;
+        scene.Define<RenderVar>("/Render/Tap", {.sourceName = "Tap", .tap = {"/Pipes/Raw/Noise"}});
+        const Prim a = *scene.Find("/Render/A");
+        a.Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Raw", "/Render/Tap"});
+        scene.Publish().Wait();
+        SceneImpl& impl = SceneImpl::Get(scene);
+        const auto outputs = Instance(rig, rig.raw)->resolved.outputs;
+        ASSERT_EQ(outputs.size(), 2u);
+        EXPECT_NE(std::ranges::find(outputs, "/Render/Tap", &pipeline::ResolvedOutput::name),
+                  outputs.end());
+        EXPECT_EQ(Instance(rig, rig.color)->resolved.outputs.size(), 1u);
+        const auto product = impl.GetProducts().Find(a.Index());
+        ASSERT_EQ(product->error, "");
+        EXPECT_TRUE(product->vars[1].tap);
+        EXPECT_EQ(product->vars[1].shape, (std::vector<int64_t>{1, 4, 8, 3}));
+
+        const Prim c = *scene.Find("/Render/C");
+        c.Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Tap"});
+        scene.Publish().Wait();
+        EXPECT_NE(impl.GetProducts().Find(c.Index())->error.find("taps no node of /Pipes/Color"),
+                  std::string::npos);
     });
 }
 
