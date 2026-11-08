@@ -125,6 +125,7 @@ ernie_test(
     SOURCES
         unit/render/utest_render_camera.cpp
         unit/render/utest_render_detector.cpp
+        unit/render/utest_render_emva1288.cpp
         unit/render/utest_render_in_flight.cpp
         unit/render/utest_render_lidar.cpp
         unit/render/utest_render_origin.cpp
