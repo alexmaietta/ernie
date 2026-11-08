@@ -266,8 +266,8 @@ void WriteLidars(uniform SensorParams p) {
     record.samples = max(data.beamSamples[row], 1u);
     record.latticeStep = LatticeStep(record.samples);
     record.returnMode = data.returnMode[row];
+    record.wavelength = data.beamWavelength[row];
     record.padding0 = 0;
-    record.padding1 = 0;
     p.lidars[row] = record;
 }
 

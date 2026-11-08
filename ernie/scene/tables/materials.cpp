@@ -75,7 +75,7 @@ std::vector<ColumnRef> MaterialInputs() {
     for (const SchemaId schema :
          {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
           SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
-          SchemaId::TexturePlacement, SchemaId::NonVisualMaterialAPI, SchemaId::CheckerboardAPI}) {
+          SchemaId::TexturePlacement, SchemaId::CheckerboardAPI}) {
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t index = 0; index < columns.size(); ++index) {
             inputs.push_back({schema, &columns[index], index});
@@ -118,7 +118,6 @@ std::span<const ColumnRef> MaterialTable::Inputs() const {
 void MaterialTable::Describe(RenderTables& tables) const {
     tables.materials.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
     tables.materialWords.address = m_words.Address();
-    tables.nonVisuals.address = m_nonVisuals.Address();
     tables.checkers.address = m_checkers.Address();
 }
 
@@ -802,7 +801,6 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     m_records.Upload(device);
     Pack();
     WarnOutsideVisible();
-    m_nonVisuals.Reserve(device, store.Schema(SchemaId::NonVisualMaterialAPI).Capacity());
     m_checkers.Reserve(device, store.Schema(SchemaId::CheckerboardAPI).Capacity());
     const uint32_t prims = m_structure.GetPrims().Size();
     if (prims == 0) {
@@ -810,7 +808,6 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     }
     MaterialParams params{};
     params.scene.address = store.DeviceData();
-    params.nonVisuals.address = m_nonVisuals.Address();
     params.checkers.address = m_checkers.Address();
     device::Queue& queue = device.GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Materials/Write");

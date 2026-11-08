@@ -119,15 +119,6 @@ struct PackEntry {
 
 ERNIE_CHECK_SIZE(PackEntry, 24);
 
-struct NonVisualRecord {
-    float lidarReflectance;
-    float radarBackscatter;
-    uint retroreflective;
-    uint padding0;
-};
-
-ERNIE_CHECK_SIZE(NonVisualRecord, 16);
-
 struct CheckerRecord {
     Float3 colorA;
     uint enabled;

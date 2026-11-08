@@ -15,16 +15,6 @@ void WriteMaterials(uniform MaterialParams p) {
         return;
     }
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
-    if (HasApi(scene, prim, kApiNonVisualMaterialAPI)) {
-        const uint row = ApiRow(scene, prim, kApiNonVisualMaterialAPI);
-        NonVisualMaterialAPIData* n = &scene->schemas.nonVisualMaterialAPI;
-        NonVisualRecord record;
-        record.lidarReflectance = n.nonvisualLidarReflectance[row];
-        record.radarBackscatter = n.nonvisualRadarBackscatter[row];
-        record.retroreflective = n.nonvisualRetroreflective[row];
-        record.padding0 = 0;
-        p.nonVisuals[row] = record;
-    }
     if (HasApi(scene, prim, kApiCheckerboardAPI)) {
         const uint row = ApiRow(scene, prim, kApiCheckerboardAPI);
         CheckerboardAPIData* c = &scene->schemas.checkerboardAPI;

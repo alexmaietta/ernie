@@ -427,6 +427,13 @@ class Lidar : Sensor (
         min = 1
         doc = "Rays traced across each beam's spread and merged into its returns."
     )
+    float beam:wavelength = 905 (
+        tracked
+        group = "Beam"
+        displayName = "Wavelength"
+        min = 1
+        doc = "The laser's wavelength in nanometers. Returns take each surface's reflectance at it, from its spectrum or the smooth uplift of its RGB colour."
+    )
 }
 
 class Radar : Sensor (
@@ -452,31 +459,5 @@ class Radar : Sensor (
         group = "Returns"
         displayName = "Range"
         doc = "The nearest and farthest distances a return is reported at."
-    )
-}
-
-api class NonVisualMaterialAPI (
-    appliesTo = [Material]
-    doc = "How a material looks to lidar and radar, apart from how it shades. A material without it reflects both as a white diffuse surface."
-) {
-    float nonvisual:lidarReflectance = 1 (
-        tracked
-        group = "Non-Visual"
-        displayName = "Lidar Reflectance"
-        min = 0
-        doc = "The fraction of a lidar's light the surface scatters back, scaling the intensity of its returns."
-    )
-    float nonvisual:radarBackscatter = 1 (
-        tracked
-        group = "Non-Visual"
-        displayName = "Radar Backscatter"
-        min = 0
-        doc = "Scales the radar cross section of the surface's returns."
-    )
-    bool nonvisual:retroreflective = false (
-        tracked
-        group = "Non-Visual"
-        displayName = "Retroreflective"
-        doc = "Sends lidar straight back toward its emitter, so the intensity of a return doesn't fall with the angle it strikes at."
     )
 }

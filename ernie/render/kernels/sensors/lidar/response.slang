@@ -6,6 +6,7 @@ __exported import ernie.render.kernels.sensors.iresponse;
 import ernie.render.kernels.sensors.points;
 import ernie.render.kernels.random;
 import ernie.render.kernels.surface.compute;
+import ernie.render.kernels.material.dispatch;
 
 using namespace ernie;
 
@@ -22,6 +23,7 @@ struct LidarResponse : IResponse<LidarPattern> {
     HitQuery query;
     RenderTables* tables;
     ReturnMode mode;
+    float wavelength;
     uint stride;
     uint returns;
     uint found;
@@ -43,6 +45,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         const LidarRecord record =
             response.tables->lidars[PrimRow(response.tables, capture->plan.sensor, kSlotLidar)];
         response.mode = ReturnMode(record.returnMode);
+        response.wavelength = record.wavelength;
         response.stride = max(capture->plan.returns, 1u);
         response.returns = min(response.stride, kMostLidarReturns);
         response.found = 0;
@@ -60,17 +63,16 @@ struct LidarResponse : IResponse<LidarPattern> {
         return response;
     }
 
-    float Intensity(uint prim, float3 normal, float3 direction) {
-        float reflectance = 1;
-        bool retroreflective = false;
-        const uint material = PrimImageable(tables, prim).material;
-        if (material != kNoPrim && HasApi(tables, material, kApiNonVisualMaterialAPI)) {
-            const NonVisualRecord nonVisual =
-                tables->nonVisuals[ApiRow(tables, material, kApiNonVisualMaterialAPI)];
-            reflectance = nonVisual.lidarReflectance;
-            retroreflective = nonVisual.retroreflective != 0;
-        }
-        return retroreflective ? reflectance : reflectance * abs(dot(normal, direction));
+    float Intensity(SurfacePoint point, float3 direction) {
+        MaterialQuery materials = MaterialQuery(query, 0, 1);
+        materials.minimal = true;
+        ShadeContext context =
+            ShadeContext(materials, materials.BoundMaterial(point.prim), point, -direction);
+        UseWavelength(wavelength);
+        OpticalClosure<MonoSpectrum> closure = OpticalClosure<MonoSpectrum>();
+        ShadeDefinition<MonoSpectrum>(context, closure);
+        const float facing = abs(dot(point.geometricNormal, direction));
+        return max(closure.albedo.value, 0.0f) * lerp(facing, 1.0f, closure.retroreflection);
     }
 
     bool Before(LidarReturn a, LidarReturn b) {
@@ -114,7 +116,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         LidarReturn candidate;
         candidate.position = point.position;
         candidate.distance = point.distance;
-        candidate.intensity = Intensity(point.prim, point.geometricNormal, ray.ray.direction);
+        candidate.intensity = Intensity(point, ray.ray.direction);
         candidate.normal = point.shadingNormal;
         candidate.prim = point.prim;
         candidate.instance = HitInstanceId(tables, point);

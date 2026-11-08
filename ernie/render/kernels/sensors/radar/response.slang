@@ -6,6 +6,7 @@ __exported import ernie.render.kernels.sensors.iresponse;
 import ernie.render.kernels.sensors.points;
 import ernie.render.kernels.random;
 import ernie.render.kernels.surface.compute;
+import ernie.render.kernels.material.dispatch;
 
 using namespace ernie;
 
@@ -40,13 +41,14 @@ struct RadarResponse : IResponse<RadarPattern> {
         return response;
     }
 
-    float Backscatter(uint prim) {
-        const uint material = PrimImageable(tables, prim).material;
-        if (material != kNoPrim && HasApi(tables, material, kApiNonVisualMaterialAPI)) {
-            return tables->nonVisuals[ApiRow(tables, material, kApiNonVisualMaterialAPI)]
-                .radarBackscatter;
-        }
-        return 1;
+    float Backscatter(SurfacePoint point, float3 direction) {
+        MaterialQuery materials = MaterialQuery(query, 0, 1);
+        materials.minimal = true;
+        ShadeContext context =
+            ShadeContext(materials, materials.BoundMaterial(point.prim), point, -direction);
+        OpticalClosure<MonoSpectrum> closure = OpticalClosure<MonoSpectrum>();
+        ShadeDefinition<MonoSpectrum>(context, closure);
+        return closure.radarBackscatter;
     }
 
     [mutating]
@@ -60,7 +62,8 @@ struct RadarResponse : IResponse<RadarPattern> {
         hit = true;
         position = point.position;
         distance = point.distance;
-        intensity = Backscatter(point.prim) * abs(dot(point.geometricNormal, ray.ray.direction));
+        intensity = Backscatter(point, ray.ray.direction) *
+                    abs(dot(point.geometricNormal, ray.ray.direction));
         radialVelocity = dot(velocity - sensorVelocity, ray.ray.direction);
         normal = point.shadingNormal;
         prim = point.prim;

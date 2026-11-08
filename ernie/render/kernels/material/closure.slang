@@ -127,6 +127,8 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
     Spectrum albedo;
     Spectrum emission;
     float opacity;
+    no_diff float retroreflection;
+    no_diff float radarBackscatter;
 
     [Differentiable]
     __init() {
@@ -138,6 +140,8 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
         albedo = Spectrum.Constant(0);
         emission = Spectrum.Constant(0);
         opacity = 1;
+        retroreflection = 0;
+        radarBackscatter = 1;
     }
 
     [Differentiable]

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -176,6 +177,116 @@ struct TestSpectralBase {
         ExpectNear(Center(renderer), grey);
         wall.spectrum.Set(SampledSpectrum::kValues, std::vector<float>{0.25f, 0.25f});
         EXPECT_LT(Center(renderer).y, grey.y);
+    });
+}
+
+struct Returns {
+    Ref<Scene> scene;
+    Prim surface;
+    Prim spectrum;
+    Prim lidar;
+};
+
+Returns Wall(Device& device, float elevation) {
+    Returns wall{.scene = Scene::Create(device)};
+    Scene& scene = *wall.scene;
+    scene.Define<Scope>("/Looks");
+    const Prim material = scene.Define<Material>("/Looks/Paint");
+    wall.surface = scene.Define<Shader>("/Looks/Paint/Surface", {.id = "UsdPreviewSurface"});
+    material.Connect("surface", wall.surface, "surface");
+    wall.spectrum = scene.Define<Shader>("/Looks/Paint/Spectrum", {.id = "SampledSpectrum"});
+    scene.Define<Plane>(
+        "/Wall",
+        {.materialBinding = {"/Looks/Paint"}, .translate = {0, 0, -5}, .width = 0, .length = 0});
+    wall.lidar = scene.Define<Lidar>(
+        "/Lidar",
+        {.scanType = ScanType::SolidState, .firingsPerScan = 1, .emitterElevations = {elevation}});
+    scene.Define<Radar>("/Radar", {.fieldOfView = {2, 2}, .rays = {kSize, kSize}});
+    scene.Define<Scope>("/Render");
+    scene.Define<RenderVar>("/Render/Points",
+                            {.sourceName = "PointCloud", .channels = {"Intensity"}});
+    scene.Define<RenderProduct>("/Render/Scan",
+                                {.camera = {"/Lidar"}, .orderedVars = {"/Render/Points"}});
+    scene.Define<RenderVar>("/Render/Echo", {.sourceName = "Intensity"});
+    scene.Define<RenderProduct>("/Render/Radar",
+                                {.camera = {"/Radar"}, .orderedVars = {"/Render/Echo"}});
+    return wall;
+}
+
+float LidarIntensity(Renderer& renderer) {
+    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Scan"}, 0);
+    output.Wait();
+    const std::vector<float> values = output["/Render/Scan"]
+                                          .frames.at(0)
+                                          .Source("PointCloud")
+                                          .channels.at("Intensity")
+                                          .ToHost<float>();
+    return values.empty() ? 0.0f : values.front();
+}
+
+float RadarIntensity(Renderer& renderer) {
+    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Radar"}, 0);
+    output.Wait();
+    const std::vector<float> values =
+        output["/Render/Radar"].frames.at(0).Source("Intensity").tensor.ToHost<float>();
+    return values.at((kSize / 2) * kSize + kSize / 2);
+}
+
+TEST(SpectraTest, LidarReadsMaterialsAtItsLaserWavelength) {
+    ForEachDevice([](Device& device) {
+        Returns wall = Wall(device, 0);
+        wall.surface.Connect("diffuseColor", wall.spectrum, "spectrum");
+        wall.spectrum.Set(SampledSpectrum::kWavelengths, std::vector<float>{380, 780, 800, 1000});
+        Renderer renderer(wall.scene);
+        wall.spectrum.Set(SampledSpectrum::kValues, std::vector<float>{0.9f, 0.9f, 0.1f, 0.1f});
+        const float visible = LidarIntensity(renderer);
+        wall.spectrum.Set(SampledSpectrum::kValues, std::vector<float>{0.1f, 0.1f, 0.9f, 0.9f});
+        const float infrared = LidarIntensity(renderer);
+        ASSERT_GT(visible, 0);
+        EXPECT_NEAR(infrared / visible, 9, 0.1f);
+
+        wall.lidar.Set(Lidar::kBeamWavelength, 550.0f);
+        EXPECT_NEAR(LidarIntensity(renderer) / infrared, 1.0f / 9, 0.01f);
+
+        wall.lidar.Set(Lidar::kBeamWavelength, 905.0f);
+        wall.spectrum.Set(SampledSpectrum::kValues, std::vector<float>{0.5f, 0.5f, 0.5f, 0.5f});
+        const float flat = LidarIntensity(renderer);
+        wall.surface.Disconnect("diffuseColor");
+        wall.surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0.5f, 0.5f, 0.5f});
+        EXPECT_NEAR(LidarIntensity(renderer), flat, 0.03f * flat);
+    });
+}
+
+TEST(SpectraTest, RetroreflectionAndRadarBackscatterComeFromTheMaterial) {
+    const std::filesystem::path file = Scratch() / "ernie_render_spectra_returns.slang";
+    std::ofstream(file) << R"(
+import ernie.material;
+
+struct TestReturns {
+    float retro = 0;
+    float backscatter = 1;
+
+    void Material(inout SurfaceInputs m, ShadeContext c) {
+        m.baseColor = SpectralValue.Constant(0.5);
+        m.retroreflection = retro;
+        m.radarBackscatter = backscatter;
+    }
+}
+)";
+    ForEachDevice([&](Device& device) {
+        Returns wall = Wall(device, 45);
+        LoadShaders(*wall.scene, file);
+        wall.surface.Set(Shader::kId, "TestReturns");
+        Renderer renderer(wall.scene);
+        const float diffuse = LidarIntensity(renderer);
+        ASSERT_GT(diffuse, 0);
+        wall.surface.Set("retro", 1.0f);
+        EXPECT_NEAR(LidarIntensity(renderer) / diffuse, std::sqrt(2.0f), 0.01f);
+
+        const float echo = RadarIntensity(renderer);
+        ASSERT_GT(echo, 0);
+        wall.surface.Set("backscatter", 0.25f);
+        EXPECT_NEAR(RadarIntensity(renderer) / echo, 0.25f, 1e-3f);
     });
 }
 

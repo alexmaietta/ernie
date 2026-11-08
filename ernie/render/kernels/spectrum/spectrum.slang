@@ -2,3 +2,4 @@
 
 __exported import ernie.render.kernels.spectrum.band;
 __exported import ernie.render.kernels.spectrum.rgb;
+__exported import ernie.render.kernels.spectrum.mono;

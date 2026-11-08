@@ -46,7 +46,6 @@ struct RenderTables {
     Ptr<ProductRecord> products;
     Ptr<MaterialRecord> materials;
     Ptr<uint> materialWords;
-    Ptr<NonVisualRecord> nonVisuals;
     Ptr<CheckerRecord> checkers;
     SpectraRecord spectra;
     SemanticsData semantics;
@@ -54,6 +53,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 376);
+ERNIE_CHECK_SIZE(RenderTables, 368);
 
 }

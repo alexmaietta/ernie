@@ -38,6 +38,8 @@ void LowerStandardSurface<Spectrum : ISpectrum>(SurfaceInputs inputs, float3 out
     closure.albedo = base;
     closure.emission = inputs.emission.Evaluate<Spectrum>();
     closure.opacity = inputs.opacity;
+    closure.retroreflection = no_diff saturate(detach(inputs.retroreflection));
+    closure.radarBackscatter = no_diff max(detach(inputs.radarBackscatter), 0.0f);
 }
 
 interface IStandardMaterial {

@@ -89,8 +89,8 @@ struct LidarRecord {
     uint samples;
     uint latticeStep;
     uint returnMode;
+    float wavelength;
     uint padding0;
-    uint padding1;
 };
 
 ERNIE_CHECK_SIZE(LidarRecord, 80);

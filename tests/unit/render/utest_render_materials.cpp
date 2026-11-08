@@ -213,40 +213,6 @@ TEST(MaterialsTest, UsdTransform2dScalesThenRotatesThenTranslates) {
     });
 }
 
-TEST(MaterialsTest, NonvisualReflectanceScalesLidarIntensity) {
-    ForEachDevice([](Device& device) {
-        const Ref<Scene> scene = Scene::Create(device);
-        scene->Define<Scope>("/Looks");
-        const Prim look = scene->Define<Material>("/Looks/Wall");
-        scene->Apply<NonVisualMaterialAPI>(look, {.nonvisualLidarReflectance = 1});
-        scene->Define<Plane>("/Wall", {.translate = {0, 0, -5}, .width = 0, .length = 0})
-            .Set(MaterialBindingAPI::kMaterialBinding, std::vector<std::string>{"/Looks/Wall"});
-        scene->Define<Lidar>(
-            "/Lidar",
-            {.scanType = ScanType::SolidState, .firingsPerScan = 1, .emitterElevations = {0}});
-        scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Points",
-                                 {.sourceName = "PointCloud", .channels = {"Intensity"}});
-        scene->Define<RenderProduct>("/Render/Scan",
-                                     {.camera = {"/Lidar"}, .orderedVars = {"/Render/Points"}});
-        Renderer renderer(scene);
-        const auto intensity = [&] {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Scan"}, 0);
-            output.Wait();
-            const std::vector<float> values = output["/Render/Scan"]
-                                                  .frames.at(0)
-                                                  .Source("PointCloud")
-                                                  .channels.at("Intensity")
-                                                  .ToHost<float>();
-            return values.empty() ? 0.0f : values.front();
-        };
-        const float full = intensity();
-        ASSERT_GT(full, 0);
-        look.Set(NonVisualMaterialAPI::kNonvisualLidarReflectance, 0.25f);
-        EXPECT_NEAR(intensity() / full, 0.25f, 1e-3f);
-    });
-}
-
 TEST(MaterialsTest, ShadowLinksLetExcludedBlockersPassLight) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = LookingDown(device, MinimalMode::Full);

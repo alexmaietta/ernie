@@ -49,8 +49,7 @@ class MaterialTable : public Table {
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_nonVisuals.Buffer(),
-                           m_checkers.Buffer()});
+        HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_checkers.Buffer()});
     }
 
     const MaterialRecord& Record(uint32_t prim) const {
@@ -135,7 +134,6 @@ class MaterialTable : public Table {
     uint32_t m_wordCount = 0;
     uint32_t m_resolves = 0;
     DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();
-    DeviceTable<NonVisualRecord> m_nonVisuals{"nonvisual material records"};
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
 };
 

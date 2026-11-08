@@ -8,11 +8,10 @@ namespace ernie {
 
 struct MaterialParams {
     Ptr<AuthoredData> scene;
-    Ptr<NonVisualRecord> nonVisuals;
     Ptr<CheckerRecord> checkers;
 };
 
-ERNIE_CHECK_SIZE(MaterialParams, 24);
+ERNIE_CHECK_SIZE(MaterialParams, 16);
 
 struct PackParams {
     Ptr<PackEntry> entries;
