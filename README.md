@@ -179,7 +179,7 @@ If you use Ernie in your research, please cite it. GitHub's "Cite this repositor
   author  = {Maietta, Alex},
   title   = {Ernie: Efficient Renderer for Natural and Interplanetary Environments},
   year    = {2026},
-  version = {0.1.1},
+  version = {0.1.2},
   url     = {https://github.com/alexmaietta/ernie},
   license = {BSD-3-Clause}
 }

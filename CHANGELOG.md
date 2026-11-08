@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-08
+
+### Fixed
+
+- Ernie builds with GCC 12, whose standard library has no `<format>`, because it formats text with the header-only fmt library on every compiler. CMake 3.25.1 also accepts the VMA download again.
+
 ## [0.1.1] - 2026-11-08
 
 ### Added
@@ -15,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Ernie builds with GCC 12, whose standard library has no `<format>`, because it formats text with the header-only fmt library on every compiler. CMake 3.25.1 also accepts the VMA download again.
 - `ernie --version`, the viewer's About window and `ernie.build_info().version` show the full version with its patch and any release candidate, such as `0.1.0` or `0.1.1rc1`, instead of `0.1`.
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
 - hipRTC loads from the folder of the HIP runtime Ernie uses, such as the one bundled in PyTorch, instead of from another ROCm install that would pull in a second comgr and HSA runtime. Runtime libraries already in the process are also found under their unversioned names.
@@ -42,6 +47,7 @@ The first release of Ernie, a real-time spectral GPU renderer for planetary robo
 - Infinite planes no longer stretch scene and world bounds, and finite planes get flat boxes.
 - Cylinders, cones and capsules no longer show black speckles on their lit sides when seen from far away.
 
-[unreleased]: https://github.com/alexmaietta/ernie/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/alexmaietta/ernie/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/alexmaietta/ernie/compare/v0.1.1rc1...v0.1.2
 [0.1.1]: https://github.com/alexmaietta/ernie/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alexmaietta/ernie/releases/tag/v0.1.0
