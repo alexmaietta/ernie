@@ -211,6 +211,24 @@ class UsdUVTexture : Shader (
     )
 }
 
+class SampledSpectrum : Shader (
+    doc = "A spectrum given as wavelength and value samples, linear between samples and holding its end values beyond them. Its spectrum output connects to any colour input."
+) {
+    token info:id = SampledSpectrum
+    float[] inputs:wavelengths (
+        tracked
+        group = "Spectrum"
+        displayName = "Wavelengths"
+        doc = "Increasing wavelengths in nanometers."
+    )
+    float[] inputs:values (
+        tracked
+        group = "Spectrum"
+        displayName = "Values"
+        doc = "The value at each wavelength, a reflectance from 0 to 1 for surface colours."
+    )
+}
+
 class UsdPrimvarReader_float2 : Shader (
     doc = "Reads a float2 primvar, usually texture coordinates."
 ) {

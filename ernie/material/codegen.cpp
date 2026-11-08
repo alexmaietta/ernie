@@ -102,6 +102,8 @@ std::string_view CellType(NodeInputType type) {
         return "Float3";
     case NodeInputType::Float4:
         return "Float4";
+    case NodeInputType::Spectral:
+        return "Float3";
     }
     return "float";
 }
@@ -120,6 +122,8 @@ std::string_view SlangType(NodeInputType type) {
         return "float3";
     case NodeInputType::Float4:
         return "float4";
+    case NodeInputType::Spectral:
+        return "SpectralValue";
     }
     return "float";
 }
@@ -128,17 +132,26 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
                        uint32_t input) {
     const InputBinding& binding = graph.nodes[node].inputs[input];
     const NodeInput& declared = graph.nodes[node].node->inputs[input];
+    const bool spectral = declared.type == NodeInputType::Spectral;
     if (binding.kind == BindingKind::Pattern) {
-        return std::format("r{}", binding.source);
+        return spectral ? std::format("SpectralValue.Rgb(r{})", binding.source)
+                        : std::format("r{}", binding.source);
     }
     const std::string cell = std::format("p.n{}_{}", node, declared.name);
     if (binding.kind == BindingKind::Texture) {
         const std::string sampled =
             std::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]",
                         layout.textures[node][input]);
-        return declared.type == NodeInputType::Float
-                   ? std::format("TexturedFloat({}, {})", cell, sampled)
-                   : std::format("TexturedColor({}, {})", cell, sampled);
+        if (declared.type == NodeInputType::Float) {
+            return std::format("TexturedFloat({}, {})", cell, sampled);
+        }
+        const std::string color = std::format("TexturedColor({}, {})", cell, sampled);
+        return spectral ? std::format("SpectralValue.Rgb({})", color) : color;
+    }
+    if (spectral) {
+        return std::format("({0}_spectrum != kNoSpectrum ? SpectralValue.Library({0}_spectrum) : "
+                           "SpectralValue.Rgb({0}.Vector()))",
+                           cell);
     }
     switch (declared.type) {
     case NodeInputType::Bool:
@@ -176,7 +189,8 @@ std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t 
 }
 
 bool Texturable(NodeInputType type) {
-    return type == NodeInputType::Float || type == NodeInputType::Float3;
+    return type == NodeInputType::Float || type == NodeInputType::Float3 ||
+           type == NodeInputType::Spectral;
 }
 
 GraphLayout LayOut(const ShadingGraph& graph) {
@@ -236,6 +250,9 @@ DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
         const NodeDefinition& definition = *graph.nodes[node].node;
         for (const NodeInput& input : definition.inputs) {
             fields += std::format("    {} n{}_{};\n", CellType(input.type), node, input.name);
+            if (input.type == NodeInputType::Spectral) {
+                fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
+            }
         }
         const std::string file = ModuleFile(definition.module);
         if (std::ranges::find(module.files, file, &std::pair<std::string, std::string>::first) ==

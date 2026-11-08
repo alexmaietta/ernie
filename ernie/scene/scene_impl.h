@@ -26,6 +26,7 @@
 #include "ernie/scene/tables/products.h"
 #include "ernie/scene/tables/semantics.h"
 #include "ernie/scene/tables/sensors.h"
+#include "ernie/scene/tables/spectra.h"
 #include "ernie/scene/tables/surfaces.h"
 #include "ernie/scene/tables/tangents.h"
 #include "ernie/scene/tables/textures.h"
@@ -205,6 +206,7 @@ class SceneImpl {
     ProductPlans m_plans;
     CaptureSchedule m_captures;
     MaterialTable m_materials;
+    SpectralTable m_spectra;
     InstanceTable m_instances;
     SurfaceTable m_surfaces;
     LightTable m_lights;

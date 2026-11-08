@@ -21,6 +21,14 @@ struct RgbSpectrum : ISpectrum {
     }
 
     [Differentiable]
+    static RgbSpectrum FromLibrary(no_diff uint spectrum) {
+        if (!KnownSpectrum(spectrum)) {
+            return RgbSpectrum(float3(0));
+        }
+        return RgbSpectrum(gSpectra->spectra.rgb[spectrum].Vector());
+    }
+
+    [Differentiable]
     static RgbSpectrum Blackbody(float kelvin) {
         return RgbSpectrum(
             float3(Planck(610, kelvin), Planck(550, kelvin), Planck(465, kelvin)));

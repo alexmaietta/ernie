@@ -20,12 +20,18 @@
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
+#include "support/support.h"
 
 namespace ernie {
 namespace {
 
 using device::Device;
 using test::ForEachDevice;
+
+const std::filesystem::path& Scratch() {
+    static const test::TemporaryDirectory directory;
+    return directory.Path();
+}
 
 constexpr uint32_t kSide = 8;
 
@@ -45,7 +51,7 @@ struct TestTint {
 )";
 
 std::filesystem::path WriteFile(std::string_view name, std::string_view text) {
-    const std::filesystem::path path = std::filesystem::temp_directory_path() / name;
+    const std::filesystem::path path = Scratch() / name;
     std::ofstream(path) << text;
     return path;
 }
@@ -123,8 +129,7 @@ TEST(MaterialNodeTest, NewMaterialsShowThePlaceholderAndChangedOnesTheirPrevious
     const std::filesystem::path file = WriteFile(
         "ernie_render_nodes_fresh.slang",
         std::regex_replace(std::string(kTint), std::regex("TestTint"), "TestFresh") + unique);
-    const std::filesystem::path blue =
-        std::filesystem::temp_directory_path() / "ernie_render_nodes_blue.png";
+    const std::filesystem::path blue = Scratch() / "ernie_render_nodes_blue.png";
     WritePng(blue, Image(4, 4, Rgba{0, 0, 1, 1}));
     const auto settle = [](Renderer& renderer, bool (*done)(Float3)) {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
@@ -239,8 +244,7 @@ struct TestBase {
 
 TEST(MaterialNodeTest, PatternsFeedMaterialInputsAndTheirValuesEditInPlace) {
     const std::filesystem::path file = WriteFile("ernie_render_nodes_patterns.slang", kPatterns);
-    const std::filesystem::path red =
-        std::filesystem::temp_directory_path() / "ernie_render_nodes_pattern_red.png";
+    const std::filesystem::path red = Scratch() / "ernie_render_nodes_pattern_red.png";
     WritePng(red, Image(4, 4, Rgba{1, 0, 0, 1}));
     ForEachDevice([&](Device& device) {
         const Ref<Scene> scene = LookingDown(device, true);

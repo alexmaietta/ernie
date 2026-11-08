@@ -24,6 +24,9 @@ interface ISpectrum : IDifferentiable {
     static This FromRgb(float3 rgb);
 
     [Differentiable]
+    static This FromLibrary(no_diff uint spectrum);
+
+    [Differentiable]
     static This Blackbody(float kelvin);
 
     [Differentiable]

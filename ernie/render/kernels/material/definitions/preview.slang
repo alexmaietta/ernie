@@ -11,6 +11,11 @@ struct PreviewMaterial : IStandardMaterial {
         return context.materials.Params<PreviewParams>(context.words);
     }
 
+    static SpectralValue Colored(PreviewParams* d, PreviewInput input, float3 rgb) {
+        const uint spectrum = d.inputs[uint(input)].spectrum;
+        return spectrum != kNoSpectrum ? SpectralValue.Library(spectrum) : SpectralValue.Rgb(rgb);
+    }
+
     static bool Textured(ShadeContext context) {
         return context.definition == kDefinitionPreviewTextured;
     }
@@ -83,22 +88,23 @@ struct PreviewMaterial : IStandardMaterial {
     static SpectralValue Albedo(inout ShadeContext context) {
         SurfaceTexels<1> base;
         SurfacePoint point = context.point;
-        const float3 albedo =
-            Mapped<1, false>(context.materials, Params(context), Textured(context), point, base);
+        PreviewParams* d = Params(context);
+        const float3 albedo = Mapped<1, false>(context.materials, d, Textured(context), point, base);
         context.point = point;
-        return SpectralValue.Rgb(albedo);
+        return Colored(d, PreviewInput::DiffuseColor, albedo);
     }
 
     static void Material(inout ShadeContext context, inout SurfaceInputs inputs) {
         PreviewParams* d = Params(context);
         SurfaceTexels<kTextureInputs> base;
         SurfacePoint point = context.point;
-        inputs.baseColor = SpectralValue.Rgb(
+        inputs.baseColor = Colored(
+            d, PreviewInput::DiffuseColor,
             Mapped<kTextureInputs, true>(context.materials, d, Textured(context), point, base));
         context.point = point;
-        inputs.emission = SpectralValue.Rgb(
-            TexturedColor(d.emissiveColor, base.texels[1], base.Handle(1),
-                          &d.inputs[uint(PreviewInput::EmissiveColor)]));
+        inputs.emission = Colored(d, PreviewInput::EmissiveColor,
+                                  TexturedColor(d.emissiveColor, base.texels[1], base.Handle(1),
+                                                &d.inputs[uint(PreviewInput::EmissiveColor)]));
         inputs.roughness = TexturedFloat(d.roughness, base.texels[4], base.Handle(4),
                                          &d.inputs[uint(PreviewInput::Roughness)]);
         inputs.coatWeight = TexturedFloat(d.clearcoat, base.texels[5], base.Handle(5),
@@ -114,7 +120,8 @@ struct PreviewMaterial : IStandardMaterial {
                               &d.inputs[uint(PreviewInput::SpecularColor)]);
             inputs.metallic = 0;
             inputs.ior = 1.5f;
-            inputs.specularColor = SpectralValue.Rgb(specular / DielectricReflectance(1.5f));
+            inputs.specularColor = Colored(d, PreviewInput::SpecularColor, specular)
+                                       .Scaled(1 / DielectricReflectance(1.5f));
         } else {
             inputs.metallic = TexturedFloat(d.metallic, base.texels[3], base.Handle(3),
                                             &d.inputs[uint(PreviewInput::Metallic)]);

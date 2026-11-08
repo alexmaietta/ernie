@@ -29,6 +29,7 @@ ernie_object_library(
     tables/regions.cpp
     tables/semantics.cpp
     tables/sensors.cpp
+    tables/spectra.cpp
     tables/surfaces.cpp
     tables/tangents.cpp
     tables/textures.cpp

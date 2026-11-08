@@ -2,6 +2,7 @@
 
 __exported import ernie.render.kernels.query.material;
 __exported import ernie.render.kernels.surface.point;
+import ernie.render.kernels.spectrum.band;
 
 using namespace ernie;
 
@@ -16,6 +17,7 @@ struct ShadeContext {
     __init(MaterialQuery materials, uint material, SurfacePoint point, float3 outgoing) {
         this.materials = materials;
         this.material = material;
+        UseSpectra(materials.hit.tables);
         const MaterialRecord record = materials.Record(material);
         definition = record.definition;
         words = record.words;

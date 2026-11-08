@@ -25,7 +25,8 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraPattern> {
 
     static CameraResponse<I> Load(SensorContext context, CameraPattern pattern) {
         RenderTables* tables = context.params.tables;
-        UseBands(tables->detectors + ApiRow(tables, context.capture->plan.sensor, kApiDetectorAPI));
+        const uint detector = ApiRow(tables, context.capture->plan.sensor, kApiDetectorAPI);
+        UseBands(tables->detectors + detector, detector);
         CameraResponse<I> response;
         response.integrator = I.Load(context);
         response.background = Background.Load(context.query.tables, context.capture->plan.product);

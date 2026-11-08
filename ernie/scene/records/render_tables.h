@@ -11,6 +11,7 @@
 #include "ernie/scene/records/products.h"
 #include "ernie/scene/records/semantics.h"
 #include "ernie/scene/records/sensors.h"
+#include "ernie/scene/records/spectra.h"
 #include "ernie/scene/records/tangents.h"
 #include "ernie/scene/records/textures.h"
 #include "ernie/scene/records/transforms.h"
@@ -47,11 +48,12 @@ struct RenderTables {
     Ptr<uint> materialWords;
     Ptr<NonVisualRecord> nonVisuals;
     Ptr<CheckerRecord> checkers;
+    SpectraRecord spectra;
     SemanticsData semantics;
     uint worldCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 312);
+ERNIE_CHECK_SIZE(RenderTables, 352);
 
 }

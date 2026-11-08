@@ -9,7 +9,7 @@
 
 namespace ernie {
 
-enum class NodeInputType { Bool, Int, Float, Float2, Float3, Float4 };
+enum class NodeInputType { Bool, Int, Float, Float2, Float3, Float4, Spectral };
 
 struct NodeInput {
     std::string name;

@@ -348,6 +348,10 @@ LinkedKernel Link(slang::ISession& session, std::span<slang::IComponentType* con
 
 std::optional<FieldType> ReflectedType(slang::TypeReflection* type) {
     const slang::TypeReflection::Kind kind = type->getKind();
+    if (kind == slang::TypeReflection::Kind::Struct &&
+        std::string_view(type->getName()) == "SpectralValue") {
+        return FieldType::Spectral;
+    }
     const SlangScalarType scalar = SlangScalarType(type->getScalarType());
     if (kind == slang::TypeReflection::Kind::Scalar) {
         switch (scalar) {
@@ -384,6 +388,8 @@ uint32_t FieldBytes(FieldType type) {
         return 12;
     case FieldType::Float4:
         return 16;
+    case FieldType::Spectral:
+        return 12;
     default:
         return 4;
     }
@@ -418,10 +424,31 @@ ReflectedField Field(slang::IGlobalSession& global, slang::VariableReflection* v
     ReflectedField field{.name = variable->getName(), .type = *type};
     field.fallback.assign(FieldBytes(*type), std::byte{0});
     ComPtr<ISlangBlob> fallback;
-    if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(fallback.writeRef())) && fallback &&
-        fallback->getBufferSize() >= field.fallback.size()) {
+    const SlangResult read = variable->getDefaultValueBlob(fallback.writeRef());
+    const bool authored = SLANG_SUCCEEDED(read) && fallback;
+    if (read == SLANG_E_NOT_AVAILABLE) {
+        Log(LogLevel::Warning,
+            "{}'s input {} in {} has a default Ernie can't read, so it starts at zero; write it "
+            "as a literal, such as {{ 1, 1, float3(0.5) }} for an RGB SpectralValue",
+            node, variable->getName(), label);
+    }
+    if (authored && *type == FieldType::Spectral && fallback->getBufferSize() >= 20) {
+        struct Packed {
+            uint32_t kind;
+            float scale;
+            float data[3];
+        } packed;
+
+        std::memcpy(&packed, fallback->getBufferPointer(), sizeof(packed));
+        float rgb[3];
+        for (int i = 0; i < 3; ++i) {
+            rgb[i] = packed.kind == 1 ? packed.data[i] * packed.scale : packed.scale;
+        }
+        std::memcpy(field.fallback.data(), rgb, sizeof(rgb));
+    } else if (authored && fallback->getBufferSize() >= field.fallback.size()) {
         std::memcpy(field.fallback.data(), fallback->getBufferPointer(), field.fallback.size());
     }
+    field.color = field.color || *type == FieldType::Spectral;
     SlangSession* session = &global;
     field.color = variable->findUserAttributeByName(session, "Color") != nullptr;
     if (slang::Attribute* input = variable->findUserAttributeByName(session, "Input")) {

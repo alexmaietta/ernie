@@ -48,7 +48,7 @@ ERNIE_CHECK_SIZE(MaterialRecord, 16);
 struct TextureInput {
     uint64_t handle;
     uint channel;
-    uint padding0;
+    uint spectrum;
     Float4 scale;
     Float4 bias;
 };

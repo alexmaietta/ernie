@@ -8,9 +8,20 @@ using namespace ernie;
 static const uint kSpectrumBands = 8;
 
 static Ptr<DetectorRecord> gBandDetector;
+static uint gBandRow;
+static Ptr<RenderTables> gSpectra;
 
-void UseBands(Ptr<DetectorRecord> detector) {
+void UseBands(Ptr<DetectorRecord> detector, uint row) {
     gBandDetector = detector;
+    gBandRow = row;
+}
+
+void UseSpectra(Ptr<RenderTables> tables) {
+    gSpectra = tables;
+}
+
+bool KnownSpectrum(uint spectrum) {
+    return spectrum < gSpectra->spectra.count;
 }
 
 float4 FromRgbBands(uint row) {
@@ -46,6 +57,17 @@ struct BandSpectrum : ISpectrum {
                                 rgb.z * no_diff FromRgbBands(4),
                             rgb.x * no_diff FromRgbBands(1) + rgb.y * no_diff FromRgbBands(3) +
                                 rgb.z * no_diff FromRgbBands(5));
+    }
+
+    [Differentiable]
+    static BandSpectrum FromLibrary(no_diff uint spectrum) {
+        if (!KnownSpectrum(spectrum) || gBandRow >= gSpectra->spectra.detectors) {
+            return BandSpectrum.Constant(0);
+        }
+        const Ptr<float> bands =
+            gSpectra->spectra.bands + (gBandRow * gSpectra->spectra.count + spectrum) * kSpectrumBands;
+        return BandSpectrum(float4(bands[0], bands[1], bands[2], bands[3]),
+                            float4(bands[4], bands[5], bands[6], bands[7]));
     }
 
     [Differentiable]

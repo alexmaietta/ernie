@@ -11,7 +11,7 @@
 
 namespace ernie::device {
 
-enum class FieldType { Bool, Int, Float, Float2, Float3, Float4 };
+enum class FieldType { Bool, Int, Float, Float2, Float3, Float4, Spectral };
 
 struct ReflectedField {
     std::string name;

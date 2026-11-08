@@ -59,6 +59,10 @@ RuntimeColumnDesc Column(const device::ReflectedField& field) {
         column.type = ColumnType::Float4;
         column.fallback = Read<Float4>(field.fallback);
         break;
+    case device::FieldType::Spectral:
+        column.type = ColumnType::Float3;
+        column.fallback = Read<Float3>(field.fallback);
+        break;
     }
     return column;
 }
@@ -75,6 +79,8 @@ NodeInputType InputType(device::FieldType type) {
         return NodeInputType::Float3;
     case device::FieldType::Float4:
         return NodeInputType::Float4;
+    case device::FieldType::Spectral:
+        return NodeInputType::Spectral;
     default:
         return NodeInputType::Float;
     }

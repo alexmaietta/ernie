@@ -36,6 +36,11 @@ constexpr std::string_view kPreviewInputNames[kPreviewInputs] = {
     "detailNormal", "detailAlbedo",       "displacement",
 };
 
+constexpr bool Spectral(PreviewInput input) {
+    return input == PreviewInput::DiffuseColor || input == PreviewInput::EmissiveColor ||
+           input == PreviewInput::SpecularColor;
+}
+
 constexpr bool ColorInput(uint32_t input) {
     return input == uint32_t(PreviewInput::DiffuseColor) ||
            input == uint32_t(PreviewInput::EmissiveColor) ||
@@ -264,7 +269,20 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
         };
         const auto found =
             std::ranges::find(connections, kPreviewInputNames[input], &Connection::input);
-        if (found == connections.end()) {
+        const bool spectral = found != connections.end() && found->source != kNoPrim &&
+                              prims.Record(found->source).schema == SchemaId::SampledSpectrum;
+        uint32_t spectrum = kNoSpectrum;
+        if (spectral && Spectral(PreviewInput(input))) {
+            spectrum = prims.Row(found->source, SchemaId::SampledSpectrum);
+        } else if (spectral) {
+            Log(LogLevel::Warning,
+                "{}'s {} connects to the spectrum {}, but only diffuseColor, emissiveColor and "
+                "specularColor take spectra; the input keeps its value",
+                m_structure.GetPaths().Path(shader), kPreviewInputNames[input],
+                m_structure.GetPaths().Path(found->source));
+        }
+        m_literals.push_back({at(slot + offsetof(TextureInput, spectrum)), spectrum});
+        if (found == connections.end() || spectral) {
             unbound();
             continue;
         }
@@ -370,8 +388,19 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                 source == kNoPrim ? SchemaId::None : prims.Record(source).schema;
             std::shared_ptr<const NodeDefinition> pattern =
                 IsRuntime(schema) ? FindNode(Info(schema).name) : nullptr;
+            if (schema == SchemaId::SampledSpectrum) {
+                if (input.type != NodeInputType::Spectral) {
+                    Log(LogLevel::Warning,
+                        "{}'s {} connects to the spectrum {}, but only SpectralValue inputs take "
+                        "spectra; the input keeps its value",
+                        paths.Path(prim), input.name, paths.Path(source));
+                }
+                continue;
+            }
+            const NodeInputType fed =
+                input.type == NodeInputType::Spectral ? NodeInputType::Float3 : input.type;
             if (pattern && pattern->role == NodeRole::Pattern) {
-                if (pattern->result != input.type) {
+                if (pattern->result != fed) {
                     Log(LogLevel::Warning,
                         "{}'s {} connects to {}, whose result has another type; the input keeps "
                         "its value",
@@ -395,7 +424,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                 continue;
             }
             TextureChannel channel = TextureChannel::Rgb;
-            if (BindTexture(prim, *found, input.name, input.type == NodeInputType::Float3, kNoPrim,
+            if (BindTexture(prim, *found, input.name, input.type != NodeInputType::Float, kNoPrim,
                             channel)) {
                 inputs[i] = {BindingKind::Texture, 0};
                 textures[i] = *found;
@@ -471,12 +500,23 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t i = 0; i < node.node->inputs.size(); ++i) {
             CopyCell({schema, &columns[i], i}, node.prim, base + Word(layout.cells[n][i]));
+            if (node.node->inputs[i].type == NodeInputType::Spectral) {
+                uint32_t spectrum = kNoSpectrum;
+                for (const Connection& connection : Connections(node.prim)) {
+                    if (connection.input == node.node->inputs[i].name &&
+                        connection.source != kNoPrim &&
+                        prims.Record(connection.source).schema == SchemaId::SampledSpectrum) {
+                        spectrum = prims.Row(connection.source, SchemaId::SampledSpectrum);
+                    }
+                }
+                m_literals.push_back({base + Word(layout.cells[n][i] + 12), spectrum});
+            }
             if (node.inputs[i].kind != BindingKind::Texture) {
                 continue;
             }
             TextureChannel channel = TextureChannel::Rgb;
             BindTexture(node.prim, node.textures[i], node.node->inputs[i].name,
-                        node.node->inputs[i].type == NodeInputType::Float3,
+                        node.node->inputs[i].type != NodeInputType::Float,
                         base + Word(layout.textures[n][i] * kTextureInputBytes), channel);
             uint32_t read = kNoPrim;
             for (const Connection& connection : Connections(node.textures[i].source)) {

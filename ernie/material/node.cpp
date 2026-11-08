@@ -102,6 +102,7 @@ uint32_t NodeInputBytes(NodeInputType type) {
     case NodeInputType::Float3:
         return 12;
     case NodeInputType::Float4:
+    case NodeInputType::Spectral:
         return 16;
     default:
         return 4;
