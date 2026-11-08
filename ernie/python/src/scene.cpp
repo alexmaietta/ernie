@@ -389,10 +389,21 @@ MapAccess Access(std::string_view access) {
     throw nb::value_error("Access is read, write or read_write");
 }
 
+SchemaId DefinedSchema(std::string_view name, const std::optional<nb::dict>& values) {
+    const SchemaId schema = FindSchema(name);
+    if (schema != SchemaId::Shader) {
+        return schema;
+    }
+    if (!values || !values->contains("id")) {
+        throw nb::value_error("A Shader needs an id naming its node, such as UsdPreviewSurface");
+    }
+    return ShaderSchema(nb::cast<std::string>((*values)["id"]));
+}
+
 ScenePrim Define(Ref<Scene> scene, std::string_view path, std::string_view name,
                  std::optional<nb::dict> values, std::optional<nb::dict> apis) {
-    const Prim prim = DefineSchema(*scene, path, FindSchema(name), values ? *values : nb::dict(),
-                                   apis ? *apis : nb::dict());
+    const Prim prim = DefineSchema(*scene, path, DefinedSchema(name, values),
+                                   values ? *values : nb::dict(), apis ? *apis : nb::dict());
     return {std::move(scene), prim};
 }
 
@@ -408,7 +419,7 @@ std::vector<Prim> Handles(std::span<const ScenePrim> prims) {
 SceneSelection DefineBatch(Ref<Scene> scene, const std::vector<std::string>& paths,
                            std::string_view name, std::optional<nb::dict> values,
                            std::optional<nb::dict> apis, bool attachable) {
-    const SchemaId schema = FindSchema(name);
+    const SchemaId schema = DefinedSchema(name, values);
     const PrimRange range = scene->Define(paths, schema, {.attachable = attachable});
     SceneSelection defined{scene, scene->Select(range, schema)};
     if (values) {

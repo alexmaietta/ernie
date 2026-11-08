@@ -277,18 +277,18 @@ class TexturePlacement : Shader (
     float2 inputs:uvScale = (1, 1) (
         group = "Placement"
         displayName = "Tiling"
-        doc = "Repeats per unit of texture coordinate, applied after rotation."
+        doc = "Repeats per unit of texture coordinate, applied first."
     )
     float2 inputs:uvOffset = (0, 0) (
         group = "Placement"
         displayName = "Offset"
-        doc = "Shift applied after rotation and tiling."
+        doc = "Shift applied after tiling and rotation."
     )
     float inputs:uvRotation = 0 (
         unit = degrees
         group = "Placement"
         displayName = "Rotation"
-        doc = "Rotation about the texture origin, applied first."
+        doc = "Counterclockwise rotation about the texture origin, applied after tiling."
     )
     bool inputs:hexTiling = false (
         group = "Hex Tiling"

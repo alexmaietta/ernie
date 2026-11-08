@@ -195,7 +195,10 @@ Lit RenderLitQuad(Device& device, Float3 tilt, RenderMode mode) {
                                    .focalLength = 400});
     scene->Define<DistantLight>("/Sun", {.orient = LookAlong({0, -1, -1})});
     scene->Define<Scope>("/Looks");
-    scene->DefineMaterial("/Looks/Bent", {.inputs = {{"normal", tilt}}});
+    const Prim material = scene->Define<Material>("/Looks/Bent");
+    const Prim surface = scene->Define<Shader>("/Looks/Bent/Surface", {.id = "UsdPreviewSurface"});
+    surface.Set(UsdPreviewSurface::kNormal, tilt);
+    material.Connect("surface", surface, "surface");
     const std::vector<Float2> st = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
     scene->Define<Mesh>("/Quad", {.materialBinding = {"/Looks/Bent"},
                                   .primvars = {Primvar::Create("st", Interpolation::Vertex, st)},

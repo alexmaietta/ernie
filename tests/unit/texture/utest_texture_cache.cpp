@@ -71,7 +71,7 @@ void ExpectLoadsAndResolves(Device& device, const Files& files) {
     TextureCache cache(device, files.Lookup(), 2);
     std::vector<TextureBinding> bindings;
     for (const char* name : {"small.png", "large.png", "linear.exr", kCheckerboardTexture.data()}) {
-        bindings.push_back(cache.Bind({name, true}, TextureWrap::Clamp));
+        bindings.push_back(cache.Bind({name, true}, TextureWrap::Clamp, TextureWrap::Clamp));
         EXPECT_EQ(bindings.back().handle, 0u);
     }
     cache.Finish();
@@ -105,13 +105,15 @@ TEST(TextureCacheTest, ResolvesSoftwareSampledDescriptors) {
         ExpectLoadsAndResolves(*software, files);
 
         TextureCache cache(*software, files.Lookup(), 1);
-        TextureBinding first = cache.Bind({"small.png", true}, TextureWrap::Repeat);
+        TextureBinding first =
+            cache.Bind({"small.png", true}, TextureWrap::Repeat, TextureWrap::Repeat);
         cache.Finish();
         cache.Collect();
         cache.Resolve(first);
         ASSERT_NE(first.desc, ~0u);
         cache.Unbind(first);
-        TextureBinding second = cache.Bind({"small.png", false}, TextureWrap::Mirror);
+        TextureBinding second =
+            cache.Bind({"small.png", false}, TextureWrap::Mirror, TextureWrap::Mirror);
         cache.Finish();
         cache.Collect();
         cache.Resolve(second);
@@ -125,9 +127,12 @@ TEST(TextureCacheTest, CountsImagesThatCannotBeRead) {
     const Files files;
     ForEachDevice([&](Device& device) {
         TextureCache cache(device, files.Lookup(), 2);
-        TextureBinding missing = cache.Bind({"missing.png", true}, TextureWrap::Repeat);
-        TextureBinding corrupt = cache.Bind({"corrupt.png", true}, TextureWrap::Repeat);
-        const TextureBinding none = cache.Bind({"", true}, TextureWrap::Repeat);
+        TextureBinding missing =
+            cache.Bind({"missing.png", true}, TextureWrap::Repeat, TextureWrap::Repeat);
+        TextureBinding corrupt =
+            cache.Bind({"corrupt.png", true}, TextureWrap::Repeat, TextureWrap::Repeat);
+        const TextureBinding none =
+            cache.Bind({"", true}, TextureWrap::Repeat, TextureWrap::Repeat);
         EXPECT_EQ(none.handle, 0u);
         cache.Finish();
         cache.Collect();
@@ -148,9 +153,12 @@ TEST(TextureCacheTest, SharesImagesUntilTheirLastBindingGoes) {
     const Files files;
     ForEachDevice([&](Device& device) {
         TextureCache cache(device, files.Lookup(), 1);
-        const TextureBinding a = cache.Bind({"small.png", true}, TextureWrap::Repeat);
-        const TextureBinding b = cache.Bind({"small.png", true}, TextureWrap::Clamp);
-        const TextureBinding linear = cache.Bind({"small.png", false}, TextureWrap::Repeat);
+        const TextureBinding a =
+            cache.Bind({"small.png", true}, TextureWrap::Repeat, TextureWrap::Repeat);
+        const TextureBinding b =
+            cache.Bind({"small.png", true}, TextureWrap::Clamp, TextureWrap::Clamp);
+        const TextureBinding linear =
+            cache.Bind({"small.png", false}, TextureWrap::Repeat, TextureWrap::Repeat);
         EXPECT_EQ(cache.Images(), 2u);
         cache.Finish();
         cache.Collect();

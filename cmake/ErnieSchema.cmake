@@ -331,9 +331,6 @@ function(_ernie_schema_types type where gpu cpp)
     elseif(type STREQUAL "primvars")
         set(g ArrayRef)
         set(c "std::vector<Primvar>")
-    elseif(type STREQUAL "inputs")
-        set(g "")
-        set(c "std::vector<MaterialInput>")
     elseif(type MATCHES "^(float3|color3f|point3f|normal3f|vector3f)_array$")
         set(g ArrayRef)
         set(c "std::vector<Float3>")
@@ -422,7 +419,7 @@ function(_ernie_schema_value type value where out)
         set(${out} "{}" PARENT_SCOPE)
         return()
     endif()
-    if(type MATCHES "(_array|^primvars|^inputs)$")
+    if(type MATCHES "(_array|^primvars)$")
         message(FATAL_ERROR "${where}: arrays take no fallback")
     endif()
     if(type MATCHES "^enum_(.+)$")
@@ -672,9 +669,6 @@ function(_ernie_schema_python name out_prim out_selection)
     set(values "")
     set(fields "")
     foreach(field IN LISTS desc)
-        if(desc_type_${field} STREQUAL "inputs")
-            continue()
-        endif()
         _ernie_schema_python_name(${field} python)
         _ernie_schema_python_types(${desc_type_${field}} value input many many_input)
         string(APPEND parameters "        ${python}: ${input} | None = None,\n")
@@ -1399,7 +1393,7 @@ function(ernie_generate_schemas directory)
         foreach(level IN LISTS chain)
             foreach(owner IN LISTS expanded_${level} level)
                 foreach(field IN LISTS fields_${owner})
-                    if(field IN_LIST typed OR type_${owner}_${field} STREQUAL "inputs")
+                    if(field IN_LIST typed)
                         continue()
                     endif()
                     list(APPEND typed ${field})
@@ -1442,7 +1436,7 @@ function(ernie_generate_schemas directory)
                     list(APPEND desc ${field})
                     set(desc_type_${field} ${type_${level}_${field}})
                     set(desc_owner_${field} ${level})
-                    if(level STREQUAL name AND NOT type_${level}_${field} STREQUAL "inputs")
+                    if(level STREQUAL name)
                         list(APPEND columns ${field})
                     endif()
                 endif()
@@ -1729,9 +1723,6 @@ function(ernie_generate_schemas directory)
                 "    template <class W> static void Write(W& w, const Desc& d) {\n"
             )
             foreach(field IN LISTS desc)
-                if(desc_type_${field} STREQUAL "inputs")
-                    continue()
-                endif()
                 set(owner ${desc_owner_${field}})
                 string(
                     APPEND desc_${family}
@@ -1797,15 +1788,8 @@ function(ernie_generate_schemas directory)
                 "ERNIE_API PrimRange Define(Scene& scene, Span<const std::string> paths,\n"
                 "                           const ${name}::Desc& desc = {}, const BatchDesc& batch = {});\n"
             )
-            set(inputs "")
-            if("inputs" IN_LIST desc AND desc_type_inputs STREQUAL "inputs")
-                set(inputs "\n        SetInputs(writer, ${name}::kSchema, desc.inputs);")
-            endif()
             set(assignments "")
             foreach(field IN LISTS desc)
-                if(desc_type_${field} STREQUAL "inputs")
-                    continue()
-                endif()
                 set(tokens "")
                 if(desc_type_${field} MATCHES "^enum_(.+)$")
                     set(tokens ", k${CMAKE_MATCH_1}Tokens")
@@ -1901,13 +1885,13 @@ function(ernie_generate_schemas directory)
                 "\n${name}Prim Define(Scene& scene, std::string_view path, const ${name}::Desc& desc) {\n"
                 "    return ${name}Prim(SceneImpl::Get(scene).Define(path, ${name}::kSchema, ${name}::Apis(desc),\n"
                 "                                                    [&](RowWriter& writer) {\n"
-                "        ${name}::Write(writer, desc);${inputs}\n"
+                "        ${name}::Write(writer, desc);\n"
                 "    }));\n}\n\n"
                 "PrimRange Define(Scene& scene, Span<const std::string> paths, const ${name}::Desc& desc,\n"
                 "                 const BatchDesc& batch) {\n"
                 "    return SceneImpl::Get(scene).Define(paths, ${name}::kSchema, ${name}::Apis(desc),\n"
                 "                                        [&](RowWriter& writer) {\n"
-                "        ${name}::Write(writer, desc);${inputs}\n"
+                "        ${name}::Write(writer, desc);\n"
                 "    }, batch);\n}\n"
             )
         endif()

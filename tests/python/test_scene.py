@@ -142,3 +142,14 @@ def test_shaders_connect_reconnect_and_disconnect(scene):
     assert albedo.connections == []
     with pytest.raises(RuntimeError):
         ernie.Sphere.define(scene, "/Ball").connect("st", albedo, "rgb")
+
+
+def test_shaders_are_defined_by_their_info_id(scene):
+    surface = scene.define("/Surface", "Shader", {"id": "UsdPreviewSurface", "roughness": 0.25})
+    assert surface["id"] == "UsdPreviewSurface"
+    assert surface["roughness"] == 0.25
+    assert ernie.UsdPreviewSurface.select(scene, "/Surface").roughness == [0.25]
+    with pytest.raises(ValueError):
+        scene.define("/Unnamed", "Shader")
+    with pytest.raises(RuntimeError):
+        scene.define("/Missing", "Shader", {"id": "NoSuchNode"})

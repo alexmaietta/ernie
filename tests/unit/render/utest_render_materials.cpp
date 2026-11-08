@@ -79,8 +79,12 @@ TEST(MaterialsTest, PreviewSurfaceEditsReachTheImage) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = LookingDown(device, MinimalMode::Full);
         scene->Define<Scope>("/Looks");
-        scene->DefineMaterial("/Looks/Paint", {.inputs = {{"diffuseColor", Float3{1, 0, 0}}}});
-        const Prim look = *scene->Find("/Looks/Paint/Surface");
+        const Prim material = scene->Define<Material>("/Looks/Paint");
+        const Prim surface =
+            scene->Define<Shader>("/Looks/Paint/Surface", {.id = "UsdPreviewSurface"});
+        surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{1, 0, 0});
+        material.Connect("surface", surface, "surface");
+        const Prim& look = surface;
         scene->Define<Mesh>("/Quad", {.materialBinding = {"/Looks/Paint"},
                                       .points = {{-9, -9, 0}, {9, -9, 0}, {9, 9, 0}, {-9, 9, 0}},
                                       .faceVertexIndices = {0, 1, 2, 3},
@@ -103,9 +107,14 @@ TEST(MaterialsTest, TexturesConnectedThroughUsdUVTextureReachTheImage) {
     ForEachDevice([&](Device& device) {
         const Ref<Scene> scene = LookingDown(device, MinimalMode::TextureDiffuse);
         scene->Define<Scope>("/Looks");
-        scene->DefineMaterial("/Looks/Paint",
-                              {.inputs = {{"diffuseColor", Float3{0, 0, 1}}},
-                               .textures = {{.input = "diffuseColor", .file = red.string()}}});
+        const Prim material = scene->Define<Material>("/Looks/Paint");
+        const Prim surface =
+            scene->Define<Shader>("/Looks/Paint/Surface", {.id = "UsdPreviewSurface"});
+        surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0, 0, 1});
+        material.Connect("surface", surface, "surface");
+        const Prim texture = scene->Define<Shader>("/Looks/Paint/Red", {.id = "UsdUVTexture"});
+        texture.Set(UsdUVTexture::kFile, red.string());
+        surface.Connect("diffuseColor", texture, "rgb");
         const std::vector<Float2> st = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
         scene->Define<Mesh>("/Quad",
                             {.materialBinding = {"/Looks/Paint"},
@@ -128,11 +137,87 @@ TEST(MaterialsTest, TexturesConnectedThroughUsdUVTextureReachTheImage) {
     });
 }
 
+Float3 Center(Renderer& renderer, bool (*settled)(Float3)) {
+    const uint32_t center = (kSide / 2) * kSide + kSide / 2;
+    Float3 pixel = Colors(renderer)[center];
+    for (int attempt = 0; attempt < 500 && !settled(pixel); ++attempt) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(4));
+        pixel = Colors(renderer)[center];
+    }
+    return pixel;
+}
+
+Prim TexturedQuad(Scene& scene, const std::filesystem::path& file, std::vector<Float2> st) {
+    scene.Define<Scope>("/Looks");
+    const Prim material = scene.Define<Material>("/Looks/Paint");
+    const Prim surface = scene.Define<Shader>("/Looks/Paint/Surface", {.id = "UsdPreviewSurface"});
+    surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0, 0, 1});
+    material.Connect("surface", surface, "surface");
+    const Prim texture = scene.Define<Shader>("/Looks/Paint/Texture", {.id = "UsdUVTexture"});
+    texture.Set(UsdUVTexture::kFile, file.string());
+    surface.Connect("diffuseColor", texture, "rgb");
+    scene.Define<Mesh>("/Quad",
+                       {.materialBinding = {"/Looks/Paint"},
+                        .primvars = {Primvar::Create("st", Interpolation::Vertex, std::move(st))},
+                        .points = {{-9, -9, 0}, {9, -9, 0}, {9, 9, 0}, {-9, 9, 0}},
+                        .faceVertexIndices = {0, 1, 2, 3},
+                        .faceVertexCounts = {4},
+                        .subdivisionScheme = SubdivisionScheme::None});
+    return texture;
+}
+
+bool Red(Float3 pixel) {
+    return pixel.x > pixel.z;
+}
+
+TEST(MaterialsTest, TexturesWrapEachDirectionOnItsOwn) {
+    const std::filesystem::path red =
+        std::filesystem::temp_directory_path() / "ernie_render_materials_wrap.png";
+    WritePng(red, Image(4, 4, Rgba{1, 0, 0, 1}));
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, MinimalMode::TextureDiffuse);
+        const Prim texture =
+            TexturedQuad(*scene, red, {{0.2f, 1.4f}, {0.8f, 1.4f}, {0.8f, 1.6f}, {0.2f, 1.6f}});
+        Renderer renderer(scene);
+        const Float3 repeated = Center(renderer, Red);
+        ASSERT_TRUE(Red(repeated));
+        texture.Set(UsdUVTexture::kWrapT, TextureWrapMode::Black);
+        EXPECT_LT(Center(renderer, [](Float3) { return true; }).x, 0.1f * repeated.x);
+        texture.Set(UsdUVTexture::kWrapS, TextureWrapMode::Black);
+        texture.Set(UsdUVTexture::kWrapT, TextureWrapMode::Repeat);
+        EXPECT_NEAR(Center(renderer, [](Float3) { return true; }).x, repeated.x, 1e-3f);
+    });
+}
+
+TEST(MaterialsTest, UsdTransform2dScalesThenRotatesThenTranslates) {
+    const std::filesystem::path halves =
+        std::filesystem::temp_directory_path() / "ernie_render_materials_halves.png";
+    Image image(4, 4);
+    for (uint32_t y = 0; y < 4; ++y) {
+        for (uint32_t x = 0; x < 4; ++x) {
+            image.Pixel(x, y) = x < 2 ? Rgba{1, 0, 0, 1} : Rgba{0, 0, 1, 1};
+        }
+    }
+    WritePng(halves, image);
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, MinimalMode::TextureDiffuse);
+        const Prim texture = TexturedQuad(*scene, halves, {{0, 0}, {1, 0}, {1, 1}, {0, 1}});
+        const Prim transform =
+            scene->Define<Shader>("/Looks/Paint/Transform", {.id = "UsdTransform2d"});
+        transform.Set(UsdTransform2d::kRotation, 90.0f);
+        transform.Set(UsdTransform2d::kScale, Float2{1, 0.4f});
+        transform.Set(UsdTransform2d::kTranslation, Float2{0.45f, 0});
+        texture.Connect("st", transform, "result");
+        Renderer renderer(scene);
+        EXPECT_TRUE(Red(Center(renderer, Red)));
+    });
+}
+
 TEST(MaterialsTest, NonvisualReflectanceScalesLidarIntensity) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);
         scene->Define<Scope>("/Looks");
-        const Prim look = scene->DefineMaterial("/Looks/Wall");
+        const Prim look = scene->Define<Material>("/Looks/Wall");
         scene->Apply<NonVisualMaterialAPI>(look, {.nonvisualLidarReflectance = 1});
         scene->Define<Plane>("/Wall", {.translate = {0, 0, -5}, .width = 0, .length = 0})
             .Set(MaterialBindingAPI::kMaterialBinding, std::vector<std::string>{"/Looks/Wall"});

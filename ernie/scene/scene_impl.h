@@ -33,7 +33,6 @@
 
 namespace ernie {
 
-
 class SceneImpl {
   public:
     SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc);

@@ -24,7 +24,10 @@ using Tables = std::set<std::string_view>;
 Ref<Scene> Stage(device::Device& device) {
     const Ref<Scene> scene = Scene::Create(device);
     scene->Define<Scope>("/Looks");
-    scene->DefineMaterial("/Looks/Red", {.inputs = {{"diffuseColor", Float3{1, 0, 0}}}});
+    const Prim material = scene->Define<Material>("/Looks/Red");
+    const Prim surface = scene->Define<Shader>("/Looks/Red/Surface", {.id = "UsdPreviewSurface"});
+    surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{1, 0, 0});
+    material.Connect("surface", surface, "surface");
     scene->Define<World>("/Env0");
     const Prim ball = scene->Define<Sphere>("/Env0/Ball", {.materialBinding = {"/Looks/Red"}});
     scene->Apply<SemanticsLabelsAPI>(ball, "class", {.semanticsLabels = {"rock"}});

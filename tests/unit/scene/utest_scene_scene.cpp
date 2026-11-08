@@ -91,50 +91,6 @@ TEST(SceneTest, ABatchIsOneDenseView) {
     });
 }
 
-bool Connected(const Prim& prim, std::string_view input, std::string_view source,
-               std::string_view output) {
-    for (const Connection& connection : prim.Connections()) {
-        if (connection.input == input) {
-            return connection.source == source && connection.output == output;
-        }
-    }
-    return false;
-}
-
-TEST(SceneTest, MaterialsAreDefinedWithASurfaceTexturesAndAPlacement) {
-    ForEachScene([](Scene& scene) {
-        const Prim look = scene.DefineMaterial(
-            "/Look", {.inputs = {{"roughness", 0.25f}, {"diffuseColor", Float3{1, 0, 0}}},
-                      .textures = {{.input = "normal", .file = "normal.png"},
-                                   {.input = "metallic", .file = "masks.png", .output = "b"}},
-                      .placement = {{"tileSize", 2.0f}}});
-        EXPECT_EQ(look.Schema(), SchemaId::Material);
-        EXPECT_TRUE(Connected(look, "surface", "/Look/Surface", "surface"));
-        const Prim surface = *scene.Find("/Look/Surface");
-        EXPECT_EQ(surface.Schema(), SchemaId::UsdPreviewSurface);
-        EXPECT_EQ(surface.Get(UsdPreviewSurface::kRoughness), 0.25f);
-        EXPECT_TRUE(Connected(surface, "normal", "/Look/NormalTexture", "rgb"));
-        EXPECT_TRUE(Connected(surface, "metallic", "/Look/MetallicTexture", "b"));
-        const Prim normal = *scene.Find("/Look/NormalTexture");
-        EXPECT_EQ(normal.Get(UsdUVTexture::kFile), "normal.png");
-        EXPECT_EQ(normal.Get(UsdUVTexture::kSourceColorSpace), TextureColorSpace::Raw);
-        EXPECT_EQ(normal.Get(UsdUVTexture::kScale), (Float4{2, 2, 2, 1}));
-        EXPECT_EQ(normal.Get(UsdUVTexture::kBias), (Float4{-1, -1, -1, 0}));
-        EXPECT_TRUE(Connected(normal, "st", "/Look/Placement", "st"));
-        EXPECT_EQ(scene.Find("/Look/Placement")->Get(TexturePlacement::kTileSize), 2.0f);
-
-        EXPECT_THROW(scene.DefineMaterial("/Bad", {.id = "NoSuchMaterial"}), Error);
-        EXPECT_THROW(
-            scene.DefineMaterial("/Twice", {.inputs = {{"roughness", 0.1f}, {"roughness", 0.2f}}}),
-            Error);
-        EXPECT_THROW(scene.DefineMaterial("/Untextured", {.placement = {{"tileSize", 2.0f}}}),
-                     Error);
-        EXPECT_FALSE(scene.Find("/Bad"));
-        EXPECT_FALSE(scene.Find("/Twice"));
-        EXPECT_FALSE(scene.Find("/Untextured"));
-    });
-}
-
 TEST(SceneTest, ClonesFillNewWorlds) {
     ForEachScene([](Scene& scene) {
         const Prim env = scene.Define<World>("/Env0");
@@ -368,7 +324,7 @@ TEST(SceneTest, TargetsTokensAndPrimvarsAreSetByValue) {
         UntypedAttribute binding = view.Get("materialBinding");
         binding.SetTargets(0, {"/Later"});
         EXPECT_TRUE(binding.GetTargets(0).empty());
-        scene.DefineMaterial("/Later");
+        scene.Define<Material>("/Later");
         EXPECT_EQ(binding.GetTargets(0), std::vector<std::string>{"/Later"});
 
         const std::vector<Prim> meshes = scene.Handles({view.Prims()[0], 1, 1, kGlobalWorld, 0});

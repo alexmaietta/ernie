@@ -343,8 +343,8 @@ std::set<TextureKey> TextureCache::Collect() {
     return finished;
 }
 
-TextureBinding TextureCache::Bind(TextureKey key, TextureWrap wrap) {
-    TextureBinding binding{.key = std::move(key), .wrap = wrap};
+TextureBinding TextureCache::Bind(TextureKey key, TextureWrap wrapS, TextureWrap wrapT) {
+    TextureBinding binding{.key = std::move(key), .wrapS = wrapS, .wrapT = wrapT};
     if (binding.key.first.empty()) {
         return binding;
     }
@@ -361,9 +361,8 @@ void TextureCache::Resolve(TextureBinding& binding) {
     if (!entry.ready) {
         return;
     }
-    const TextureWrap wrap = binding.wrap;
     if (entry.texture) {
-        binding.handle = entry.texture->KernelHandle(wrap, wrap);
+        binding.handle = entry.texture->KernelHandle(binding.wrapS, binding.wrapT);
     } else if (entry.texels) {
         TextureDesc desc{};
         desc.texels.address = entry.texels->Address();
@@ -372,8 +371,8 @@ void TextureCache::Resolve(TextureBinding& binding) {
         desc.numLevels = entry.levels;
         desc.format = entry.format;
         desc.colorSpace = entry.colorSpace;
-        desc.wrapS = wrap;
-        desc.wrapT = wrap;
+        desc.wrapS = binding.wrapS;
+        desc.wrapT = binding.wrapT;
         std::copy(entry.offsets.begin(), entry.offsets.end(), desc.levelOffsets);
         binding.desc = AllocateDesc();
         m_device.GetQueue().Write(

@@ -61,9 +61,10 @@ bool Channel(std::string_view output, bool color, TextureChannel& channel) {
 std::vector<ColumnRef> MaterialInputs() {
     std::vector<ColumnRef> inputs = {kPlaneAxis};
     for (const SchemaId schema :
-         {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
-          SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
-          SchemaId::TexturePlacement, SchemaId::NonVisualMaterialAPI, SchemaId::CheckerboardAPI}) {
+         {SchemaId::Connectable, SchemaId::Shader, SchemaId::UsdPreviewSurface,
+          SchemaId::SurfaceDetailAPI, SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2,
+          SchemaId::UsdTransform2d, SchemaId::TexturePlacement, SchemaId::NonVisualMaterialAPI,
+          SchemaId::CheckerboardAPI}) {
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t index = 0; index < columns.size(); ++index) {
             inputs.push_back({schema, &columns[index], index});
@@ -74,7 +75,7 @@ std::vector<ColumnRef> MaterialInputs() {
 
 bool Restructured(const ChangeSet& changes) {
     if (changes.resync || changes.structure || !changes.added.empty() || !changes.removed.empty() ||
-        !changes.apis.empty()) {
+        !changes.apis.empty() || changes.Rows(kShaderId)) {
         return true;
     }
     for (const ColumnRef column : {kConnectableConnectionsSources, kConnectableConnectionsInputs,
@@ -343,11 +344,27 @@ void MaterialTable::Resolve() {
     m_bindings.clear();
     m_wordCount = 0;
     m_records.Assign(std::max(prims.Size(), 1u), MaterialRecord{});
+    ColumnTable& shaders = m_structure.GetColumnStore().Schema(SchemaId::Shader);
+    const std::vector<uint32_t> ids =
+        Items<uint32_t>(shaders.Read(kShaderId.index, 0, shaders.Rows()));
     uint32_t materials = 0;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
-        if (prims.Alive(prim) && IsA(prims.Record(prim).schema, SchemaId::Material)) {
+        if (!prims.Alive(prim)) {
+            continue;
+        }
+        const SchemaId schema = prims.Record(prim).schema;
+        if (IsA(schema, SchemaId::Material)) {
             ResolveMaterial(prim);
             ++materials;
+        } else if (IsA(schema, SchemaId::Shader)) {
+            const std::string_view id =
+                m_structure.GetTokens().Text(Token{ids[prims.Row(prim, SchemaId::Shader)]});
+            if (id != Info(schema).name) {
+                Log(LogLevel::Warning,
+                    "{} has info:id {} but was defined as {}, so it still runs {}; define a new "
+                    "shader to change its node",
+                    m_structure.GetPaths().Path(prim), id, Info(schema).name, Info(schema).name);
+            }
         }
     }
     std::vector<uint32_t> written;

@@ -49,8 +49,8 @@ std::map<SchemaId, std::vector<TextureSlot>> MaterialSlots() {
 }
 
 std::vector<ColumnRef> InputColumns(const std::map<SchemaId, std::vector<TextureSlot>>& materials) {
-    std::vector<ColumnRef> inputs = {kUsdUVTextureWrapS, kUsdUVTextureSourceColorSpace,
-                                     kCheckerboardAPICheckerboard};
+    std::vector<ColumnRef> inputs = {kUsdUVTextureWrapS, kUsdUVTextureWrapT,
+                                     kUsdUVTextureSourceColorSpace, kCheckerboardAPICheckerboard};
     for (const auto& [schema, slots] : materials) {
         for (const TextureSlot& slot : slots) {
             const ColumnRef column = {slot.table, &Columns(slot.table)[slot.texture], slot.texture};
@@ -226,12 +226,15 @@ void TextureTable::Rebind(uint32_t prim, Cells& cells) {
     const Prims& prims = m_structure.GetPrims();
     const SchemaId schema = prims.Record(prim).schema;
     Material material;
-    TextureWrap wrap = TextureWrap::Repeat;
+    TextureWrap wrapS = TextureWrap::Clamp;
+    TextureWrap wrapT = TextureWrap::Clamp;
     TextureColorSpace space = TextureColorSpace::Auto;
     if (schema == SchemaId::UsdUVTexture) {
         const uint32_t row = prims.Row(prim, SchemaId::UsdUVTexture);
-        wrap = Wrap(
+        wrapS = Wrap(
             TextureWrapMode(Read(cells, SchemaId::UsdUVTexture, kUsdUVTextureWrapS.index)[row]));
+        wrapT = Wrap(
+            TextureWrapMode(Read(cells, SchemaId::UsdUVTexture, kUsdUVTextureWrapT.index)[row]));
         space = TextureColorSpace(
             Read(cells, SchemaId::UsdUVTexture, kUsdUVTextureSourceColorSpace.index)[row]);
     }
@@ -241,7 +244,8 @@ void TextureTable::Rebind(uint32_t prim, Cells& cells) {
         material.checkered =
             Read(cells, SchemaId::CheckerboardAPI, kCheckerboardAPICheckerboard.index)[row] != 0;
         if (material.checkered) {
-            checker = m_cache.Bind({std::string(kCheckerboardTexture), false}, TextureWrap::Repeat);
+            checker = m_cache.Bind({std::string(kCheckerboardTexture), false}, TextureWrap::Repeat,
+                                   TextureWrap::Repeat);
         }
         material.rows.push_back({SchemaId::CheckerboardAPI, row});
     }
@@ -258,10 +262,11 @@ void TextureTable::Rebind(uint32_t prim, Cells& cells) {
             const bool srgb = space == TextureColorSpace::SRGB ||
                               (space == TextureColorSpace::Auto && slot.color && !path.empty() &&
                                IsPngOrJpeg(path));
-            const TextureWrap slotWrap = schema == SchemaId::UsdUVTexture ? wrap
-                                         : schema == SchemaId::DomeLight  ? TextureWrap::Repeat
-                                                                          : TextureWrap::Clamp;
-            material.slots.push_back({slot, m_cache.Bind({std::move(path), srgb}, slotWrap)});
+            if (schema == SchemaId::DomeLight) {
+                wrapS = TextureWrap::Repeat;
+                wrapT = TextureWrap::Repeat;
+            }
+            material.slots.push_back({slot, m_cache.Bind({std::move(path), srgb}, wrapS, wrapT)});
             if (std::ranges::find(material.rows, RowKey{slot.table, row}) == material.rows.end()) {
                 material.rows.push_back({slot.table, row});
             }

@@ -385,13 +385,20 @@ void Materials(benchmark::State& state) {
         scene->Define<Scope>("/Looks");
         for (uint32_t m = 0; m < materials; ++m) {
             const float hue = float(m % 97) / 97;
-            MaterialDesc look = {.inputs = {{"roughness", 0.3f + 0.4f * hue}}};
+            const std::string path = std::format("/Looks/Look_{}", m);
+            const Prim material = scene->Define<Material>(path);
+            const Prim surface =
+                scene->Define<Shader>(path + "/Surface", {.id = "UsdPreviewSurface"});
+            surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{hue, 0.4f, 1 - hue});
+            surface.Set(UsdPreviewSurface::kRoughness, 0.3f + 0.4f * hue);
+            material.Connect("surface", surface, "surface");
             if (textured) {
-                look.textures.push_back({.input = "diffuseColor", .file = TextureFile(m)});
-            } else {
-                look.inputs.push_back({"diffuseColor", Float3{hue, 0.4f, 1 - hue}});
+                const Prim texture =
+                    scene->Define<Shader>(path + "/Albedo", {.id = "UsdUVTexture"});
+                texture.Set(UsdUVTexture::kFile, TextureFile(m));
+                texture.Set(UsdUVTexture::kSourceColorSpace, TextureColorSpace::SRGB);
+                surface.Connect("diffuseColor", texture, "rgb");
             }
-            scene->DefineMaterial(fmt::format("/Looks/Look_{}", m), look);
         }
         scene->Define<World>("/env_0");
         scene->Define<Mesh>("/env_0/Ground", Tile(32, 40, 0, true));

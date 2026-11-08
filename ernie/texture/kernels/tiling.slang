@@ -69,13 +69,14 @@ Placement Transformed(Placement placement, PlacementTransform transform) {
     Placement result = placement;
     const float c = cos(transform.angle);
     const float s = sin(transform.angle);
-    result.st = Rotate(placement.st, transform.angle) * transform.scale + transform.offset;
-    result.axis = Rotate(placement.axis, transform.angle) * transform.scale;
+    result.st = Rotate(placement.st * transform.scale, transform.angle) + transform.offset;
+    result.axis = Rotate(placement.axis * transform.scale, transform.angle);
     result.footprint = placement.footprint * max(abs(transform.scale.x), abs(transform.scale.y));
-    result.tangent =
-        (placement.tangent * c - placement.bitangent * s) * (transform.scale.x < 0 ? -1.0f : 1.0f);
-    result.bitangent =
-        (placement.tangent * s + placement.bitangent * c) * (transform.scale.y < 0 ? -1.0f : 1.0f);
+    const float2 inverse = select(transform.scale != 0, 1 / transform.scale, float2(1));
+    const float3 u = placement.tangent * inverse.x;
+    const float3 v = placement.bitangent * inverse.y;
+    result.tangent = normalize(u * c - v * s);
+    result.bitangent = normalize(u * s + v * c);
     return result;
 }
 

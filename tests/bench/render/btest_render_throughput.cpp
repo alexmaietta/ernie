@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
@@ -125,17 +127,35 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     static const Textures textures;
     const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
     scene->Define<Scope>("/Looks");
-    scene->DefineMaterial("/Looks/Ground",
-                          {.textures = {{.input = "diffuseColor", .file = textures.albedo},
-                                        {.input = "normal", .file = textures.normal},
-                                        {.input = "roughness", .file = textures.roughness}}});
-    scene->DefineMaterial("/Looks/Hex",
-                          {.textures = {{.input = "diffuseColor", .file = textures.albedo}},
-                           .placement = {{"hexTiling", true}}});
-    scene->DefineMaterial("/Looks/Triplanar",
-                          {.textures = {{.input = "diffuseColor", .file = textures.albedo},
-                                        {.input = "normal", .file = textures.normal}},
-                           .placement = {{"projection", "triplanar"}, {"tileSize", 2.0f}}});
+    const auto look = [&](const std::string& path,
+                          std::initializer_list<std::pair<std::string, std::string>> files) {
+        const Prim material = scene->Define<Material>(path);
+        const Prim surface = scene->Define<Shader>(path + "/Surface", {.id = "UsdPreviewSurface"});
+        material.Connect("surface", surface, "surface");
+        const Prim placement =
+            scene->Define<Shader>(path + "/Placement", {.id = "TexturePlacement"});
+        for (const auto& [input, file] : files) {
+            const Prim texture = scene->Define<Shader>(path + "/" + input, {.id = "UsdUVTexture"});
+            texture.Set(UsdUVTexture::kFile, file);
+            texture.Set(UsdUVTexture::kSourceColorSpace,
+                        input == "diffuseColor" ? TextureColorSpace::SRGB : TextureColorSpace::Raw);
+            if (input == "normal") {
+                texture.Set(UsdUVTexture::kScale, Float4{2, 2, 2, 1});
+                texture.Set(UsdUVTexture::kBias, Float4{-1, -1, -1, 0});
+            }
+            texture.Connect("st", placement, "st");
+            surface.Connect(input, texture, "rgb");
+        }
+        return placement;
+    };
+    look("/Looks/Ground", {{"diffuseColor", textures.albedo},
+                           {"normal", textures.normal},
+                           {"roughness", textures.roughness}});
+    look("/Looks/Hex", {{"diffuseColor", textures.albedo}}).Set(TexturePlacement::kHexTiling, true);
+    const Prim triplanar =
+        look("/Looks/Triplanar", {{"diffuseColor", textures.albedo}, {"normal", textures.normal}});
+    triplanar.Set(TexturePlacement::kProjection, TextureProjection::Triplanar);
+    triplanar.Set(TexturePlacement::kTileSize, 2.0f);
     scene->Define<World>("/env_0");
     scene->Define<Mesh>("/env_0/Ground", Ground());
     for (uint32_t i = 0; i < kBalls; ++i) {

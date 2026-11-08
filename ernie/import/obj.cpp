@@ -184,55 +184,83 @@ class SourceMaterials : public tinyobj::MaterialReader {
     const ImportSource& m_source;
 };
 
+struct LookTexture {
+    std::string input;
+    std::string output;
+    UsdUVTexture::Desc texture;
+};
+
+struct Look {
+    UsdPreviewSurface::Desc surface;
+    std::vector<LookTexture> textures;
+    TexturePlacement::Desc placement;
+};
+
+void DefineLook(Scene& scene, std::string_view at, const Look& look) {
+    const std::string root(at);
+    const Prim material = scene.Define<Material>(root);
+    const Prim surface = scene.Define<UsdPreviewSurface>(root + "/Surface", look.surface);
+    material.Connect("surface", surface, "surface");
+    if (look.textures.empty()) {
+        return;
+    }
+    const Prim placement = scene.Define<TexturePlacement>(root + "/Placement", look.placement);
+    for (const LookTexture& texture : look.textures) {
+        std::string name = texture.input;
+        name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
+        const Prim read =
+            scene.Define<UsdUVTexture>(root + "/" + name + "Texture", texture.texture);
+        read.Connect("st", placement, "st");
+        surface.Connect(texture.input, read, texture.output);
+    }
+}
+
 class SurfaceBuilder {
   public:
     SurfaceBuilder(const tinyobj::material_t& material, std::string_view path,
                    const ImportSource& source, ImportPlan& plan)
         : m_material(material), m_path(path), m_source(source), m_plan(plan) {}
 
-    MaterialDesc Build() && {
+    Look Build() && {
         const tinyobj::material_t& m = m_material;
-        Set("diffuseColor", Float3{m.diffuse[0], m.diffuse[1], m.diffuse[2]});
+        UsdPreviewSurface::Desc& surface = m_look.surface;
+        surface.diffuseColor = {m.diffuse[0], m.diffuse[1], m.diffuse[2]};
         Map("diffuseColor", "map_Kd", m.diffuse_texname);
-        Set("emissiveColor", Float3{m.emission[0], m.emission[1], m.emission[2]});
+        surface.emissiveColor = {m.emission[0], m.emission[1], m.emission[2]};
         Map("emissiveColor", "map_Ke", m.emissive_texname);
-        Set("opacity", m.dissolve);
+        surface.opacity = m.dissolve;
         Map("opacity", "map_d", m.alpha_texname,
             m.alpha_texname == m.diffuse_texname ? "a" : ScalarChannel(m.alpha_texopt));
-        Set("roughness", m.roughness > 0   ? m.roughness
-                         : m.shininess > 0 ? std::pow(2 / (m.shininess + 2), 0.25f)
-                                           : 0.5f);
+        surface.roughness = m.roughness > 0   ? m.roughness
+                            : m.shininess > 0 ? std::pow(2 / (m.shininess + 2), 0.25f)
+                                              : 0.5f;
         Map("roughness", "map_Pr", m.roughness_texname, ScalarChannel(m.roughness_texopt));
-        Set("metallic", m.metallic);
+        surface.metallic = m.metallic;
         Map("metallic", "map_Pm", m.metallic_texname, ScalarChannel(m.metallic_texopt));
         if (m.ior > 1) {
-            Set("ior", m.ior);
+            surface.ior = m.ior;
         }
         if (m.clearcoat_thickness > 0) {
-            Set("clearcoat", m.clearcoat_thickness);
-            Set("clearcoatRoughness", m.clearcoat_roughness);
+            surface.clearcoat = m.clearcoat_thickness;
+            surface.clearcoatRoughness = m.clearcoat_roughness;
         }
         if (Map("normal", "norm", m.normal_texname)) {
-            Set("normalStrength", m.normal_texopt.bump_multiplier);
+            surface.normalStrength = m.normal_texopt.bump_multiplier;
         } else if (Map("normal", "map_Bump", m.bump_texname)) {
             Log(LogLevel::Debug, "{} reads its map_Bump \"{}\" as a normal map", m_path,
                 m.bump_texname);
-            Set("normalStrength", m.bump_texopt.bump_multiplier);
+            surface.normalStrength = m.bump_texopt.bump_multiplier;
         }
         if (m.diffuse_texopt.clamp) {
-            for (MaterialTexture& texture : m_textures) {
-                texture.inputs = {{"wrapS", std::string("clamp")}, {"wrapT", std::string("clamp")}};
+            for (LookTexture& texture : m_look.textures) {
+                texture.texture.wrapS = TextureWrapMode::Clamp;
+                texture.texture.wrapT = TextureWrapMode::Clamp;
             }
         }
         const tinyobj::real_t* scale = m.diffuse_texopt.scale;
         const tinyobj::real_t* offset = m.diffuse_texopt.origin_offset;
-        std::vector<MaterialInput> placement;
-        if (!m_textures.empty() && (scale[0] != 1 || scale[1] != 1)) {
-            placement.push_back({"uvScale", Float2{scale[0], scale[1]}});
-        }
-        if (!m_textures.empty() && (offset[0] != 0 || offset[1] != 0)) {
-            placement.push_back({"uvOffset", Float2{offset[0], offset[1]}});
-        }
+        m_look.placement.uvScale = {scale[0], scale[1]};
+        m_look.placement.uvOffset = {offset[0], offset[1]};
         Ignore("map_Ka", m.ambient_texname);
         Ignore("map_Ks", m.specular_texname);
         Ignore("map_Ns", m.specular_highlight_texname);
@@ -249,36 +277,36 @@ class SurfaceBuilder {
             Log(LogLevel::Debug, "{} ignores {}, which UsdPreviewSurface has no input for", m_path,
                 Join(m_ignored));
         }
-        return {.inputs = std::move(m_inputs),
-                .textures = std::move(m_textures),
-                .placement = std::move(placement)};
+        return std::move(m_look);
     }
 
   private:
-    void Set(std::string name, MaterialValue value) {
-        m_inputs.push_back({std::move(name), std::move(value)});
-    }
-
     bool Map(std::string_view input, std::string_view statement, const std::string& name,
              std::string_view output = "rgb") {
         if (name.empty()) {
             return false;
         }
+        std::string file;
         if (FileBytes bytes = m_source.Find(name)) {
-            m_textures.push_back({.input = std::string(input),
-                                  .file = m_plan.AddFile(name, std::move(bytes)),
-                                  .output = std::string(output)});
-            return true;
+            file = m_plan.AddFile(name, std::move(bytes));
+        } else {
+            const std::filesystem::path located = m_source.Locate(name);
+            if (!std::filesystem::exists(located)) {
+                Log(LogLevel::Warning, "{}'s {} \"{}\" doesn't exist; {} stays untextured", m_path,
+                    statement, located.string(), input);
+                return false;
+            }
+            file = located.generic_string();
         }
-        const std::filesystem::path file = m_source.Locate(name);
-        if (!std::filesystem::exists(file)) {
-            Log(LogLevel::Warning, "{}'s {} \"{}\" doesn't exist; {} stays untextured", m_path,
-                statement, file.string(), input);
-            return false;
+        const bool color = input == "diffuseColor" || input == "emissiveColor";
+        LookTexture texture{.input = std::string(input), .output = std::string(output)};
+        texture.texture.file = std::move(file);
+        texture.texture.sourceColorSpace = color ? TextureColorSpace::SRGB : TextureColorSpace::Raw;
+        if (input == "normal") {
+            texture.texture.scale = {2, 2, 2, 1};
+            texture.texture.bias = {-1, -1, -1, 0};
         }
-        m_textures.push_back({.input = std::string(input),
-                              .file = file.generic_string(),
-                              .output = std::string(output)});
+        m_look.textures.push_back(std::move(texture));
         return true;
     }
 
@@ -292,8 +320,7 @@ class SurfaceBuilder {
     std::string m_path;
     const ImportSource& m_source;
     ImportPlan& m_plan;
-    std::vector<MaterialInput> m_inputs;
-    std::vector<MaterialTexture> m_textures;
+    Look m_look;
     std::vector<std::string> m_ignored;
 };
 
@@ -354,8 +381,8 @@ ImportPlan ObjImporter::Read(std::string_view path, const ImportSource& source,
             const std::string look =
                 fmt::format("{}/{}", scope, names.Take(material.name, "Material"));
             plan.Add(look,
-                     [desc = SurfaceBuilder(material, look, source, plan).Build()](
-                         Scene& scene, std::string_view at) { scene.DefineMaterial(at, desc); });
+                     [built = SurfaceBuilder(material, look, source, plan).Build()](
+                         Scene& scene, std::string_view at) { DefineLook(scene, at, built); });
             Log(LogLevel::Debug, "read OBJ material \"{}\" for {}", material.name, look);
             looks.push_back(look);
         }

@@ -3,14 +3,12 @@
 
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <string>
 #include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include "ernie/device/program.h"
@@ -25,17 +23,6 @@
 namespace ernie {
 
 namespace {
-
-SchemaId SurfaceSchema(std::string_view id) {
-    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
-        const SchemaId schema = SchemaId(index);
-        if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
-            IsA(schema, SchemaId::Shader)) {
-            return schema;
-        }
-    }
-    throw Error("no shader is called {}", id);
-}
 
 struct CopiedValue {
     SchemaId owner = SchemaId::None;
@@ -73,77 +60,6 @@ std::string Rebased(const std::string& target, const std::string& from, std::str
     return target;
 }
 
-ColumnRef InputColumn(SchemaId schema, std::string_view id, std::string_view name) {
-    const ColumnRef column = FindColumn(schema, name);
-    const bool owned =
-        column && column.schema != SchemaId::Connectable && column.schema != SchemaId::Shader &&
-        (IsA(column.schema, SchemaId::Shader) || Info(column.schema).kind == SchemaKind::Api);
-    if (!owned || Has(column.column->flags, ColumnFlags::Internal)) {
-        throw Error("{} has no input {}", id, name);
-    }
-    return column;
-}
-
-uint32_t EnumValue(ColumnRef column, std::string_view id, std::string_view text) {
-    const std::span<const std::string_view> tokens = column.column->tokens;
-    const auto found = std::ranges::find(tokens, text);
-    if (found == tokens.end()) {
-        throw Error("{}'s {} can't be {}", id, column.column->field, text);
-    }
-    return uint32_t(found - tokens.begin());
-}
-
-void SetInput(RowWriter& writer, SchemaId schema, std::string_view id, const MaterialInput& input) {
-    const ColumnRef column = InputColumn(schema, id, input.name);
-    const ColumnType type = column.column->type;
-    const auto mismatch = [&] {
-        return Error("{}'s {} can't take that kind of value", id, input.name);
-    };
-    std::visit(
-        [&]<class T>(const T& value) {
-            if constexpr (std::is_same_v<T, std::string>) {
-                if (type == ColumnType::Enum) {
-                    writer.Set(column.schema, column.index, EnumValue(column, id, value));
-                } else if (type == ColumnType::Token || type == ColumnType::Asset) {
-                    writer.Set(column.schema, column.index, value);
-                } else {
-                    throw mismatch();
-                }
-            } else if constexpr (std::is_same_v<T, int32_t>) {
-                if (type == ColumnType::Int) {
-                    writer.Set(column.schema, column.index, value);
-                } else if (type == ColumnType::Float) {
-                    writer.Set(column.schema, column.index, float(value));
-                } else {
-                    throw mismatch();
-                }
-            } else {
-                constexpr ColumnType expected = std::is_same_v<T, bool>     ? ColumnType::Bool
-                                                : std::is_same_v<T, float>  ? ColumnType::Float
-                                                : std::is_same_v<T, Float2> ? ColumnType::Float2
-                                                : std::is_same_v<T, Float3> ? ColumnType::Float3
-                                                                            : ColumnType::Float4;
-                if (type != expected) {
-                    throw mismatch();
-                }
-                writer.Set(column.schema, column.index, value);
-            }
-        },
-        input.value);
-}
-
-}
-
-void SetInputs(RowWriter& writer, SchemaId schema, std::span<const MaterialInput> inputs) {
-    const std::string_view id = Info(schema).name;
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        for (size_t j = 0; j < i; ++j) {
-            if (inputs[j].name == inputs[i].name) {
-                throw Error("{}'s {} is given twice", id, inputs[i].name);
-            }
-        }
-        SetInput(writer, schema, id, inputs[i]);
-    }
 }
 
 SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc)
@@ -208,94 +124,36 @@ void SceneImpl::Check(const Prim& prim) const {
     }
 }
 
-namespace {
-
-std::vector<MaterialInput> TextureInputs(SchemaId surface, std::string_view id,
-                                         const MaterialTexture& texture) {
-    const ColumnRole role = InputColumn(surface, id, texture.input).column->role;
-    std::vector<MaterialInput> inputs = {
-        {"file", texture.file},
-        {"sourceColorSpace", std::string(role == ColumnRole::Color ? "sRGB" : "raw")}};
-    if (role == ColumnRole::Normal) {
-        inputs.push_back({"scale", Float4{2, 2, 2, 1}});
-        inputs.push_back({"bias", Float4{-1, -1, -1, 0}});
-    }
-    for (const MaterialInput& input : texture.inputs) {
-        const auto found = std::ranges::find(inputs, input.name, &MaterialInput::name);
-        if (found != inputs.end()) {
-            found->value = input.value;
-        } else {
-            inputs.push_back(input);
+SchemaId ShaderSchema(std::string_view id) {
+    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
+        const SchemaId schema = SchemaId(index);
+        if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
+            IsA(schema, SchemaId::Shader)) {
+            return schema;
         }
     }
-    return inputs;
+    throw Error("no shader has info:id \"{}\"", id);
 }
 
-std::string TextureName(std::string_view input) {
-    std::string name(input);
-    if (!name.empty()) {
-        name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
-    }
-    return name + "Texture";
+ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc) {
+    const SchemaId schema = ShaderSchema(desc.id);
+    Log(LogLevel::Debug, "{} is a {} shader", path, desc.id);
+    return ShaderPrim(SceneImpl::Get(scene).Define(path, schema, [&](RowWriter& writer) {
+        WriteFallbacks(schema, writer);
+        Shader::Write(writer, desc);
+    }));
 }
 
-void DefineSurface(SceneImpl& impl, const Prim& material, const std::string& root, SchemaId surface,
-                   const MaterialDesc& desc,
-                   const std::vector<std::vector<MaterialInput>>& textures) {
-    const Prim shader = impl.Define(root + "/Surface", surface, [&](RowWriter& writer) {
-        WriteFallbacks(surface, writer);
-        SetInputs(writer, surface, desc.inputs);
-    });
-    material.Connect("surface", shader, "surface");
-    if (!desc.textures.empty()) {
-        const Prim placement =
-            impl.Define(root + "/Placement", SchemaId::TexturePlacement, [&](RowWriter& writer) {
-                WriteFallbacks(SchemaId::TexturePlacement, writer);
-                SetInputs(writer, SchemaId::TexturePlacement, desc.placement);
-            });
-        for (size_t i = 0; i < desc.textures.size(); ++i) {
-            const MaterialTexture& texture = desc.textures[i];
-            const Prim read =
-                impl.Define(root + "/" + TextureName(texture.input), SchemaId::UsdUVTexture,
-                            [&](RowWriter& writer) {
-                                WriteFallbacks(SchemaId::UsdUVTexture, writer);
-                                SetInputs(writer, SchemaId::UsdUVTexture, textures[i]);
-                            });
-            read.Connect("st", placement, "st");
-            shader.Connect(texture.input, read, texture.output);
-        }
-    }
-}
-
-}
-
-Prim DefineMaterial(Scene& scene, std::string_view path, const MaterialDesc& desc) {
-    const SchemaId surface = SurfaceSchema(desc.id);
-    std::vector<std::vector<MaterialInput>> textures;
-    for (const MaterialTexture& texture : desc.textures) {
-        textures.push_back(TextureInputs(surface, desc.id, texture));
-    }
-    if (desc.textures.empty() && !desc.placement.empty()) {
-        throw Error("{} places textures but has none", path);
-    }
-    SceneImpl& impl = SceneImpl::Get(scene);
-    const std::string root(path);
-    const Prim material = impl.Define(path, SchemaId::Material, [](RowWriter& writer) {
-        WriteFallbacks(SchemaId::Material, writer);
-    });
-    try {
-        DefineSurface(impl, material, root, surface, desc, textures);
-    } catch (...) {
-        scene.Remove(material);
-        throw;
-    }
-    Log(LogLevel::Debug, "{} is a {} with {} inputs and {} textures", path, desc.id,
-        desc.inputs.size(), desc.textures.size());
-    return material;
-}
-
-Prim Scene::DefineMaterial(std::string_view path, const MaterialDesc& desc) {
-    return ernie::DefineMaterial(*this, path, desc);
+PrimRange Define(Scene& scene, Span<const std::string> paths, const Shader::Desc& desc,
+                 const BatchDesc& batch) {
+    const SchemaId schema = ShaderSchema(desc.id);
+    return SceneImpl::Get(scene).Define(
+        paths, schema,
+        [&](RowWriter& writer) {
+            WriteFallbacks(schema, writer);
+            Shader::Write(writer, desc);
+        },
+        batch);
 }
 
 Ref<Scene> Scene::Create(const SceneDesc& desc) {

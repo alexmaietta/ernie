@@ -105,8 +105,11 @@ std::string Editor::Create(SchemaId type, const Double3& at, const Quatd& orient
     }
     const std::vector<std::string> before = m_selection.paths;
     const auto define = [this, type, path, at, orient] {
-        const Prim prim = type == SchemaId::Material ? m_scene->DefineMaterial(path)
-                                                     : m_scene->Define(path, type);
+        const Prim prim = m_scene->Define(path, type);
+        if (type == SchemaId::Material) {
+            prim.Connect("surface", m_scene->Define(path + "/Surface", SchemaId::UsdPreviewSurface),
+                         "surface");
+        }
         if (prim.IsA(SchemaId::Xformable)) {
             prim.Set(Xformable::kTranslate, at);
             prim.Set(Xformable::kOrient, orient);

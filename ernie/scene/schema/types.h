@@ -8,7 +8,6 @@
 #include <functional>
 #include <map>
 #include <string>
-#include <variant>
 #include <vector>
 #endif
 
@@ -172,27 +171,6 @@ struct Quatd {
     bool operator!=(const Quatd& other) const {
         return !(*this == other);
     }
-};
-
-using MaterialValue = std::variant<bool, int32_t, float, Float2, Float3, Float4, std::string>;
-
-struct MaterialInput {
-    std::string name;
-    MaterialValue value;
-};
-
-struct MaterialTexture {
-    std::string input;
-    std::string file;
-    std::string output = "rgb";
-    std::vector<MaterialInput> inputs;
-};
-
-struct MaterialDesc {
-    std::string id = "UsdPreviewSurface";
-    std::vector<MaterialInput> inputs;
-    std::vector<MaterialTexture> textures;
-    std::vector<MaterialInput> placement;
 };
 
 using InstancedTokens = std::map<std::string, std::vector<std::string>, std::less<>>;

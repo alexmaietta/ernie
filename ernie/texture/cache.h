@@ -35,7 +35,8 @@ inline constexpr std::string_view kCheckerboardTexture = "<checkerboard>";
 
 struct TextureBinding {
     TextureKey key;
-    TextureWrap wrap = TextureWrap::Repeat;
+    TextureWrap wrapS = TextureWrap::Repeat;
+    TextureWrap wrapT = TextureWrap::Repeat;
     uint32_t desc = ~0u;
     uint64_t handle = 0;
 };
@@ -47,7 +48,7 @@ class TextureCache {
     TextureCache(const TextureCache&) = delete;
     TextureCache& operator=(const TextureCache&) = delete;
 
-    TextureBinding Bind(TextureKey key, TextureWrap wrap);
+    TextureBinding Bind(TextureKey key, TextureWrap wrapS, TextureWrap wrapT);
     void Resolve(TextureBinding& binding);
     void Unbind(const TextureBinding& binding);
 
