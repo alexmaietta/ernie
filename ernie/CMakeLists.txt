@@ -21,6 +21,7 @@ ernie_generate_schemas(
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/sensor.schema"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/render.schema"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/shade.schema"
+    "${CMAKE_CURRENT_SOURCE_DIR}/schema/pipeline.schema"
     DEFINE_HEADER "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/defines.h"
     DEFINE_SOURCE "${ernie_scene_defines}"
     TYPED_HEADER "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/typed.h"
@@ -33,6 +34,7 @@ add_subdirectory(algorithms)
 add_subdirectory(bvh)
 add_subdirectory(io)
 add_subdirectory(texture)
+add_subdirectory(graph)
 add_subdirectory(material)
 add_subdirectory(scene)
 add_subdirectory(overlay)
@@ -48,6 +50,7 @@ ernie_shared_library(
     ernie_algorithms
     ernie_bvh
     ernie_texture
+    ernie_graph
     ernie_material
     ernie_scene
     ernie_overlay

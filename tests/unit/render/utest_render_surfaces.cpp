@@ -38,8 +38,7 @@ TEST(SurfaceTest, RadarSeesTheMotionOfTheNearestMovingAncestor) {
         scene->Define<Xform>("/Cart/Body");
         scene->Define<Cube>("/Cart/Body/Panel", {.size = 4});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Velocity",
-                                 {.sourceName = RenderVarSource::RadialVelocity});
+        scene->Define<RenderVar>("/Render/Velocity", {.sourceName = "RadialVelocity"});
         scene->Define<RenderProduct>("/Render/Scan",
                                      {.camera = {"/Radar"}, .orderedVars = {"/Render/Velocity"}});
         Renderer renderer(scene);
@@ -70,8 +69,7 @@ TEST(SurfaceTest, RadarSeesAMovingCloudOfPoints) {
         const Prim cloud =
             scene->Define<Points>("/Plume/Grains", {.points = grains, .widths = {0.3f}});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Velocity",
-                                 {.sourceName = RenderVarSource::RadialVelocity});
+        scene->Define<RenderVar>("/Render/Velocity", {.sourceName = "RadialVelocity"});
         scene->Define<RenderProduct>("/Render/Scan",
                                      {.camera = {"/Radar"}, .orderedVars = {"/Render/Velocity"}});
         Renderer renderer(scene);
@@ -110,7 +108,7 @@ Ref<Scene> TwoTiles(Device& device) {
                                      .focalLength = 400});
     }
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
     scene->Define<RenderProduct>("/Render/View", {.camera = {"/CamA", "/CamB"},
                                                   .resolution = {kSide, kSide},
                                                   .orderedVars = {"/Render/Color"}});
@@ -190,7 +188,7 @@ TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
         scene->Define<Scope>("/Inst/Protos");
         scene->Define<Mesh>("/Inst/Protos/Tile", kTile);
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::InstanceId});
+        scene->Define<RenderVar>("/Render/Ids", {.sourceName = "InstanceId"});
         scene->Define<RenderProduct>(
             "/Render/View",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
@@ -218,7 +216,7 @@ TEST(SurfaceTest, InstanceIdsReportEachPointsIdOrIndex) {
         const Prim cloud = scene->Define<Points>(
             "/Cloud", {.points = {{-1.5, 0, 0}, {1.5, 0, 0}}, .widths = {1.5f}, .ids = {7, 9}});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::InstanceId});
+        scene->Define<RenderVar>("/Render/Ids", {.sourceName = "InstanceId"});
         scene->Define<RenderProduct>(
             "/Render/View",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
@@ -250,7 +248,7 @@ TEST(SurfaceTest, InstanceIdsReportEachPointsIdThroughBoxesOfPoints) {
              .widths = {1.5f},
              .ids = {9, 7, 1, 2, 3}});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::InstanceId});
+        scene->Define<RenderVar>("/Render/Ids", {.sourceName = "InstanceId"});
         scene->Define<RenderProduct>(
             "/Render/View",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});

@@ -100,7 +100,7 @@ Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::
         scene->Define<DomeLight>("/Sky");
     }
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/env_0/Cam"}, .resolution = {64, 64}, .orderedVars = {"/Render/Color"}});

@@ -39,8 +39,8 @@ Ref<Scene> Stage(device::Device& device) {
     scene->Clone(*scene->Find("/Env0"), std::vector<std::string>{"/Env1"});
     scene->Define<DistantLight>("/Sun");
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::SemanticSegmentation});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene->Define<RenderVar>("/Render/Ids", {.sourceName = "SemanticSegmentation"});
     scene->Define<RenderProduct>("/Render/View", {.camera = {"/Env0/Cam"},
                                                   .resolution = {8, 8},
                                                   .orderedVars = {"/Render/Color", "/Render/Ids"}});

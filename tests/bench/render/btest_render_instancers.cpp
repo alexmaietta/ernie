@@ -152,7 +152,7 @@ Setup Prepare(const Shape& shape, device::Traversal traversal) {
     scene->Define<Camera>("/Eye", {.translate = {0, -shape.extent * 0.6, height},
                                    .orient = LookAt({0, -shape.extent * 0.6, height}, {0, 0, 0})});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
     scene->Define<RenderProduct>(
         "/Render/Product",
         {.camera = {"/Eye"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Color"}});

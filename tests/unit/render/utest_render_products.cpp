@@ -27,7 +27,7 @@ Ref<Scene> OneCamera(Device& device) {
     scene->Define<Camera>("/Cam");
     scene->Define<Sphere>("/Ball", {.translate = {0, 0, -5}});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {4, 3}, .orderedVars = {"/Render/Depth"}});

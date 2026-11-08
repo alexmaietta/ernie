@@ -204,7 +204,14 @@ api class SensorAPI (
 
 abstract class Sensor : Xformable, SensorAPI (
     doc = "A prim that captures the scene. Render products render sensors, and each kind of sensor shapes its own rays and outputs."
-) {}
+) {
+    prim[] pipeline:binding (
+        tracked
+        group = "Pipeline"
+        displayName = "Pipeline"
+        doc = "The SensorPipeline that processes this sensor's captures. Only the first target is used, and it isn't inherited by descendants. A camera without one runs the built-in display pipeline."
+    )
+}
 
 class Camera : Sensor, LensDistortionAPI, DetectorAPI (
     doc = "A camera looking down its local -z axis, with +y up, following UsdGeomCamera."

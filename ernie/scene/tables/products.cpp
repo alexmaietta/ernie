@@ -156,8 +156,12 @@ const SensorKind& FindSensorKind(SchemaId schema) {
 
 ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
                        int64_t channels) {
-    const RenderVarSource source = prim.Get(RenderVar::kSourceName);
-    const std::string_view name = kRenderVarSourceTokens[uint32_t(source)];
+    const std::string name = prim.Get(RenderVar::kSourceName);
+    const std::optional<RenderVarSource> builtIn = FindRenderVarSource(name);
+    if (!builtIn) {
+        throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(), name);
+    }
+    const RenderVarSource source = *builtIn;
     ResolvedVar var{.prim = prim.Index(),
                     .path = prim.Path(),
                     .source = source,

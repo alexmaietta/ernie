@@ -183,8 +183,8 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     }
     scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     std::vector<std::string> views;
     for (uint32_t w = 0; w < worlds; ++w) {
         for (uint32_t c = 0; c < cameras; ++c) {

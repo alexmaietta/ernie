@@ -28,9 +28,8 @@ Ref<Scene> FacingWall(Device& device, const Camera::Desc& camera) {
     scene->Define<Plane>("/Wall", {.translate = {0, 0, -kWallDistance}, .width = 0, .length = 0});
     scene->Define<Camera>("/Cam", camera);
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
-    scene->Define<RenderVar>("/Render/Plane",
-                             {.sourceName = RenderVarSource::DistanceToImagePlane});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
+    scene->Define<RenderVar>("/Render/Plane", {.sourceName = "DistanceToImagePlane"});
     scene->Define<RenderProduct>("/Render/View",
                                  {.camera = {"/Cam"},
                                   .resolution = {kSize, kSize},
@@ -263,7 +262,7 @@ TEST(CameraTest, PixelSamplesAverageCoverageAcrossThePixel) {
             "/Wall", {.translate = {edge + 50, 0, -kWallDistance}, .width = 100, .length = 100});
         scene->Define<Camera>("/Cam", {.focalLength = kFocalLength});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
         scene->Define<RenderProduct>("/Render/View", {.renderMode = RenderMode::RealTime,
                                                       .camera = {"/Cam"},
                                                       .resolution = {kSize, kSize},
@@ -292,7 +291,7 @@ TEST(CameraTest, BandsFollowTheCamerasSpectralRange) {
             "/Wall", {.translate = {0, 0, -kWallDistance}, .width = 100, .length = 100});
         Prim camera = scene->Define<Camera>("/Cam", {.focalLength = kFocalLength});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
         Prim product =
             scene->Define<RenderProduct>("/Render/View", {.renderMode = RenderMode::RealTime,
                                                           .camera = {"/Cam"},

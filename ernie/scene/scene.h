@@ -17,6 +17,7 @@
 #include "ernie/export.h"
 #include "ernie/scene/defines.h"
 #include "ernie/scene/prim.h"
+#include "ernie/scene/records/render_vars.h"
 #include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/tokens.h"
 #include "ernie/scene/types.h"

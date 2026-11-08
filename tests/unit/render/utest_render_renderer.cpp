@@ -36,8 +36,8 @@ Ref<Scene> TwoWorlds(Device& device, RenderMode mode) {
     scene->Define<Sphere>("/env_0/Ball", {.radius = 1});
     scene->Define<Sphere>("/env_1/Ball", {.translate = {0, 0, 50}, .radius = 1});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene->Define<RenderProduct>("/Render/View",
                                  {.camera = {"/env_0/Cam", "/env_1/Cam"},
                                   .resolution = {kWidth, kHeight},
@@ -166,7 +166,7 @@ TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
                                       .faceVertexCounts = {4, 4},
                                       .subdivisionScheme = SubdivisionScheme::None});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
         scene->Define<RenderProduct>(
             "/Render/Roof",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
@@ -207,8 +207,8 @@ Lit RenderLitQuad(Device& device, Float3 tilt, RenderMode mode) {
                                   .faceVertexCounts = {4},
                                   .subdivisionScheme = SubdivisionScheme::None});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
     scene->Define<RenderProduct>("/Render/Roof",
                                  {.camera = {"/Cam"},
                                   .resolution = {kSide, kSide},
@@ -255,7 +255,7 @@ TEST(RendererTest, NormalsHaveThreeChannelsAndMissesAreZero) {
                                       .faceVertexCounts = {4},
                                       .subdivisionScheme = SubdivisionScheme::None});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
         scene->Define<RenderProduct>(
             "/Render/Quad",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
@@ -288,7 +288,7 @@ TEST(RendererTest, AuthoredNormalsAndTheSubdivisionSchemeReachTheNormalOutput) {
                       .faceVertexCounts = {4},
                       .subdivisionScheme = SubdivisionScheme::None});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
         scene->Define<RenderProduct>(
             "/Render/Roof",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});

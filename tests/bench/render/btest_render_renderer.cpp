@@ -64,8 +64,8 @@ Setup Prepare(uint32_t width, uint32_t height, RenderMode mode) {
     scene->Define<Camera>("/env_0/Cam", {.translate = {0, 0, 9}});
     scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene->Define<RenderProduct>("/Render/Product",
                                  {.camera = {"/env_0/Cam"},
                                   .resolution = {width, height},

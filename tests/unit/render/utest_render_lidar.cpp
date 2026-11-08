@@ -29,8 +29,8 @@ Ref<Scene> BeamAtWall(Device& device, Float2 divergence) {
                                     .returnMode = ReturnMode::Mean,
                                     .beamDivergence = divergence});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>(
-        "/Render/Points", {.sourceName = RenderVarSource::PointCloud, .channels = {"Coordinates"}});
+    scene->Define<RenderVar>("/Render/Points",
+                             {.sourceName = "PointCloud", .channels = {"Coordinates"}});
     scene->Define<RenderProduct>("/Render/Scan",
                                  {.camera = {"/Lidar"}, .orderedVars = {"/Render/Points"}});
     return scene;

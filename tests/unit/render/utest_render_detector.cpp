@@ -39,8 +39,8 @@ Ref<Scene> UniformSky(Device& device) {
                                    .detectorQeClear = {{300, 0.8f}, {900, 0.8f}},
                                    .focalLength = kFocalLength});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Rate", {.sourceName = RenderVarSource::ElectronRate});
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderVar>("/Render/Rate", {.sourceName = "ElectronRate"});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
     scene->Define<RenderProduct>("/Render/View",
                                  {.renderMode = RenderMode::RealTime,
                                   .camera = {"/Cam"},

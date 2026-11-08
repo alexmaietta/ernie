@@ -29,7 +29,7 @@ Ref<Scene> LookingDown(Device& device, MinimalMode mode) {
                                    .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
                                    .focalLength = 30});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Color"}});
@@ -225,8 +225,8 @@ TEST(MaterialsTest, NonvisualReflectanceScalesLidarIntensity) {
             "/Lidar",
             {.scanType = ScanType::SolidState, .firingsPerScan = 1, .emitterElevations = {0}});
         scene->Define<Scope>("/Render");
-        scene->Define<RenderVar>("/Render/Points", {.sourceName = RenderVarSource::PointCloud,
-                                                    .channels = {"Intensity"}});
+        scene->Define<RenderVar>("/Render/Points",
+                                 {.sourceName = "PointCloud", .channels = {"Intensity"}});
         scene->Define<RenderProduct>("/Render/Scan",
                                      {.camera = {"/Lidar"}, .orderedVars = {"/Render/Points"}});
         Renderer renderer(scene);

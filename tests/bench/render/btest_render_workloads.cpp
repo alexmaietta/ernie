@@ -87,8 +87,8 @@ void Look(Scene& scene, const std::string& path, double angle, double distance, 
 
 void Vars(Scene& scene) {
     scene.Define<Scope>("/Render");
-    scene.Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene.Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene.Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene.Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
 }
 
 void Replicate(Scene& scene, uint32_t worlds) {

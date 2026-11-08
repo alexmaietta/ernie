@@ -256,7 +256,7 @@ Setup Prepare(const Shape& shape, device::Traversal traversal) {
     setup.eyes = scene->Select(views);
     scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
     scene->Define<RenderProduct>("/Render/Product", {.mode = MinimalMode::DisplayColor,
                                                      .castShadows = true,
                                                      .camera = views,

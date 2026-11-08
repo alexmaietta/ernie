@@ -59,15 +59,15 @@ const char* Name(Motion motion) {
     return "";
 }
 
-const std::pair<RenderVarSource, const char*> kVars[] = {
-    {RenderVarSource::LdrColor, "/Render/Color"},
-    {RenderVarSource::DistanceToCamera, "/Render/Depth"},
-    {RenderVarSource::Normal, "/Render/Normal"},
-    {RenderVarSource::DiffuseAlbedo, "/Render/Albedo"},
-    {RenderVarSource::NonStableInstanceSegmentation, "/Render/Instances"},
-    {RenderVarSource::HdrColor, "/Render/Hdr"},
-    {RenderVarSource::DistanceToImagePlane, "/Render/Plane"},
-    {RenderVarSource::StableIdSegmentation, "/Render/StableIds"},
+const std::pair<const char*, const char*> kVars[] = {
+    {"LdrColor", "/Render/Color"},
+    {"DistanceToCamera", "/Render/Depth"},
+    {"Normal", "/Render/Normal"},
+    {"DiffuseAlbedo", "/Render/Albedo"},
+    {"NonStableInstanceSegmentation", "/Render/Instances"},
+    {"HdrColor", "/Render/Hdr"},
+    {"DistanceToImagePlane", "/Render/Plane"},
+    {"StableIdSegmentation", "/Render/StableIds"},
 };
 
 struct Shape {

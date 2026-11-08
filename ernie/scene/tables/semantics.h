@@ -17,6 +17,7 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
 #include "ernie/device/tensor.h"
+#include "ernie/scene/records/render_vars.h"
 #include "ernie/scene/records/semantics.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/kernels/authored.h"

@@ -24,12 +24,11 @@ std::string WorldPath(uint32_t world) {
     return world == 0 ? std::string("/World") : fmt::format("/World_{}", world);
 }
 
-RenderVarSource ParseSource(std::string_view name) {
-    const auto token = std::ranges::find(kRenderVarSourceTokens, name);
-    if (token == std::end(kRenderVarSourceTokens)) {
+std::string ParseSource(std::string_view name) {
+    if (!FindRenderVarSource(name)) {
         throw Error("\"{}\" is no AOV; try LdrColor, HdrColor, DistanceToCamera or Normal", name);
     }
-    return RenderVarSource(token - std::begin(kRenderVarSourceTokens));
+    return std::string(name);
 }
 
 RenderMode ParsePreset(std::string_view preset) {

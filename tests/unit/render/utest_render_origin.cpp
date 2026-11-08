@@ -25,8 +25,8 @@ const std::vector<std::string> kProducts = {"/Render/View"};
 
 void DefineProduct(Scene& scene, const std::vector<std::string>& cameras, RenderMode mode) {
     scene.Define<Scope>("/Render");
-    scene.Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
-    scene.Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene.Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
+    scene.Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene.Define<RenderProduct>("/Render/View",
                                 {.camera = cameras,
                                  .resolution = {kWidth, kHeight},

@@ -84,6 +84,7 @@ ernie_public_files(
     prim.h
     primvar.h
     records/primvars.h
+    records/render_vars.h
     records/semantics.h
     rotation.h
     scene.h

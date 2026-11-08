@@ -326,9 +326,7 @@ void Viewport::DefineSession() {
         m_scene->Define<World>(root);
     }
     share();
-    const auto token = std::ranges::find(kRenderVarSourceTokens, m_aov);
-    m_scene->Define<RenderVar>(
-        m_shownVar, {.sourceName = RenderVarSource(token - std::begin(kRenderVarSourceTokens))});
+    m_scene->Define<RenderVar>(m_shownVar, {.sourceName = std::string(m_aov)});
     std::optional<Prim> camera;
     if (source) {
         m_scene->Paste(m_scene->Copy(*source), m_product);
@@ -1607,10 +1605,7 @@ void Viewport::SetAov(const std::string& aov) {
     if (aov == m_aov) {
         return;
     }
-    const auto token = std::ranges::find(kRenderVarSourceTokens, aov);
-    m_scene->Select(m_shownVar)
-        .Get(RenderVar::kSourceName)
-        .Set(RenderVarSource(token - std::begin(kRenderVarSourceTokens)));
+    m_scene->Select(m_shownVar).Get(RenderVar::kSourceName).Set(m_scene->Token(aov));
     m_aov = aov;
     m_bounds.reset();
     m_range.reset();

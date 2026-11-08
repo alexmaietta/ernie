@@ -36,7 +36,7 @@ Ref<Scene> Empty(Device& device) {
     scene->Define<Camera>("/Cam",
                           {.translate = {0, -5, 0}, .orient = LookAt({0, -5, 0}, {0, 0, 0})});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {kWidth, kHeight}, .orderedVars = {"/Render/Color"}});

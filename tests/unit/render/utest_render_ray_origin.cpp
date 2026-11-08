@@ -42,9 +42,9 @@ Ref<Scene> SunScene(Device& device, Double3 eye, Double3 target, Double3 toward,
         {.translate = eye, .orient = LookAt(eye, target, {0, 1, 0}), .focalLength = focalLength});
     scene->Define<DistantLight>("/Sun", {.orient = LookAlong({-toward.x, -toward.y, -toward.z})});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
-    scene->Define<RenderVar>("/Render/Normal", {.sourceName = RenderVarSource::Normal});
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
+    scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene->Define<RenderProduct>(
         "/Render/View", {.camera = {"/Cam"},
                          .resolution = {kWidth, kHeight},

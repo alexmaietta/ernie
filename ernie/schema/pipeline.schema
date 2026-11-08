@@ -1,0 +1,7 @@
+class SensorPipeline : NodeGraph (
+    doc = "A sensor processing graph that turns what a sensor's trace measured into its outputs, such as raw digital numbers, a processed image or a point cloud. Its outputs connect to its nodes' outputs and name what render variables can read. Sensors and render products bind it with pipeline:binding."
+) {}
+
+abstract class SensorNode : Shader (
+    doc = "One step of a sensor pipeline, named by info:id. Token and bool inputs pick how the step is built, so changing one compiles the pipeline again, while numeric inputs are values that change without compiling."
+) {}

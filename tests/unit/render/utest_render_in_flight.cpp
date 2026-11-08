@@ -27,7 +27,7 @@ Ref<Scene> BallScene(Device& device) {
                           {.translate = {0, -5, 0}, .orient = LookAt({0, -5, 0}, {0, 0, 0})});
     scene->Define<Sphere>("/Ball", {.radius = 1});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {kWidth, kHeight}, .orderedVars = {"/Render/Depth"}});

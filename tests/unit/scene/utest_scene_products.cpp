@@ -19,9 +19,9 @@ Ref<Scene> TwoProducts(device::Device& device) {
     scene->Define<Camera>("/Cam");
     scene->Define<Camera>("/Second");
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Depth", {.sourceName = RenderVarSource::DistanceToCamera});
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::LdrColor});
-    scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::SemanticSegmentation});
+    scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});
+    scene->Define<RenderVar>("/Render/Ids", {.sourceName = "SemanticSegmentation"});
     scene->Define<RenderProduct>(
         "/Render/Depths",
         {.camera = {"/Cam", "/Second"}, .resolution = {4, 3}, .orderedVars = {"/Render/Depth"}});
@@ -70,9 +70,21 @@ TEST(ProductsTest, PlansGroupCapturesByEntryAndStayCachedUntilAProductChanges) {
 TEST(ProductsTest, PlanningAProductItsSensorCannotOutputThrows) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = TwoProducts(device);
-        scene->Define<RenderVar>("/Render/Points", {.sourceName = RenderVarSource::PointCloud});
+        scene->Define<RenderVar>("/Render/Points", {.sourceName = "PointCloud"});
         scene->Find("/Render/Depths")
             ->Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Points"});
+        scene->Publish().Wait();
+        const std::vector<std::string> paths = {"/Render/Depths"};
+        EXPECT_THROW(SceneImpl::Get(*scene).GetPlans().Plan(paths), Error);
+    });
+}
+
+TEST(ProductsTest, PlanningAVarNamingNoOutputThrows) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = TwoProducts(device);
+        scene->Define<RenderVar>("/Render/Raw", {.sourceName = "raw"});
+        scene->Find("/Render/Depths")
+            ->Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Raw"});
         scene->Publish().Wait();
         const std::vector<std::string> paths = {"/Render/Depths"};
         EXPECT_THROW(SceneImpl::Get(*scene).GetPlans().Plan(paths), Error);

@@ -31,6 +31,15 @@ ernie_test(
 )
 
 ernie_test(
+    ernie_graph_tests
+    LINK
+        ernie_graph_internal
+    SOURCES
+        unit/graph/utest_graph_graph.cpp
+        unit/graph/utest_graph_library.cpp
+)
+
+ernie_test(
     ernie_material_tests
     LINK
         ernie_material_internal
