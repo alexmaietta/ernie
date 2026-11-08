@@ -14,6 +14,7 @@
 #include "ernie/scene/structure/packing.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/semantics.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -61,7 +62,8 @@ template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         SemanticTable semantics(structure);
         publisher.Add(semantics);
         const Token taxonomy = structure.GetTokens().Intern("class");

@@ -61,8 +61,9 @@ const std::vector<ColumnRef>& InputColumns() {
 
 }
 
-InstanceTable::InstanceTable(Structure& structure, bvh::Builder& builder, uint32_t maxRefits)
-    : m_structure(structure), m_builder(builder), m_maxRefits(maxRefits) {
+InstanceTable::InstanceTable(Structure& structure, const RenderTables& tables,
+                             bvh::Builder& builder, uint32_t maxRefits)
+    : m_structure(structure), m_tables(tables), m_builder(builder), m_maxRefits(maxRefits) {
     device::Device& device = structure.GetColumnStore().GetDevice();
     const BvhBox unit = {{-1, -1, -1}, {1, 1, 1}};
     m_unitBoxes = device.CreateBuffer(
@@ -193,10 +194,10 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
     params.tlases.address = dirtyBuffer->Address();
     params.hits.address = m_hits.Address();
     params.origins.address = m_renderOrigins.Address();
-    params.transforms = changes.tables->transforms;
-    params.imageables = changes.tables->imageables;
-    params.meshes = changes.tables->meshes;
-    params.points = changes.tables->points;
+    params.transforms = m_tables.transforms;
+    params.imageables = m_tables.imageables;
+    params.meshes = m_tables.meshes;
+    params.points = m_tables.points;
     params.slotWorlds.address = m_slotWorlds.Address();
     params.unitBox = m_unitBox->Handle();
 
@@ -208,7 +209,7 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
     origins.products.address = m_productBuffer->Address();
     origins.origins.address = m_renderOrigins.Address();
     origins.viewers.address = m_viewers->Address();
-    origins.transforms = changes.tables->transforms;
+    origins.transforms = m_tables.transforms;
     origins.productCount = uint32_t(m_products.size());
     origins.tlasCount = tlases;
     if (!m_products.empty()) {

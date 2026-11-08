@@ -14,6 +14,7 @@
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/textures.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
@@ -98,7 +99,8 @@ template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         TextureTable textures(structure);
         publisher.Add(textures);
         Scene scene{store, structure, publisher, textures};
@@ -195,7 +197,8 @@ TEST(TexturesTest, DomeRecordsCarryTheirImageSizeAndRebindsAreLoggedPerWorld) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         TextureTable textures(structure);
         TextureProbe probe;
         publisher.Add(textures);

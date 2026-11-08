@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/scene/columns/kernels/authored.h"
 #include "ernie/scene/columns/kernels/paged.h"
 
 namespace ernie {
-
-static const uint kPrimAlive = 1u << 0;
-static const uint kPrimSession = 1u << 1;
 
 struct PrimTable {
     Paged<uint> schema;

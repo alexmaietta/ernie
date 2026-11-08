@@ -119,12 +119,12 @@ TEST(SceneTest, SnapshotsCarryEverySystemsOutput) {
         EXPECT_EQ(snapshot.ordinal, 1u);
         EXPECT_NE(snapshot.tables, 0u);
         const PinnedTables& pinned = PinnedTables::From(snapshot);
-        EXPECT_EQ(snapshot.tables, pinned.header->Address());
-        EXPECT_NE(pinned.tables.instances.address, 0u);
-        EXPECT_NE(pinned.tables.lights.address, 0u);
-        EXPECT_NE(pinned.tables.origins.address, 0u);
-        EXPECT_EQ(pinned.tables.semantics.taxonomyCount, 1u);
-        EXPECT_EQ(pinned.tables.worldCount, 1u);
+        EXPECT_EQ(snapshot.tables, pinned.buffer->Address());
+        EXPECT_NE(pinned.Header<RenderTables>().instances.address, 0u);
+        EXPECT_NE(pinned.Header<RenderTables>().lights.address, 0u);
+        EXPECT_NE(pinned.Header<RenderTables>().origins.address, 0u);
+        EXPECT_EQ(pinned.Header<RenderTables>().semantics.taxonomyCount, 1u);
+        EXPECT_EQ(pinned.Header<RenderTables>().worldCount, 1u);
         EXPECT_TRUE(snapshot.ready.Ready());
         scene.Release(snapshot);
         scene.Publish({.ordinal = 10}).Wait();

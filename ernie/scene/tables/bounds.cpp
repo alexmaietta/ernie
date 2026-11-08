@@ -88,10 +88,10 @@ void BoundsTable::Run(const ChangeSet& changes, TableVersions&) {
     params.origins.address = m_origins->Address();
     params.extents.address = m_extents->Address();
     params.boxes.address = m_boxes.Address();
-    params.transforms = changes.tables->transforms;
-    params.imageables = changes.tables->imageables;
-    params.meshes = changes.tables->meshes;
-    params.points = changes.tables->points;
+    params.transforms = m_tables.transforms;
+    params.imageables = m_tables.imageables;
+    params.meshes = m_tables.meshes;
+    params.points = m_tables.points;
     params.primBounds.address = m_primBounds.Address();
     params.primCount = m_structure.GetPrims().Size();
     params.slotCount = m_boxes.Rows();
@@ -101,9 +101,9 @@ void BoundsTable::Run(const ChangeSet& changes, TableVersions&) {
             {.bytes = std::bit_ceil(instancerBytes), .label = "instancer extents"});
     }
     params.instancerExtents.address = m_instancerExtents->Address();
-    const bool slots = changes.tables->instances.address != 0;
+    const bool slots = m_tables.instances.address != 0;
     if (slots) {
-        params.instances = changes.tables->instances;
+        params.instances = m_tables.instances;
         params.instanceSlots = uint32_t(m_instances.InstancePrims().size());
         params.tlasCount = uint32_t(m_instances.InstanceCounts().size());
     }

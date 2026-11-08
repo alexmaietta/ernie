@@ -17,7 +17,7 @@
 
 namespace ernie {
 
-class TransformTable : public Table {
+class TransformTable : public RenderTable {
   public:
     explicit TransformTable(Structure& structure) : m_structure(structure) {}
 

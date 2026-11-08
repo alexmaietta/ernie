@@ -29,9 +29,10 @@ struct InstanceStats {
     bool relaid = false;
 };
 
-class InstanceTable : public Table {
+class InstanceTable : public RenderTable {
   public:
-    InstanceTable(Structure& structure, bvh::Builder& builder, uint32_t maxRefits = 16);
+    InstanceTable(Structure& structure, const RenderTables& tables, bvh::Builder& builder,
+                  uint32_t maxRefits = 16);
 
     std::string_view Name() const override {
         return "instances";
@@ -133,6 +134,7 @@ class InstanceTable : public Table {
     void Compose();
 
     Structure& m_structure;
+    const RenderTables& m_tables;
     bvh::Builder& m_builder;
     uint32_t m_maxRefits;
     Ref<device::Buffer> m_unitBoxes;

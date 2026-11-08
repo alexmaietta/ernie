@@ -108,10 +108,7 @@ uint64_t TextureTable::Handle(uint32_t prim, std::string_view input) const {
 
 void TextureTable::UploadBindings() {
     const uint64_t address = m_cache.UploadBindings();
-    if (address != m_bindingAddress) {
-        m_bindingAddress = address;
-        m_structure.GetColumnStore().SetTextureBindings(address);
-    }
+    m_bindingAddress = address;
 }
 
 std::set<uint32_t> TextureTable::Collect() {

@@ -173,7 +173,7 @@ void WriteDomeMaps(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     const uint row = PrimRow(scene, domePrim, kSlotDomeLight);
     const TextureRecord texture = p.textures[domePrim];
     const uint binding = texture.textures;
-    const uint64_t handle = binding != 0 ? scene->textureBindings[binding] : 0;
+    const uint64_t handle = binding != 0 ? p.textureBindings[binding] : 0;
     const float2 uv = float2((id.x % kDomeMapWidth + 0.5f) / kDomeMapWidth,
                              (id.x / kDomeMapWidth + 0.5f) / kDomeMapHeight);
     float value = 1;
@@ -387,7 +387,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         record.coneAngle = radians(clamp(shaping.shapingConeAngle[at], 0.0f, 180.0f));
         record.coneSoftness = clamp(shaping.shapingConeSoftness[at], 0.0f, 1.0f);
         const uint binding = p.textures[prim].shaping;
-        ies = binding != 0 ? scene->textureBindings[binding] : 0;
+        ies = binding != 0 ? p.textureBindings[binding] : 0;
         if (ies != 0) {
             record.ies = binding;
             record.iesAngleScale = shaping.shapingIesAngleScale[at];
@@ -461,7 +461,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         Profile(record, ies, true, iesNormalize);
         flux = area * kPi * EmissionIntegral(record, ies, true, true);
         record.textures = p.textures[prim].textures;
-        const uint64_t image = record.textures != 0 ? scene->textureBindings[record.textures] : 0;
+        const uint64_t image = record.textures != 0 ? p.textureBindings[record.textures] : 0;
         if (image != 0) {
             TextureLookup lookup;
             lookup.st = float2(0.5f);

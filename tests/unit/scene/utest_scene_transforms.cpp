@@ -12,6 +12,7 @@
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
@@ -71,7 +72,8 @@ template <class Test> void ForEachWorld(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         TransformTable hierarchy(structure);
         publisher.Add(hierarchy);
         World world{store, structure, publisher, hierarchy};

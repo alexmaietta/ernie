@@ -18,6 +18,7 @@
 #include "ernie/scene/tables/instances.h"
 #include "ernie/scene/tables/meshes.h"
 #include "ernie/scene/tables/surfaces.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
@@ -184,12 +185,13 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
             SCOPED_TRACE(c.name);
             ColumnStore store(device);
             Structure structure(store);
-            Publisher publisher(structure);
+            RenderHeader header;
+            Publisher publisher(structure, &header);
             const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
             TransformTable hierarchy(structure);
             MeshTable geometry(structure, *builder);
-            InstanceTable instances(structure, *builder);
-            SurfaceTable surfaces(structure, instances);
+            InstanceTable instances(structure, header.Tables(), *builder);
+            SurfaceTable surfaces(structure, header.Tables(), instances);
             publisher.Add(hierarchy);
             publisher.Add(geometry);
             publisher.Add(instances);

@@ -19,10 +19,10 @@
 
 namespace ernie {
 
-class BoundsTable : public Table {
+class BoundsTable : public RenderTable {
   public:
-    BoundsTable(Structure& structure, const InstanceTable& instances)
-        : m_structure(structure), m_instances(instances) {}
+    BoundsTable(Structure& structure, const RenderTables& tables, const InstanceTable& instances)
+        : m_structure(structure), m_tables(tables), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "bounds";
@@ -58,6 +58,7 @@ class BoundsTable : public Table {
     void Relayout();
 
     Structure& m_structure;
+    const RenderTables& m_tables;
     const InstanceTable& m_instances;
     device::Program& Kernels();
 

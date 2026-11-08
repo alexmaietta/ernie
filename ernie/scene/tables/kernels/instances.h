@@ -5,7 +5,8 @@
 #include "ernie/scene/records/instances.h"
 #include "ernie/scene/records/meshes.h"
 #include "ernie/scene/records/points.h"
-#include "ernie/scene/tables/kernels/authored.h"
+#include "ernie/scene/records/prims.h"
+#include "ernie/scene/records/transforms.h"
 #include "ernie/scene/tables/kernels/instance_layout.h"
 
 namespace ernie {

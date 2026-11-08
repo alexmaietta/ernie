@@ -32,7 +32,7 @@ struct TextureSlot {
     bool color = false;
 };
 
-class TextureTable : public Table {
+class TextureTable : public RenderTable {
   public:
     explicit TextureTable(Structure& structure, unsigned threads = 4);
     ~TextureTable() override;

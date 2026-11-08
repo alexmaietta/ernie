@@ -30,7 +30,7 @@ struct PointsStats {
     uint32_t capacity = 0;
 };
 
-class PointsTable : public Table {
+class PointsTable : public RenderTable {
   public:
     PointsTable(Structure& structure, bvh::Builder& builder, uint32_t maxRefits = 16,
                 uint32_t pointsPerBox = 1)

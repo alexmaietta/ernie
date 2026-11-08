@@ -16,10 +16,10 @@
 
 namespace ernie {
 
-class SurfaceTable : public Table {
+class SurfaceTable : public RenderTable {
   public:
-    SurfaceTable(Structure& structure, const InstanceTable& instances)
-        : m_structure(structure), m_instances(instances) {}
+    SurfaceTable(Structure& structure, const RenderTables& tables, const InstanceTable& instances)
+        : m_structure(structure), m_tables(tables), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "surfaces";
@@ -52,6 +52,7 @@ class SurfaceTable : public Table {
     device::Program& Kernels();
 
     Structure& m_structure;
+    const RenderTables& m_tables;
     const InstanceTable& m_instances;
     Ref<device::Program> m_program;
     DeviceTable<SurfaceRecord> m_surfaces{"instance surfaces"};

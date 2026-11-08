@@ -54,6 +54,7 @@ ernie_shared_library(
     ernie_graph
     ernie_pipeline
     ernie_material
+    ernie_stage
     ernie_scene
     ernie_overlay
     ernie_render

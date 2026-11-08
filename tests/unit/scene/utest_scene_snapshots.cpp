@@ -11,6 +11,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
 
@@ -26,7 +27,7 @@ template <class Test> void ForEachScene(Test test) {
 
 RenderTables ReadHeader(device::Device& device, const Snapshot& snapshot) {
     RenderTables tables{};
-    device.GetQueue().Read(PinnedTables::From(snapshot).header->Slice(0, sizeof(tables)), &tables);
+    device.GetQueue().Read(PinnedTables::From(snapshot).buffer->Slice(0, sizeof(tables)), &tables);
     return tables;
 }
 
@@ -48,7 +49,7 @@ TEST(SnapshotTest, TheHeaderOnTheDeviceMatchesTheTablesItPins) {
         const Snapshot snapshot = scene.Acquire(Stream::Host());
         const PinnedTables& pinned = PinnedTables::From(snapshot);
         const RenderTables header = ReadHeader(device, snapshot);
-        EXPECT_EQ(std::memcmp(&header, &pinned.tables, sizeof(header)), 0);
+        EXPECT_EQ(std::memcmp(&header, &pinned.Header<RenderTables>(), sizeof(header)), 0);
         SceneImpl& impl = SceneImpl::Get(scene);
         EXPECT_EQ(header.instances.address, impl.GetInstances().Layout()->Address());
         EXPECT_EQ(header.lights.address, impl.GetLights().Layout()->Address());
@@ -97,7 +98,7 @@ TEST(SnapshotTest, OnlyRelayoutsReplaceTheHeader) {
         scene.Publish().Wait();
         const Snapshot relaid = scene.Acquire(Stream::Host());
         EXPECT_NE(relaid.tables, first.tables);
-        EXPECT_EQ(PinnedTables::From(relaid).tables.worldCount, 1u);
+        EXPECT_EQ(PinnedTables::From(relaid).Header<RenderTables>().worldCount, 1u);
         const RenderTables kept = ReadHeader(device, first);
         EXPECT_EQ(std::memcmp(&kept, &before, sizeof(kept)), 0);
         for (const Snapshot* snapshot : {&first, &moved, &relaid}) {
@@ -111,7 +112,7 @@ TEST(SnapshotTest, HeldSnapshotsKeepRelaidTablesAlive) {
         scene.Define<Sphere>("/Ball");
         scene.Publish().Wait();
         const Snapshot held = scene.Acquire(Stream::Host());
-        const uint64_t layout = PinnedTables::From(held).tables.instances.address;
+        const uint64_t layout = PinnedTables::From(held).Header<RenderTables>().instances.address;
         const RefCounted* buffer = Held(held, layout);
         ASSERT_NE(buffer, nullptr);
 

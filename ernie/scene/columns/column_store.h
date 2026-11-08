@@ -22,10 +22,10 @@
 #include "ernie/scene/columns/array_pool.h"
 #include "ernie/scene/columns/column_table.h"
 #include "ernie/scene/columns/device_heap.h"
+#include "ernie/scene/columns/kernels/authored.h"
 #include "ernie/scene/columns/kernels/cells.h"
 #include "ernie/scene/columns/kernels/changes.h"
 #include "ernie/scene/schema/schema.h"
-#include "ernie/scene/tables/kernels/authored.h"
 
 namespace ernie {
 
@@ -139,10 +139,6 @@ class ColumnStore {
 
     void SetCounts(uint32_t prims, uint32_t worlds);
 
-    void SetTextureBindings(uint64_t address) {
-        m_textureBindings = address;
-    }
-
     void Flush();
     AuthoredData Data() const;
     uint64_t DeviceData();
@@ -249,7 +245,6 @@ class ColumnStore {
     Ref<device::Program> m_program;
     Ref<device::Buffer> m_deviceData;
     std::vector<std::byte> m_uploaded;
-    uint64_t m_textureBindings = 0;
     uint64_t m_writes = 0;
     Ordinal m_stamp = 1;
     uint32_t m_primCount = 0;

@@ -13,7 +13,7 @@
 
 namespace ernie {
 
-class SpectralTable : public Table {
+class SpectralTable : public RenderTable {
   public:
     explicit SpectralTable(Structure& structure) : m_structure(structure) {}
 

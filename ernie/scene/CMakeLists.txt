@@ -1,21 +1,66 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
-    ernie_scene
+    ernie_stage
     columns/array_pool.cpp
     columns/column_store.cpp
     schema/runtime.cpp
     columns/column_table.cpp
     columns/device_heap.cpp
-    prim.cpp
     publish/change_set.cpp
     publish/publisher.cpp
-    rotation.cpp
-    scene.cpp
     structure/packing.cpp
     structure/paths.cpp
     structure/prims.cpp
     structure/structure.cpp
     structure/tokens.cpp
+    views/attribute.cpp
+    views/layout.cpp
+    views/mapping.cpp
+    views/poses.cpp
+    views/view.cpp
+)
+target_link_libraries(ernie_stage PUBLIC ernie_device)
+ernie_embed(
+    ernie_stage
+    LIBRARY kStageKernels
+    USES
+        kDeviceKernels
+    HEADER ernie/scene/stage_kernels.h
+    ROOTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema|ernie/scene/schema/|*.h"
+        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/schema|ernie/scene/schema/|*.h"
+)
+
+file(
+    GLOB_RECURSE ernie_stage_files
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/columns/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/publish/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/schema/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/structure/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/views/*"
+)
+ernie_check_layer(
+    ernie_stage
+    ALLOW
+        "^ernie/device/"
+        "^ernie/util/"
+        "^ernie/export\\.h$"
+        "^ernie/scene/(columns|publish|schema|structure|views)/"
+        "^ernie/scene/(primvar|stage_kernels|types)\\.h$"
+    FILES
+        ${ernie_stage_files}
+        "${CMAKE_CURRENT_SOURCE_DIR}/primvar.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
+)
+
+ernie_object_library(
+    ernie_scene
+    prim.cpp
+    rotation.cpp
+    scene.cpp
     tables/bounds.cpp
     tables/captures.cpp
     tables/instance_layout.cpp
@@ -34,16 +79,12 @@ ernie_object_library(
     tables/tangents.cpp
     tables/textures.cpp
     tables/transforms.cpp
-    views/attribute.cpp
-    views/layout.cpp
-    views/mapping.cpp
-    views/poses.cpp
-    views/view.cpp
     "${ernie_scene_defines}"
 )
 target_link_libraries(
     ernie_scene
     PUBLIC
+        ernie_stage
         ernie_device
         ernie_algorithms
         ernie_bvh
@@ -57,23 +98,21 @@ ernie_embed(
     ernie_scene
     LIBRARY kSceneKernels
     USES
+        kStageKernels
         kBvhKernels
         kIoKernels
         kTextureKernels
     HEADER ernie/scene/kernels.h
     ROOTS
-        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.slang"
-        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/tables/kernels|ernie/scene/tables/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/tables/kernels|ernie/scene/tables/kernels/|*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/schema|ernie/scene/schema/|*.h"
-        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/schema|ernie/scene/schema/|*.h"
 )
 
 ernie_static_library(
     ernie_scene_internal
+    ernie_stage
     ernie_scene
     ernie_bvh_internal
     ernie_io_internal
@@ -86,12 +125,12 @@ ernie_public_files(
     columns/kernels/paged.h
     prim.h
     primvar.h
-    records/primvars.h
     records/render_vars.h
     records/semantics.h
     rotation.h
     scene.h
     schema/ids.h
+    schema/primvars.h
     schema/runtime.h
     schema/schema.h
     schema/types.h

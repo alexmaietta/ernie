@@ -16,6 +16,7 @@
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/table.h"
 #include "support/devices.h"
 
 namespace ernie {
@@ -55,7 +56,8 @@ template <class Test> void ForEachScene(Test test, uint32_t perBox = 1) {
         }
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
         PointsTable points(structure, *builder, kMaxRefits, perBox);
         publisher.Add(points);

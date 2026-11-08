@@ -15,7 +15,7 @@
 
 namespace ernie {
 
-class SensorTable : public Table {
+class SensorTable : public RenderTable {
   public:
     explicit SensorTable(Structure& structure) : m_structure(structure) {}
 

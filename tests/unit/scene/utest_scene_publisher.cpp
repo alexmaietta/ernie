@@ -78,7 +78,8 @@ template <class Test> void ForEachTimeline(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         test(device, structure, publisher);
     });
 }

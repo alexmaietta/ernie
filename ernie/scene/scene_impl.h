@@ -28,6 +28,7 @@
 #include "ernie/scene/tables/sensors.h"
 #include "ernie/scene/tables/spectra.h"
 #include "ernie/scene/tables/surfaces.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/tangents.h"
 #include "ernie/scene/tables/textures.h"
 #include "ernie/scene/tables/transforms.h"
@@ -191,6 +192,7 @@ class SceneImpl {
     bool m_waitForKernels = true;
     ColumnStore m_store;
     Structure m_structure;
+    RenderHeader m_header;
     Publisher m_publisher;
     std::unique_ptr<bvh::Builder> m_builder;
     TransformTable m_transforms;

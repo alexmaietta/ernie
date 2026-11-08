@@ -83,7 +83,7 @@ struct TangentStats {
     uint32_t deformed = 0;
 };
 
-class TangentTable : public Table {
+class TangentTable : public RenderTable {
   public:
     TangentTable(Structure& structure, const MeshTable& geometry)
         : m_structure(structure), m_geometry(geometry) {}

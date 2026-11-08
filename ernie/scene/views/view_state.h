@@ -10,7 +10,7 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/records/primvars.h"
+#include "ernie/scene/schema/primvars.h"
 #include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/structure.h"
 

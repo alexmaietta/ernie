@@ -40,7 +40,7 @@ struct MeshShape {
     uint32_t users = 0;
 };
 
-class MeshTable : public Table {
+class MeshTable : public RenderTable {
   public:
     MeshTable(Structure& structure, bvh::Builder& builder)
         : m_structure(structure), m_builder(builder) {}

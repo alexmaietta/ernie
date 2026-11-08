@@ -404,11 +404,12 @@ void LightTable::Run(const ChangeSet& changes, TableVersions&) {
     LightParams params{};
     params.scene.address = store.DeviceData();
     params.layout.address = m_layout->Address();
-    params.instances = changes.tables->instances;
-    params.origins = changes.tables->origins;
-    params.transforms = changes.tables->transforms;
-    params.imageables = changes.tables->imageables;
-    params.textures = changes.tables->textures;
+    params.instances = m_tables.instances;
+    params.origins = m_tables.origins;
+    params.transforms = m_tables.transforms;
+    params.imageables = m_tables.imageables;
+    params.textures = m_tables.textures;
+    params.textureBindings = m_tables.textureBindings;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());

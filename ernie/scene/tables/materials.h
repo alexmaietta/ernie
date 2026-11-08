@@ -23,7 +23,7 @@ namespace ernie {
 
 class TextureTable;
 
-class MaterialTable : public Table {
+class MaterialTable : public RenderTable {
   public:
     MaterialTable(Structure& structure, const TextureTable& textures)
         : m_structure(structure), m_textures(textures) {}

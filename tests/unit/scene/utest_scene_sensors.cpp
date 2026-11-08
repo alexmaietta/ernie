@@ -8,6 +8,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/scene/tables/table.h"
 #include "support/devices.h"
 
 namespace ernie {
@@ -38,7 +39,7 @@ TEST(SensorsTest, RecordsHoldResolvedParametersAndFollowEdits) {
         const uint32_t cameraRow = prims.Row(camera.Index(), SchemaId::Camera);
 
         Snapshot snapshot = scene->Acquire(Stream::Host());
-        const RenderTables& tables = PinnedTables::From(snapshot).tables;
+        const RenderTables& tables = PinnedTables::From(snapshot).Header<RenderTables>();
         const CameraRecord before =
             ReadRecord<CameraRecord>(device, snapshot, tables.cameras.address, cameraRow);
         EXPECT_FLOAT_EQ(before.focalLength, 50);
@@ -56,7 +57,8 @@ TEST(SensorsTest, RecordsHoldResolvedParametersAndFollowEdits) {
         scene->Publish().Wait();
         snapshot = scene->Acquire(Stream::Host());
         const CameraRecord after = ReadRecord<CameraRecord>(
-            device, snapshot, PinnedTables::From(snapshot).tables.cameras.address, cameraRow);
+            device, snapshot, PinnedTables::From(snapshot).Header<RenderTables>().cameras.address,
+            cameraRow);
         EXPECT_FLOAT_EQ(after.focalLength, 25);
         EXPECT_FLOAT_EQ(after.apertureRadius, 25 * 0.001f / 4);
         scene->Release(snapshot);
@@ -80,7 +82,8 @@ TEST(SensorsTest, DetectorRecordsAverageQeOverTheCamerasBands) {
         const auto detector = [&](const Prim& camera) {
             const Snapshot snapshot = scene->Acquire(Stream::Host());
             const DetectorRecord record = ReadRecord<DetectorRecord>(
-                device, snapshot, PinnedTables::From(snapshot).tables.detectors.address,
+                device, snapshot,
+                PinnedTables::From(snapshot).Header<RenderTables>().detectors.address,
                 prims.Row(camera.Index(), SchemaId::DetectorAPI));
             scene->Release(snapshot);
             return record;
@@ -133,7 +136,8 @@ TEST(SensorsTest, LightShapesKeepAuthoredSizesForGuides) {
         const auto shape = [&](const Prim& light) {
             const Snapshot snapshot = scene->Acquire(Stream::Host());
             const LightShapeRecord record = ReadRecord<LightShapeRecord>(
-                device, snapshot, PinnedTables::From(snapshot).tables.lightShapes.address,
+                device, snapshot,
+                PinnedTables::From(snapshot).Header<RenderTables>().lightShapes.address,
                 prims.Row(light.Index(), SchemaId::LightAPI));
             scene->Release(snapshot);
             return record;

@@ -2,7 +2,8 @@
 #pragma once
 
 #include "ernie/scene/records/lights.h"
-#include "ernie/scene/tables/kernels/authored.h"
+#include "ernie/scene/records/prims.h"
+#include "ernie/scene/records/transforms.h"
 #include "ernie/scene/tables/kernels/instance_layout.h"
 
 namespace ernie {
@@ -17,6 +18,7 @@ struct LightParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<TextureRecord> textures;
+    Ptr<uint64_t> textureBindings;
     Ptr<uint> tlases;
     Ptr<Float3> spectra;
     Ptr<CollectionRecord> collections;
@@ -29,7 +31,7 @@ struct LightParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 112);
+ERNIE_CHECK_SIZE(LightParams, 120);
 
 #ifdef __SLANG__
 

@@ -42,7 +42,7 @@ void SurfaceTable::Run(const ChangeSet& changes, TableVersions&) {
     ColumnStore& store = m_structure.GetColumnStore();
     const std::span<const uint32_t> starts = m_instances.FirstInstances();
     const std::span<const uint32_t> counts = m_instances.InstanceCounts();
-    if (changes.tables->instances.address == 0 || counts.empty()) {
+    if (m_tables.instances.address == 0 || counts.empty()) {
         return;
     }
     device::Device& device = store.GetDevice();
@@ -64,8 +64,8 @@ void SurfaceTable::Run(const ChangeSet& changes, TableVersions&) {
     const Ref<device::Buffer> list = device.CreateBuffer({.label = "surface TLASes"}, tlases);
     SurfaceParams params{};
     params.scene.address = store.DeviceData();
-    params.layout = changes.tables->instances;
-    params.meshes = changes.tables->meshes;
+    params.layout = m_tables.instances;
+    params.meshes = m_tables.meshes;
     params.surfaces.address = m_surfaces.Address();
     params.tlases.address = list->Address();
     device::Queue& queue = device.GetQueue();

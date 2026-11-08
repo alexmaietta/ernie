@@ -2,7 +2,6 @@
 #include "ernie/scene/publish/publisher.h"
 
 #include <algorithm>
-#include <cstring>
 #include <optional>
 
 #include "ernie/device/commands.h"
@@ -177,11 +176,12 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         const uint64_t writes = store.WriteSequence();
         const uint64_t epoch = m_structure.Epoch();
         const uint64_t logged = m_versions.Sequence();
-        changes.tables = &m_tables;
         ++table.m_runs;
         ++m_tableRuns;
         table.Run(changes, m_versions);
-        table.Describe(m_tables);
+        if (m_header != nullptr) {
+            m_header->Describe(table);
+        }
         scheduled.writes = writes;
         scheduled.epoch = epoch;
         scheduled.logged = logged;
@@ -263,27 +263,21 @@ ChangeSet Publisher::Changes(Ordinal since, std::span<const ColumnRef> columns) 
 
 void Publisher::Seal() {
     ERNIE_ZONE("Publisher/Seal");
-    const AuthoredData data = m_structure.GetColumnStore().Data();
-    m_tables.prims = {.schema = data.prims.schema,
-                      .world = data.prims.world,
-                      .flags = data.prims.flags,
-                      .slots = data.prims.slots,
-                      .apis = data.prims.apis,
-                      .rows = data.rows,
-                      .parent = data.prims.parent,
-                      .count = data.primCount};
-    RenderTables tables = m_tables;
-    tables.worldCount = m_structure.GetPrims().WorldCount();
-    m_tables.worldCount = tables.worldCount;
     auto pinned = std::make_shared<PinnedTables>();
-    if (m_pinned && std::memcmp(&tables, &m_pinned->tables, sizeof(tables)) == 0) {
-        pinned->header = m_pinned->header;
-    } else {
-        pinned->header = m_structure.GetColumnStore().GetDevice().CreateBuffer(
-            {.label = "render tables"}, std::span<const RenderTables>(&tables, 1));
+    if (m_header != nullptr) {
+        const std::span<const std::byte> header = m_header->Seal(
+            m_structure.GetColumnStore().Data(), m_structure.GetPrims().WorldCount());
+        pinned->header.assign(header.begin(), header.end());
     }
-    pinned->tables = tables;
-    pinned->held.emplace_back(pinned->header);
+    if (m_pinned && m_pinned->header == pinned->header) {
+        pinned->buffer = m_pinned->buffer;
+    } else if (!pinned->header.empty()) {
+        pinned->buffer = m_structure.GetColumnStore().GetDevice().CreateBuffer(
+            {.label = "snapshot header"}, std::span<const std::byte>(pinned->header));
+    }
+    if (pinned->buffer) {
+        pinned->held.emplace_back(pinned->buffer);
+    }
     pinned->content = m_tableRuns;
     for (const Scheduled& scheduled : m_scheduled) {
         scheduled.table->Hold(pinned->held);
@@ -303,7 +297,7 @@ Snapshot Publisher::Acquire(Stream consumer) {
     if (!m_pinned) {
         Seal();
     }
-    snapshot.tables = m_pinned->header->Address();
+    snapshot.tables = m_pinned->buffer ? m_pinned->buffer->Address() : 0;
     snapshot.pinned = m_pinned;
     snapshot.ready = store.GetDevice().GetQueue().Mark();
     snapshot.ready.Wait(consumer);

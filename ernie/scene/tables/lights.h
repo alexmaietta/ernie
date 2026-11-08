@@ -17,10 +17,10 @@
 
 namespace ernie {
 
-class LightTable : public Table {
+class LightTable : public RenderTable {
   public:
-    LightTable(Structure& structure, const InstanceTable& instances)
-        : m_structure(structure), m_instances(instances) {}
+    LightTable(Structure& structure, const RenderTables& tables, const InstanceTable& instances)
+        : m_structure(structure), m_tables(tables), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "lights";
@@ -65,6 +65,7 @@ class LightTable : public Table {
     device::Program& Kernels();
 
     Structure& m_structure;
+    const RenderTables& m_tables;
     Ref<device::Program> m_program;
     Ref<device::Buffer> m_layout;
     Ref<device::Buffer> m_records;

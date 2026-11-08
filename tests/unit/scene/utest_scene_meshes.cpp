@@ -17,6 +17,7 @@
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -77,7 +78,8 @@ template <class Test> void ForEachScene(Test test) {
         }
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
         MeshTable geometry(structure, *builder);
         publisher.Add(geometry);

@@ -2,7 +2,7 @@
 
 __exported import ernie.render.kernels.surface.element;
 
-#include "ernie/scene/records/primvars.h"
+#include "ernie/scene/schema/primvars.h"
 
 using namespace ernie;
 

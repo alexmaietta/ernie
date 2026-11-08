@@ -10,7 +10,7 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/columns/kernels/cells.h"
-#include "ernie/scene/kernels.h"
+#include "ernie/scene/stage_kernels.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/span.h"
@@ -240,7 +240,7 @@ device::Program& ColumnStore::Kernels() {
         m_program = m_device.CreateProgram(
             {.modules = {"ernie.scene.columns.kernels.cells",
                          "ernie.scene.columns.kernels.changes"},
-             .library = &kSceneKernels,
+             .library = &kStageKernels,
              .entries = {"CopyWords", "ScatterCells", "StampRows", "GatherCells", "FillCells",
                          "CloneRows", "WritePoses", "ReadPoses", "CompactChanged", "GatherRows"},
              .label = "scene store"});
@@ -640,7 +640,6 @@ AuthoredData ColumnStore::Data() const {
     data.prims.apis.pages.address = m_prims.Pages(kPrimApis);
     data.rows.pages.address = m_slots.Pages(0);
     data.worldStamps.pages.address = m_worlds.Pages(0);
-    data.textureBindings.address = m_textureBindings;
 
     std::byte* schemas = reinterpret_cast<std::byte*>(&data.schemas);
     uint32_t base = 0;

@@ -105,7 +105,7 @@ struct ResolvedProduct : ProductShape {
     uint64_t version = 0;
 };
 
-class ProductTable : public Table {
+class ProductTable : public RenderTable {
   public:
     ProductTable(Scene& scene, Structure& structure) : m_scene(scene), m_structure(structure) {}
 

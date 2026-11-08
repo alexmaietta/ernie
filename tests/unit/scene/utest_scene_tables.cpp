@@ -20,6 +20,7 @@
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/meshes.h"
 #include "ernie/scene/tables/storage.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -81,9 +82,10 @@ class Probe : public Table {
         ++runs;
         worlds = changes.worlds;
         wrote = changes.Wrote(TableId::Transforms);
-        transforms = changes.tables->transforms.address;
+        transforms = tables != nullptr ? tables->transforms.address : 0;
     }
 
+    const RenderTables* tables = nullptr;
     bool fail = false;
     uint32_t runs = 0;
     std::vector<uint32_t> worlds;
@@ -102,13 +104,15 @@ class Loop : public Probe {
 struct Fixture {
     ColumnStore store;
     Structure structure;
+    RenderHeader header;
     Publisher publisher;
     TransformTable hierarchy;
     Probe probe;
     Ordinal ordinal = 0;
 
     explicit Fixture(device::Device& device)
-        : store(device), structure(store), publisher(structure), hierarchy(structure) {
+        : store(device), structure(store), publisher(structure, &header), hierarchy(structure) {
+        probe.tables = &header.Tables();
         publisher.Add(hierarchy);
         publisher.Add(probe);
     }
@@ -166,7 +170,8 @@ TEST(TableTrackingTest, ReadersMustBeAddedAfterTheirWriters) {
     test::ForEachDevice([](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         TransformTable hierarchy(structure);
         Probe probe;
         publisher.Add(probe);
@@ -182,7 +187,7 @@ TEST(TableTrackingTest, GrowingPastTheTableRebuildsItAndHeldSnapshotsKeepTheOldO
         scene->Define<Sphere>("/First", {.translate = {1, 2, 3}});
         scene->Publish().Wait();
         const Snapshot held = scene->Acquire(Stream::Host());
-        const uint64_t before = PinnedTables::From(held).tables.transforms.address;
+        const uint64_t before = PinnedTables::From(held).Header<RenderTables>().transforms.address;
 
         std::vector<std::string> paths;
         for (uint32_t i = 0; i < 5000; ++i) {
@@ -191,7 +196,7 @@ TEST(TableTrackingTest, GrowingPastTheTableRebuildsItAndHeldSnapshotsKeepTheOldO
         scene->Define<Sphere>(Span<const std::string>(paths), {.translate = {0, 0, 7}});
         scene->Publish().Wait();
         const Snapshot after = scene->Acquire(Stream::Host());
-        EXPECT_NE(PinnedTables::From(after).tables.transforms.address, before);
+        EXPECT_NE(PinnedTables::From(after).Header<RenderTables>().transforms.address, before);
         bool kept = false;
         for (const Ref<const RefCounted>& item : PinnedTables::From(held).held) {
             const auto* buffer = dynamic_cast<const device::Buffer*>(item.Get());
@@ -403,7 +408,8 @@ TEST(TableTrackingTest, DeformingAMeshUpdatesItsDataAndReshapingRelinksIt) {
         }
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
         MeshTable geometry(structure, *builder);
         MeshProbe probe;

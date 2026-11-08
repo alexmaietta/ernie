@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -14,20 +13,7 @@
 
 namespace ernie {
 
-enum class TableId : uint32_t {
-    Transforms,
-    Imageables,
-    Meshes,
-    MeshPoints,
-    Points,
-    PointsMoved,
-    Tangents,
-    Textures,
-    Instances,
-    Slots,
-};
-
-inline constexpr uint32_t kTableCount = 10;
+enum class TableId : uint32_t;
 
 class TableVersions {
   public:
@@ -38,7 +24,7 @@ class TableVersions {
     }
 
     uint64_t Version(TableId table) const {
-        return m_versions[uint32_t(table)];
+        return uint32_t(table) < m_versions.size() ? m_versions[uint32_t(table)] : 0;
     }
 
     void Collect(TableId table, uint64_t since, std::vector<uint32_t>& worlds) const;
@@ -47,16 +33,14 @@ class TableVersions {
   private:
     struct Entry {
         uint64_t sequence = 0;
-        TableId table = TableId::Transforms;
+        TableId table{};
         std::vector<uint32_t> worlds;
     };
 
     std::vector<Entry> m_entries;
-    std::array<uint64_t, kTableCount> m_versions{};
+    std::vector<uint64_t> m_versions;
     uint64_t m_sequence = 0;
 };
-
-struct RenderTables;
 
 class ChangedRows {
   public:
@@ -100,7 +84,6 @@ struct ChangeSet {
     std::vector<uint32_t> worlds;
     std::vector<ChangedRows> columns;
     std::vector<std::pair<ColumnRef, std::vector<uint32_t>>> arrays;
-    const RenderTables* tables = nullptr;
     std::vector<TableId> wrote;
 
     const ChangedRows* Rows(ColumnRef column) const;

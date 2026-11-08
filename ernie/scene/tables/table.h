@@ -1,76 +1,61 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <span>
-#include <string_view>
-#include <vector>
 
-#include "ernie/device/buffer.h"
-#include "ernie/device/ref.h"
-#include "ernie/scene/publish/change_set.h"
-#include "ernie/scene/schema/schema.h"
+#include "ernie/scene/publish/header.h"
+#include "ernie/scene/publish/table.h"
+#include "ernie/scene/records/render_tables.h"
 
 namespace ernie {
 
-struct ChangeSet;
-struct RenderTables;
+enum class TableId : uint32_t {
+    Transforms,
+    Imageables,
+    Meshes,
+    MeshPoints,
+    Points,
+    PointsMoved,
+    Tangents,
+    Textures,
+    Instances,
+    Slots,
+};
 
-class Table {
+class RenderTable : public Table {
   public:
-    virtual ~Table() = default;
-
-    virtual std::string_view Name() const = 0;
-    virtual std::span<const ColumnRef> Inputs() const = 0;
-
-    virtual std::span<const ColumnRef> RowInputs() const {
-        return {};
-    }
-
-    virtual std::span<const TableId> TableInputs() const {
-        return {};
-    }
-
-    virtual std::span<const TableId> TableOutputs() const {
-        return {};
-    }
-
-    virtual bool Structural() const {
-        return true;
-    }
-
-    virtual bool Pending() const {
-        return false;
-    }
-
-    virtual void Prepare() {}
-
-    virtual void Finish() {}
-
     virtual void Describe(RenderTables&) const {}
+};
 
-    virtual void Hold(std::vector<Ref<const RefCounted>>&) const {}
+class RenderHeader : public SnapshotHeader {
+  public:
+    const RenderTables& Tables() const {
+        return m_tables;
+    }
 
-    virtual void Run(const ChangeSet& changes, TableVersions& versions) = 0;
+    void Describe(const Table& table) override {
+        if (const auto* render = dynamic_cast<const RenderTable*>(&table)) {
+            render->Describe(m_tables);
+        }
+    }
 
-    uint32_t Runs() const {
-        return m_runs;
+    std::span<const std::byte> Seal(const AuthoredData& data, uint32_t worldCount) override {
+        m_tables.prims = {.schema = data.prims.schema,
+                          .world = data.prims.world,
+                          .flags = data.prims.flags,
+                          .slots = data.prims.slots,
+                          .apis = data.prims.apis,
+                          .rows = data.rows,
+                          .parent = data.prims.parent,
+                          .count = data.primCount};
+        m_tables.worldCount = worldCount;
+        return std::as_bytes(std::span(&m_tables, 1));
     }
 
   private:
-    friend class Publisher;
-
-    uint32_t m_runs = 0;
+    RenderTables m_tables{};
 };
-
-inline void HoldBuffers(std::vector<Ref<const RefCounted>>& held,
-                        std::initializer_list<Ref<device::Buffer>> buffers) {
-    for (const Ref<device::Buffer>& buffer : buffers) {
-        if (buffer) {
-            held.emplace_back(buffer);
-        }
-    }
-}
 
 }

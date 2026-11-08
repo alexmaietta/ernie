@@ -19,6 +19,7 @@
 #include "ernie/scene/tables/instances.h"
 #include "ernie/scene/tables/kernels/shapes.h"
 #include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
@@ -74,11 +75,12 @@ template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
         Structure structure(store);
-        Publisher publisher(structure);
+        RenderHeader header;
+        Publisher publisher(structure, &header);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
         TransformTable hierarchy(structure);
         MeshTable geometry(structure, *builder);
-        InstanceTable instances(structure, *builder, 2);
+        InstanceTable instances(structure, header.Tables(), *builder, 2);
         publisher.Add(hierarchy);
         publisher.Add(geometry);
         publisher.Add(instances);

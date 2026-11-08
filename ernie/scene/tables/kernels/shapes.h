@@ -3,7 +3,8 @@
 
 #include "ernie/scene/records/bounds.h"
 #include "ernie/scene/records/instances.h"
-#include "ernie/scene/tables/kernels/authored.h"
+#include "ernie/scene/records/prims.h"
+#include "ernie/scene/records/transforms.h"
 
 namespace ernie {
 

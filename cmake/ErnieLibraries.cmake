@@ -59,6 +59,41 @@ function(ernie_check_includes owner)
     endforeach()
 endfunction()
 
+function(ernie_check_layer layer)
+    cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "ALLOW;FILES")
+    foreach(file IN LISTS ARG_FILES)
+        file(STRINGS "${file}" lines REGEX "^(#include \"ernie/|import ernie\\.)")
+        foreach(line IN LISTS lines)
+            if(line MATCHES "^#include \"([^\"]+)\"")
+                set(included "${CMAKE_MATCH_1}")
+            else()
+                string(
+                    REGEX REPLACE "^import ([a-z_.]+);.*"
+                    "\\1"
+                    included
+                    "${line}"
+                )
+                string(
+                    REPLACE "."
+                    "/"
+                    included
+                    "${included}"
+                )
+            endif()
+            set(allowed FALSE)
+            foreach(pattern IN LISTS ARG_ALLOW)
+                if(included MATCHES "${pattern}")
+                    set(allowed TRUE)
+                    break()
+                endif()
+            endforeach()
+            if(NOT allowed)
+                message(FATAL_ERROR "${file} includes ${included}, which is outside ${layer}")
+            endif()
+        endforeach()
+    endforeach()
+endfunction()
+
 function(ernie_check_public_files)
     get_property(public GLOBAL PROPERTY ERNIE_PUBLIC_FILES)
     ernie_check_includes("" ${public})
