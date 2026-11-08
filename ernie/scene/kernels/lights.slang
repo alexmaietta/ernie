@@ -538,3 +538,24 @@ void WriteLightCdf(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         layout->cdf[i] = i + 1 == last ? 1.0f : running;
     }
 }
+
+[shader("compute")]
+[numthreads(kLightGroup, 1, 1)]
+void WriteCollections(uniform LightParams p) {
+    const uint row = LinearThreadIndex();
+    if (row >= p.collectionRows) {
+        return;
+    }
+    CollectionAPIData* collection = &p.scene->schemas.collectionAPI;
+    CollectionRecord record;
+    record.includes = collection.collectionIncludes[row];
+    record.excludes = collection.collectionExcludes[row];
+    record.includeRoot = collection.collectionIncludeRoot[row];
+    record.explicitOnly = CollectionExpansionRule(collection.collectionExpansionRule[row]) ==
+                                  CollectionExpansionRule::ExplicitOnly
+                              ? 1
+                              : 0;
+    record.padding0 = 0;
+    record.padding1 = 0;
+    p.collections[row] = record;
+}

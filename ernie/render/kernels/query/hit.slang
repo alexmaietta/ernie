@@ -63,7 +63,7 @@ struct ObjectSpace {
 struct LinkFilter : IHitFilter {
     static const uint kRayFlags = 0;
 
-    SceneData* scene;
+    RenderTables* tables;
     Ptr<SlotHit> hits;
     uint first;
     uint row;
@@ -77,7 +77,7 @@ struct LinkFilter : IHitFilter {
     }
 
     bool Accept(Ray ray, Hit candidate) {
-        return row == kNoRow || InCollection(scene, row, hits[first + candidate.instance].prim);
+        return row == kNoRow || InCollection(tables, row, hits[first + candidate.instance].prim);
     }
 }
 
@@ -134,7 +134,7 @@ struct HitQuery {
 
     LinkFilter Links(uint row) {
         LinkFilter filter;
-        filter.scene = scene;
+        filter.tables = tables;
         filter.hits = layout->hits;
         filter.first = layout->firstInstances[tlas];
         filter.row = row;

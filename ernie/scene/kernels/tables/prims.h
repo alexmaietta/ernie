@@ -12,10 +12,11 @@ struct PrimTable {
     Paged<uint> slots;
     Paged<uint64_t> apis;
     Paged<uint> rows;
+    Paged<uint> parent;
     uint count;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(PrimTable, 56);
+ERNIE_CHECK_SIZE(PrimTable, 64);
 
 }

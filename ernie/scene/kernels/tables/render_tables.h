@@ -30,6 +30,7 @@ struct RenderTables {
     Ptr<uint64_t> textureBindings;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
+    Ptr<CollectionRecord> collections;
     Ptr<RenderOrigin> origins;
     Ptr<WorldTransform> slotWorlds;
     Ptr<CameraRecord> cameras;
@@ -44,7 +45,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 248);
+ERNIE_CHECK_SIZE(RenderTables, 264);
 
 #ifdef __SLANG__
 
@@ -77,6 +78,27 @@ uint ApiRow(RenderTables* tables, uint prim, uint api) {
 
 WorldTransform PrimWorld(RenderTables* tables, uint prim) {
     return tables->transforms[PrimRow(tables, prim, kSlotXformable)];
+}
+
+bool InCollection(RenderTables* tables, uint row, uint prim) {
+    if (row == kNoRow) {
+        return true;
+    }
+    const CollectionRecord collection = tables->collections[row];
+    uint at = prim;
+    while (at != kNoPrim) {
+        if (Lists(collection.excludes, at)) {
+            return false;
+        }
+        if (Lists(collection.includes, at)) {
+            return true;
+        }
+        if (collection.explicitOnly != 0) {
+            break;
+        }
+        at = tables->prims.parent[at];
+    }
+    return collection.includeRoot != 0;
 }
 
 ResolvedImageable PrimImageable(RenderTables* tables, uint prim) {

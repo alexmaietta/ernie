@@ -224,6 +224,7 @@ void Timeline::Seal() {
                       .slots = data.prims.slots,
                       .apis = data.prims.apis,
                       .rows = data.rows,
+                      .parent = data.prims.parent,
                       .count = data.primCount};
     RenderTables tables = m_tables;
     tables.worldCount = m_catalog.GetPrims().WorldCount();

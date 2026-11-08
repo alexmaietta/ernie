@@ -126,5 +126,25 @@ TEST(MaterialsTest, NonvisualReflectanceScalesLidarIntensity) {
     });
 }
 
+TEST(MaterialsTest, ShadowLinksLetExcludedBlockersPassLight) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, MinimalMode::Full);
+        scene->Find("/Cam")->Set(Xformable::kTranslate, Double3{0, 0, 1});
+        scene->Find("/Render/View")->Set(RenderProduct::kRenderMode, RenderMode::RealTime);
+        const Prim sun = scene->Define<DistantLight>("/Sun", {.orient = LookAlong({0, 0, -1})});
+        scene->Define<Cube>("/Blocker", {.translate = {0, 0, 3}, .size = 4});
+        scene->Define<Mesh>("/Ground", {.points = {{-9, -9, 0}, {9, -9, 0}, {9, 9, 0}, {-9, 9, 0}},
+                                        .faceVertexIndices = {0, 1, 2, 3},
+                                        .faceVertexCounts = {4},
+                                        .subdivisionScheme = SubdivisionScheme::None});
+        Renderer renderer(scene);
+        const uint32_t center = (kSide / 2) * kSide + kSide / 2;
+        const float shadowed = Colors(renderer)[center].x;
+        sun.Set(CollectionAPI::kCollectionExcludes, "shadowLink", {"/Blocker"});
+        const float lit = Colors(renderer)[center].x;
+        EXPECT_GT(lit, 2 * shadowed + 1e-3f);
+    });
+}
+
 }
 }

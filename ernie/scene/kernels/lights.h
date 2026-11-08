@@ -117,6 +117,17 @@ ERNIE_CHECK_SIZE(SpectralTables, 7300);
 
 #endif
 
+struct CollectionRecord {
+    ArrayRef includes;
+    ArrayRef excludes;
+    uint includeRoot;
+    uint explicitOnly;
+    uint padding0;
+    uint padding1;
+};
+
+ERNIE_CHECK_SIZE(CollectionRecord, 48);
+
 struct LightParams {
     Ptr<SceneData> scene;
     Ptr<LightLayout> layout;
@@ -127,13 +138,14 @@ struct LightParams {
     Ptr<TextureRecord> textures;
     Ptr<uint> tlases;
     Ptr<Float3> spectra;
+    Ptr<CollectionRecord> collections;
     uint tlasCount;
     uint lightLink;
     uint shadowLink;
-    uint padding;
+    uint collectionRows;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 88);
+ERNIE_CHECK_SIZE(LightParams, 96);
 
 static const uint kLoopedLights = 8;
 
