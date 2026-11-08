@@ -107,8 +107,7 @@ struct PlannedCapture {
 struct ProductPlan {
     uint64_t id = 0;
     std::vector<std::string> paths;
-    std::vector<uint32_t> products;
-    std::vector<uint64_t> versions;
+    std::vector<ResolvedProduct> products;
     std::array<std::vector<PlannedCapture>, kRenderEntryCount> captures;
     std::array<uint64_t, kRenderEntryCount> pixelCounts{};
     uint32_t captureCount = 0;

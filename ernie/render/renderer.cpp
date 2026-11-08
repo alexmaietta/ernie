@@ -71,13 +71,13 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     ERNIE_ZONE("Render/Step");
     const std::lock_guard stepping(m_stepMutex);
     device::Operation published = m_scene->Publish({.dt = dt}, stream);
-    DropStaleProducts();
     StepPlan& plan = PlanProducts(products);
-    const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
+    const ProductPlan& planned = *plan.plan;
+    const ProductTable& table = SceneImpl::Get(*m_scene).GetProducts();
     std::set<uint32_t> due;
-    for (const uint32_t prim : plan.plan->products) {
-        if (resolved.Find(prim)->due) {
-            due.insert(prim);
+    for (const ResolvedProduct& product : planned.products) {
+        if (table.Find(product.prim)->due) {
+            due.insert(product.prim);
         }
     }
 
@@ -85,37 +85,46 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     RenderOutput result;
     result.simulationStartTime = clock.start;
     result.simulationEndTime = clock.end;
+    for (const std::string& path : planned.paths) {
+        result.m_products[path] = ProductOutput{path, {}};
+    }
     if (due.empty()) {
-        result.m_products = plan.products;
-        for (auto& [path, product] : result.m_products) {
-            product.frames.clear();
-        }
         return result;
     }
 
-    if (!plan.plan->taxonomies.empty()) {
-        m_scene->Require(plan.plan->taxonomies);
+    if (!planned.taxonomies.empty()) {
+        m_scene->Require(planned.taxonomies);
     }
     if (m_scene->Pending()) {
         published = m_scene->Publish({}, stream);
     }
     const Snapshot snapshot = m_scene->Acquire();
-    if (!plan.plan->taxonomies.empty()) {
-        UpdateMaps();
-    }
     const OutputSet& set = AcquireSet(plan);
-    result.m_products = plan.products;
-    for (auto& [path, product] : result.m_products) {
-        if (!due.contains(m_products.at(path).prim)) {
-            product.frames.clear();
+    SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
+    for (size_t index = 0; index < planned.products.size(); ++index) {
+        const ResolvedProduct& product = planned.products[index];
+        if (!due.contains(product.prim)) {
+            continue;
         }
-        for (FrameOutput& frame : product.frames) {
-            frame.startTime = result.simulationStartTime;
-            frame.endTime = result.simulationEndTime;
+        FrameOutput& frame =
+            result.m_products.at(planned.paths[index])
+                .frames.emplace_back(FrameOutput{.startTime = result.simulationStartTime,
+                                                 .endTime = result.simulationEndTime});
+        for (const ResolvedVar& var : product.vars) {
+            RenderVarOutput& output = frame.renderVars[var.path];
+            output.renderVarPath = var.path;
+            output.sourceName = kRenderVarSourceTokens[uint32_t(var.source)];
+            if (var.semantic && var.source != RenderVarSource::PointCloud) {
+                const SemanticMap map = semantics.Map(var.source, product.taxonomy);
+                output.idMap = map.map;
+                if (var.shape.empty()) {
+                    output.tensor = map.packed;
+                }
+            }
         }
     }
     for (const OwnedVar& var : set.vars) {
-        std::vector<FrameOutput>& frames = result.m_products.at(var.product).frames;
+        std::vector<FrameOutput>& frames = result.m_products.at(planned.paths[var.product]).frames;
         if (frames.empty()) {
             continue;
         }
@@ -127,111 +136,41 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         }
     }
     for (const OwnedOverlay& overlay : set.overlays) {
-        std::vector<FrameOutput>& frames = result.m_products.at(overlay.product).frames;
+        std::vector<FrameOutput>& frames =
+            result.m_products.at(planned.paths[overlay.product]).frames;
         if (!frames.empty()) {
             frames[0].overlay = overlay.tensor;
         }
     }
-    result.m_done = plan.plan->captureCount > 0 ? Trace(set, due, snapshot) : published;
+    result.m_done = planned.captureCount > 0 ? Trace(planned, set, due, snapshot) : published;
     m_scene->Release(snapshot);
     return result;
-}
-
-void RendererImpl::DropStaleProducts() {
-    const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
-    std::vector<std::string> stale;
-    for (const auto& [path, product] : m_products) {
-        const ResolvedProduct* current = resolved.Find(product.prim);
-        if (current == nullptr || current->version != product.version) {
-            stale.push_back(path);
-        }
-    }
-    if (stale.empty()) {
-        return;
-    }
-    Log(LogLevel::Debug, "{} changed, so {} prepared again", Counted(stale.size(), "product"),
-        stale.size() == 1 ? "it's" : "they're");
-    for (const std::string& path : stale) {
-        m_products.erase(path);
-        std::erase_if(m_plans, [&](const StepPlan& plan) { return plan.products.contains(path); });
-    }
-    m_plan = nullptr;
 }
 
 RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> products) {
     std::shared_ptr<const ProductPlan> planned =
         SceneImpl::Get(*m_scene).GetProducts().Plan(products);
+    std::erase_if(m_plans, [&](const StepPlan& plan) {
+        return plan.plan->id != planned->id && plan.plan->paths == planned->paths;
+    });
     const auto cached = std::ranges::find_if(
         m_plans, [&](const StepPlan& plan) { return plan.plan->id == planned->id; });
     if (cached != m_plans.end()) {
         m_plans.splice(m_plans.begin(), m_plans, cached);
-        m_plan = &m_plans.front();
-        return *m_plan;
-    }
-    ERNIE_ZONE("Render/PlanProducts");
-
-    StepPlan plan{planned};
-    for (size_t index = 0; index < planned->paths.size(); ++index) {
-        const std::string& path = planned->paths[index];
-        const auto [prepared, added] = m_products.try_emplace(
-            path, *SceneImpl::Get(*m_scene).GetProducts().Find(planned->products[index]));
-        const ResolvedProduct& product = prepared->second;
-        FrameOutput frame;
-        std::string sources;
-        for (const ResolvedVar& var : product.vars) {
-            const std::string_view source = kRenderVarSourceTokens[uint32_t(var.source)];
-            frame.renderVars[var.path] = {var.path, std::string(source), {}};
-            sources += std::format("{}{}", sources.empty() ? "" : ", ", source);
-        }
-        if (added) {
-            const ProductRecord& record = product.record;
-            Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
-                Counted(product.sensors.size(), "sensor"), record.width, record.height,
-                sources.empty() ? "nothing" : sources, kRenderEntries[uint32_t(product.entry)],
-                record.frameRate > 0 ? std::format(", capturing at {} Hz", record.frameRate) : "");
-        }
-        plan.products[path] = ProductOutput{path, {std::move(frame)}};
+        return m_plans.front();
     }
     uint64_t launches = 0;
     for (const uint64_t pixels : planned->pixelCounts) {
         launches += (pixels + m_maxPixelsPerLaunch - 1) / m_maxPixelsPerLaunch;
     }
-    Log(LogLevel::Debug, "planned {}: {}, {} in {}", Counted(plan.products.size(), "product"),
+    Log(LogLevel::Debug, "planned {}: {}, {} in {}", Counted(planned->paths.size(), "product"),
         Counted(planned->captureCount, "capture"), Counted(planned->pixelCount, "pixel"),
         Counted(launches, "launch"));
-    m_plans.push_front(std::move(plan));
-    m_plan = &m_plans.front();
+    m_plans.push_front({std::move(planned)});
     if (m_plans.size() > kCachedPlans) {
         m_plans.pop_back();
-        const auto unused = [&](const auto& entry) {
-            return std::ranges::none_of(
-                m_plans, [&](const StepPlan& kept) { return kept.products.contains(entry.first); });
-        };
-        const size_t dropped = std::erase_if(m_products, unused);
-        Log(LogLevel::Debug, "dropped the least recently stepped plan and {} only it used",
-            Counted(dropped, "product"));
     }
-    return *m_plan;
-}
-
-void RendererImpl::UpdateMaps() {
-    SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
-    for (auto& [path, planned] : m_plan->products) {
-        const ResolvedProduct& product = m_products.at(path);
-        for (const ResolvedVar& var : product.vars) {
-            if (!var.semantic || var.source == RenderVarSource::PointCloud) {
-                continue;
-            }
-            const SemanticMap map = semantics.Map(var.source, product.taxonomy);
-            for (FrameOutput& frame : planned.frames) {
-                RenderVarOutput& output = frame.renderVars.at(var.path);
-                output.idMap = map.map;
-                if (var.shape.empty()) {
-                    output.tensor = map.packed;
-                }
-            }
-        }
-    }
+    return m_plans.front();
 }
 
 RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
@@ -262,13 +201,15 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     set.outlined = outlined;
     std::map<uint32_t, std::array<uint64_t, kRenderVarSourceCount>> addresses;
     std::map<uint32_t, uint64_t> primIds;
-    for (const auto& [path, output] : plan.products) {
-        const ResolvedProduct& product = m_products.at(path);
+    const ProductPlan& planned = *plan.plan;
+    for (uint32_t index = 0; index < planned.products.size(); ++index) {
+        const std::string& path = planned.paths[index];
+        const ResolvedProduct& product = planned.products[index];
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
         for (const ResolvedVar& var : product.vars) {
             if (var.source == RenderVarSource::PointCloud) {
                 uint64_t& clouds = slots[uint32_t(var.source)];
-                clouds = AcquireCloud(set, path, product, var, clouds);
+                clouds = AcquireCloud(set, index, path, product, var, clouds);
                 continue;
             }
             if (var.shape.empty()) {
@@ -281,7 +222,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
                 device.CreateBuffer({.bytes = bytes, .usage = usage, .label = var.path});
             device::Tensor tensor(buffer, 0, var.type, var.shape);
             slots[uint32_t(var.source)] = tensor.Address();
-            set.vars.push_back({path, var.path, std::move(tensor), {}});
+            set.vars.push_back({index, var.path, std::move(tensor), {}});
         }
         if (product.overlays.empty()) {
             continue;
@@ -289,10 +230,11 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         const std::vector<int64_t> shape = {int64_t(product.sensors.size()), product.record.height,
                                             product.record.width, 4};
         const uint64_t pixels = uint64_t(shape[0]) * shape[1] * shape[2];
-        OwnedOverlay overlay{path, device::Tensor(device.CreateBuffer({.bytes = pixels * 4,
-                                                                       .usage = usage,
-                                                                       .label = path + " overlay"}),
-                                                  0, device::DType::UInt8, shape)};
+        OwnedOverlay overlay{
+            index,
+            device::Tensor(device.CreateBuffer(
+                               {.bytes = pixels * 4, .usage = usage, .label = path + " overlay"}),
+                           0, device::DType::UInt8, shape)};
         uint64_t& depth = slots[uint32_t(RenderVarSource::DistanceToImagePlane)];
         if (depth == 0) {
             overlay.ownDepth =
@@ -308,12 +250,11 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         set.overlays.push_back(std::move(overlay));
     }
     for (uint32_t entry = 0; entry < kRenderEntryCount; ++entry) {
-        const std::vector<PlannedCapture>& planned = plan.plan->captures[entry];
-        if (planned.empty()) {
+        if (planned.captures[entry].empty()) {
             continue;
         }
         std::vector<Capture> captures;
-        for (const PlannedCapture& each : planned) {
+        for (const PlannedCapture& each : planned.captures[entry]) {
             Capture& capture = captures.emplace_back(Capture{.firstPixel = each.firstPixel,
                                                              .product = each.product,
                                                              .sensor = each.sensor,
@@ -342,7 +283,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     return plan.sets.back();
 }
 
-uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path,
+uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
                                     const ResolvedProduct& product, const ResolvedVar& var,
                                     uint64_t next) {
     device::Device& device = m_scene->GetDevice();
@@ -359,7 +300,7 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path,
                 {.bytes = bytes, .usage = usage, .label = var.path + " " + channel}),
             0, type, std::move(shape));
         const uint64_t address = tensor.Address();
-        set.vars.push_back({path, var.path, std::move(tensor), std::move(channel)});
+        set.vars.push_back({index, var.path, std::move(tensor), std::move(channel)});
         return address;
     };
 
@@ -396,8 +337,8 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path,
     return address;
 }
 
-device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint32_t>& due,
-                                      const Snapshot& snapshot) {
+device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& set,
+                                      const std::set<uint32_t>& due, const Snapshot& snapshot) {
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
     params.tables.address = snapshot.tables;
@@ -449,8 +390,8 @@ device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint3
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});
     }
     encoder.EndZone();
-    auto overlays =
-        std::make_shared<std::vector<OverlayContents>>(RecordOverlays(encoder, set, due, snapshot));
+    auto overlays = std::make_shared<std::vector<OverlayContents>>(
+        RecordOverlays(encoder, plan, set, due, snapshot));
     const device::Operation done = queue.Submit(encoder.Finish());
     if (!overlays->empty()) {
         queue.Retire(std::move(overlays), done);
@@ -468,6 +409,7 @@ device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint3
 }
 
 std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder& encoder,
+                                                          const ProductPlan& plan,
                                                           const OutputSet& set,
                                                           const std::set<uint32_t>& due,
                                                           const Snapshot& snapshot) {
@@ -478,8 +420,9 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
         named.assign(overlays.layers.begin(), overlays.layers.end());
         std::vector<std::shared_ptr<OverlayPickState>> waiting;
         for (std::shared_ptr<OverlayPickState>& pick : overlays.picks) {
-            const auto product = m_products.find(pick->product);
-            const bool served = product != m_products.end() && due.contains(product->second.prim);
+            const auto path = std::ranges::find(plan.paths, pick->product);
+            const bool served = path != plan.paths.end() &&
+                                due.contains(plan.products[size_t(path - plan.paths.begin())].prim);
             (served ? m_servedPicks : waiting).push_back(std::move(pick));
         }
         overlays.picks = std::move(waiting);
@@ -501,7 +444,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     std::vector<OverlayTarget> targets;
     std::vector<std::pair<std::string, uint32_t>> targetKeys;
     for (const OwnedOverlay& overlay : set.overlays) {
-        const ResolvedProduct& product = m_products.at(overlay.product);
+        const ResolvedProduct& product = plan.products[overlay.product];
         if (!due.contains(product.prim)) {
             continue;
         }
@@ -531,7 +474,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
                                .depth = overlay.depth,
                                .overlays = mask,
                                .primIds = overlay.primIds ? overlay.primIds->Address() : 0});
-            targetKeys.emplace_back(overlay.product, layer);
+            targetKeys.emplace_back(plan.paths[overlay.product], layer);
         }
     }
     if (targets.empty() || used.empty()) {
@@ -539,7 +482,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     }
     std::vector<OverlayCameraSource> cameraImages;
     for (const OwnedVar& var : set.vars) {
-        const ResolvedProduct& product = m_products.at(var.product);
+        const ResolvedProduct& product = plan.products[var.product];
         if (!due.contains(product.prim) ||
             !IsA(SchemaId(product.record.sensorSchema), SchemaId::Camera)) {
             continue;

@@ -33,7 +33,7 @@ class RendererImpl {
                       Stream stream = Stream::None());
 
     struct OwnedVar {
-        std::string product;
+        uint32_t product = 0;
         std::string renderVar;
         device::Tensor tensor;
         std::string channel;
@@ -49,7 +49,7 @@ class RendererImpl {
     };
 
     struct OwnedOverlay {
-        std::string product;
+        uint32_t product = 0;
         device::Tensor tensor;
         uint64_t depth = 0;
         Ref<device::Buffer> ownDepth;
@@ -67,21 +67,19 @@ class RendererImpl {
 
     struct StepPlan {
         std::shared_ptr<const ProductPlan> plan;
-        std::map<std::string, ProductOutput, std::less<>> products;
         std::vector<OutputSet> sets;
     };
 
-    void DropStaleProducts();
     StepPlan& PlanProducts(std::span<const std::string> products);
-    void UpdateMaps();
 
     OutputSet& AcquireSet(StepPlan& plan);
-    uint64_t AcquireCloud(OutputSet& set, const std::string& path, const ResolvedProduct& product,
-                          const ResolvedVar& var, uint64_t next);
-    device::Operation Trace(const OutputSet& set, const std::set<uint32_t>& due,
-                            const Snapshot& snapshot);
+    uint64_t AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
+                          const ResolvedProduct& product, const ResolvedVar& var, uint64_t next);
+    device::Operation Trace(const ProductPlan& plan, const OutputSet& set,
+                            const std::set<uint32_t>& due, const Snapshot& snapshot);
     std::vector<OverlayContents> RecordOverlays(device::CommandEncoder& encoder,
-                                                const OutputSet& set, const std::set<uint32_t>& due,
+                                                const ProductPlan& plan, const OutputSet& set,
+                                                const std::set<uint32_t>& due,
                                                 const Snapshot& snapshot);
 
     Ref<Scene> m_scene;
@@ -89,11 +87,9 @@ class RendererImpl {
     Ref<Overlays> m_overlays;
     Ref<device::Program> m_renderProgram;
 
-    std::map<std::string, ResolvedProduct> m_products;
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;
     std::list<StepPlan> m_plans;
-    StepPlan* m_plan = nullptr;
 
     std::mutex m_stepMutex;
     std::optional<OverlayPass> m_overlayPass;

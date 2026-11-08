@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <optional>
 
 #include "ernie/scene/publish/change_set.h"
@@ -252,7 +253,6 @@ std::shared_ptr<const ProductPlan> ProductTable::Plan(std::span<const std::strin
     std::ranges::sort(sorted);
     sorted.erase(std::ranges::unique(sorted).begin(), sorted.end());
     std::vector<const ResolvedProduct*> products;
-    std::vector<uint64_t> versions;
     for (const std::string& path : sorted) {
         const std::optional<Prim> prim = m_scene.Find(path);
         if (!prim || !prim->IsA<RenderProduct>()) {
@@ -266,13 +266,16 @@ std::shared_ptr<const ProductPlan> ProductTable::Plan(std::span<const std::strin
             throw Error("{}", product->error);
         }
         products.push_back(product);
-        versions.push_back(product->version);
     }
 
     const std::lock_guard lock(m_planMutex);
     const auto cached =
         std::ranges::find_if(m_plans, [&](const auto& plan) { return plan->paths == sorted; });
-    if (cached != m_plans.end() && (*cached)->versions == versions) {
+    if (cached != m_plans.end() &&
+        std::ranges::equal((*cached)->products, products,
+                           [](const ResolvedProduct& kept, const ResolvedProduct* current) {
+                               return kept.version == current->version;
+                           })) {
         m_plans.splice(m_plans.begin(), m_plans, cached);
         return m_plans.front();
     }
@@ -283,10 +286,9 @@ std::shared_ptr<const ProductPlan> ProductTable::Plan(std::span<const std::strin
     auto plan = std::make_shared<ProductPlan>();
     plan->id = ++m_planIds;
     plan->paths = std::move(sorted);
-    plan->versions = std::move(versions);
     for (const ResolvedProduct* product : products) {
         const ProductRecord& record = product->record;
-        plan->products.push_back(product->prim);
+        plan->products.push_back(*product);
         PlannedCapture capture{.product = product->prim,
                                .width = record.width,
                                .height = record.height,
@@ -445,9 +447,20 @@ void ProductTable::Resolve() {
         }
         ResolvedProduct product = Resolve(prim);
         const auto previous = m_products.find(prim);
-        product.version = previous != m_products.end() && SamePlan(previous->second, product)
-                              ? previous->second.version
-                              : ++m_versions;
+        const bool same = previous != m_products.end() && SamePlan(previous->second, product);
+        product.version = same ? previous->second.version : ++m_versions;
+        if (!same && product.error.empty()) {
+            const ProductRecord& record = product.record;
+            std::string sources;
+            for (const ResolvedVar& var : product.vars) {
+                sources += std::format("{}{}", sources.empty() ? "" : ", ",
+                                       kRenderVarSourceTokens[uint32_t(var.source)]);
+            }
+            Log(LogLevel::Debug, "resolved {}: {} at {} x {} writing {}{}",
+                m_scene.ByIndex(prim).Path(), Counted(product.sensors.size(), "sensor"),
+                record.width, record.height, sources.empty() ? "nothing" : sources,
+                record.frameRate > 0 ? std::format(", capturing at {} Hz", record.frameRate) : "");
+        }
         m_records.Set(prims.Row(prim, SchemaId::RenderProduct), product.record);
         resolved.emplace(prim, std::move(product));
     }
