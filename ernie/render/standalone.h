@@ -9,7 +9,6 @@
 #include <string_view>
 #include <vector>
 
-#include "ernie/device/buffer.h"
 #include "ernie/device/device.h"
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
@@ -83,7 +82,7 @@ class ERNIE_API Pipeline {
     friend class PipelineSession;
     struct State;
 
-    PipelineOutputs Run(const PipelineRunDesc& desc, Ref<device::Buffer>& state) const;
+    PipelineOutputs Run(const PipelineRunDesc& desc, device::Tensor& state) const;
 
     std::unique_ptr<State> m_state;
 };
@@ -105,7 +104,7 @@ class ERNIE_API PipelineSession {
   private:
     const Pipeline& m_pipeline;
     uint32_t m_captures = 0;
-    Ref<device::Buffer> m_state;
+    device::Tensor m_state;
 };
 
 }

@@ -155,11 +155,11 @@ std::vector<std::string> Pipeline::Outputs() const {
 }
 
 PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc) const {
-    Ref<device::Buffer> state;
+    device::Tensor state;
     return Run(desc, state);
 }
 
-PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& state) const {
+PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, device::Tensor& state) const {
     const pipeline::NodeRegistry& registry = *m_state->registry;
     const pipeline::ResolvedPipeline& instance = m_state->instance;
     const pipeline::PipelineDefinition& definition = *m_state->compiled->definition;
@@ -248,14 +248,15 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
     const Ref<device::Buffer> wordBuffer = device.CreateBuffer({.label = "pipeline words"}, words);
     const uint64_t stateBytes = std::max<uint64_t>(
         uint64_t(definition.stateWords) * captures * sizeof(float), sizeof(float));
-    if (!state || state->Bytes() != stateBytes) {
+    if (state.Empty() || state.GetBuffer().Bytes() != stateBytes) {
         const std::vector<float> initial = pipeline::InitialState(definition, registry);
         std::vector<float> states;
         for (int64_t capture = 0; capture < captures; ++capture) {
             states.insert(states.end(), initial.begin(), initial.end());
         }
         states.resize(stateBytes / sizeof(float));
-        state = device.CreateBuffer({.label = "pipeline state"}, states);
+        state = device::Tensor(device.CreateBuffer({.label = "pipeline state"}, states), 0,
+                               device::DType::Float32, {int64_t(states.size())});
     }
     for (int64_t capture = 0; capture < captures; ++capture) {
         for (uint32_t slot = 0; slot < values.size(); ++slot) {
@@ -272,7 +273,7 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
                            .capture = desc.capture,
                            .identity = desc.identity + uint32_t(capture),
                            .firstValue = uint32_t(capture * values.size()),
-                           .state = {state->Address() +
+                           .state = {state.Address() +
                                      uint64_t(capture) * definition.stateWords * sizeof(float)}});
     }
     const Ref<device::Buffer> cameras =
