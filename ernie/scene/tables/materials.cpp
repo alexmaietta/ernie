@@ -517,7 +517,7 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
     if (surface != kNoPrim && IsRuntime(prims.Record(surface).schema)) {
         std::shared_ptr<const NodeDefinition> node =
             FindNode(Info(prims.Record(surface).schema).name);
-        if (node && node->role == NodeRole::Material) {
+        if (node && node->role != NodeRole::Pattern) {
             ResolveNode(material, surface, std::move(node));
             return;
         }

@@ -391,6 +391,15 @@ uint32_t FieldBytes(FieldType type) {
     }
 }
 
+bool IsShadeMethod(slang::DeclReflection* decl) {
+    if (decl->getKind() != slang::DeclReflection::Kind::Generic) {
+        return false;
+    }
+    slang::DeclReflection* inner = decl->asGeneric()->getInnerDecl();
+    return inner != nullptr && inner->getKind() == slang::DeclReflection::Kind::Func &&
+           std::string_view(inner->getName()) == "Shade";
+}
+
 bool IsMaterialMethod(slang::DeclReflection* decl) {
     if (decl->getKind() != slang::DeclReflection::Kind::Func) {
         return false;
@@ -463,13 +472,21 @@ std::optional<ReflectedNode> ReflectPattern(slang::IGlobalSession& global,
 std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::DeclReflection* decl,
                                          std::string_view label) {
     bool material = false;
+    bool surface = false;
     for (slang::DeclReflection* child : decl->getChildren()) {
         material = material || IsMaterialMethod(child);
+        surface = surface || IsShadeMethod(child);
     }
-    if (!material) {
+    if (!material && !surface) {
         return std::nullopt;
     }
-    ReflectedNode node{.name = decl->getName()};
+    if (material && surface) {
+        throw Error("{} in {} has both Material and Shade; a node fills SurfaceInputs or builds a "
+                    "closure, not both",
+                    decl->getName(), label);
+    }
+    ReflectedNode node{.name = decl->getName(),
+                       .role = surface ? NodeRole::Surface : NodeRole::Material};
     for (slang::DeclReflection* child : decl->getChildren()) {
         if (child->getKind() != slang::DeclReflection::Kind::Variable) {
             continue;

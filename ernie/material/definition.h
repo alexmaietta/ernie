@@ -19,6 +19,7 @@ struct DefinitionModule {
     std::string source;
     std::vector<std::pair<std::string, std::string>> files;
     std::vector<std::pair<std::string, std::string>> origins;
+    bool surface = false;
 };
 
 class DefinitionSet {

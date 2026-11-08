@@ -276,6 +276,43 @@ TEST(MaterialNodeTest, PatternsFeedMaterialInputsAndTheirValuesEditInPlace) {
     });
 }
 
+TEST(MaterialNodeTest, SurfacesBuildTheirOwnClosures) {
+    const std::filesystem::path file = WriteFile("ernie_render_nodes_surface.slang", R"(
+import ernie.material;
+
+struct TestOrange {
+    [Color] float3 tint = float3(1, 0.5, 0);
+    float glow = 0;
+
+    void Shade<Spectrum : ISpectrum>(ShadeContext c, inout OpticalClosure<Spectrum> s) {
+        const Spectrum color = SpectralValue.Rgb(tint).Evaluate<Spectrum>();
+        s.AddLobe(Lobe<Spectrum>.DiffuseReflection(color, 1));
+        s.albedo = color;
+        s.emission = color.Scale(glow);
+    }
+}
+)");
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, true);
+        EXPECT_EQ(LoadShaders(*scene, file), std::vector<std::string>{"TestOrange"});
+        const Prim surface = Paint(*scene, "TestOrange");
+        Renderer renderer(scene);
+        const auto orange = [](Float3 pixel) {
+            return pixel.x > 0.5f && pixel.y > 0.2f * pixel.x && pixel.y < 0.8f * pixel.x &&
+                   pixel.z < 0.05f;
+        };
+        Float3 pixel = Center(renderer);
+        EXPECT_TRUE(orange(pixel)) << pixel.x << " " << pixel.y << " " << pixel.z;
+        scene->Find("/Render/View")->Set(MinimalAPI::kMode, MinimalMode::Full);
+        pixel = Center(renderer);
+        EXPECT_TRUE(orange(pixel)) << pixel.x << " " << pixel.y << " " << pixel.z;
+        const Float3 lit = pixel;
+        surface.Set("glow", 4.0f);
+        pixel = Center(renderer);
+        EXPECT_GT(pixel.x, lit.x + 1);
+    });
+}
+
 TEST(MaterialNodeTest, FilesWithoutNodesOrWithBadInputsAreReported) {
     const std::filesystem::path empty = WriteFile("ernie_render_nodes_empty.slang", R"(
 import ernie.material;

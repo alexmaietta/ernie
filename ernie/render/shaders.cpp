@@ -123,8 +123,9 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                           {"slangSourceAsset", file.string()},
                           {"slangSourceAssetSubIdentifier", reflected.name}}};
         NodeDefinition node{.name = reflected.name,
-                            .role = reflected.role == device::NodeRole::Pattern
-                                        ? NodeRole::Pattern
+                            .role = reflected.role == device::NodeRole::Pattern ? NodeRole::Pattern
+                                    : reflected.role == device::NodeRole::Surface
+                                        ? NodeRole::Surface
                                         : NodeRole::Material,
                             .file = file.string(),
                             .module = module,
@@ -149,7 +150,9 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         node.schema = uint32_t(RegisterSchema(desc));
         RegisterNode(std::move(node));
         Log(LogLevel::Debug, "loaded {} {} from {} with inputs {}",
-            reflected.role == device::NodeRole::Pattern ? "pattern" : "material node",
+            reflected.role == device::NodeRole::Pattern   ? "pattern"
+            : reflected.role == device::NodeRole::Surface ? "surface"
+                                                          : "material node",
             reflected.name, file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
         names.push_back(reflected.name);
     }

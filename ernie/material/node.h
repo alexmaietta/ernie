@@ -17,7 +17,7 @@ struct NodeInput {
     bool color = false;
 };
 
-enum class NodeRole { Material, Pattern };
+enum class NodeRole { Material, Surface, Pattern };
 
 struct NodeParameter {
     enum class Source { Input, Context, Point };
