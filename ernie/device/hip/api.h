@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 
 #include "ernie/device/compute/runtime_compiler.h"
@@ -247,6 +248,7 @@ constexpr int hipMemoryTypeArray = 10;
 
 struct Api {
     std::string library;
+    std::filesystem::path directory;
     Version runtimeVersion;
     Version driverVersion;
 

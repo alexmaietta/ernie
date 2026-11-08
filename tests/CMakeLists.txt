@@ -153,6 +153,24 @@ target_compile_definitions(
         ERNIE_TEST_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
+if(UNIX AND NOT APPLE)
+    add_library(ernie_fake_beside SHARED support/fake_beside.cpp)
+    set_target_properties(
+        ernie_fake_beside
+        PROPERTIES
+            OUTPUT_NAME
+                ernie_beside
+            LIBRARY_OUTPUT_DIRECTORY
+                "${CMAKE_CURRENT_BINARY_DIR}/beside"
+    )
+    add_dependencies(ernie_util_tests ernie_fake_beside)
+    target_compile_definitions(
+        ernie_util_tests
+        PRIVATE
+            ERNIE_TEST_BESIDE_DIR="$<TARGET_FILE_DIR:ernie_fake_beside>"
+    )
+endif()
+
 ernie_test(
     ernie_runtime_compiler_tests
     LINK

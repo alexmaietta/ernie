@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstddef>
+#include <filesystem>
 #include <initializer_list>
 #include <memory>
 #include <mutex>
@@ -56,7 +57,8 @@ Loaded<RuntimeCompiler> LoadRuntimeCompiler(std::string_view name, std::string_v
                                             std::string_view code,
                                             std::initializer_list<const char*> names,
                                             std::initializer_list<const char*> paths,
-                                            Version minimum);
+                                            Version minimum,
+                                            const std::filesystem::path& beside = {});
 
 class ModuleCache {
   public:

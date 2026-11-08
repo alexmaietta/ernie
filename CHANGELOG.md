@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
+- hipRTC loads from the folder of the HIP runtime Ernie uses, such as the one bundled in PyTorch, instead of from another ROCm install that would pull in a second comgr and HSA runtime. Runtime libraries already in the process are also found under their unversioned names.
+
 ## [0.1.0] - 2026-11-06
 
 The first release of Ernie, a real-time spectral GPU renderer for planetary robotics and sensing with C++ and Python APIs.

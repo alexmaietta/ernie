@@ -2,6 +2,7 @@
 #include "ernie/util/library.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <string>
 #include <string_view>
 
@@ -54,6 +55,39 @@ TEST(LibraryTest, LoadFallsBackToPaths) {
     const Library library = Library::Load({kMissing}, {kMissing, kOtherUnloaded});
     ASSERT_TRUE(library);
     EXPECT_EQ(library.Name(), kOtherUnloaded);
+}
+
+#ifdef ERNIE_TEST_BESIDE_DIR
+TEST(LibraryTest, LoadLooksBesideADirectoryBeforeTheSearchPath) {
+    const std::filesystem::path directory = ERNIE_TEST_BESIDE_DIR;
+    EXPECT_FALSE(Library::Load({"libernie_beside.so.1"}));
+
+    const Library beside = Library::Load({"libernie_beside.so.1"}, {}, directory);
+    ASSERT_TRUE(beside);
+    EXPECT_EQ(beside.Name(), (directory / "libernie_beside.so").string());
+    EXPECT_EQ(std::filesystem::canonical(beside.Directory()),
+              std::filesystem::canonical(directory));
+    int (*answer)() = nullptr;
+    ASSERT_TRUE(beside.Symbol("ernie_beside", answer));
+    EXPECT_EQ(answer(), 7);
+
+    const test::CapturedLog log;
+    const Library loaded = Library::Load({"libernie_beside.so.1"});
+    ASSERT_TRUE(loaded);
+    EXPECT_EQ(loaded.Name(), "libernie_beside.so");
+    ASSERT_EQ(log.Messages().size(), 1u);
+    EXPECT_EQ(log.Messages()[0].second, "using the libernie_beside.so already in the process");
+}
+#endif
+
+TEST(LibraryTest, ReportsTheDirectoryItLoadedFrom) {
+    const Library library = Library::Load({kLoaded});
+#if defined(__APPLE__)
+    EXPECT_TRUE(library.Directory().empty());
+#else
+    EXPECT_TRUE(std::filesystem::exists(library.Directory()));
+#endif
+    EXPECT_TRUE(Library().Directory().empty());
 }
 
 TEST(LibraryTest, IsEmptyWhenNothingLoads) {
