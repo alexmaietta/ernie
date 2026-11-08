@@ -47,7 +47,6 @@ struct ImportReader;
 struct ImportDesc;
 struct ImportSource;
 
-ERNIE_API SchemaId ShaderSchema(std::string_view id);
 ERNIE_API ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc);
 ERNIE_API PrimRange Define(Scene& scene, Span<const std::string> paths, const Shader::Desc& desc,
                            const BatchDesc& batch = {});

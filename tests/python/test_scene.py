@@ -151,5 +151,11 @@ def test_shaders_are_defined_by_their_info_id(scene):
     assert ernie.UsdPreviewSurface.select(scene, "/Surface").roughness == [0.25]
     with pytest.raises(ValueError):
         scene.define("/Unnamed", "Shader")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         scene.define("/Missing", "Shader", {"id": "NoSuchNode"})
+
+    surface["id"] = "UsdUVTexture"
+    assert ernie.UsdUVTexture.select(scene, "/Surface").wrap_s == ["repeat"]
+    with pytest.raises(RuntimeError):
+        surface["id"] = "NoSuchNode"
+    assert surface["id"] == "UsdUVTexture"

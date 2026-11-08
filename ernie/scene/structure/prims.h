@@ -95,6 +95,7 @@ class Prims {
     BlockTable ApplyInstance(std::span<const uint32_t> prims, SchemaId api, uint32_t instance);
     void UnapplyInstance(std::span<const uint32_t> prims, SchemaId api, uint32_t instance);
     void StageLinks(std::span<const uint32_t> prims, SchemaId api);
+    std::vector<BlockTable> Retype(uint32_t prim, SchemaId schema, uint64_t apis);
     void Reparent(uint32_t prim, uint32_t parent);
     void Renew(uint32_t prim);
     void MarkSession(uint32_t prim);

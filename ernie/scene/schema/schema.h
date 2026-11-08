@@ -300,6 +300,17 @@ constexpr uint32_t PrimSlot(SchemaId schema, uint64_t apis, SchemaId table) {
     return IsApi(table) ? ApiSlot(schema, apis, table) : Slot(schema, table);
 }
 
+constexpr SchemaId ShaderSchema(std::string_view id) {
+    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
+        const SchemaId schema = SchemaId(index);
+        if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
+            IsA(schema, SchemaId::Shader)) {
+            return schema;
+        }
+    }
+    return SchemaId::None;
+}
+
 inline std::vector<SchemaId> PrimTables(SchemaId schema, uint64_t apis) {
     const Span<const SchemaId> typed = Slots(schema);
     std::vector<SchemaId> tables(typed.begin(), typed.end());

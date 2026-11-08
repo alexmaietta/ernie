@@ -310,6 +310,65 @@ void Prims::CheckRemovable(uint32_t prim) const {
     }
 }
 
+std::vector<BlockTable> Prims::Retype(uint32_t prim, SchemaId schema, uint64_t apis) {
+    const PrimRecord old = Record(prim);
+    const std::vector<SchemaId> before = PrimTables(old.schema, old.apis);
+    const std::vector<SchemaId> after = PrimTables(schema, apis);
+    const auto kept = [](const std::vector<SchemaId>& tables, SchemaId table) {
+        return std::ranges::find(tables, table) != tables.end();
+    };
+    for (const SchemaId table : before) {
+        if (!kept(after, table) && m_store.Pinned(table)) {
+            throw Error("{} data is mapped or attached, so prims with it can't change type until "
+                        "the mapping closes or the attachment is released",
+                        Info(table).name);
+        }
+    }
+    const uint32_t first = AcquireSlots(uint32_t(after.size()));
+    std::vector<BlockTable> added;
+    for (uint32_t slot = 0; slot < after.size(); ++slot) {
+        const SchemaId table = after[slot];
+        uint32_t row = kNoRow;
+        if (kept(before, table)) {
+            row = m_slotRows[old.slots + PrimSlot(old.schema, old.apis, table)];
+        } else {
+            row = m_store.Schema(table).Acquire();
+            m_store.Schema(table).Stage(m_store.PrimsColumn(table), row, Word(prim));
+            added.push_back({table, row, 1, 1});
+        }
+        m_slotRows[first + slot] = row;
+    }
+    for (uint32_t slot = 0; slot < before.size(); ++slot) {
+        const SchemaId table = before[slot];
+        if (kept(after, table)) {
+            continue;
+        }
+        if (!IsMultipleApi(table)) {
+            ReleaseRow(table, m_slotRows[old.slots + slot]);
+            continue;
+        }
+        const auto found = m_instances.find(InstanceKey(prim, table));
+        for (const ApiInstance& entry : found->second) {
+            ReleaseRow(table, entry.row);
+        }
+        m_instances.erase(found);
+    }
+    if (!before.empty()) {
+        m_freeSlots[uint32_t(before.size())].push_back(old.slots);
+    }
+    PrimRecord& record = m_records[prim];
+    record.schema = schema;
+    record.apis = apis;
+    record.slots = after.empty() ? kNoRow : first;
+    if (!after.empty()) {
+        m_store.Slots().Stage(0, first,
+                              std::as_bytes(std::span(m_slotRows.data() + first, after.size())));
+    }
+    StageRecord(prim);
+    m_store.StampWorld(record.world);
+    return added;
+}
+
 void Prims::Reparent(uint32_t prim, uint32_t parent) {
     m_records[prim].parent = parent;
     StageRecord(prim);

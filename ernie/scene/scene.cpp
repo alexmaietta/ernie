@@ -124,19 +124,20 @@ void SceneImpl::Check(const Prim& prim) const {
     }
 }
 
-SchemaId ShaderSchema(std::string_view id) {
-    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
-        const SchemaId schema = SchemaId(index);
-        if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
-            IsA(schema, SchemaId::Shader)) {
-            return schema;
-        }
+namespace {
+
+SchemaId KnownShader(std::string_view id) {
+    const SchemaId schema = ShaderSchema(id);
+    if (schema == SchemaId::None) {
+        throw Error("no shader has info:id \"{}\"", id);
     }
-    throw Error("no shader has info:id \"{}\"", id);
+    return schema;
+}
+
 }
 
 ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc) {
-    const SchemaId schema = ShaderSchema(desc.id);
+    const SchemaId schema = KnownShader(desc.id);
     Log(LogLevel::Debug, "{} is a {} shader", path, desc.id);
     return ShaderPrim(SceneImpl::Get(scene).Define(path, schema, [&](RowWriter& writer) {
         WriteFallbacks(schema, writer);
@@ -146,7 +147,7 @@ ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc)
 
 PrimRange Define(Scene& scene, Span<const std::string> paths, const Shader::Desc& desc,
                  const BatchDesc& batch) {
-    const SchemaId schema = ShaderSchema(desc.id);
+    const SchemaId schema = KnownShader(desc.id);
     return SceneImpl::Get(scene).Define(
         paths, schema,
         [&](RowWriter& writer) {
@@ -255,6 +256,9 @@ void Overrides::Set(Prim prim, ColumnRef column, Span<const std::byte> cell) {
     }
     if (IsArray(column.column->type)) {
         throw Error("{} holds arrays, which overrides don't", column.column->field);
+    }
+    if (column.schema == SchemaId::Shader && column.index == Shader::kId.index) {
+        throw Error("A shader's info:id picks its node, so overrides can't change it");
     }
     SceneImpl& impl = SceneImpl::Get(*m_scene);
     impl.Check(prim);

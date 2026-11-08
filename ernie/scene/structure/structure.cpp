@@ -11,6 +11,7 @@
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/util/error.h"
+#include "ernie/util/log.h"
 #include "ernie/util/span.h"
 #include "ernie/util/text.h"
 
@@ -453,6 +454,67 @@ void Structure::Remove(uint32_t prim) {
     for (const Retarget& retarget : retargets) {
         SetTargets(retarget.prim, retarget.row, retarget.column, retarget.paths);
         m_store.StampWorld(m_prims.Record(retarget.prim).world);
+    }
+}
+
+void Structure::Retype(uint32_t prim, SchemaId schema) {
+    if (!m_prims.Alive(prim)) {
+        throw Error("Prim {} was removed", prim);
+    }
+    const PrimRecord& record = m_prims.Record(prim);
+    if (record.schema == schema) {
+        return;
+    }
+    if (Info(schema).kind != SchemaKind::Concrete) {
+        throw Error("{} can't become a {}, which isn't a concrete schema", m_paths.Path(prim),
+                    Info(schema).name);
+    }
+    const SchemaId from = record.schema;
+    uint64_t apis = Info(schema).apis & ~kMultipleApis;
+    std::vector<std::string> dropped;
+    for (const SchemaId api : kApiSchemas) {
+        if (!HasApi(record.apis, api) || HasApi(Info(from).apis, api) || HasApi(apis, api)) {
+            continue;
+        }
+        if (AppliesTo(api, schema) || Includes(schema, api)) {
+            apis |= ApiBit(api);
+        } else {
+            dropped.emplace_back(Info(api).name);
+        }
+    }
+    const std::vector<SchemaId> before = PrimTables(from, record.apis);
+    const std::vector<SchemaId> after = PrimTables(schema, apis);
+    std::set<std::pair<SchemaId, uint32_t>> released;
+    for (const SchemaId table : before) {
+        if (std::ranges::find(after, table) != after.end()) {
+            continue;
+        }
+        if (!IsMultipleApi(table)) {
+            released.insert({table, m_prims.Row(prim, table)});
+            continue;
+        }
+        for (const ApiInstance& entry : m_prims.Instances(prim, table)) {
+            released.insert({table, entry.row});
+        }
+    }
+    std::erase_if(m_pending, [&](const PendingTargets& pending) {
+        return released.contains({pending.column.schema, pending.row});
+    });
+    Logged(prim, false);
+    PrimBlock block;
+    block.firstPrim = prim;
+    block.count = 1;
+    block.copies = 1;
+    block.tables = m_prims.Retype(prim, schema, apis);
+    RowWriter writer(*this, block, {}, true);
+    WriteFallbacks(schema, writer);
+    Logged(prim, true);
+    ++m_epoch;
+    ernie::Log(LogLevel::Debug, "{} changed from a {} to a {}", m_paths.Path(prim), Info(from).name,
+               Info(schema).name);
+    if (!dropped.empty()) {
+        ernie::Log(LogLevel::Warning, "{} lost {}, which doesn't apply to a {}", m_paths.Path(prim),
+                   Join(dropped), Info(schema).name);
     }
 }
 

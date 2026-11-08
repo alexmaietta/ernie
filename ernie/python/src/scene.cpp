@@ -397,7 +397,12 @@ SchemaId DefinedSchema(std::string_view name, const std::optional<nb::dict>& val
     if (!values || !values->contains("id")) {
         throw nb::value_error("A Shader needs an id naming its node, such as UsdPreviewSurface");
     }
-    return ShaderSchema(nb::cast<std::string>((*values)["id"]));
+    const std::string id = nb::cast<std::string>((*values)["id"]);
+    const SchemaId shader = ShaderSchema(id);
+    if (shader == SchemaId::None) {
+        throw nb::value_error(("No shader has info:id " + id).c_str());
+    }
+    return shader;
 }
 
 ScenePrim Define(Ref<Scene> scene, std::string_view path, std::string_view name,

@@ -37,10 +37,15 @@ struct StructureEntry {
 
 class RowWriter {
   public:
-    RowWriter(Structure& structure, const PrimBlock& block, std::span<const uint32_t> prims = {})
-        : m_structure(structure), m_block(block), m_prims(prims) {}
+    RowWriter(Structure& structure, const PrimBlock& block, std::span<const uint32_t> prims = {},
+              bool partial = false)
+        : m_structure(structure), m_block(block), m_prims(prims), m_partial(partial) {}
 
     template <class T> void Set(SchemaId owner, uint32_t column, const T& value) {
+        if (m_partial &&
+            std::ranges::find(m_block.tables, owner, &BlockTable::table) == m_block.tables.end()) {
+            return;
+        }
         const ColumnRef ref{owner, &Columns(owner)[column], column};
         if constexpr (std::is_same_v<T, std::vector<std::string>>) {
             if (ref.column->type == ColumnType::TokenArray) {
@@ -83,6 +88,7 @@ class RowWriter {
     Structure& m_structure;
     const PrimBlock& m_block;
     std::span<const uint32_t> m_prims;
+    bool m_partial = false;
 };
 
 class Structure {
@@ -191,6 +197,7 @@ class Structure {
                     std::span<const std::string> paths);
     void Remove(uint32_t prim);
     void Move(uint32_t prim, std::string_view path);
+    void Retype(uint32_t prim, SchemaId schema);
 
     template <class Write>
     void Apply(std::span<const uint32_t> prims, SchemaId api, std::string_view instance,

@@ -14,6 +14,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/columns/kernels/cells.h"
+#include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/scene/views/layout.h"
 #include "ernie/util/profiler.h"
@@ -45,6 +46,30 @@ bool IsByteBool(const DLTensor& tensor) {
 
 bool Selected(std::span<const uint64_t> mask, uint32_t index) {
     return mask.empty() || (mask[index / 64] >> (index % 64) & 1) != 0;
+}
+
+bool PicksSchema(ColumnRef column) {
+    return column.schema == SchemaId::Shader && column.index == kShaderId.index;
+}
+
+void CheckHostWritten(ColumnRef column) {
+    if (PicksSchema(column)) {
+        throw Error("A shader's info:id picks its node, so it's written from the host");
+    }
+}
+
+std::vector<SchemaId> Nodes(const Structure& structure, Span<const std::byte> cells) {
+    std::vector<SchemaId> nodes(cells.size() / sizeof(uint32_t));
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        uint32_t token = 0;
+        std::memcpy(&token, cells.data() + i * sizeof(uint32_t), sizeof(uint32_t));
+        const std::string_view id = structure.GetTokens().Text(Token{token});
+        nodes[i] = ShaderSchema(id);
+        if (nodes[i] == SchemaId::None) {
+            throw Error("No shader has info:id \"{}\"", id);
+        }
+    }
+    return nodes;
 }
 
 std::vector<int64_t> Shape(uint32_t count, const ColumnLayout& layout) {
@@ -139,18 +164,36 @@ void UntypedAttribute::Fill(Span<const std::byte> cell) {
         throw Error("{} bytes for {}, whose cells are {}", cell.size(), m_column.column->field,
                     CellBytes());
     }
+    const std::vector<SchemaId> nodes =
+        PicksSchema(m_column) ? Nodes(m_view->GetStructure(), cell) : std::vector<SchemaId>{};
     const ViewRows& rows = Rows();
     for (const ViewBlock& block : rows.blocks) {
         GetColumnStore().Fill(m_column, block.firstRow, block.count, cell);
     }
     StampWorlds();
+    Retype(nodes);
 }
 
 void UntypedAttribute::Write(Span<const std::byte> cells) {
     ERNIE_ZONE("Scene/Write");
     CheckWritable();
     CheckNotAttached();
+    const std::vector<SchemaId> nodes =
+        PicksSchema(m_column) ? Nodes(m_view->GetStructure(), cells) : std::vector<SchemaId>{};
     StageCells(cells);
+    Retype(nodes);
+}
+
+void UntypedAttribute::Retype(std::span<const SchemaId> nodes) {
+    if (nodes.empty()) {
+        return;
+    }
+    const std::vector<uint32_t> prims(m_view->Prims().begin(), m_view->Prims().end());
+    for (uint32_t index = 0; index < prims.size(); ++index) {
+        if (m_view->Live(index)) {
+            m_view->GetStructure().Retype(prims[index], nodes[nodes.size() == 1 ? 0 : index]);
+        }
+    }
 }
 
 void UntypedAttribute::StageCells(Span<const std::byte> cells) {
@@ -172,6 +215,7 @@ device::Operation UntypedAttribute::Write(const DLTensor& source, Stream produce
                                           const DLTensor* mask) {
     ERNIE_ZONE("Scene/Write");
     CheckWritable();
+    CheckHostWritten(m_column);
     CheckNotAttached();
     return WriteTensor(source, producer, mask);
 }
@@ -243,6 +287,7 @@ device::Operation UntypedAttribute::Write(const device::Tensor& source, Stream p
                                           const device::Tensor& mask) {
     ERNIE_ZONE("Scene/Write");
     CheckWritable();
+    CheckHostWritten(m_column);
     CheckNotAttached();
     if (Size() == 0) {
         return {};
@@ -357,6 +402,7 @@ device::Operation UntypedAttribute::Stamp(Stream producer, const DLTensor* mask)
 
 device::Operation UntypedAttribute::MarkChanged(Stream producer, const DLTensor* mask) {
     CheckWritable(true);
+    CheckHostWritten(m_column);
     if (Size() == 0) {
         return {};
     }
@@ -525,6 +571,7 @@ device::Operation UntypedAttribute::Attach(DLManagedTensorVersioned* tensor, Str
 device::Operation UntypedAttribute::AttachTensor(const DLTensor* tensor, Stream producer,
                                                  AttachFrom from, const Owner& own) {
     CheckWritable(true);
+    CheckHostWritten(m_column);
     const ColumnInfo& column = *m_column.column;
     if (tensor == nullptr) {
         throw Error("{} attaches no tensor", column.field);
@@ -911,6 +958,7 @@ void UntypedAttribute::MapArray(Mapping& mapping) {
 Mapping UntypedAttribute::Map(MapAccess access, Stream consumer) {
     if (access != MapAccess::Read) {
         CheckWritable(true);
+        CheckHostWritten(m_column);
         const Attachment* attachment = GetColumnStore().AttachmentCount() > 0
                                            ? GetColumnStore().FindAttachment(m_column, Rows().rows)
                                            : nullptr;

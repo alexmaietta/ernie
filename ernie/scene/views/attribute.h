@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -101,6 +102,7 @@ class ERNIE_API UntypedAttribute {
     void CheckNotAttached() const;
     void CheckArrayType(ColumnType type) const;
     void StageCells(Span<const std::byte> cells);
+    void Retype(std::span<const SchemaId> nodes);
     device::Operation WriteTensor(const DLTensor& source, Stream producer, const DLTensor* mask);
     using Owner = std::function<std::shared_ptr<const DLTensor>()>;
     device::Operation AttachTensor(const DLTensor* source, Stream producer, AttachFrom from,

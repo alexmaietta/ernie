@@ -62,6 +62,42 @@ TEST(MaterialTableTest, ShadersTakeTheSchemaTheirInfoIdNames) {
     });
 }
 
+TEST(MaterialTableTest, ShadersChangeNodeWhenTheirInfoIdChanges) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim material = scene->Define<Material>("/Look");
+        const Prim surface = scene->Define<Shader>("/Look/Surface", {.id = "UsdUVTexture"});
+        const Prim albedo = scene->Define<Shader>("/Look/Albedo", {.id = "UsdUVTexture"});
+        surface.Set(UsdUVTexture::kFile, "albedo.png");
+        surface.Connect("diffuseColor", albedo, "rgb");
+        material.Connect("surface", surface, "surface");
+        scene->Publish().Wait();
+        const MaterialTable& materials = SceneImpl::Get(*scene).GetMaterials();
+        EXPECT_EQ(materials.Record(material.Index()).definition, kDefinitionDiffuse);
+
+        surface.Set(Shader::kId, "UsdPreviewSurface");
+        EXPECT_EQ(surface.Schema(), SchemaId::UsdPreviewSurface);
+        EXPECT_EQ(surface.Get(Shader::kId), "UsdPreviewSurface");
+        EXPECT_EQ(surface.Get(UsdPreviewSurface::kRoughness), 0.5f);
+        EXPECT_EQ(surface.Get(UsdPreviewSurface::kNormalStrength), 1.0f);
+        EXPECT_THROW(surface.Get(UsdUVTexture::kFile), Error);
+        EXPECT_EQ(surface.Connections().size(), 1u);
+        EXPECT_EQ(material.Connections().front().source, "/Look/Surface");
+        surface.Set(UsdPreviewSurface::kRoughness, 0.25f);
+        scene->Publish().Wait();
+        EXPECT_EQ(materials.Record(material.Index()).definition, kDefinitionPreviewTextured);
+
+        EXPECT_THROW(surface.Set(Shader::kId, "NoSuchNode"), Error);
+        EXPECT_EQ(surface.Schema(), SchemaId::UsdPreviewSurface);
+        EXPECT_EQ(surface.Get(UsdPreviewSurface::kRoughness), 0.25f);
+
+        surface.Set(Shader::kId, "UsdUVTexture");
+        EXPECT_EQ(surface.Get(UsdUVTexture::kFile), "");
+        scene->Publish().Wait();
+        EXPECT_EQ(materials.Record(material.Index()).definition, kDefinitionDiffuse);
+    });
+}
+
 TEST(MaterialTableTest, MaterialsWithoutAKnownSurfaceShadeAsDiffuse) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

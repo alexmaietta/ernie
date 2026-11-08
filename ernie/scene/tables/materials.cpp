@@ -61,10 +61,9 @@ bool Channel(std::string_view output, bool color, TextureChannel& channel) {
 std::vector<ColumnRef> MaterialInputs() {
     std::vector<ColumnRef> inputs = {kPlaneAxis};
     for (const SchemaId schema :
-         {SchemaId::Connectable, SchemaId::Shader, SchemaId::UsdPreviewSurface,
-          SchemaId::SurfaceDetailAPI, SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2,
-          SchemaId::UsdTransform2d, SchemaId::TexturePlacement, SchemaId::NonVisualMaterialAPI,
-          SchemaId::CheckerboardAPI}) {
+         {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
+          SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
+          SchemaId::TexturePlacement, SchemaId::NonVisualMaterialAPI, SchemaId::CheckerboardAPI}) {
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t index = 0; index < columns.size(); ++index) {
             inputs.push_back({schema, &columns[index], index});
@@ -75,7 +74,7 @@ std::vector<ColumnRef> MaterialInputs() {
 
 bool Restructured(const ChangeSet& changes) {
     if (changes.resync || changes.structure || !changes.added.empty() || !changes.removed.empty() ||
-        !changes.apis.empty() || changes.Rows(kShaderId)) {
+        !changes.apis.empty()) {
         return true;
     }
     for (const ColumnRef column : {kConnectableConnectionsSources, kConnectableConnectionsInputs,
@@ -360,9 +359,7 @@ void MaterialTable::Resolve() {
             const std::string_view id =
                 m_structure.GetTokens().Text(Token{ids[prims.Row(prim, SchemaId::Shader)]});
             if (id != Info(schema).name) {
-                Log(LogLevel::Warning,
-                    "{} has info:id {} but was defined as {}, so it still runs {}; define a new "
-                    "shader to change its node",
+                Log(LogLevel::Warning, "{} has info:id {} but is a {}, so it runs {}",
                     m_structure.GetPaths().Path(prim), id, Info(schema).name, Info(schema).name);
             }
         }
