@@ -5,8 +5,8 @@ import ernie.render.kernels.light.area;
 import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.dome;
 import ernie.render.kernels.light.scatter;
-import ernie.render.kernels.material.diffuse;
-import ernie.render.kernels.material.preview;
+import ernie.render.kernels.material.definitions.diffuse;
+import ernie.render.kernels.material.definitions.preview;
 import ernie.render.kernels.random;
 import ernie.render.kernels.basis;
 
@@ -44,46 +44,6 @@ struct PathVertex<Spectrum : ISpectrum> {
     float3 albedo;
     float opacity;
     BsdfSample<Spectrum> next;
-}
-
-struct MaterialBsdf<Spectrum : ISpectrum> : IBsdf<Spectrum> {
-    PreviewSurfaceBsdf<Spectrum> preview;
-    no_diff bool lambert;
-
-    [Differentiable]
-    __init(PreviewSurfaceBsdf<Spectrum> preview) {
-        this.preview = preview;
-        lambert = false;
-    }
-
-    [Differentiable]
-    __init(Lambert<Spectrum> diffuse) {
-        preview = PreviewSurfaceBsdf<Spectrum>(diffuse.albedo, Spectrum.Constant(0), 1, 0, 1);
-        lambert = true;
-    }
-
-    [Differentiable]
-    BsdfValue<Spectrum> Evaluate(float3 outgoing, float3 incoming) {
-        if (lambert) {
-            return Lambert<Spectrum>(preview.diffuse).Evaluate(outgoing, incoming);
-        }
-        return preview.Evaluate(outgoing, incoming);
-    }
-
-    [Differentiable]
-    BsdfSample<Spectrum> Sample(float3 outgoing, no_diff float3 u) {
-        if (lambert) {
-            return Lambert<Spectrum>(preview.diffuse).Sample(outgoing, u);
-        }
-        return preview.Sample(outgoing, u);
-    }
-
-    float Pdf(float3 outgoing, float3 incoming) {
-        if (lambert) {
-            return Lambert<Spectrum>(preview.diffuse).Pdf(outgoing, incoming);
-        }
-        return preview.Pdf(outgoing, incoming);
-    }
 }
 
 struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
@@ -258,36 +218,26 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         }
     }
 
-    PathVertex<Spectrum> Surfaced<M : IMaterial<Spectrum>>(M loaded, SurfacePoint point,
-                                                          float3 outgoing) {
-        PathVertex<Spectrum> vertex;
-        vertex.point = point;
-        vertex.albedo = loaded.Albedo(point).ToRgb();
-        vertex.opacity = loaded.Opacity(point);
-        vertex.radiance = loaded.Emission(point, outgoing);
-        return vertex;
-    }
-
     PathVertex<Spectrum> Shade(Ray ray, uint material, SurfacePoint point,
                                float3 u, uint bounce, inout Rng rng) {
         const bool primary = bounce == 0;
         const float weighted = bounce < bounces ? 1.0f : 0.0f;
-        PathVertex<Spectrum> vertex;
-        MaterialBsdf<Spectrum> bsdf;
+        ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
+        OpticalClosure<Spectrum> closure = OpticalClosure<Spectrum>();
         if (materials.Schema(material) == SchemaId::UsdPreviewSurface) {
-            const PreviewSurface<Spectrum> loaded =
-                PreviewSurface<Spectrum>.Load(materials, material, point);
-            vertex = Surfaced(loaded, point, Basis(point.shadingNormal).ToLocal(-ray.direction));
-            bsdf = MaterialBsdf<Spectrum>(loaded.Surface(point));
+            StandardDefinition<PreviewMaterial, Spectrum>.Shade(context, closure);
         } else {
-            const DiffuseMaterial<Spectrum> loaded =
-                DiffuseMaterial<Spectrum>.Load(materials, material, point);
-            vertex = Surfaced(loaded, point, Basis(point.shadingNormal).ToLocal(-ray.direction));
-            bsdf = MaterialBsdf<Spectrum>(loaded.Surface(point));
+            StandardDefinition<DiffuseMaterial, Spectrum>.Shade(context, closure);
         }
+        point = context.point;
+        PathVertex<Spectrum> vertex;
+        vertex.point = point;
+        vertex.albedo = closure.albedo.ToRgb();
+        vertex.opacity = closure.opacity;
+        vertex.radiance = closure.emission;
         const Basis frame = Basis(point.shadingNormal);
         const float3 outgoing = frame.ToLocal(-ray.direction);
-        vertex.next = bsdf.Sample(outgoing, u);
+        vertex.next = closure.Sample(outgoing, u);
         const uint first = lights->firstLights[query.tlas];
         const uint last = lights->firstLights[query.tlas + 1];
         const bool sampled = last - first > kLoopedLights;
@@ -333,8 +283,8 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
             }
             vertex.radiance =
                 vertex.radiance +
-                Direct<Spectrum, MaterialBsdf<Spectrum>>(query, ray, point, frame, bsdf, sample,
-                                                         shadowing, chance)
+                Direct<Spectrum, OpticalClosure<Spectrum>>(query, ray, point, frame, closure,
+                                                           sample, shadowing, chance)
                     .Scale(factor);
         }
         return vertex;

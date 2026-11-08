@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 import ernie.device.kernels.device;
-import ernie.render.kernels.spectrum.spectrum;
+__exported import ernie.render.kernels.spectrum.spectrum;
 
 [Differentiable]
 float GgxD(float3 h, float alpha) {
@@ -66,4 +66,34 @@ float3 SampleGgxVisibleNormal(float3 outgoing, float alpha, float2 u) {
     const float p2 = (1 - s) * sqrt(max(0.0f, 1 - p1 * p1)) + s * r * sin(phi);
     const float3 n = p1 * t1 + p2 * t2 + sqrt(max(0.0f, 1 - p1 * p1 - p2 * p2)) * v;
     return normalize(float3(alpha * n.x, alpha * n.y, max(1e-6f, n.z)));
+}
+
+struct MicrofacetGgxBsdf<Spectrum : ISpectrum> : IDifferentiable {
+    Spectrum f0;
+    float alpha;
+
+    [Differentiable]
+    __init(Spectrum f0, float alpha) {
+        this.f0 = f0;
+        this.alpha = alpha;
+    }
+
+    [Differentiable]
+    Spectrum Estimate(float3 outgoing) {
+        return Schlick(f0, outgoing.z);
+    }
+
+    [Differentiable]
+    Spectrum Evaluate(float3 outgoing, float3 incoming, float3 h) {
+        return Schlick(f0, dot(incoming, h)) * GgxReflection(outgoing, incoming, h, alpha);
+    }
+
+    float Pdf(float3 outgoing, float3 h) {
+        return GgxReflectionPdf(outgoing, h, alpha);
+    }
+
+    float3 Direction(float3 outgoing, float2 u) {
+        const float3 h = SampleGgxVisibleNormal(outgoing, alpha, u);
+        return 2 * dot(outgoing, h) * h - outgoing;
+    }
 }
