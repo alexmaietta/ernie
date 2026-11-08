@@ -15,7 +15,7 @@ if(ERNIE_BUILD_PYTHON)
 endif()
 set(ernie_scene_defines "${PROJECT_BINARY_DIR}/ernie/scene/defines.cpp")
 ernie_generate_schemas(
-    "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels/schema"
+    "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/schema"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/geom.schema"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/lux.schema"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/sensor.schema"

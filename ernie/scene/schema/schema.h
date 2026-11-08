@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/schema/types.h"
+#include "ernie/scene/schema/types.h"
 
 #ifndef __SLANG__
 
@@ -192,7 +192,7 @@ template <class T> struct Field {
 
 #endif
 
-#include "ernie/scene/kernels/schema/registry.h"
+#include "ernie/scene/schema/registry.h"
 
 #ifndef __SLANG__
 

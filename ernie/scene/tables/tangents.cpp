@@ -12,10 +12,10 @@
 #include <mikktspace.h>
 
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/kernels/tangents.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
+#include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/span.h"

@@ -10,7 +10,7 @@
 #include "ernie/device/stream.h"
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
-#include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/schema/schema.h"
 
 namespace ernie {
 

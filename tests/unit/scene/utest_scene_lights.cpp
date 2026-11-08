@@ -13,9 +13,9 @@
 #include "ernie/device/queue.h"
 #include "ernie/io/image.h"
 #include "ernie/scene/kernels/lights.h"
-#include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/scene/schema/columns.h"
 #include "support/devices.h"
 
 namespace ernie {

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "ernie/scene/columns/heap.h"
-#include "ernie/scene/kernels/schema/types.h"
+#include "ernie/scene/schema/types.h"
 
 namespace ernie {
 

@@ -12,7 +12,7 @@
 #include "ernie/export.h"
 #include "ernie/render/kernels/overlay/style.h"
 #include "ernie/scene/kernels/ids.h"
-#include "ernie/scene/kernels/schema/types.h"
+#include "ernie/scene/schema/types.h"
 #include "ernie/util/span.h"
 
 namespace ernie {

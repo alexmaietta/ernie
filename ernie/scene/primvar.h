@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "ernie/scene/kernels/primvars.h"
-#include "ernie/scene/kernels/schema/types.h"
+#include "ernie/scene/schema/types.h"
 #include "ernie/util/span.h"
 
 namespace ernie {

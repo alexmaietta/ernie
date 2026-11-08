@@ -17,7 +17,7 @@
 #include "ernie/scene/columns/heap.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/attributes.h"
-#include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/schema/columns.h"
 #include "support/devices.h"
 
 namespace ernie {

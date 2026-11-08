@@ -8,9 +8,9 @@
 
 #include "ernie/device/operation.h"
 #include "ernie/device/stream.h"
-#include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
+#include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/scene/types.h"

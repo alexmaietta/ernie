@@ -9,8 +9,8 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/publish/change_set.h"
+#include "ernie/scene/schema/schema.h"
 
 namespace ernie {
 

@@ -25,7 +25,7 @@
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/changes.h"
-#include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/schema/schema.h"
 
 namespace ernie {
 

@@ -2049,13 +2049,13 @@ function(ernie_generate_schemas directory)
 
     set(includes "")
     foreach(family IN LISTS families)
-        string(APPEND includes "#include \"ernie/scene/kernels/schema/${family}.h\"\n")
+        string(APPEND includes "#include \"ernie/scene/schema/${family}.h\"\n")
         string(
             CONCAT text
             "// SPDX-License-Identifier: BSD-3-Clause\n"
             "// Generated from ${source_${family}} by cmake/ErnieSchema.cmake; do not edit.\n"
             "#pragma once\n\n"
-            "#include \"ernie/scene/kernels/schema/types.h\"\n\n"
+            "#include \"ernie/scene/schema/types.h\"\n\n"
             "#ifndef __SLANG__\n#include <cstdint>\n#include <limits>\n#include <map>\n#include <optional>\n#include <string>\n#include <vector>\n\n"
             "#include \"ernie/scene/primvar.h\"\n#endif\n\n"
             "namespace ernie {\n\n${gpu_${family}}}\n\n"
@@ -2071,7 +2071,7 @@ function(ernie_generate_schemas directory)
         "// SPDX-License-Identifier: BSD-3-Clause\n"
         "// Generated from ${sources} by cmake/ErnieSchema.cmake; do not edit.\n"
         "#pragma once\n\n"
-        "#include \"ernie/scene/kernels/schema/types.h\"\n\n"
+        "#include \"ernie/scene/schema/types.h\"\n\n"
         "namespace ernie {\n\n"
         "ERNIE_ENUM(SchemaId) {\n${ids}    Count,\n    None = 0xFFFFFFFF,\n};\n\n}\n\n"
         "${includes}\n"
@@ -2114,7 +2114,7 @@ function(ernie_generate_schemas directory)
         "// SPDX-License-Identifier: BSD-3-Clause\n"
         "// Generated from ${sources} by cmake/ErnieSchema.cmake; do not edit.\n"
         "#pragma once\n\n"
-        "#include \"ernie/scene/kernels/schema/schema.h\"\n\n"
+        "#include \"ernie/scene/schema/schema.h\"\n\n"
         "#ifndef __SLANG__\n\nnamespace ernie {\n\n${column_refs_text}\n}\n\n#endif\n"
     )
     _ernie_schema_write("${directory}/columns.h" text)
@@ -2145,7 +2145,7 @@ function(ernie_generate_schemas directory)
             "#pragma once\n\n"
             "#include <string>\n#include <string_view>\n\n"
             "#include \"ernie/export.h\"\n"
-            "#include \"ernie/scene/kernels/schema/schema.h\"\n"
+            "#include \"ernie/scene/schema/schema.h\"\n"
             "#include \"ernie/scene/typed.h\"\n"
             "#include \"ernie/scene/types.h\"\n"
             "#include \"ernie/util/span.h\"\n\n"
@@ -2172,7 +2172,7 @@ function(ernie_generate_schemas directory)
             "// Generated from ${sources} by cmake/ErnieSchema.cmake; do not edit.\n"
             "#pragma once\n\n"
             "#include <cstdint>\n#include <string>\n#include <utility>\n#include <vector>\n\n"
-            "#include \"ernie/scene/kernels/schema/schema.h\"\n"
+            "#include \"ernie/scene/schema/schema.h\"\n"
             "#include \"ernie/scene/views/attribute.h\"\n"
             "#include \"ernie/scene/views/view.h\"\n"
             "#include \"ernie/scene/prim.h\"\n\n"

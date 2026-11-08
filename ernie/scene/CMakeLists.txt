@@ -58,7 +58,8 @@ ernie_embed(
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.h"
-        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels|ernie/scene/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/schema|ernie/scene/schema/|*.h"
+        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/schema|ernie/scene/schema/|*.h"
 )
 
 ernie_static_library(
@@ -74,16 +75,16 @@ ernie_public_files(
     kernels/ids.h
     kernels/paged.h
     kernels/primvars.h
-    kernels/schema/schema.h
-    kernels/schema/types.h
     kernels/semantics.h
     kernels/textures.h
     prim.h
     primvar.h
+    records/transforms.h
     rotation.h
     scene.h
+    schema/schema.h
+    schema/types.h
     structure/tokens.h
-    records/transforms.h
     types.h
     views/attribute.h
     views/layout.h

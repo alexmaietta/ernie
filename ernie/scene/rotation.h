@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ernie/export.h"
-#include "ernie/scene/kernels/schema/types.h"
+#include "ernie/scene/schema/types.h"
 
 namespace ernie {
 

@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "ernie/scene/columns/column_store.h"
-#include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/primvar.h"
+#include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/paths.h"
 #include "ernie/scene/structure/prims.h"
 #include "ernie/scene/structure/tokens.h"

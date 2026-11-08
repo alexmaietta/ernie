@@ -8,7 +8,7 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/structure.h"
 
 namespace ernie {

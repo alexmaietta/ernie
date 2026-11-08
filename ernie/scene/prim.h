@@ -10,7 +10,7 @@
 
 #include "ernie/export.h"
 #include "ernie/scene/kernels/ids.h"
-#include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/schema/schema.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "ernie/util/span.h"

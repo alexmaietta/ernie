@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "ernie/scene/kernels/schema/columns.h"
+#include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/util/error.h"
 #include "ernie/util/span.h"

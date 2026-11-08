@@ -19,8 +19,8 @@
 #include "ernie/device/commands.h"
 #include "ernie/render/kernels.h"
 #include "ernie/render/kernels/render/render.h"
-#include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/scene/schema/columns.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
 

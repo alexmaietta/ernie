@@ -9,8 +9,8 @@
 #include "ernie/device/operation.h"
 #include "ernie/export.h"
 #include "ernie/scene/kernels/ids.h"
-#include "ernie/scene/kernels/schema/types.h"
 #include "ernie/scene/kernels/semantics.h"
+#include "ernie/scene/schema/types.h"
 
 namespace ernie {
 

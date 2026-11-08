@@ -168,8 +168,8 @@ install(
 )
 install(
     DIRECTORY
-        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels/schema/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/scene/kernels/schema"
+        "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/schema/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ernie/scene/schema"
     COMPONENT dev
     FILES_MATCHING
     PATTERN "*.h"
