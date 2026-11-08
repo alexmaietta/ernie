@@ -66,9 +66,10 @@ struct LightRecord {
     float iesScale;
     uint instancer;
     uint copyOffset;
+    uint64_t portalPrims;
 };
 
-ERNIE_CHECK_SIZE(LightRecord, 208);
+ERNIE_CHECK_SIZE(LightRecord, 216);
 
 struct LightLayout {
     Ptr<LightRecord> records;

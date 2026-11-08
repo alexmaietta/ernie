@@ -26,6 +26,7 @@ struct RenderTables {
     Ptr<SurfaceRecord> surfaces;
     Ptr<BoundableBox> primBounds;
     Ptr<TextureRecord> textures;
+    Ptr<uint64_t> textureBindings;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
@@ -38,7 +39,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 208);
+ERNIE_CHECK_SIZE(RenderTables, 216);
 
 #ifdef __SLANG__
 

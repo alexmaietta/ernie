@@ -162,7 +162,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                  float scatteredPdf, bool scatteredDelta) {
         const bool camera = originPrim == kNoPrim;
         Spectrum seen = Spectrum.Constant(0);
-        const LightContext context = LightContext(query.scene, lights, query.tlas);
+        const LightContext context = LightContext(query.tables, lights, query.tlas);
         const uint first = lights->firstLights[query.tlas];
         const uint last = lights->firstLights[query.tlas + 1];
         for (uint i = first; i < last; ++i) {
@@ -210,7 +210,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                 return Spectrum.Constant(0);
             }
             const AreaLight<Spectrum> light =
-                AreaLight<Spectrum>.Load(LightContext(query.scene, lights, query.tlas), candidate);
+                AreaLight<Spectrum>.Load(LightContext(query.tables, lights, query.tlas), candidate);
             const Spectrum emitted = light.EmittedToward(origin, point.position);
             if (camera) {
                 return emitted;
@@ -223,7 +223,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
 
     LightSample<Spectrum> SampleLight(LightRecord record, float3 position,
                                       float2 u) {
-        const LightContext context = LightContext(query.scene, lights, query.tlas);
+        const LightContext context = LightContext(query.tables, lights, query.tlas);
         switch (LightType(record.type)) {
         case LightType::Distant:
             return DistantLight<Spectrum>.Load(context, record).Sample(position, u);

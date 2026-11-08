@@ -6,12 +6,12 @@ __exported import ernie.render.kernels.spectrum.spectrum;
 using namespace ernie;
 
 struct LightContext {
-    SceneData* scene;
+    RenderTables* tables;
     LightLayout* lights;
     uint tlas;
 
-    __init(SceneData* scene, LightLayout* lights, uint tlas) {
-        this.scene = scene;
+    __init(RenderTables* tables, LightLayout* lights, uint tlas) {
+        this.tables = tables;
         this.lights = lights;
         this.tlas = tlas;
     }

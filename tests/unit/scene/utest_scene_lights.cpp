@@ -13,6 +13,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/io/image.h"
 #include "ernie/scene/kernels/lights.h"
+#include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "support/devices.h"
@@ -322,6 +323,10 @@ TEST(LightsTest, DomesTurnTheirPoleUpAndListTheirPortals) {
         const LightRecord dome = Find(records, sky);
         EXPECT_EQ(LightType(dome.type), LightType::Dome);
         EXPECT_EQ(dome.portals, 1u);
+        SceneImpl& impl = SceneImpl::Get(scene);
+        const uint32_t row = impl.GetCatalog().GetPrims().Row(sky.Index(), SchemaId::DomeLight);
+        EXPECT_EQ(dome.portalPrims, impl.GetStore().Array(kDomeLightPortals, row).address);
+        EXPECT_NE(dome.portalPrims, 0u);
         EXPECT_NEAR(dome.power, 2 * kPi, 2 * kPi * 1e-3f);
         EXPECT_FLOAT_EQ(dome.axisY.z, 1);
         EXPECT_FLOAT_EQ(dome.axisZ.y, -1);

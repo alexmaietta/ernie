@@ -16,18 +16,18 @@ struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     no_diff uint last;
 
     static DomeLight<Spectrum> Load(LightContext context, LightRecord record) {
-        SceneData* scene = context.scene;
+        RenderTables* tables = context.tables;
         DomeLight<Spectrum> light;
         light.record = record;
         light.context = context;
-        light.texture = record.textures != 0 ? scene->textureBindings[record.textures] : 0;
+        light.texture = record.textures != 0 ? tables->textureBindings[record.textures] : 0;
         light.portals.address = 0;
         light.portals.count = 0;
         light.first = 0;
         light.last = 0;
         if (record.portals > 0) {
-            light.portals =
-                scene->schemas.domeLight.portals[PrimRow(scene, record.prim, kSlotDomeLight)];
+            light.portals.address = record.portalPrims;
+            light.portals.count = record.portals;
             light.first = context.lights->firstLights[context.tlas];
             light.last = context.lights->firstLights[context.tlas + 1];
         }

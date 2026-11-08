@@ -38,10 +38,10 @@ struct MaterialQuery {
 
     Ptr<uint64_t> Bindings(uint textures, uint first) {
         return textures == kNoTextures ? Ptr<uint64_t>(0)
-                                       : hit.scene->textureBindings + (textures + first);
+                                       : hit.tables->textureBindings + (textures + first);
     }
 
     uint64_t Texture(uint textures, uint input) {
-        return textures == kNoTextures ? 0 : hit.scene->textureBindings[textures + input];
+        return textures == kNoTextures ? 0 : hit.tables->textureBindings[textures + input];
     }
 }

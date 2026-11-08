@@ -240,6 +240,7 @@ LightRecord DarkLight(uint instancer) {
     record.textureFormat = 0;
     record.map = Ptr<float>(0);
     record.portals = 0;
+    record.portalPrims = 0;
     record.ies = 0;
     record.iesAngleScale = 0;
     record.iesScale = 1;
@@ -322,6 +323,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     record.textureFormat = 0;
     record.map = layout->maps;
     record.portals = 0;
+    record.portalPrims = 0;
     record.ies = 0;
     record.iesAngleScale = 0;
     record.iesScale = 1;
@@ -390,6 +392,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
         record.textureFormat = uint(DomeFormat(scene, p.textures[prim], at));
         record.map = layout->maps + layout->domeSlots[slot] * kDomeMapFloats;
         record.portals = dome.portals[at].count;
+        record.portalPrims = dome.portals[at].address;
         domeMean = record.map[kDomeMapCells + kDomeMapHeight];
         break;
     }

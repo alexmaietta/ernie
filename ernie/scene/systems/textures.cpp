@@ -100,6 +100,7 @@ Textures::~Textures() = default;
 
 void Textures::Describe(RenderTables& tables) const {
     tables.textures.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
+    tables.textureBindings.address = m_bindingAddress;
 }
 
 void Textures::Hold(std::vector<Ref<const RefCounted>>& held) const {

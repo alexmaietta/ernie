@@ -18,9 +18,9 @@ struct AreaLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     static AreaLight<Spectrum> Load(LightContext context, LightRecord record) {
         AreaLight<Spectrum> light;
         light.record = record;
-        light.ies = record.ies != 0 ? context.scene->textureBindings[record.ies] : 0;
+        light.ies = record.ies != 0 ? context.tables->textureBindings[record.ies] : 0;
         light.texture = record.textures != 0 && LightType(record.type) == LightType::Rect
-                            ? context.scene->textureBindings[record.textures]
+                            ? context.tables->textureBindings[record.textures]
                             : 0;
         return light;
     }
