@@ -72,6 +72,7 @@ ernie_bench(
     SOURCES
         render/btest_render_instancers.cpp
         render/btest_render_overlay.cpp
+        render/btest_render_points.cpp
         render/btest_render_renderer.cpp
         render/btest_render_scaling.cpp
         render/btest_render_throughput.cpp

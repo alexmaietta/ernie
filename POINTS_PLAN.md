@@ -35,23 +35,35 @@ GPU simulations already have two zero-copy paths. `Map(MapAccess::Write)` hands 
 - Points under prototype roots draw through PointInstancers like any gprim.
 - Ray cast tests for per-point, shared and default widths, moved points, changing counts and emptied points, passing on hardware and software traversal.
 
-### 2. Benchmarks
+### 2. Benchmarks (done)
 
-A `btest_render_points.cpp` suite in `tests/bench/render`, registered like the scaling and instancer suites and with capped run times.
+`tests/bench/render/btest_render_points.cpp` in `ernie_render_bench`. Every case renders a 64×64 shadowed DisplayColor view per world, with the camera nudged each step so tracing is always measured.
 
-- **Single world scaling.** One world, one camera, point counts of 1k, 10k, 100k, 1M, 4M and 16M, on hardware and software traversal.
-- **Batched worlds.** 16, 256, 1024 and 4096 worlds with 1k, 10k and 50k points each, one camera per world at a small resolution, cloned from one world as the scaling suite does.
+- **Single world.** `Render/Points/World/<layout>/motion:<motion>` with 1k, 10k, 100k, 1M, 4M and 16M points, on hardware and software traversal.
+- **Batched worlds.** `Render/Points/Worlds/box/motion:<motion>` with 16, 256, 1024 and 4096 worlds of 1k, 10k and 50k points each, cloned from one world, capped at 16M points in total.
 - **Motion modes.**
-    - Stationary, with points written once and only the camera moving.
-    - Moving, with every point rewritten each step from frames kept on the device, so host uploads don't count.
-    - Mapped, with a kernel writing positions through `Map(MapAccess::Write)` as a simulation would.
-    - Recounted, spawning and killing a fraction of the points each step so counts change.
-    - Resized, with only widths changing.
-- **Layouts.** A uniform box like gas or dust, a dense clustered splash like a fluid, and a flat bed like granular media, since they stress BVH quality differently.
-- **Baselines.** The same counts as Sphere prims and as a PointInstancer of one sphere, up to where those stop scaling, to show what the Points path buys.
-- **Measurements.** Step time split into box writes, BLAS builds, TLAS work and tracing (the `Points/Boxes`, `Points/Blas` and existing zones), points per second, rays per second, and box and BLAS memory per point.
+    - `stationary` leaves the points alone and only moves the camera.
+    - `moving` copies device-side frames into the points through `Map(MapAccess::Write)`, which is exactly what a GPU simulation does, so no host upload is counted.
+    - `uploaded` sets new positions from the host every step.
+    - `recounted` alternates between all the points and 90% of them, so the BLAS and box buffer are recreated each step.
+    - `resized` rewrites only widths through `Map`.
+- **Layouts.** `box` is uniform like gas or dust, `splash` is eight dense Gaussian blobs like fluid, and `bed` is a thin layer like granular media. The splash and bed layouts run the stationary and moving modes only.
+- **Baselines.** `Render/Points/Baseline/spheres` (one Sphere prim per point, up to 100k) and `Render/Points/Baseline/instancer` (a PointInstancer of one sphere, up to 1M), stationary and moving.
+- **Counters.** CPU ms per step, GPU ms split into `gpu boxes ms` (`Points/Boxes`), `gpu blas ms` (`Points/Blas`), `gpu tlas ms` (the `Bvh/` and `Instances/` zones), `gpu render ms` and the rest, plus points/s, px/s and device bytes per point, net of the motion frames.
 
-These are the baselines milestone 4 is measured against.
+The first numbers on an RTX 5070 Laptop GPU with hardware traversal set the targets for milestone 4.
+
+| Case | Step | Where the time goes |
+| --- | --- | --- |
+| 1M points, moving | 6.1 ms | 5.6 ms BLAS rebuild, 0.1 ms boxes |
+| 16M points, moving | 86 ms | 74 ms BLAS rebuild, 2.9 ms boxes |
+| 16M points, stationary | 0.3 ms | 154 B/point |
+| 4096 worlds × 1k, moving | 77 ms | 45 ms CPU per step, 32 ms BLAS builds |
+| 4096 worlds × 1k, recounted | 137 ms | 67 ms CPU per step |
+| 1M instancer copies, moving | 8.4 ms | 6.4 ms TLAS, 8.1 ms CPU |
+| 1k points, moving, software | 1.6 ms | 1.1 ms BLAS, mostly fixed cost |
+
+So a moving cloud is bound by the BLAS rebuild, many small clouds are bound by per-cloud CPU work in `PointsTable` and by per-BLAS build overhead, and Points beat the instancer on moving particles while using a sixth of the memory.
 
 ### 3. Shading and sensors
 
@@ -62,7 +74,9 @@ These are the baselines milestone 4 is measured against.
 
 ### 4. Efficiency
 
-- A refit or rebuild policy per Points prim, refitting up to a limit and then rebuilding as the instance table's `maxRefits` does, chosen from the moving benchmark.
+- A refit or rebuild policy per Points prim, refitting up to a limit and then rebuilding as the instance table's `maxRefits` does, chosen from the moving benchmark, since the rebuild is almost all of a moving step.
+- Per-cloud CPU work in `PointsTable::Run` and `Build` that scales to thousands of worlds, and batched BLAS builds for many small clouds.
+- A lower fixed cost for small software BLAS builds.
 - Capacity that grows geometrically, with inactive boxes for dead slots, so spawning and killing particles doesn't reallocate the BLAS.
 - Clustered leaves, with 4 to 8 Morton-adjacent points per box and the intersector looping over them, for dense fluids and batched worlds.
 - Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path.
