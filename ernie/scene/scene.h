@@ -37,6 +37,7 @@ struct ERNIE_API SceneDesc {
 
 struct PublishDesc {
     std::optional<Ordinal> ordinal;
+    std::optional<double> dt;
     bool wait = false;
 };
 
@@ -246,6 +247,8 @@ class ERNIE_API Scene : public RefCounted {
     std::vector<Box> PrimBounds(Span<const std::string> paths) const;
 
     device::Operation Publish(const PublishDesc& desc = {}, Stream producer = Stream::None());
+    double Time() const;
+    void SetTime(double time);
     bool Pending() const;
     Ordinal Published() const;
     uint64_t StructureVersion() const;

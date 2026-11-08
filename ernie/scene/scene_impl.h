@@ -143,6 +143,10 @@ class SceneImpl {
         return m_surfaces;
     }
 
+    SimulationClock& GetClock() {
+        return m_clock;
+    }
+
     ProductTable& GetProducts() {
         return m_products;
     }
@@ -173,6 +177,7 @@ class SceneImpl {
     TextureTable m_textures;
     SemanticTable m_semantics;
     SensorTable m_sensors;
+    SimulationClock m_clock;
     ProductTable m_products;
     MaterialTable m_materials;
     InstanceTable m_instances;

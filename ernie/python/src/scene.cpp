@@ -606,10 +606,14 @@ void RegisterScene(nb::module_& module) {
         .def(
             "publish",
             [](Scene& scene, std::optional<Ordinal> ordinal, std::optional<uintptr_t> stream,
-               bool wait) { scene.Publish({.ordinal = ordinal, .wait = wait}, ToStream(stream)); },
+               bool wait, std::optional<double> dt) {
+                scene.Publish({.ordinal = ordinal, .dt = dt, .wait = wait}, ToStream(stream));
+            },
             nb::arg("ordinal") = nb::none(), nb::arg("stream") = nb::none(), nb::kw_only(),
-            nb::arg("wait") = false, nb::call_guard<nb::gil_scoped_release>())
+            nb::arg("wait") = false, nb::arg("dt") = nb::none(),
+            nb::call_guard<nb::gil_scoped_release>())
         .def_prop_ro("published", &Scene::Published)
+        .def_prop_rw("time", &Scene::Time, &Scene::SetTime)
         .def_prop_ro("structure_version", &Scene::StructureVersion)
         .def(
             "acquire",

@@ -30,8 +30,6 @@ class ERNIE_API Renderer {
     Renderer& operator=(Renderer&&) noexcept;
 
     RenderOutput Step(Span<const std::string> products, double dt, Stream stream = Stream::None());
-    void Reset(double time);
-    double Time() const;
 
     void SetOverlay(std::string_view name, Overlay overlay);
     void RemoveOverlay(std::string_view name);

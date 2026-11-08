@@ -142,8 +142,6 @@ void RegisterRenderer(nb::module_& module) {
             },
             nb::arg("products"), nb::arg("dt") = 0.0, nb::arg("stream") = nb::none(),
             nb::call_guard<nb::gil_scoped_release>())
-        .def("reset", &Renderer::Reset, nb::arg("time"))
-        .def_prop_ro("time", &Renderer::Time)
         .def("set_overlay", &Renderer::SetOverlay, nb::arg("name"), nb::arg("overlay"),
              nb::call_guard<nb::gil_scoped_release>())
         .def("remove_overlay", &Renderer::RemoveOverlay, nb::arg("name"),

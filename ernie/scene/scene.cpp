@@ -151,7 +151,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_transforms(m_structure), m_meshes(m_structure, *m_builder),
       m_bounds(m_structure, m_instances), m_tangents(m_structure, m_meshes),
       m_textures(m_structure, desc.textureThreads), m_semantics(m_structure),
-      m_sensors(m_structure), m_products(scene, m_structure), m_materials(m_structure),
+      m_sensors(m_structure), m_products(scene, m_structure, m_clock), m_materials(m_structure),
       m_instances(m_structure, *m_builder, desc.maxRefits), m_surfaces(m_structure, m_instances),
       m_lights(m_structure, m_instances) {
     m_publisher.Add(m_transforms);
@@ -561,6 +561,12 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
         ERNIE_ZONE("Scene/CommitSteps");
         m_impl->RunCommitSteps();
     }
+    if (desc.dt) {
+        SimulationClock& clock = m_impl->GetClock();
+        clock.start = clock.end;
+        clock.end += *desc.dt;
+        ++clock.steps;
+    }
     device::Operation done =
         m_impl->GetPublisher().Publish(desc.ordinal.value_or(Published() + 1), producer);
     while (desc.wait && Pending()) {
@@ -569,6 +575,19 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
         done = m_impl->GetPublisher().Publish(Published() + 1, producer);
     }
     return done;
+}
+
+double Scene::Time() const {
+    return m_impl->GetClock().end;
+}
+
+void Scene::SetTime(double time) {
+    SimulationClock& clock = m_impl->GetClock();
+    Log(LogLevel::Debug, "simulation time set from {} to {}", clock.end, time);
+    clock.start = time;
+    clock.end = time;
+    ++clock.steps;
+    ++clock.resets;
 }
 
 namespace {

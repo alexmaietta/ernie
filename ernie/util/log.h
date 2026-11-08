@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -31,6 +33,10 @@ void Log(LogLevel level, fmt::format_string<Args...> format, Args&&... args) {
     if (level >= GetLogLevel()) {
         LogMessage(level, fmt::format(format, std::forward<Args>(args)...));
     }
+}
+
+inline std::string Counted(uint64_t count, std::string_view noun) {
+    return std::format("{} {}{}", count, noun, count == 1 ? "" : "s");
 }
 #endif
 

@@ -198,12 +198,6 @@ constexpr const char* kRenderEntries[kRenderEntryCount] = {"RenderMinimalData",
 
 constexpr size_t kHeldOutputsWarning = 8;
 
-constexpr double kCaptureTolerance = 1e-6;
-
-std::string Counted(uint64_t count, std::string_view noun) {
-    return fmt::format("{} {}{}", count, noun, count == 1 ? "" : "s");
-}
-
 }
 
 RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
@@ -229,11 +223,7 @@ RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
 RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt, Stream stream) {
     ERNIE_ZONE("Render/Step");
     const std::lock_guard stepping(m_stepMutex);
-    device::Operation published;
-    const bool edited = m_scene->Pending();
-    if (edited) {
-        published = m_scene->Publish({}, stream);
-    }
+    device::Operation published = m_scene->Publish({.dt = dt}, stream);
     DropStaleProducts();
     std::map<std::string, std::vector<std::string>, std::less<>> shown;
     {
@@ -254,18 +244,19 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         plan.sets.clear();
         plan.shownOverlays = std::move(shown);
     }
+    const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
     std::set<uint32_t> due;
     for (const auto& [path, planned] : plan.products) {
-        const Product& product = m_products.at(path);
-        if (Due(path, product, dt)) {
-            due.insert(product.prim);
+        const ResolvedProduct* product = resolved.Find(m_products.at(path).prim);
+        if (product != nullptr && product->due) {
+            due.insert(product->prim);
         }
     }
 
+    const SimulationClock& clock = SceneImpl::Get(*m_scene).GetClock();
     RenderOutput result;
-    result.simulationStartTime = m_time;
-    m_time += dt;
-    result.simulationEndTime = m_time;
+    result.simulationStartTime = clock.start;
+    result.simulationEndTime = clock.end;
     if (due.empty()) {
         result.m_products = plan.products;
         for (auto& [path, product] : result.m_products) {
@@ -277,7 +268,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     if (!plan.taxonomies.empty()) {
         m_scene->Require(plan.taxonomies);
     }
-    if (!edited || m_scene->Pending()) {
+    if (m_scene->Pending()) {
         published = m_scene->Publish({}, stream);
     }
     const Snapshot snapshot = m_scene->Acquire();
@@ -316,36 +307,6 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     result.m_done = plan.captureCount > 0 ? Trace(set, due, snapshot) : published;
     m_scene->Release(snapshot);
     return result;
-}
-
-void RendererImpl::Reset(double time) {
-    const std::lock_guard stepping(m_stepMutex);
-    Log(LogLevel::Debug, "simulation time reset from {} to {}", m_time, time);
-    m_time = time;
-    m_schedules.clear();
-}
-
-bool RendererImpl::Due(const std::string& path, const Product& product, double dt) {
-    if (product.frameRate <= 0 || dt == 0) {
-        return true;
-    }
-    const double rate = product.frameRate;
-    Schedule& schedule = m_schedules[path];
-    if (schedule.frameRate != product.frameRate || schedule.startTime != product.startTime) {
-        const double first = std::ceil((m_time - product.startTime) * rate - kCaptureTolerance);
-        schedule = {product.frameRate, product.startTime, std::max<int64_t>(0, int64_t(first))};
-    }
-    const double reached = (m_time + dt - product.startTime) * rate + kCaptureTolerance;
-    if (double(schedule.next) > reached) {
-        return false;
-    }
-    const auto last = int64_t(std::floor(reached));
-    if (last > schedule.next) {
-        Log(LogLevel::Debug, "{} skipped {} in a step of {} s", path,
-            Counted(uint64_t(last - schedule.next), "capture"), dt);
-    }
-    schedule.next = last + 1;
-    return true;
 }
 
 void RendererImpl::DropStaleProducts() {
@@ -434,7 +395,6 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
             });
         };
         const size_t dropped = std::erase_if(m_products, unused);
-        std::erase_if(m_schedules, unused);
         Log(LogLevel::Debug, "dropped the least recently stepped plan and {} only it used",
             Counted(dropped, "product"));
     }
@@ -969,14 +929,6 @@ Renderer& Renderer::operator=(Renderer&&) noexcept = default;
 
 RenderOutput Renderer::Step(Span<const std::string> products, double dt, Stream stream) {
     return m_impl->Step(products, dt, stream);
-}
-
-void Renderer::Reset(double time) {
-    m_impl->Reset(time);
-}
-
-double Renderer::Time() const {
-    return m_impl->Time();
 }
 
 void Renderer::SetOverlay(std::string_view name, Overlay overlay) {

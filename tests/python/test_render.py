@@ -67,7 +67,7 @@ def test_steps_keep_time_and_frames_write(scene, tmp_path):
     renderer.step([PRODUCT], dt=0.25)
     output = renderer.step([PRODUCT], dt=0.25)
     output.wait()
-    assert renderer.time == pytest.approx(0.5)
+    assert scene.time == pytest.approx(0.5)
     assert PRODUCT in output
     assert len(output) == 1
     [frame] = output[PRODUCT].frames
@@ -76,8 +76,8 @@ def test_steps_keep_time_and_frames_write(scene, tmp_path):
     written = ernie.write_frame(tmp_path, frame)
     assert written and all(path.exists() for path in written)
 
-    renderer.reset(3)
-    assert renderer.time == pytest.approx(3)
+    scene.time = 3
+    assert scene.time == pytest.approx(3)
     with pytest.raises(RuntimeError):
         renderer.step(["/Render/Nothing"], dt=0.1)
 

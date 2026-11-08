@@ -97,19 +97,20 @@ TEST(RendererTest, RealTimeModeShowsEachWorldOnlyItsOwnPrims) {
 
 TEST(RendererTest, StepsAdvanceTimeUntilReset) {
     ForEachDevice([](Device& device) {
-        Renderer renderer(TwoWorlds(device, RenderMode::Minimal));
-        EXPECT_EQ(renderer.Time(), 0);
+        const Ref<Scene> scene = TwoWorlds(device, RenderMode::Minimal);
+        Renderer renderer(scene);
+        EXPECT_EQ(scene->Time(), 0);
         RenderOutput output = renderer.Step(kProducts, 0.25);
         output = renderer.Step(kProducts, 0.25);
         output.Wait();
         EXPECT_TRUE(output.Ready());
-        EXPECT_DOUBLE_EQ(renderer.Time(), 0.5);
+        EXPECT_DOUBLE_EQ(scene->Time(), 0.5);
         EXPECT_DOUBLE_EQ(output.simulationStartTime, 0.25);
         EXPECT_DOUBLE_EQ(output.simulationEndTime, 0.5);
         EXPECT_TRUE(output.Contains("/Render/View"));
         EXPECT_EQ(output.Size(), 1u);
-        renderer.Reset(3);
-        EXPECT_DOUBLE_EQ(renderer.Time(), 3);
+        scene->SetTime(3);
+        EXPECT_DOUBLE_EQ(scene->Time(), 3);
         EXPECT_THROW(renderer.Step(std::vector<std::string>{"/Render/Nothing"}, 0.1), Error);
     });
 }

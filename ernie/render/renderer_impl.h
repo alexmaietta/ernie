@@ -45,11 +45,6 @@ class RendererImpl {
 
     RenderOutput Step(std::span<const std::string> products, double dt,
                       Stream stream = Stream::None());
-    void Reset(double time);
-
-    double Time() const {
-        return m_time;
-    }
 
     struct ProductVar {
         RenderVarSource source;
@@ -98,12 +93,6 @@ class RendererImpl {
         Ref<device::Buffer> offsets;
     };
 
-    struct Schedule {
-        float frameRate = 0;
-        float startTime = 0;
-        int64_t next = 0;
-    };
-
     struct OwnedOverlay {
         std::string product;
         device::Tensor tensor;
@@ -136,7 +125,6 @@ class RendererImpl {
     Product& PrepareProduct(const std::string& path);
     ProductVar PrepareVar(const ResolvedVar& var, const Product& product);
     void UpdateMaps();
-    bool Due(const std::string& path, const Product& product, double dt);
 
     OutputSet& AcquireSet(StepPlan& plan);
     uint64_t AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
@@ -157,11 +145,9 @@ class RendererImpl {
     uint64_t m_maxPixelsPerLaunch;
     Ref<device::Program> m_renderProgram;
 
-    double m_time = 0;
     std::map<std::string, Product> m_products;
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;
-    std::map<std::string, Schedule> m_schedules;
     std::list<StepPlan> m_plans;
     StepPlan* m_plan = nullptr;
 

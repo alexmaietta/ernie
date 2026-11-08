@@ -2,6 +2,7 @@
 #include "ernie/scene/tables/products.h"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 
 #include "ernie/scene/publish/change_set.h"
@@ -10,11 +11,14 @@
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/views/view.h"
 #include "ernie/util/error.h"
+#include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
 
 namespace {
+
+constexpr double kCaptureTolerance = 1e-6;
 
 std::vector<ColumnRef> ProductInputs() {
     std::vector<ColumnRef> inputs = {kLidarFiringsPerScan, kLidarEmitterElevations,
@@ -186,8 +190,21 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
     return product;
 }
 
-void ProductTable::Run(const ChangeSet&, TableVersions&) {
+void ProductTable::Run(const ChangeSet& changes, TableVersions&) {
     ERNIE_ZONE("Products/Run");
+    ColumnStore& store = m_structure.GetColumnStore();
+    const bool edited = changes.resync || changes.structure || !changes.apis.empty() ||
+                        std::ranges::any_of(Inputs(), [&](ColumnRef input) {
+                            return store.LastWrite(input) > m_seen;
+                        });
+    m_seen = store.WriteSequence();
+    if (edited) {
+        Resolve();
+    }
+    ScheduleCaptures();
+}
+
+void ProductTable::Resolve() {
     const Prims& prims = m_structure.GetPrims();
     std::map<uint32_t, ResolvedProduct> resolved;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
@@ -205,6 +222,41 @@ void ProductTable::Run(const ChangeSet&, TableVersions&) {
     m_products = std::move(resolved);
     m_records.Reserve(m_structure.GetColumnStore().Schema(SchemaId::RenderProduct).Capacity());
     m_records.Upload(m_structure.GetColumnStore().GetDevice());
+}
+
+void ProductTable::ScheduleCaptures() {
+    m_scheduled = m_clock.steps;
+    if (m_clock.resets != m_resets) {
+        m_resets = m_clock.resets;
+        m_schedules.clear();
+    }
+    std::erase_if(m_schedules,
+                  [&](const auto& entry) { return !m_products.contains(entry.first); });
+    const double dt = m_clock.end - m_clock.start;
+    for (auto& [prim, product] : m_products) {
+        const float rate = product.record.frameRate;
+        if (rate <= 0 || dt == 0) {
+            product.due = true;
+            continue;
+        }
+        Schedule& schedule = m_schedules[prim];
+        const float start = product.record.startTime;
+        if (schedule.frameRate != rate || schedule.startTime != start) {
+            const double first = std::ceil((m_clock.start - start) * rate - kCaptureTolerance);
+            schedule = {rate, start, std::max<int64_t>(0, int64_t(first))};
+        }
+        const double reached = (m_clock.end - start) * rate + kCaptureTolerance;
+        product.due = double(schedule.next) <= reached;
+        if (!product.due) {
+            continue;
+        }
+        const auto last = int64_t(std::floor(reached));
+        if (last > schedule.next) {
+            Log(LogLevel::Debug, "{} skipped {} in a step of {} s", m_scene.ByIndex(prim).Path(),
+                Counted(uint64_t(last - schedule.next), "capture"), dt);
+        }
+        schedule.next = last + 1;
+    }
 }
 
 }

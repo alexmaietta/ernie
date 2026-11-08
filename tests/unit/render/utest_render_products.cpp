@@ -96,5 +96,28 @@ TEST(ProductsTest, ABrokenProductFailsOnlyWhenSteppedAndRecoversOnceFixed) {
     });
 }
 
+TEST(ProductsTest, SensorsCaptureAtTheirFrameRateOnTheScenesClock) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = OneCamera(device);
+        scene->Find("/Cam")->Set(SensorAPI::kSensorFrameRate, 10.0f);
+        Renderer renderer(scene);
+        const auto captured = [&] {
+            RenderOutput output = renderer.Step(kProducts, 0.04);
+            output.Wait();
+            return !output["/Render/View"].frames.empty();
+        };
+        std::vector<bool> pattern;
+        for (int step = 0; step < 6; ++step) {
+            pattern.push_back(captured());
+        }
+        EXPECT_EQ(pattern, (std::vector<bool>{true, false, true, false, true, false}));
+        EXPECT_NEAR(scene->Time(), 0.24, 1e-9);
+
+        scene->SetTime(0);
+        EXPECT_TRUE(captured());
+        EXPECT_FALSE(captured());
+    });
+}
+
 }
 }
