@@ -12,7 +12,7 @@ using namespace ernie;
 ObjectSpace TransformSpace(HitQuery query, uint slot, WorldTransform w) {
     ObjectSpace space;
     const SlotHit hit = query.layout->hits[slot];
-    const uint source = query.scene->prims.world[hit.instancer != kNoPrim ? hit.instancer : hit.prim];
+    const uint source = query.tables->prims.world[hit.instancer != kNoPrim ? hit.instancer : hit.prim];
     space.origin = RenderTranslation(query.tables, w, query.world) +
                    ShownOffset(query.layout, query.world, source);
     space.axes = float3x3(w.x.Vector(), w.y.Vector(), w.z.Vector());

@@ -32,7 +32,7 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     point.slot = primHit.slot;
     point.distance = primHit.hit.t;
     const SurfaceRecord surface = query.tables->surfaces[primHit.slot];
-    point.element = FindSurfaceElement(data, surface, prim, primHit.hit);
+    point.element = FindSurfaceElement(surface, primHit.hit);
     float3 error;
 
     if (point.element.mesh) {

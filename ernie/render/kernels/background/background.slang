@@ -11,7 +11,7 @@ struct Background {
     SchemaId kind;
     float3 fallback;
 
-    static Background Load(SceneData* scene, uint product) {
+    static Background Load(SceneData* scene, RenderTables* tables, uint product) {
         BackgroundAPIData* data = &scene->schemas.backgroundAPI;
         const uint row = ApiRow(scene, product, kApiBackgroundAPI);
         const ArrayRef targets = data.background[row];
@@ -24,9 +24,9 @@ struct Background {
 
         if (targets.count > 0) {
             const uint prim = Ptr<uint>(targets.address)[0];
-            if (prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0) {
+            if (PrimAlive(tables, prim)) {
                 background.prim = prim;
-                background.kind = SchemaId(scene->prims.schema[prim]);
+                background.kind = PrimSchema(tables, prim);
             }
         }
         return background;

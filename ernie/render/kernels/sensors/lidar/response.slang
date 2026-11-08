@@ -62,7 +62,7 @@ struct LidarResponse : IResponse<LidarPattern> {
     float Intensity(uint prim, float3 normal, float3 direction) {
         float reflectance = 1;
         bool retroreflective = false;
-        const uint material = PrimImageable(scene, tables->imageables, prim).material;
+        const uint material = PrimImageable(tables, prim).material;
         if (material != kNoPrim && HasApi(scene, material, kApiNonVisualMaterialAPI)) {
             const uint row = ApiRow(scene, material, kApiNonVisualMaterialAPI);
             reflectance = scene->schemas.nonVisualMaterialAPI.nonvisualLidarReflectance[row];

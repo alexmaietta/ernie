@@ -218,7 +218,7 @@ struct CameraModel : IDifferentiable {
         camera.shutter.open = data.shutterOpen[row];
         camera.shutter.close = data.shutterClose[row];
 
-        camera.pose = LoadSensorFrame(scene, tables, prim);
+        camera.pose = LoadSensorFrame(tables, prim);
 
         const float exposureFStop = data.exposureFStop[row];
         const float sensitivity = data.exposureResponsivity[row] * (data.exposureIso[row] / 100);

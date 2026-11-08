@@ -24,7 +24,7 @@ struct LidarPattern : IPattern {
         const uint row = PrimRow(scene, capture->sensor, kSlotLidar);
         const float2 sweep = radians(float2(data.azimuthRange[row].x, data.azimuthRange[row].y));
         LidarPattern pattern;
-        pattern.frame = LoadSensorFrame(scene, context.params.tables, capture->sensor);
+        pattern.frame = LoadSensorFrame(context.params.tables, capture->sensor);
         pattern.rotary = ScanType(data.scanType[row]) == ScanType::Rotary;
         pattern.azimuthStart = sweep.x;
         pattern.azimuthStep = (sweep.y - sweep.x) / float(max(capture->width, 1u));

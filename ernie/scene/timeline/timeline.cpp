@@ -217,6 +217,14 @@ ChangeSet Timeline::Changes(Ordinal since, std::span<const ColumnRef> columns) {
 }
 
 void Timeline::Seal() {
+    const SceneData data = m_catalog.GetStore().Data();
+    m_tables.prims = {.schema = data.prims.schema,
+                      .world = data.prims.world,
+                      .flags = data.prims.flags,
+                      .slots = data.prims.slots,
+                      .apis = data.prims.apis,
+                      .rows = data.rows,
+                      .count = data.primCount};
     RenderTables tables = m_tables;
     tables.worldCount = m_catalog.GetPrims().WorldCount();
     m_tables.worldCount = tables.worldCount;

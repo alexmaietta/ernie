@@ -102,7 +102,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                 break;
             }
             const SurfacePoint point = ComputeSurfacePoint(query, ray, primHit, spread);
-            if (IsEmitter(query.scene->prims.schema[point.prim])) {
+            if (IsEmitter(uint(PrimSchema(query.tables, point.prim)))) {
                 if (bounce == 0) {
                     result.point = point;
                 }

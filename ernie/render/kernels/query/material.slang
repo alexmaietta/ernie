@@ -27,11 +27,11 @@ struct MaterialQuery {
     }
 
     uint BoundMaterial(uint prim) {
-        return PrimImageable(hit.scene, hit.tables->imageables, prim).material;
+        return PrimImageable(hit.tables, prim).material;
     }
 
     SchemaId Schema(uint material) {
-        return material == kNoPrim ? SchemaId::None : SchemaId(hit.scene->prims.schema[material]);
+        return material == kNoPrim ? SchemaId::None : PrimSchema(hit.tables, material);
     }
 
     uint Textures(uint material) {

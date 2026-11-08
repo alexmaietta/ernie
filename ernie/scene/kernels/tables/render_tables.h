@@ -9,12 +9,14 @@
 #include "ernie/scene/kernels/tables/geometry.h"
 #include "ernie/scene/kernels/tables/hierarchy.h"
 #include "ernie/scene/kernels/tables/instances.h"
+#include "ernie/scene/kernels/tables/prims.h"
 #include "ernie/scene/kernels/tables/tangents.h"
 #include "ernie/scene/kernels/tables/textures.h"
 
 namespace ernie {
 
 struct RenderTables {
+    PrimTable prims;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
@@ -30,9 +32,44 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 120);
+ERNIE_CHECK_SIZE(RenderTables, 176);
 
 #ifdef __SLANG__
+
+bool PrimAlive(RenderTables* tables, uint prim) {
+    return prim < tables->prims.count && (tables->prims.flags[prim] & kPrimAlive) != 0;
+}
+
+SchemaId PrimSchema(RenderTables* tables, uint prim) {
+    return SchemaId(tables->prims.schema[prim]);
+}
+
+uint PrimRow(RenderTables* tables, uint prim, uint slot) {
+    return tables->prims.rows[tables->prims.slots[prim] + slot];
+}
+
+bool HasApi(RenderTables* tables, uint prim, uint api) {
+    const uint64_t apis = tables->prims.apis[prim];
+    return ((api < 32 ? uint(apis) >> api : uint(apis >> 32) >> (api - 32)) & 1) != 0;
+}
+
+uint ApiRow(RenderTables* tables, uint prim, uint api) {
+    const uint64_t apis = tables->prims.apis[prim];
+    const uint low = uint(apis);
+    const uint below =
+        api < 32 ? countbits(low & ((1u << api) - 1))
+                 : countbits(low) + countbits(uint(apis >> 32) & ((1u << (api - 32)) - 1));
+    const uint typed = kSchemaSlotCounts[tables->prims.schema[prim]];
+    return tables->prims.rows[tables->prims.slots[prim] + typed + below];
+}
+
+WorldTransform PrimWorld(RenderTables* tables, uint prim) {
+    return tables->transforms[PrimRow(tables, prim, kSlotXformable)];
+}
+
+ResolvedImageable PrimImageable(RenderTables* tables, uint prim) {
+    return tables->imageables[PrimRow(tables, prim, kSlotImageable)];
+}
 
 RenderOrigin TlasOrigin(RenderTables* tables, uint world) {
     return tables->origins[TlasIndex(world, tables->worldCount)];

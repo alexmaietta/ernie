@@ -58,6 +58,26 @@ TEST(SnapshotTest, TheHeaderOnTheDeviceMatchesTheTablesItPins) {
     });
 }
 
+TEST(SnapshotTest, TheHeaderCarriesThePrimTableAsPublished) {
+    ForEachScene([](Scene& scene, device::Device& device) {
+        scene.Define<Sphere>("/Ball");
+        scene.Publish().Wait();
+        const Snapshot first = scene.Acquire(Stream::Host());
+        const RenderTables before = ReadHeader(device, first);
+        const SceneData data = SceneImpl::Get(scene).GetStore().Data();
+        EXPECT_EQ(before.prims.count, data.primCount);
+        EXPECT_EQ(before.prims.schema.pages.address, data.prims.schema.pages.address);
+        EXPECT_EQ(before.prims.rows.pages.address, data.rows.pages.address);
+        scene.Release(first);
+
+        scene.Define<Sphere>("/Other");
+        scene.Publish().Wait();
+        const Snapshot second = scene.Acquire(Stream::Host());
+        EXPECT_EQ(ReadHeader(device, second).prims.count, before.prims.count + 1);
+        scene.Release(second);
+    });
+}
+
 TEST(SnapshotTest, OnlyRelayoutsReplaceTheHeader) {
     ForEachScene([](Scene& scene, device::Device& device) {
         const Prim ball = scene.Define<Sphere>("/Ball");

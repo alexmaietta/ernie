@@ -88,7 +88,7 @@ void WriteInstance(RenderParams params, CapturePixel pixel, uint slot, bool hit)
     }
     SceneData* scene = params.scene;
     int64_t id = 0;
-    if (SchemaId(scene->prims.schema[drawn.instancer]) == SchemaId::PointInstancer) {
+    if (PrimSchema(params.tables, drawn.instancer) == SchemaId::PointInstancer) {
         const ArrayRef ids =
             scene->schemas.pointInstancer.ids[PrimRow(scene, drawn.instancer, kSlotPointInstancer)];
         id = drawn.instance < ids.count ? Ptr<int64_t>(ids.address)[drawn.instance]

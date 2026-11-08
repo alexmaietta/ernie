@@ -25,9 +25,9 @@ struct SurfaceElement {
     }
 }
 
-SurfaceElement FindSurfaceElement(SceneData* scene, SurfaceRecord surface, uint prim, Hit hit) {
+SurfaceElement FindSurfaceElement(SurfaceRecord surface, Hit hit) {
     SurfaceElement element = SurfaceElement.Shape(hit.primitive);
-    if (SchemaId(scene->prims.schema[prim]) != SchemaId::Mesh) {
+    if (surface.corners == 0) {
         return element;
     }
     element.mesh = true;
