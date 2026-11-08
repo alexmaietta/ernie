@@ -400,6 +400,66 @@ bool IsMaterialMethod(slang::DeclReflection* decl) {
            function->getParameterCount() == 2;
 }
 
+ReflectedField Field(slang::IGlobalSession& global, slang::VariableReflection* variable,
+                     std::string_view node, std::string_view label) {
+    const std::optional<FieldType> type = ReflectedType(variable->getType());
+    if (!type) {
+        throw Error("{}'s input {} in {} has type {}, but material inputs are bool, int, "
+                    "float, float2, float3 or float4",
+                    node, variable->getName(), label, variable->getType()->getName());
+    }
+    ReflectedField field{.name = variable->getName(), .type = *type};
+    field.fallback.assign(FieldBytes(*type), std::byte{0});
+    ComPtr<ISlangBlob> fallback;
+    if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(fallback.writeRef())) && fallback &&
+        fallback->getBufferSize() >= field.fallback.size()) {
+        std::memcpy(field.fallback.data(), fallback->getBufferPointer(), field.fallback.size());
+    }
+    SlangSession* session = &global;
+    field.color = variable->findUserAttributeByName(session, "Color") != nullptr;
+    if (slang::Attribute* input = variable->findUserAttributeByName(session, "Input")) {
+        input->getArgumentValueFloat(0, &field.minimum);
+        input->getArgumentValueFloat(1, &field.maximum);
+    }
+    if (slang::Attribute* named = variable->findUserAttributeByName(session, "DisplayName")) {
+        size_t size = 0;
+        if (const char* text = named->getArgumentValueString(0, &size)) {
+            field.displayName.assign(text, size);
+        }
+    }
+    return field;
+}
+
+std::optional<ReflectedNode> ReflectPattern(slang::IGlobalSession& global,
+                                            slang::DeclReflection* decl, std::string_view label) {
+    slang::FunctionReflection* function = decl->asFunction();
+    if (function == nullptr || function->findUserAttributeByName(&global, "Pattern") == nullptr) {
+        return std::nullopt;
+    }
+    ReflectedNode node{.name = function->getName(), .role = NodeRole::Pattern};
+    const std::optional<FieldType> result = ReflectedType(function->getReturnType());
+    if (!result) {
+        throw Error("pattern {} in {} returns {}, but patterns return bool, int, float, float2, "
+                    "float3 or float4",
+                    node.name, label, function->getReturnType()->getName());
+    }
+    node.result = *result;
+    for (unsigned i = 0; i < function->getParameterCount(); ++i) {
+        slang::VariableReflection* parameter = function->getParameterByIndex(i);
+        const std::string_view type = parameter->getType()->getName();
+        if (type == "ShadeContext") {
+            node.parameters.push_back({.source = ParameterSource::Context});
+        } else if (type == "SurfacePoint") {
+            node.parameters.push_back({.source = ParameterSource::Point});
+        } else {
+            node.parameters.push_back(
+                {.source = ParameterSource::Input, .input = uint32_t(node.fields.size())});
+            node.fields.push_back(Field(global, parameter, node.name, label));
+        }
+    }
+    return node;
+}
+
 std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::DeclReflection* decl,
                                          std::string_view label) {
     bool material = false;
@@ -419,32 +479,7 @@ std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::D
             variable->findModifier(slang::Modifier::Const) != nullptr) {
             continue;
         }
-        const std::optional<FieldType> type = ReflectedType(variable->getType());
-        if (!type) {
-            throw Error("{}'s input {} in {} has type {}, but material inputs are bool, int, "
-                        "float, float2, float3 or float4",
-                        node.name, variable->getName(), label, variable->getType()->getName());
-        }
-        ReflectedField field{.name = variable->getName(), .type = *type};
-        field.fallback.assign(FieldBytes(*type), std::byte{0});
-        ComPtr<ISlangBlob> fallback;
-        if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(fallback.writeRef())) && fallback &&
-            fallback->getBufferSize() >= field.fallback.size()) {
-            std::memcpy(field.fallback.data(), fallback->getBufferPointer(), field.fallback.size());
-        }
-        SlangSession* session = &global;
-        field.color = variable->findUserAttributeByName(session, "Color") != nullptr;
-        if (slang::Attribute* input = variable->findUserAttributeByName(session, "Input")) {
-            input->getArgumentValueFloat(0, &field.minimum);
-            input->getArgumentValueFloat(1, &field.maximum);
-        }
-        if (slang::Attribute* named = variable->findUserAttributeByName(session, "DisplayName")) {
-            size_t size = 0;
-            if (const char* text = named->getArgumentValueString(0, &size)) {
-                field.displayName.assign(text, size);
-            }
-        }
-        node.fields.push_back(std::move(field));
+        node.fields.push_back(Field(global, variable, node.name, label));
     }
     return node;
 }
@@ -466,10 +501,13 @@ std::vector<ReflectedNode> ReflectMaterialNodes(Backend backend, const KernelLib
     }
     std::vector<ReflectedNode> nodes;
     for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
-        if (decl->getKind() != slang::DeclReflection::Kind::Struct) {
-            continue;
+        std::optional<ReflectedNode> node;
+        if (decl->getKind() == slang::DeclReflection::Kind::Struct) {
+            node = ReflectNode(global, decl, label);
+        } else if (decl->getKind() == slang::DeclReflection::Kind::Func) {
+            node = ReflectPattern(global, decl, label);
         }
-        if (std::optional<ReflectedNode> node = ReflectNode(global, decl, label)) {
+        if (node) {
             nodes.push_back(std::move(*node));
         }
     }

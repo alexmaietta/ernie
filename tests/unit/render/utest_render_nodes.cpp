@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -213,10 +214,73 @@ struct TestLines {
     });
 }
 
+constexpr const char* kPatterns = R"(
+import ernie.material;
+
+[Pattern]
+float3 TestSwap(ShadeContext c, float3 color, [Input(0, 1)] float amount = 1) {
+    return lerp(color, color.zyx, amount);
+}
+
+[Pattern]
+float3 TestLoop(float3 color) {
+    return color;
+}
+
+struct TestBase {
+    [Color] float3 tint = float3(0, 1, 0);
+
+    void Material(inout SurfaceInputs m, ShadeContext c) {
+        m.baseColor = SpectralValue.Rgb(tint);
+        m.specularWeight = 0;
+    }
+}
+)";
+
+TEST(MaterialNodeTest, PatternsFeedMaterialInputsAndTheirValuesEditInPlace) {
+    const std::filesystem::path file = WriteFile("ernie_render_nodes_patterns.slang", kPatterns);
+    const std::filesystem::path red =
+        std::filesystem::temp_directory_path() / "ernie_render_nodes_pattern_red.png";
+    WritePng(red, Image(4, 4, Rgba{1, 0, 0, 1}));
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, true);
+        const std::vector<std::string> nodes = LoadShaders(*scene, file);
+        EXPECT_EQ(nodes.size(), 3u);
+        const Prim surface = Paint(*scene, "TestBase");
+        const Prim swap = scene->Define<Shader>("/Looks/Paint/Swap", {.id = "TestSwap"});
+        EXPECT_EQ(swap.Get<float>("amount"), 1.0f);
+        const Prim texture = scene->Define<Shader>("/Looks/Paint/Red", {.id = "UsdUVTexture"});
+        texture.Set(UsdUVTexture::kFile, red.string());
+        swap.Connect("color", texture, "rgb");
+        surface.Connect("tint", swap, "result");
+        Renderer renderer(scene);
+        const auto blue = [](Float3 pixel) { return pixel.z > 0.5f && pixel.x < 0.1f; };
+        Float3 pixel = Center(renderer);
+        for (int attempt = 0; attempt < 500 && !blue(pixel); ++attempt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            pixel = Center(renderer);
+        }
+        EXPECT_TRUE(blue(pixel)) << pixel.x << " " << pixel.y << " " << pixel.z;
+        swap.Set("amount", 0.0f);
+        pixel = Center(renderer);
+        EXPECT_GT(pixel.x, 0.5f);
+        EXPECT_LT(pixel.z, 0.1f);
+
+        const Prim first = scene->Define<Shader>("/Looks/Paint/First", {.id = "TestLoop"});
+        const Prim second = scene->Define<Shader>("/Looks/Paint/Second", {.id = "TestLoop"});
+        first.Connect("color", second, "result");
+        second.Connect("color", first, "result");
+        surface.Connect("tint", first, "result");
+        pixel = Center(renderer);
+        EXPECT_LT(std::max({pixel.x, pixel.y, pixel.z}), 0.05f);
+    });
+}
+
 TEST(MaterialNodeTest, FilesWithoutNodesOrWithBadInputsAreReported) {
     const std::filesystem::path empty = WriteFile("ernie_render_nodes_empty.slang", R"(
 import ernie.material;
 float Helper(float x) { return x; }
+struct Plain { float x; }
 )");
     const std::filesystem::path bad = WriteFile("ernie_render_nodes_bad.slang", R"(
 import ernie.material;

@@ -10,6 +10,7 @@
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
+#include "ernie/graph/graph.h"
 #include "ernie/material/codegen.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/publish/change_set.h"
@@ -339,72 +340,154 @@ void MaterialTable::Define(uint32_t material, uint32_t definition, uint32_t word
                              .previousWords = 0});
 }
 
-void MaterialTable::ResolveNode(uint32_t material, uint32_t shader, const NodeDefinition& node) {
+void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
+                                std::shared_ptr<const NodeDefinition> surface) {
+    const Prims& prims = m_structure.GetPrims();
     const Paths& paths = m_structure.GetPaths();
-    const std::vector<Connection> connections = Connections(shader);
-    std::vector<const Connection*> sources(node.inputs.size(), nullptr);
-    std::vector<uint8_t> textured(node.inputs.size(), 0);
-    for (size_t i = 0; i < node.inputs.size(); ++i) {
-        const NodeInput& input = node.inputs[i];
-        const auto found = std::ranges::find(connections, input.name, &Connection::input);
-        if (found == connections.end()) {
-            continue;
+
+    struct Reached {
+        uint32_t prim = kNoPrim;
+        std::shared_ptr<const NodeDefinition> node;
+        std::vector<InputBinding> inputs;
+        std::vector<Connection> textures;
+    };
+
+    std::vector<Reached> reached = {{.prim = shader, .node = std::move(surface)}};
+    for (uint32_t k = 0; k < reached.size(); ++k) {
+        const uint32_t prim = reached[k].prim;
+        const std::shared_ptr<const NodeDefinition> node = reached[k].node;
+        const std::vector<Connection> connections = Connections(prim);
+        std::vector<InputBinding> inputs(node->inputs.size());
+        std::vector<Connection> textures(node->inputs.size());
+        for (uint32_t i = 0; i < node->inputs.size(); ++i) {
+            const NodeInput& input = node->inputs[i];
+            const auto found = std::ranges::find(connections, input.name, &Connection::input);
+            if (found == connections.end()) {
+                continue;
+            }
+            const uint32_t source = found->source;
+            const SchemaId schema =
+                source == kNoPrim ? SchemaId::None : prims.Record(source).schema;
+            std::shared_ptr<const NodeDefinition> pattern =
+                IsRuntime(schema) ? FindNode(Info(schema).name) : nullptr;
+            if (pattern && pattern->role == NodeRole::Pattern) {
+                if (pattern->result != input.type) {
+                    Log(LogLevel::Warning,
+                        "{}'s {} connects to {}, whose result has another type; the input keeps "
+                        "its value",
+                        paths.Path(prim), input.name, paths.Path(source));
+                    continue;
+                }
+                auto at = std::ranges::find(reached, source, &Reached::prim);
+                if (at == reached.end()) {
+                    reached.push_back({.prim = source, .node = std::move(pattern)});
+                    at = reached.end() - 1;
+                }
+                inputs[i] = {BindingKind::Pattern, uint32_t(at - reached.begin())};
+                continue;
+            }
+            if (!Texturable(input.type)) {
+                Log(LogLevel::Warning,
+                    "{}'s {} connects to {}, but only float and float3 inputs take textures; "
+                    "the input keeps its value",
+                    paths.Path(prim), input.name,
+                    source == kNoPrim ? std::string("nothing") : paths.Path(source));
+                continue;
+            }
+            TextureChannel channel = TextureChannel::Rgb;
+            if (BindTexture(prim, *found, input.name, input.type == NodeInputType::Float3, kNoPrim,
+                            channel)) {
+                inputs[i] = {BindingKind::Texture, 0};
+                textures[i] = *found;
+            }
         }
-        if (!Texturable(input.type)) {
-            Log(LogLevel::Warning,
-                "{}'s {} connects to a texture, but only float and float3 inputs take textures; "
-                "the input keeps its value",
-                paths.Path(shader), input.name);
-            continue;
+        reached[k].inputs = std::move(inputs);
+        reached[k].textures = std::move(textures);
+    }
+    std::vector<uint32_t> order;
+    while (true) {
+        graph::Graph patterns;
+        for (const Reached& node : reached) {
+            patterns.Add(node.prim, 0);
         }
-        TextureChannel channel = TextureChannel::Rgb;
-        if (BindTexture(shader, *found, input.name, input.type == NodeInputType::Float3, kNoPrim,
-                        channel)) {
-            sources[i] = &*found;
-            textured[i] = 1;
+        for (uint32_t k = 0; k < reached.size(); ++k) {
+            for (uint32_t i = 0; i < reached[k].inputs.size(); ++i) {
+                if (reached[k].inputs[i].kind == BindingKind::Pattern) {
+                    patterns.Connect(k, reached[k].node->inputs[i].name,
+                                     reached[k].inputs[i].source, "result");
+                }
+            }
+        }
+        const graph::Ordering ordering = patterns.Order();
+        if (ordering.cycle.empty()) {
+            order = ordering.order;
+            break;
+        }
+        const uint32_t closing = ordering.cycle.back();
+        for (InputBinding& binding : reached[closing].inputs) {
+            if (binding.kind == BindingKind::Pattern && binding.source == ordering.cycle.front()) {
+                binding = {};
+            }
+        }
+        Log(LogLevel::Warning, "{} feeds back into itself through {}; that input keeps its value",
+            paths.Path(reached[ordering.cycle.front()].prim), paths.Path(reached[closing].prim));
+    }
+    order.resize(size_t(std::ranges::find(order, 0u) - order.begin()) + 1);
+    std::vector<uint32_t> position(reached.size(), kNoPrim);
+    ShadingGraph graph;
+    for (const uint32_t k : order) {
+        position[k] = uint32_t(graph.nodes.size());
+        graph.nodes.push_back({reached[k].node, reached[k].inputs});
+    }
+    for (ShadingNode& node : graph.nodes) {
+        for (InputBinding& binding : node.inputs) {
+            if (binding.kind == BindingKind::Pattern) {
+                binding.source = position[binding.source];
+            }
         }
     }
-    const NodeLayout layout = LayOut(node, textured);
-    std::string key = node.module + "/" + node.name + "/";
-    for (const uint8_t sampled : textured) {
-        key += sampled ? 't' : 'v';
-    }
+    const GraphLayout layout = LayOut(graph);
+    const std::string key = GraphKey(graph);
     auto known = m_library.find(key);
     if (known == m_library.end()) {
         const uint32_t id = m_nextDefinition++;
-        known = m_library.emplace(key, GenerateNodeDefinition(id, node, textured)).first;
+        known = m_library.emplace(key, GenerateDefinition(id, graph)).first;
         m_definitionWords[id] = Word(layout.bytes);
         Log(LogLevel::Debug,
-            "new material definition {} for {}, with {} in {} words and {} bytes of generated "
+            "new material definition {} for {} with {}, {} in {} words and {} bytes of generated "
             "Slang",
-            id, node.name, Counted(layout.textureCount, "texture"), Word(layout.bytes),
+            id, graph.nodes.back().node->name, Counted(graph.nodes.size() - 1, "pattern"),
+            Counted(layout.textureCount, "texture"), Word(layout.bytes),
             known->second.source.size());
     }
     m_wordCount = (m_wordCount + 1) & ~1u;
     const uint32_t base = m_wordCount;
     m_wordCount += Word(layout.bytes);
-    const SchemaId schema = SchemaId(node.schema);
-    const Span<const ColumnInfo> columns = Columns(schema);
     uint32_t coordinates = kNoPrim;
     bool placed = false;
-    for (uint32_t i = 0; i < node.inputs.size(); ++i) {
-        CopyCell({schema, &columns[i], i}, shader, base + Word(layout.cells[i]));
-        if (!textured[i]) {
-            continue;
-        }
-        TextureChannel channel = TextureChannel::Rgb;
-        BindTexture(shader, *sources[i], node.inputs[i].name,
-                    node.inputs[i].type == NodeInputType::Float3,
-                    base + Word(layout.textures[i] * kTextureInputBytes), channel);
-        uint32_t read = kNoPrim;
-        for (const Connection& connection : Connections(sources[i]->source)) {
-            if (connection.input == "st") {
-                read = connection.source;
+    for (uint32_t n = 0; n < order.size(); ++n) {
+        const Reached& node = reached[order[n]];
+        const SchemaId schema = SchemaId(node.node->schema);
+        const Span<const ColumnInfo> columns = Columns(schema);
+        for (uint32_t i = 0; i < node.node->inputs.size(); ++i) {
+            CopyCell({schema, &columns[i], i}, node.prim, base + Word(layout.cells[n][i]));
+            if (node.inputs[i].kind != BindingKind::Texture) {
+                continue;
             }
-        }
-        if (!placed) {
-            coordinates = read;
-            placed = true;
+            TextureChannel channel = TextureChannel::Rgb;
+            BindTexture(node.prim, node.textures[i], node.node->inputs[i].name,
+                        node.node->inputs[i].type == NodeInputType::Float3,
+                        base + Word(layout.textures[n][i] * kTextureInputBytes), channel);
+            uint32_t read = kNoPrim;
+            for (const Connection& connection : Connections(node.textures[i].source)) {
+                if (connection.input == "st") {
+                    read = connection.source;
+                }
+            }
+            if (!placed) {
+                coordinates = read;
+                placed = true;
+            }
         }
     }
     if (layout.textureCount > 0) {
@@ -412,7 +495,8 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader, const NodeDe
     }
     Define(material, known->second.id, base);
     Log(LogLevel::Debug, "{} shades with node {} through {} as definition {}, in {} words",
-        paths.Path(material), node.name, paths.Path(shader), known->second.id, Word(layout.bytes));
+        paths.Path(material), graph.nodes.back().node->name, paths.Path(shader), known->second.id,
+        Word(layout.bytes));
 }
 
 void MaterialTable::ResolveMaterial(uint32_t material) {
@@ -431,9 +515,10 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
         return;
     }
     if (surface != kNoPrim && IsRuntime(prims.Record(surface).schema)) {
-        if (const std::shared_ptr<const NodeDefinition> node =
-                FindNode(Info(prims.Record(surface).schema).name)) {
-            ResolveNode(material, surface, *node);
+        std::shared_ptr<const NodeDefinition> node =
+            FindNode(Info(prims.Record(surface).schema).name);
+        if (node && node->role == NodeRole::Material) {
+            ResolveNode(material, surface, std::move(node));
             return;
         }
     }

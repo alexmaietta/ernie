@@ -90,7 +90,8 @@ class MaterialTable : public Table {
     void Resolve();
     void ResolveMaterial(uint32_t material);
     void ResolvePreview(uint32_t material, uint32_t shader);
-    void ResolveNode(uint32_t material, uint32_t shader, const NodeDefinition& node);
+    void ResolveNode(uint32_t material, uint32_t shader,
+                     std::shared_ptr<const NodeDefinition> surface);
     bool BindTexture(uint32_t shader, const Connection& connection, std::string_view input,
                      bool color, uint32_t slot, TextureChannel& channel);
     void CarryPrevious(const std::vector<MaterialRecord>& before);

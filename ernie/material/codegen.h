@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 #include <span>
@@ -19,9 +20,25 @@ inline constexpr uint32_t kTextureInputBytes = 48;
 inline constexpr uint32_t kMappingBytes = 64;
 inline constexpr uint32_t kNoTexture = 0xFFFFFFFF;
 
-struct NodeLayout {
-    std::vector<uint32_t> textures;
-    std::vector<uint32_t> cells;
+enum class BindingKind : uint8_t { Value, Texture, Pattern };
+
+struct InputBinding {
+    BindingKind kind = BindingKind::Value;
+    uint32_t source = 0;
+};
+
+struct ShadingNode {
+    std::shared_ptr<const NodeDefinition> node;
+    std::vector<InputBinding> inputs;
+};
+
+struct ShadingGraph {
+    std::vector<ShadingNode> nodes;
+};
+
+struct GraphLayout {
+    std::vector<std::vector<uint32_t>> cells;
+    std::vector<std::vector<uint32_t>> textures;
     uint32_t textureCount = 0;
     uint32_t mapping = 0;
     uint32_t bytes = 0;
@@ -29,10 +46,11 @@ struct NodeLayout {
 
 bool Texturable(NodeInputType type);
 
-NodeLayout LayOut(const NodeDefinition& node, std::span<const uint8_t> textured);
+GraphLayout LayOut(const ShadingGraph& graph);
 
-DefinitionModule GenerateNodeDefinition(uint32_t id, const NodeDefinition& node,
-                                        std::span<const uint8_t> textured);
+std::string GraphKey(const ShadingGraph& graph);
+
+DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph);
 
 std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set);
 

@@ -49,6 +49,7 @@ target_link_libraries(
         ernie_io
         ernie_texture
         ernie_material
+        ernie_graph
         ernie_mikktspace
 )
 ernie_embed(
@@ -77,6 +78,7 @@ ernie_static_library(
     ernie_io_internal
     ernie_texture_internal
     ernie_material_internal
+    ernie_graph_internal
 )
 
 ernie_public_files(

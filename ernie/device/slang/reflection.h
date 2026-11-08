@@ -23,9 +23,21 @@ struct ReflectedField {
     std::string displayName;
 };
 
+enum class NodeRole { Material, Pattern };
+
+enum class ParameterSource { Input, Context, Point };
+
+struct ReflectedParameter {
+    ParameterSource source = ParameterSource::Input;
+    uint32_t input = 0;
+};
+
 struct ReflectedNode {
     std::string name;
+    NodeRole role = NodeRole::Material;
     std::vector<ReflectedField> fields;
+    FieldType result = FieldType::Float;
+    std::vector<ReflectedParameter> parameters;
 };
 
 ERNIE_API std::vector<ReflectedNode>

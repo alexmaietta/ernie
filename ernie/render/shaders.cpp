@@ -122,8 +122,23 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             .inherited = {{"implementationSource", int32_t(ImplementationSource::SourceAsset)},
                           {"slangSourceAsset", file.string()},
                           {"slangSourceAssetSubIdentifier", reflected.name}}};
-        NodeDefinition node{
-            .name = reflected.name, .file = file.string(), .module = module, .source = source};
+        NodeDefinition node{.name = reflected.name,
+                            .role = reflected.role == device::NodeRole::Pattern
+                                        ? NodeRole::Pattern
+                                        : NodeRole::Material,
+                            .file = file.string(),
+                            .module = module,
+                            .source = source,
+                            .result = InputType(reflected.result)};
+        for (const device::ReflectedParameter& parameter : reflected.parameters) {
+            node.parameters.push_back(
+                {.source = parameter.source == device::ParameterSource::Context
+                               ? NodeParameter::Source::Context
+                           : parameter.source == device::ParameterSource::Point
+                               ? NodeParameter::Source::Point
+                               : NodeParameter::Source::Input,
+                 .input = parameter.input});
+        }
         std::vector<std::string> inputs;
         for (const device::ReflectedField& field : reflected.fields) {
             desc.columns.push_back(Column(field));
@@ -133,14 +148,15 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         }
         node.schema = uint32_t(RegisterSchema(desc));
         RegisterNode(std::move(node));
-        Log(LogLevel::Debug, "loaded material node {} from {} with inputs {}", reflected.name,
-            file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
+        Log(LogLevel::Debug, "loaded {} {} from {} with inputs {}",
+            reflected.role == device::NodeRole::Pattern ? "pattern" : "material node",
+            reflected.name, file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
         names.push_back(reflected.name);
     }
     if (names.empty()) {
         Log(LogLevel::Warning,
             "{} has no material nodes; a node is a struct with a "
-            "Material(inout SurfaceInputs, ShadeContext) method",
+            "Material(inout SurfaceInputs, ShadeContext) method or a function marked [Pattern]",
             file.string());
     }
     return names;

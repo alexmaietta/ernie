@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/material/codegen.h"
 
+#include <algorithm>
 #include <format>
 
 namespace ernie {
@@ -102,16 +103,41 @@ std::string_view CellType(NodeInputType type) {
     return "float";
 }
 
-std::string Assignment(const NodeInput& input, uint32_t texture) {
-    const std::string cell = std::format("p.{}", input.name);
-    if (texture != kNoTexture) {
+std::string_view SlangType(NodeInputType type) {
+    switch (type) {
+    case NodeInputType::Bool:
+        return "bool";
+    case NodeInputType::Int:
+        return "int";
+    case NodeInputType::Float:
+        return "float";
+    case NodeInputType::Float2:
+        return "float2";
+    case NodeInputType::Float3:
+        return "float3";
+    case NodeInputType::Float4:
+        return "float4";
+    }
+    return "float";
+}
+
+std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node,
+                       uint32_t input) {
+    const InputBinding& binding = graph.nodes[node].inputs[input];
+    const NodeInput& declared = graph.nodes[node].node->inputs[input];
+    if (binding.kind == BindingKind::Pattern) {
+        return std::format("r{}", binding.source);
+    }
+    const std::string cell = std::format("p.n{}_{}", node, declared.name);
+    if (binding.kind == BindingKind::Texture) {
         const std::string sampled =
-            std::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]", texture);
-        return input.type == NodeInputType::Float
+            std::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]",
+                        layout.textures[node][input]);
+        return declared.type == NodeInputType::Float
                    ? std::format("TexturedFloat({}, {})", cell, sampled)
                    : std::format("TexturedColor({}, {})", cell, sampled);
     }
-    switch (input.type) {
+    switch (declared.type) {
     case NodeInputType::Bool:
         return cell + " != 0";
     case NodeInputType::Float2:
@@ -123,46 +149,107 @@ std::string Assignment(const NodeInput& input, uint32_t texture) {
     }
 }
 
+std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node) {
+    const NodeDefinition& definition = *graph.nodes[node].node;
+    std::string arguments;
+    for (const NodeParameter& parameter : definition.parameters) {
+        arguments += arguments.empty() ? "" : ", ";
+        switch (parameter.source) {
+        case NodeParameter::Source::Context:
+            arguments += "context";
+            break;
+        case NodeParameter::Source::Point:
+            arguments += "context.point";
+            break;
+        case NodeParameter::Source::Input:
+            arguments += Expression(graph, layout, node, parameter.input);
+            break;
+        }
+    }
+    return std::format("        const {} r{} = {}({});\n", SlangType(definition.result), node,
+                       definition.name, arguments);
+}
+
 }
 
 bool Texturable(NodeInputType type) {
     return type == NodeInputType::Float || type == NodeInputType::Float3;
 }
 
-NodeLayout LayOut(const NodeDefinition& node, std::span<const uint8_t> textured) {
-    NodeLayout layout;
-    for (size_t i = 0; i < node.inputs.size(); ++i) {
-        const bool sampled = i < textured.size() && textured[i] && Texturable(node.inputs[i].type);
-        layout.textures.push_back(sampled ? layout.textureCount++ : kNoTexture);
+GraphLayout LayOut(const ShadingGraph& graph) {
+    GraphLayout layout;
+    for (const ShadingNode& node : graph.nodes) {
+        std::vector<uint32_t>& textures = layout.textures.emplace_back();
+        for (const InputBinding& binding : node.inputs) {
+            textures.push_back(binding.kind == BindingKind::Texture ? layout.textureCount++
+                                                                    : kNoTexture);
+        }
     }
     uint32_t offset = 0;
     if (layout.textureCount > 0) {
         layout.mapping = layout.textureCount * kTextureInputBytes;
         offset = layout.mapping + kMappingBytes;
     }
-    for (const NodeInput& input : node.inputs) {
-        layout.cells.push_back(offset);
-        offset += NodeInputBytes(input.type);
+    for (const ShadingNode& node : graph.nodes) {
+        std::vector<uint32_t>& cells = layout.cells.emplace_back();
+        for (const NodeInput& input : node.node->inputs) {
+            cells.push_back(offset);
+            offset += NodeInputBytes(input.type);
+        }
     }
     layout.bytes = offset;
     return layout;
 }
 
-DefinitionModule GenerateNodeDefinition(uint32_t id, const NodeDefinition& node,
-                                        std::span<const uint8_t> textured) {
-    const NodeLayout layout = LayOut(node, textured);
+std::string GraphKey(const ShadingGraph& graph) {
+    std::string key;
+    for (const ShadingNode& node : graph.nodes) {
+        key += std::format("{}/{}:", node.node->module, node.node->name);
+        for (const InputBinding& binding : node.inputs) {
+            key += binding.kind == BindingKind::Value     ? std::string("v")
+                   : binding.kind == BindingKind::Texture ? std::string("t")
+                                                          : std::format("p{}", binding.source);
+            key += ',';
+        }
+        key += ';';
+    }
+    return key;
+}
+
+DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
+    const GraphLayout layout = LayOut(graph);
     const std::string type = std::format("Definition{}", id);
+    const uint32_t surface = uint32_t(graph.nodes.size() - 1);
+    const NodeDefinition& top = *graph.nodes[surface].node;
     std::string fields;
     if (layout.textureCount > 0) {
         fields += std::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
                               layout.textureCount);
     }
-    std::string assignments;
-    for (size_t i = 0; i < node.inputs.size(); ++i) {
-        const NodeInput& input = node.inputs[i];
-        fields += std::format("    {} {};\n", CellType(input.type), input.name);
-        assignments += std::format("        node.{} = {};\n", input.name,
-                                   Assignment(input, layout.textures[i]));
+    std::string imports;
+    DefinitionModule module{.id = id, .type = type};
+    std::string body;
+    for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
+        const NodeDefinition& definition = *graph.nodes[node].node;
+        for (const NodeInput& input : definition.inputs) {
+            fields += std::format("    {} n{}_{};\n", CellType(input.type), node, input.name);
+        }
+        const std::string file = ModuleFile(definition.module);
+        if (std::ranges::find(module.files, file, &std::pair<std::string, std::string>::first) ==
+            module.files.end()) {
+            imports += std::format("import {};\n", definition.module);
+            module.files.emplace_back(file, definition.source);
+            module.origins.emplace_back(file, definition.file);
+            module.origins.emplace_back(definition.module + ".slang", definition.file);
+        }
+        if (node != surface) {
+            body += Call(graph, layout, node);
+        }
+    }
+    body += std::format("        {} node;\n", top.name);
+    for (uint32_t input = 0; input < top.inputs.size(); ++input) {
+        body += std::format("        node.{} = {};\n", top.inputs[input].name,
+                            Expression(graph, layout, surface, input));
     }
     const std::string sampling =
         layout.textureCount == 0
@@ -170,29 +257,23 @@ DefinitionModule GenerateNodeDefinition(uint32_t id, const NodeDefinition& node,
             : std::format("        const SurfaceTexels<{0}> texels = SampleNodeTextures<{0}>("
                           "context, &p.mapping, &p.textures[0]);\n",
                           layout.textureCount);
-    std::string source = std::format(
+    module.module = std::format("ernie.material.generated.d{}", id);
+    module.source = std::format(
         R"(// SPDX-License-Identifier: BSD-3-Clause
 // Generated by ernie/material/codegen.cpp for {1}; do not edit.
 
 __exported import ernie.render.kernels.material.standard;
 import ernie.render.kernels.material.nodes.texture;
-import {2};
-
+{2}
 using namespace ernie;
 
 struct {0}Params {{
 {3}}};
 
 struct {0} : IStandardMaterial {{
-    static {1} Load(inout ShadeContext context) {{
-        {0}Params* p = context.materials.Params<{0}Params>(context.words);
-{4}        {1} node;
-{5}        return node;
-    }}
-
     static void Material(inout ShadeContext context, inout SurfaceInputs inputs) {{
-        {1} node = Load(context);
-        node.Material(inputs, context);
+        {0}Params* p = context.materials.Params<{0}Params>(context.words);
+{4}{5}        node.Material(inputs, context);
     }}
 
     static SpectralValue Albedo(inout ShadeContext context) {{
@@ -202,13 +283,8 @@ struct {0} : IStandardMaterial {{
     }}
 }}
 )",
-        type, node.name, node.module, fields, sampling, assignments);
-    return {.id = id,
-            .type = type,
-            .module = std::format("ernie.material.generated.d{}", id),
-            .source = std::move(source),
-            .files = {{ModuleFile(node.module), node.source}},
-            .origins = {{ModuleFile(node.module), node.file}, {node.module + ".slang", node.file}}};
+        type, top.name, imports, fields, sampling, body);
+    return module;
 }
 
 std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set) {
