@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
@@ -19,7 +21,8 @@ class Library {
     Library() = default;
 
     static Library Load(std::initializer_list<const char*> names,
-                        std::initializer_list<const char*> paths = {});
+                        std::initializer_list<const char*> paths = {},
+                        const std::filesystem::path& beside = {});
 
     explicit operator bool() const {
         return m_handle != nullptr;
@@ -29,6 +32,8 @@ class Library {
         return m_name;
     }
 
+    std::filesystem::path Directory() const;
+
     void* Symbol(const char* symbol) const;
 
     template <class Function> bool Symbol(const char* symbol, Function& function) const {
@@ -37,7 +42,7 @@ class Library {
     }
 
   private:
-    static Library First(std::initializer_list<const char*> names, bool loadedOnly);
+    static Library First(const std::vector<std::string>& names, bool loadedOnly);
 
     void* m_handle = nullptr;
     std::string m_name;

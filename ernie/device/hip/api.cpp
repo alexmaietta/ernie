@@ -120,6 +120,7 @@ Loaded<Api> Load() {
     SymbolResolver resolve(library);
     Api api;
     api.library = library.Name();
+    api.directory = library.Directory();
     ResolveFunctions(resolve, api);
     if (resolve.Missing() != nullptr) {
         return std::format("{} lacks {}", api.library, resolve.Missing());
@@ -150,9 +151,10 @@ const compute::RuntimeCompiler& GetHiprtc() {
     const auto names = {"libhiprtc.so.7", "libhiprtc.so.6"};
     const auto paths = {"/opt/rocm/lib/libhiprtc.so.7", "/opt/rocm/lib/libhiprtc.so.6"};
 #endif
-    static const Loaded<compute::RuntimeCompiler> loaded =
-        LogUnavailable("hipRTC", compute::LoadRuntimeCompiler("hipRTC", "hiprtc", "Code", names,
-                                                              paths, kMinimumRuntimeVersion));
+    static const Loaded<compute::RuntimeCompiler> loaded = LogUnavailable(
+        "hipRTC", compute::LoadRuntimeCompiler(
+                      "hipRTC", "hiprtc", "Code", names, paths, kMinimumRuntimeVersion,
+                      Available() ? GetApi().directory : std::filesystem::path{}));
     return RequireLoaded(loaded);
 }
 
