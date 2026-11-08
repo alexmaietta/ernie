@@ -13,17 +13,9 @@
 namespace ernie {
 
 struct Capture {
+    PlannedCapture plan;
     uint64_t vars[kRenderVarSourceCount];
-    uint64_t firstPixel;
     uint64_t primIds;
-    uint product;
-    uint sensor;
-    uint layer;
-    uint width;
-    uint height;
-    uint taxonomy;
-    float missDistance;
-    uint returns;
 };
 
 ERNIE_CHECK_SIZE(Capture, 184);

@@ -92,7 +92,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
     LightLayout* lights;
 
     static MinimalIntegrator<Mode> Load(SensorContext context) {
-        const uint product = context.capture->product;
+        const uint product = context.capture->plan.product;
         MinimalIntegrator<Mode> integrator;
         integrator.query = context.query;
         integrator.row = PrimRow(context.query.tables, product, kSlotRenderProduct);

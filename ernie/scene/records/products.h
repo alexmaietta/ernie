@@ -38,4 +38,18 @@ struct ProductRecord {
 
 ERNIE_CHECK_SIZE(ProductRecord, 176);
 
+struct PlannedCapture {
+    uint64_t firstPixel;
+    uint product;
+    uint sensor;
+    uint layer;
+    uint width;
+    uint height;
+    uint taxonomy;
+    float missDistance;
+    uint returns;
+};
+
+ERNIE_CHECK_SIZE(PlannedCapture, 40);
+
 }

@@ -38,10 +38,10 @@ struct LidarResponse : IResponse<LidarPattern> {
         LidarResponse response;
         response.query = context.query;
         response.tables = context.params.tables;
-        response.mode = ReturnMode(
-            context.params.tables->lidars[PrimRow(context.params.tables, capture->sensor, kSlotLidar)]
-                .returnMode);
-        response.stride = max(capture->returns, 1u);
+        const LidarRecord record =
+            response.tables->lidars[PrimRow(response.tables, capture->plan.sensor, kSlotLidar)];
+        response.mode = ReturnMode(record.returnMode);
+        response.stride = max(capture->plan.returns, 1u);
         response.returns = min(response.stride, kMostLidarReturns);
         response.found = 0;
         for (uint i = 0; i < kMostLidarReturns; ++i) {
@@ -150,7 +150,7 @@ struct LidarResponse : IResponse<LidarPattern> {
                 WriteNormal(at, result.normal);
                 WriteSegmentation(params, at, result.prim);
             } else {
-                Write(at, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
+                Write(at, RenderVarSource::DistanceToCamera, pixel.capture->plan.missDistance);
                 Write(at, RenderVarSource::Intensity, 0.0f);
                 WriteNormal(at, float3(0));
                 WriteSegmentation(params, at, kNoPrim);

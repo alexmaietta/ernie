@@ -20,12 +20,14 @@ struct LidarPattern : IPattern {
     static LidarPattern Load(SensorContext context) {
         RenderTables* tables = context.params.tables;
         Capture* capture = context.capture;
-        const LidarRecord record = tables->lidars[PrimRow(tables, capture->sensor, kSlotLidar)];
+        const LidarRecord record =
+            tables->lidars[PrimRow(tables, capture->plan.sensor, kSlotLidar)];
         LidarPattern pattern;
-        pattern.frame = LoadSensorFrame(tables, capture->sensor);
+        pattern.frame = LoadSensorFrame(tables, capture->plan.sensor);
         pattern.rotary = record.rotary != 0;
         pattern.azimuthStart = record.sweep.x;
-        pattern.azimuthStep = (record.sweep.y - record.sweep.x) / float(max(capture->width, 1u));
+        pattern.azimuthStep =
+            (record.sweep.y - record.sweep.x) / float(max(capture->plan.width, 1u));
         pattern.elevations = record.elevations;
         pattern.azimuths = record.azimuths;
         pattern.range = record.range.Vector();

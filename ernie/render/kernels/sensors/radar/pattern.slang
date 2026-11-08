@@ -13,11 +13,12 @@ struct RadarPattern : IPattern {
     static RadarPattern Load(SensorContext context) {
         RenderTables* tables = context.params.tables;
         Capture* capture = context.capture;
-        const RadarRecord record = tables->radars[PrimRow(tables, capture->sensor, kSlotRadar)];
+        const RadarRecord record =
+            tables->radars[PrimRow(tables, capture->plan.sensor, kSlotRadar)];
         RadarPattern pattern;
-        pattern.frame = LoadSensorFrame(tables, capture->sensor);
+        pattern.frame = LoadSensorFrame(tables, capture->plan.sensor);
         pattern.fieldOfView = record.fieldOfView.Vector();
-        pattern.resolution = float2(capture->width, capture->height);
+        pattern.resolution = float2(capture->plan.width, capture->plan.height);
         pattern.range = record.range.Vector();
         return pattern;
     }

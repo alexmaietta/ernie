@@ -14,6 +14,6 @@ struct SensorContext {
     __init(RenderParams params, Capture* capture) {
         this.params = params;
         this.capture = capture;
-        query = HitQuery(params.tables, params.tables->prims.world[capture->sensor]);
+        query = HitQuery(params.tables, params.tables->prims.world[capture->plan.sensor]);
     }
 }

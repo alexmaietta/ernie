@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <initializer_list>
 #include <optional>
 
 #include "ernie/scene/publish/change_set.h"
@@ -18,8 +19,6 @@
 namespace ernie {
 
 namespace {
-
-constexpr double kCaptureTolerance = 1e-6;
 
 std::vector<ColumnRef> ProductInputs() {
     std::vector<ColumnRef> inputs = {kLidarFiringsPerScan, kLidarEmitterElevations,
@@ -96,27 +95,41 @@ VarFormat SourceFormat(RenderVarSource source) {
     }
 }
 
-bool Semantic(RenderVarSource source) {
-    return source == RenderVarSource::NonStableInstanceSegmentation ||
-           source == RenderVarSource::SemanticSegmentation ||
-           source == RenderVarSource::SemanticIdMap ||
-           source == RenderVarSource::SemanticInstanceSegmentation ||
-           source == RenderVarSource::StableIdSegmentation ||
-           source == RenderVarSource::StableIdMap;
+constexpr uint64_t Sources(std::initializer_list<RenderVarSource> sources) {
+    uint64_t mask = 0;
+    for (const RenderVarSource source : sources) {
+        mask |= uint64_t(1) << uint32_t(source);
+    }
+    return mask;
 }
+
+constexpr bool Includes(uint64_t sources, RenderVarSource source) {
+    return (sources >> uint32_t(source) & 1) != 0;
+}
+
+constexpr uint64_t kSemanticSources =
+    Sources({RenderVarSource::NonStableInstanceSegmentation, RenderVarSource::SemanticSegmentation,
+             RenderVarSource::SemanticIdMap, RenderVarSource::SemanticInstanceSegmentation,
+             RenderVarSource::StableIdSegmentation, RenderVarSource::StableIdMap});
+
+constexpr uint64_t kRangeSources =
+    kSemanticSources | Sources({RenderVarSource::DistanceToCamera, RenderVarSource::Normal,
+                                RenderVarSource::Intensity, RenderVarSource::PointCloud});
 
 struct SensorKind {
     SchemaId schema;
     std::optional<RenderEntry> entry;
-    bool shades;
-    bool returns;
-    bool measuresVelocity;
+    uint64_t outputs;
 };
 
 const SensorKind kSensorKinds[] = {
-    {SchemaId::Camera, std::nullopt, true, false, false},
-    {SchemaId::Lidar, RenderEntry::Lidar, false, true, false},
-    {SchemaId::Radar, RenderEntry::Radar, false, true, true},
+    {SchemaId::Camera, std::nullopt,
+     ((uint64_t(1) << kRenderVarSourceCount) - 1) &
+         ~Sources({RenderVarSource::Intensity, RenderVarSource::PointCloud,
+                   RenderVarSource::RadialVelocity})},
+    {SchemaId::Lidar, RenderEntry::Lidar, kRangeSources},
+    {SchemaId::Radar, RenderEntry::Radar,
+     kRangeSources | Sources({RenderVarSource::RadialVelocity})},
 };
 
 const SensorKind& FindSensorKind(SchemaId schema) {
@@ -128,21 +141,6 @@ const SensorKind& FindSensorKind(SchemaId schema) {
     throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
 }
 
-bool Outputs(const SensorKind& kind, RenderVarSource source) {
-    switch (source) {
-    case RenderVarSource::DistanceToCamera:
-    case RenderVarSource::Normal:
-        return true;
-    case RenderVarSource::Intensity:
-    case RenderVarSource::PointCloud:
-        return kind.returns;
-    case RenderVarSource::RadialVelocity:
-        return kind.measuresVelocity;
-    default:
-        return kind.shades || Semantic(source);
-    }
-}
-
 ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind) {
     const RenderVarSource source = prim.Get(RenderVar::kSourceName);
     const std::string_view name = kRenderVarSourceTokens[uint32_t(source)];
@@ -150,8 +148,8 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
                     .path = prim.Path(),
                     .source = source,
                     .frame = prim.Get(RenderVar::kFrameOfReference),
-                    .semantic = Semantic(source)};
-    if (!Outputs(kind, source)) {
+                    .semantic = Includes(kSemanticSources, source)};
+    if (!Includes(kind.outputs, source)) {
         throw Error("{} writes {}, which a {} doesn't output", prim.Path(), name,
                     Info(kind.schema).name);
     }
@@ -167,7 +165,8 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
                             channel);
             }
             const auto point = PointChannel(found - std::begin(kPointChannels));
-            if (point == PointChannel::RadialVelocity && !kind.measuresVelocity) {
+            if (point == PointChannel::RadialVelocity &&
+                !Includes(kind.outputs, RenderVarSource::RadialVelocity)) {
                 throw Error("{} asks for RadialVelocity, which a {} doesn't measure", var.path,
                             Info(kind.schema).name);
             }
@@ -180,11 +179,10 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
     if (format.channels == 0) {
         return var;
     }
-    const ProductRecord& record = product.record;
     var.type = format.type;
-    var.shape = {int64_t(product.sensors.size()), record.height, record.width};
-    if (record.returns > 0) {
-        var.shape.push_back(record.returns);
+    var.shape = {int64_t(product.sensors.size()), product.height, product.width};
+    if (product.returns > 0) {
+        var.shape.push_back(product.returns);
     }
     if (format.channels > 1) {
         var.shape.push_back(format.channels);
@@ -220,18 +218,6 @@ RenderEntry SelectEntry(const ResolvedProduct& product, const SensorKind& kind) 
     }
 }
 
-bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
-    const ProductRecord& x = a.record;
-    const ProductRecord& y = b.record;
-    return x.sensorSchema == y.sensorSchema && x.width == y.width && x.height == y.height &&
-           x.returns == y.returns && x.frameRate == y.frameRate && x.startTime == y.startTime &&
-           x.missDistance == y.missDistance && x.renderMode == y.renderMode &&
-           x.minimalMode == y.minimalMode && x.spectralMode == y.spectralMode &&
-           a.sensors == b.sensors && a.vars == b.vars && a.overlays == b.overlays &&
-           a.taxonomy == b.taxonomy && a.entry == b.entry && a.semantic == b.semantic &&
-           a.error == b.error;
-}
-
 }
 
 std::span<const ColumnRef> ProductTable::Inputs() const {
@@ -243,80 +229,19 @@ void ProductTable::Describe(RenderTables& tables) const {
     tables.products.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }
 
-const ResolvedProduct* ProductTable::Find(uint32_t prim) const {
+std::shared_ptr<const ResolvedProduct> ProductTable::Find(uint32_t prim) const {
+    const std::lock_guard lock(m_mutex);
     const auto found = m_products.find(prim);
-    return found == m_products.end() ? nullptr : &found->second;
+    return found == m_products.end() ? nullptr : found->second;
 }
 
-std::shared_ptr<const ProductPlan> ProductTable::Plan(std::span<const std::string> paths) {
-    std::vector<std::string> sorted(paths.begin(), paths.end());
-    std::ranges::sort(sorted);
-    sorted.erase(std::ranges::unique(sorted).begin(), sorted.end());
-    std::vector<const ResolvedProduct*> products;
-    for (const std::string& path : sorted) {
-        const std::optional<Prim> prim = m_scene.Find(path);
-        if (!prim || !prim->IsA<RenderProduct>()) {
-            throw Error("\"{}\" isn't a RenderProduct", path);
-        }
-        const ResolvedProduct* product = Find(prim->Index());
-        if (product == nullptr) {
-            throw Error("{} isn't published yet", path);
-        }
-        if (!product->error.empty()) {
-            throw Error("{}", product->error);
-        }
+std::vector<std::shared_ptr<const ResolvedProduct>> ProductTable::Products() const {
+    const std::lock_guard lock(m_mutex);
+    std::vector<std::shared_ptr<const ResolvedProduct>> products;
+    for (const auto& [prim, product] : m_products) {
         products.push_back(product);
     }
-
-    const std::lock_guard lock(m_planMutex);
-    const auto cached =
-        std::ranges::find_if(m_plans, [&](const auto& plan) { return plan->paths == sorted; });
-    if (cached != m_plans.end() &&
-        std::ranges::equal((*cached)->products, products,
-                           [](const ResolvedProduct& kept, const ResolvedProduct* current) {
-                               return kept.version == current->version;
-                           })) {
-        m_plans.splice(m_plans.begin(), m_plans, cached);
-        return m_plans.front();
-    }
-    if (cached != m_plans.end()) {
-        m_plans.erase(cached);
-    }
-    ERNIE_ZONE("Products/Plan");
-    auto plan = std::make_shared<ProductPlan>();
-    plan->id = ++m_planIds;
-    plan->paths = std::move(sorted);
-    for (const ResolvedProduct* product : products) {
-        const ProductRecord& record = product->record;
-        plan->products.push_back(*product);
-        PlannedCapture capture{.product = product->prim,
-                               .width = record.width,
-                               .height = record.height,
-                               .returns = std::max(record.returns, 1u),
-                               .missDistance = record.missDistance};
-        if (product->semantic) {
-            const auto found = std::ranges::find(plan->taxonomies, product->taxonomy);
-            capture.taxonomy = uint32_t(found - plan->taxonomies.begin());
-            if (found == plan->taxonomies.end()) {
-                plan->taxonomies.push_back(product->taxonomy);
-            }
-        }
-        const auto entry = uint32_t(product->entry);
-        uint64_t& pixels = plan->pixelCounts[entry];
-        for (capture.layer = 0; capture.layer < product->sensors.size(); ++capture.layer) {
-            capture.sensor = product->sensors[capture.layer];
-            capture.firstPixel = pixels;
-            plan->captures[entry].push_back(capture);
-            pixels += uint64_t(capture.width) * capture.height;
-        }
-        plan->captureCount += uint32_t(product->sensors.size());
-        plan->pixelCount += uint64_t(record.width) * record.height * product->sensors.size();
-    }
-    m_plans.push_front(plan);
-    if (m_plans.size() > kCachedPlans) {
-        m_plans.pop_back();
-    }
-    return plan;
+    return products;
 }
 
 ResolvedProduct ProductTable::Resolve(uint32_t index) const {
@@ -366,7 +291,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
     record.renderMode = uint32_t(prim.Get(RenderProduct::kRenderMode));
     record.minimalMode = uint32_t(prim.Get(MinimalAPI::kMode));
     record.spectralMode = uint32_t(prim.Get(RenderProduct::kSpectralMode));
-    record.missDistance = prim.Get(RenderProduct::kMissDistance);
+    product.missDistance = prim.Get(RenderProduct::kMissDistance);
     record.sensors = m_structure.GetColumnStore().Array(kRenderProductCamera,
                                                         prims.Row(index, SchemaId::RenderProduct));
     record.vars = m_structure.GetColumnStore().Array(kRenderProductOrderedVars,
@@ -381,17 +306,17 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
         const SchemaId schema = prims.Record(lead.Index()).schema;
         const Uint2 resolution = prim.Get(RenderProduct::kResolution);
         const Shape shape = SensorShape(lead, resolution);
-        record.sensorSchema = uint32_t(schema);
-        record.frameRate = lead.Get(SensorAPI::kSensorFrameRate);
-        record.startTime = lead.Get(SensorAPI::kSensorStartTime);
+        product.sensor = schema;
+        product.frameRate = lead.Get(SensorAPI::kSensorFrameRate);
+        product.startTime = lead.Get(SensorAPI::kSensorStartTime);
         for (const uint32_t sensor : product.sensors) {
             const Prim each = m_scene.ByIndex(sensor);
             if (prims.Record(sensor).schema != schema) {
                 throw Error("{} stacks {} and {}, which are different kinds of sensor", path,
                             lead.Path(), each.Path());
             }
-            if (each.Get(SensorAPI::kSensorFrameRate) != record.frameRate ||
-                each.Get(SensorAPI::kSensorStartTime) != record.startTime) {
+            if (each.Get(SensorAPI::kSensorFrameRate) != product.frameRate ||
+                each.Get(SensorAPI::kSensorStartTime) != product.startTime) {
                 throw Error("{} stacks {} and {}, which capture at different times", path,
                             lead.Path(), each.Path());
             }
@@ -400,11 +325,11 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                             each.Path());
             }
         }
-        record.width = shape.resolution.x;
-        record.height = shape.resolution.y;
-        record.returns = shape.returns;
-        if (record.width == 0 || record.height == 0) {
-            throw Error("{} has a resolution of {} x {}", path, record.width, record.height);
+        product.width = shape.resolution.x;
+        product.height = shape.resolution.y;
+        product.returns = shape.returns;
+        if (product.width == 0 || product.height == 0) {
+            throw Error("{} has a resolution of {} x {}", path, product.width, product.height);
         }
         const SensorKind& kind = FindSensorKind(schema);
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
@@ -414,13 +339,20 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
         }
         product.entry = SelectEntry(product, kind);
         product.overlays = prim.Get(RenderProduct::kOverlays);
-        if (!product.overlays.empty() && !kind.shades) {
+        if (!product.overlays.empty() && kind.schema != SchemaId::Camera) {
             throw Error("{} draws overlays over a {}, and only cameras draw them", path,
                         Info(kind.schema).name);
         }
     } catch (const Error& error) {
         product.error = error.what();
     }
+    record.sensorSchema = uint32_t(product.sensor);
+    record.width = product.width;
+    record.height = product.height;
+    record.returns = product.returns;
+    record.frameRate = product.frameRate;
+    record.startTime = product.startTime;
+    record.missDistance = product.missDistance;
     return product;
 }
 
@@ -435,22 +367,20 @@ void ProductTable::Run(const ChangeSet& changes, TableVersions&) {
     if (edited) {
         Resolve();
     }
-    ScheduleCaptures();
 }
 
 void ProductTable::Resolve() {
     const Prims& prims = m_structure.GetPrims();
-    std::map<uint32_t, ResolvedProduct> resolved;
+    std::map<uint32_t, std::shared_ptr<const ResolvedProduct>> resolved;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim) || prims.Record(prim).schema != SchemaId::RenderProduct) {
             continue;
         }
         ResolvedProduct product = Resolve(prim);
-        const auto previous = m_products.find(prim);
-        const bool same = previous != m_products.end() && SamePlan(previous->second, product);
-        product.version = same ? previous->second.version : ++m_versions;
+        const std::shared_ptr<const ResolvedProduct> previous = Find(prim);
+        const bool same = previous && static_cast<const ProductShape&>(*previous) == product;
+        product.version = same ? previous->version : ++m_versions;
         if (!same && product.error.empty()) {
-            const ProductRecord& record = product.record;
             std::string sources;
             for (const ResolvedVar& var : product.vars) {
                 sources += std::format("{}{}", sources.empty() ? "" : ", ",
@@ -458,55 +388,19 @@ void ProductTable::Resolve() {
             }
             Log(LogLevel::Debug, "resolved {}: {} at {} x {} writing {}{}",
                 m_scene.ByIndex(prim).Path(), Counted(product.sensors.size(), "sensor"),
-                record.width, record.height, sources.empty() ? "nothing" : sources,
-                record.frameRate > 0 ? std::format(", capturing at {} Hz", record.frameRate) : "");
+                product.width, product.height, sources.empty() ? "nothing" : sources,
+                product.frameRate > 0 ? std::format(", capturing at {} Hz", product.frameRate)
+                                      : "");
         }
         m_records.Set(prims.Row(prim, SchemaId::RenderProduct), product.record);
-        resolved.emplace(prim, std::move(product));
+        resolved.emplace(prim, std::make_shared<const ResolvedProduct>(std::move(product)));
     }
-    m_products = std::move(resolved);
+    {
+        const std::lock_guard lock(m_mutex);
+        m_products = std::move(resolved);
+    }
     m_records.Reserve(m_structure.GetColumnStore().Schema(SchemaId::RenderProduct).Capacity());
     m_records.Upload(m_structure.GetColumnStore().GetDevice());
-}
-
-void ProductTable::ScheduleCaptures() {
-    if (m_clock.resets != m_resets) {
-        m_resets = m_clock.resets;
-        m_schedules.clear();
-    }
-    std::erase_if(m_schedules,
-                  [&](const auto& entry) { return !m_products.contains(entry.first); });
-    const double dt = m_clock.end - m_clock.start;
-    for (auto& [prim, product] : m_products) {
-        const float rate = product.record.frameRate;
-        if (rate <= 0 || dt == 0) {
-            product.due = true;
-            continue;
-        }
-        Schedule& schedule = m_schedules[prim];
-        const float start = product.record.startTime;
-        if (schedule.frameRate != rate || schedule.startTime != start) {
-            const double first = std::ceil((m_clock.start - start) * rate - kCaptureTolerance);
-            schedule = {rate, start, std::max<int64_t>(0, int64_t(first))};
-        }
-        if (schedule.step == m_clock.steps) {
-            product.due = schedule.due;
-            continue;
-        }
-        schedule.step = m_clock.steps;
-        const double reached = (m_clock.end - start) * rate + kCaptureTolerance;
-        schedule.due = double(schedule.next) <= reached;
-        product.due = schedule.due;
-        if (!product.due) {
-            continue;
-        }
-        const auto last = int64_t(std::floor(reached));
-        if (last > schedule.next) {
-            Log(LogLevel::Debug, "{} skipped {} in a step of {} s", m_scene.ByIndex(prim).Path(),
-                Counted(uint64_t(last - schedule.next), "capture"), dt);
-        }
-        schedule.next = last + 1;
-    }
 }
 
 }

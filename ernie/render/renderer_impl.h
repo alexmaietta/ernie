@@ -21,7 +21,7 @@
 #include "ernie/render/kernels/render/render.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/scene.h"
-#include "ernie/scene/tables/products.h"
+#include "ernie/scene/tables/plans.h"
 
 namespace ernie {
 

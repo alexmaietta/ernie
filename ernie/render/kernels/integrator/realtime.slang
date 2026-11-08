@@ -72,7 +72,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
 
     static RealTimeIntegrator<S> Load(SensorContext context) {
         RenderTables* tables = context.query.tables;
-        const uint product = context.capture->product;
+        const uint product = context.capture->plan.product;
         const uint row = PrimRow(tables, product, kSlotRenderProduct);
         RealTimeIntegrator<S> integrator;
         integrator.query = context.query;

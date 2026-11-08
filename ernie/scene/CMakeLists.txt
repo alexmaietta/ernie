@@ -16,11 +16,13 @@ ernie_object_library(
     structure/structure.cpp
     structure/tokens.cpp
     tables/bounds.cpp
+    tables/captures.cpp
     tables/instance_layout.cpp
     tables/instances.cpp
     tables/lights.cpp
     tables/materials.cpp
     tables/meshes.cpp
+    tables/plans.cpp
     tables/products.cpp
     tables/regions.cpp
     tables/semantics.cpp

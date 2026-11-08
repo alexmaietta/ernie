@@ -8,7 +8,7 @@ using namespace ernie;
 extension CameraModel : IPattern {
     static CameraModel Load(SensorContext context) {
         return CameraModel.Load(context.params.tables,
-                                context.capture->sensor);
+                                context.capture->plan.sensor);
     }
 
     uint SampleCount() {
@@ -16,7 +16,7 @@ extension CameraModel : IPattern {
     }
 
     SensorRay Generate(CapturePixel pixel, uint sample) {
-        const float2 resolution = float2(pixel.capture->width, pixel.capture->height);
+        const float2 resolution = float2(pixel.capture->plan.width, pixel.capture->plan.height);
         const float2 ndc = (float2(pixel.coord) + 0.5f) / resolution * 2.0f - 1.0f;
         const CameraRay cameraRay =
             GenerateRay(CameraSample(float2(ndc.x, -ndc.y), float2(0.5f), 0.5f));

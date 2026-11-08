@@ -16,10 +16,12 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/bounds.h"
+#include "ernie/scene/tables/captures.h"
 #include "ernie/scene/tables/instances.h"
 #include "ernie/scene/tables/lights.h"
 #include "ernie/scene/tables/materials.h"
 #include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/plans.h"
 #include "ernie/scene/tables/products.h"
 #include "ernie/scene/tables/semantics.h"
 #include "ernie/scene/tables/sensors.h"
@@ -151,6 +153,14 @@ class SceneImpl {
         return m_products;
     }
 
+    ProductPlans& GetPlans() {
+        return m_plans;
+    }
+
+    CaptureSchedule& GetCaptures() {
+        return m_captures;
+    }
+
     void AddCommitStep(std::function<bool()> step) {
         m_commitSteps.push_back(std::move(step));
     }
@@ -179,6 +189,8 @@ class SceneImpl {
     SensorTable m_sensors;
     SimulationClock m_clock;
     ProductTable m_products;
+    ProductPlans m_plans;
+    CaptureSchedule m_captures;
     MaterialTable m_materials;
     InstanceTable m_instances;
     SurfaceTable m_surfaces;

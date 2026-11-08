@@ -62,7 +62,7 @@ void WriteSegmentation(RenderParams params, CapturePixel pixel, uint prim) {
         return;
     }
     const SemanticsData semantics = params.tables->semantics;
-    const uint row = pixel.capture->taxonomy * semantics.stride + prim;
+    const uint row = pixel.capture->plan.taxonomy * semantics.stride + prim;
     const uint labeled = semantics.semanticPrims[row];
     Write(pixel, RenderVarSource::NonStableInstanceSegmentation,
           labeled == kNoPrim ? 1u : labeled + 2);

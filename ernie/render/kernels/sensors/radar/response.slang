@@ -26,8 +26,8 @@ struct RadarResponse : IResponse<RadarPattern> {
         RadarResponse response;
         response.query = context.query;
         response.tables = params.tables;
-        response.sensorVelocity = PointVelocity(params.tables,
-                                                context.capture->sensor, pattern.frame.position);
+        response.sensorVelocity =
+            PointVelocity(params.tables, context.capture->plan.sensor, pattern.frame.position);
         response.hit = false;
         response.position = float3(0);
         response.distance = 0;
@@ -68,7 +68,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         RenderParams params = context.params;
         WritePoint(pixel, hit, pattern.frame, position, distance, intensity, radialVelocity, prim);
         if (!hit) {
-            Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
+            Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->plan.missDistance);
             Write(pixel, RenderVarSource::Intensity, 0.0f);
             Write(pixel, RenderVarSource::RadialVelocity, 0.0f);
             WriteNormal(pixel, float3(0));

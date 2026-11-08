@@ -27,25 +27,28 @@ bool FindPixel(RenderParams params, out CapturePixel pixel) {
     uint high = params.captureCount;
     while (high - low > 1) {
         const uint middle = (low + high) / 2;
-        if (params.captures[middle].firstPixel <= flat) {
+        if (params.captures[middle].plan.firstPixel <= flat) {
             low = middle;
         } else {
             high = middle;
         }
     }
     Capture* capture = params.captures + low;
-    const uint local = uint(flat - capture->firstPixel);
+    const uint local = uint(flat - capture->plan.firstPixel);
     pixel.capture = capture;
-    pixel.coord = uint2(local % capture->width, local / capture->width);
-    if (capture->width % kPixelTileWidth == 0 && capture->height % kPixelTileHeight == 0) {
+    pixel.coord = uint2(local % capture->plan.width, local / capture->plan.width);
+    if (capture->plan.width % kPixelTileWidth == 0 &&
+        capture->plan.height % kPixelTileHeight == 0) {
         const uint tileSize = kPixelTileWidth * kPixelTileHeight;
-        const uint tilesAcross = capture->width / kPixelTileWidth;
+        const uint tilesAcross = capture->plan.width / kPixelTileWidth;
         const uint tile = local / tileSize;
         const uint lane = local % tileSize;
         pixel.coord = uint2((tile % tilesAcross) * kPixelTileWidth + lane % kPixelTileWidth,
                              (tile / tilesAcross) * kPixelTileHeight + lane / kPixelTileWidth);
     }
-    pixel.index = (capture->layer * capture->height + pixel.coord.y) * capture->width + pixel.coord.x;
+    pixel.index = (capture->plan.layer * capture->plan.height + pixel.coord.y) *
+                      capture->plan.width +
+                  pixel.coord.x;
     return true;
 }
 
@@ -59,7 +62,7 @@ void RenderPixel<P : IPattern, R : IResponse<P>>(RenderParams params) {
     const P pattern = P.Load(context);
     R response = R.Load(context, pattern);
     for (uint sample = 0; sample < pattern.SampleCount(); ++sample) {
-        Rng rng = Rng(capture->sensor, pixel.index, sample, capture->product);
+        Rng rng = Rng(capture->plan.sensor, pixel.index, sample, capture->plan.product);
         response.Add(pattern.Generate(pixel, sample), rng);
     }
     response.Write(context, pattern, pixel);

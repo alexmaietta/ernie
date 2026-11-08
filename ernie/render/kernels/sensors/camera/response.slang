@@ -21,7 +21,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
     static CameraResponse<I> Load(SensorContext context, CameraModel camera) {
         CameraResponse<I> response;
         response.integrator = I.Load(context);
-        response.background = Background.Load(context.query.tables, context.capture->product);
+        response.background = Background.Load(context.query.tables, context.capture->plan.product);
         response.exposure = camera.exposure;
         response.first = SurfacePoint.Miss();
         response.albedo = float3(0);
@@ -58,8 +58,8 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
     void WriteSurface(RenderParams params, CameraModel camera, CapturePixel pixel, bool hit) {
         WritePrimId(pixel, hit ? first.prim : kNoPrim);
         if (!hit) {
-            Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->missDistance);
-            Write(pixel, RenderVarSource::DistanceToImagePlane, pixel.capture->missDistance);
+            Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->plan.missDistance);
+            Write(pixel, RenderVarSource::DistanceToImagePlane, pixel.capture->plan.missDistance);
             WriteNormal(pixel, float3(0));
             Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(float3(0), false));
             WriteSegmentation(params, pixel, kNoPrim);
