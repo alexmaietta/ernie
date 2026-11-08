@@ -297,8 +297,12 @@ void Traits::UnloadModule(const Api& hip, hipModule_t module) {
 std::pair<uint64_t, size_t> Traits::Symbol(const Api& hip, hipModule_t module, const char* name) {
     hipDeviceptr_t pointer = nullptr;
     size_t bytes = 0;
+    const hipError_t pending = hip.hipPeekAtLastError();
     const hipError_t found = hip.hipModuleGetGlobal(&pointer, &bytes, module, name);
     if (found == hipErrorNotFound) {
+        if (pending == hipSuccess) {
+            hip.hipGetLastError();
+        }
         return {0, 0};
     }
     hip.Check(found, "hipModuleGetGlobal");

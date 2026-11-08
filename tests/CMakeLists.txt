@@ -58,6 +58,7 @@ ernie_test(
         unit/device/utest_device_buffer.cpp
         unit/device/utest_device_commands.cpp
         unit/device/utest_device_device.cpp
+        unit/device/utest_device_hip.cpp
         unit/device/utest_device_program.cpp
         unit/device/utest_device_ref.cpp
         unit/device/utest_device_shared.cpp

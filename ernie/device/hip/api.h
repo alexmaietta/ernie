@@ -256,6 +256,8 @@ struct Api {
     hipError_t (*hipGetDeviceCount)(int* count) = nullptr;
     const char* (*hipGetErrorName)(hipError_t error) = nullptr;
     const char* (*hipGetErrorString)(hipError_t error) = nullptr;
+    hipError_t (*hipGetLastError)() = nullptr;
+    hipError_t (*hipPeekAtLastError)() = nullptr;
     hipError_t (*hipDeviceGetName)(char* name, int length, hipDevice_t device) = nullptr;
     hipError_t (*hipDeviceGetUuid)(hipUUID* uuid, hipDevice_t device) = nullptr;
     hipError_t (*hipDeviceTotalMem)(size_t* bytes, hipDevice_t device) = nullptr;
