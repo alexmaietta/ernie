@@ -5,6 +5,9 @@
 
 namespace ernie {
 
+static const uint kPrimAlive = 1u << 0;
+static const uint kPrimSession = 1u << 1;
+
 struct PrimTable {
     Paged<uint> schema;
     Paged<uint> world;

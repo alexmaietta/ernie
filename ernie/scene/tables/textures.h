@@ -10,7 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "ernie/scene/kernels/textures.h"
 #include "ernie/scene/records/textures.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"

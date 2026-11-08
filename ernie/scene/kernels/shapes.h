@@ -2,56 +2,12 @@
 #pragma once
 
 #include "ernie/scene/kernels/authored.h"
+#include "ernie/scene/records/bounds.h"
+#include "ernie/scene/records/instances.h"
 
 namespace ernie {
 
-static const float kInfinitePlane = 1e6f;
-
-ERNIE_ENUM(ShapeKind){
-    Mesh,
-    Sphere,
-    Box,
-    Plane,
-    Cylinder,
-    Cone,
-    Capsule,
-    Disk,
-    Tube,
-};
-
-static const uint kGeometryMask = 1u;
-static const uint kCameraEmitterMask = 2u;
-static const uint kEmitterMask = 4u;
-
-struct ShapeRecord {
-    uint kind;
-    float param;
-};
-
-ERNIE_CHECK_SIZE(ShapeRecord, 8);
-
-ERNIE_SHARED bool IsEmitter(uint schema) {
-    switch (SchemaId(schema)) {
-    case SchemaId::SphereLight:
-    case SchemaId::RectLight:
-    case SchemaId::DiskLight:
-    case SchemaId::CylinderLight:
-        return true;
-    default:
-        return false;
-    }
-}
-
 #ifdef __SLANG__
-
-uint OrderedFloat(float value) {
-    const uint bits = asuint(value);
-    return (bits & 0x80000000u) != 0 ? ~bits : bits | 0x80000000u;
-}
-
-float FloatFromOrdered(uint bits) {
-    return asfloat((bits & 0x80000000u) != 0 ? bits & 0x7FFFFFFFu : ~bits);
-}
 
 struct UnitShape {
     float3x3 axes;

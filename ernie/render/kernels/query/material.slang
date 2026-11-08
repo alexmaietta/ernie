@@ -2,7 +2,6 @@
 
 __exported import ernie.render.kernels.query.hit;
 
-#include "ernie/scene/kernels/textures.h"
 
 using namespace ernie;
 

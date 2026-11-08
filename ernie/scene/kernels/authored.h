@@ -2,13 +2,11 @@
 #pragma once
 
 #include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/records/prims.h"
 #include "ernie/scene/records/transforms.h"
 #include "ernie/scene/schema/schema.h"
 
 namespace ernie {
-
-static const uint kPrimAlive = 1u << 0;
-static const uint kPrimSession = 1u << 1;
 
 struct PrimData {
     Paged<uint> schema;

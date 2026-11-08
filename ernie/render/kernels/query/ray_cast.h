@@ -4,8 +4,7 @@
 #include "ernie/device/kernels/shared.h"
 
 #ifndef __SLANG__
-#include "ernie/scene/kernels/authored.h"
-#include "ernie/scene/kernels/instance_layout.h"
+#include "ernie/scene/records/instances.h"
 #include "ernie/scene/records/render_tables.h"
 #endif
 

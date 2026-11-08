@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/authored.h"
-#include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/lights.h"
-#include "ernie/scene/kernels/semantics.h"
+#include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/records/bounds.h"
 #include "ernie/scene/records/instances.h"
+#include "ernie/scene/records/lights.h"
 #include "ernie/scene/records/materials.h"
 #include "ernie/scene/records/meshes.h"
 #include "ernie/scene/records/prims.h"
 #include "ernie/scene/records/products.h"
+#include "ernie/scene/records/semantics.h"
 #include "ernie/scene/records/sensors.h"
 #include "ernie/scene/records/tangents.h"
 #include "ernie/scene/records/textures.h"
 #include "ernie/scene/records/transforms.h"
+#include "ernie/scene/schema/schema.h"
 
 namespace ernie {
 

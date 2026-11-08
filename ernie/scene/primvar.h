@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "ernie/scene/kernels/primvars.h"
+#include "ernie/scene/records/primvars.h"
 #include "ernie/scene/schema/types.h"
 #include "ernie/util/span.h"
 
