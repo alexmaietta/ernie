@@ -376,8 +376,7 @@ void LightTable::Run(const ChangeSet& changes, TableVersions&) {
     const bool viewed = store.LastWrite(kRenderProductCamera) > m_seen;
     m_seen = store.WriteSequence();
     std::vector<uint32_t> dirty;
-    const bool global =
-        relaid || viewed || std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+    const bool global = relaid || viewed || changes.Global();
     std::set<uint32_t> shown;
     for (const uint32_t world : changes.worlds) {
         if (const auto found = m_shownIn.find(world); found != m_shownIn.end()) {
@@ -385,8 +384,8 @@ void LightTable::Run(const ChangeSet& changes, TableVersions&) {
         }
     }
     for (uint32_t tlas = 0; tlas <= m_worlds; ++tlas) {
-        const bool touched = global || shown.contains(tlas) ||
-                             std::ranges::find(changes.worlds, tlas) != changes.worlds.end();
+        const bool touched =
+            global || shown.contains(tlas) || std::ranges::binary_search(changes.worlds, tlas);
         if (touched && m_counts[tlas] > 0) {
             dirty.push_back(tlas);
         }

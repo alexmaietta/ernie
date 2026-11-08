@@ -236,6 +236,23 @@ TEST(PublisherTest, TablesGetChangedRowsOnlyForTheColumnsTheyAskFor) {
     });
 }
 
+TEST(PublisherTest, TheStructureLogKeepsOnlyWhatTablesHaveNotSeen) {
+    ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
+        Counter counter({kXformableTranslate});
+        publisher.Add(counter);
+        for (Ordinal ordinal = 1; ordinal <= 20; ++ordinal) {
+            const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Spawned", 4));
+            publisher.Publish(2 * ordinal - 1);
+            for (uint32_t i = 0; i < 4; ++i) {
+                structure.Remove(block.Prim(i, 0));
+            }
+            publisher.Publish(2 * ordinal);
+            EXPECT_EQ(counter.last.removed.size(), 4u);
+        }
+        EXPECT_LE(structure.Log().size(), 8u);
+    });
+}
+
 TEST(PublisherTest, SnapshotsAreCountedAndOrdered) {
     ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
         EXPECT_THROW(publisher.Acquire(), Error);

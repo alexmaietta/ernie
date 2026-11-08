@@ -104,6 +104,7 @@ struct ChangeSet {
     const ChangedRows* Rows(ColumnRef column) const;
     std::span<const uint32_t> ArrayRows(ColumnRef column) const;
     bool World(uint32_t world) const;
+    bool Global() const;
     bool Wrote(TableId table) const;
 };
 

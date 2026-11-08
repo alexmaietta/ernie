@@ -66,10 +66,10 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
     changes.sinceStamp = since;
     changes.untilStamp = until;
     changes.resync = since == 0;
-    for (StructureEntry entry : m_structure.Log()) {
-        if (entry.ordinal <= since || entry.ordinal > until) {
-            continue;
-        }
+    const std::span<const StructureEntry> log = m_structure.Log();
+    for (auto at = std::ranges::upper_bound(log, since, {}, &StructureEntry::ordinal);
+         at != log.end() && at->ordinal <= until; ++at) {
+        StructureEntry entry = *at;
         entry.ordinal = SealedOrdinal(entry.ordinal, sealing);
         if (entry.api != SchemaId::None) {
             changes.apis.push_back(entry);
@@ -86,6 +86,7 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
             changes.worlds.push_back(world);
         }
     }
+    std::ranges::sort(changes.worlds);
 
     for (const ColumnRef column : columns) {
         if (IsArray(column.column->type)) {
@@ -176,6 +177,9 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         seen = std::min(seen, scheduled.stamp);
     }
     store.TrimArrayWrites(seen);
+    if (!m_scheduled.empty()) {
+        m_structure.TrimLog(seen);
+    }
     uint64_t logged = m_versions.Sequence();
     for (const Scheduled& scheduled : m_scheduled) {
         if (!scheduled.table->TableInputs().empty()) {

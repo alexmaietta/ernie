@@ -183,8 +183,7 @@ void TransformTable::Run(const ChangeSet& changes, TableVersions& versions) {
     WriteMotions(rebuild || !changes.apis.empty());
 
     std::vector<uint32_t> segments;
-    const bool global =
-        rebuild || std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+    const bool global = rebuild || changes.Global();
     if (global) {
         segments.resize(m_segments.Size());
         std::iota(segments.begin(), segments.end(), 0u);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -146,6 +147,11 @@ class Structure {
 
     std::span<const StructureEntry> Log() const {
         return m_log;
+    }
+
+    void TrimLog(Ordinal seen) {
+        m_log.erase(m_log.begin(),
+                    std::ranges::upper_bound(m_log, seen, {}, &StructureEntry::ordinal));
     }
 
     uint32_t Find(std::string_view path) const;

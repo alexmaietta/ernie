@@ -14,6 +14,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
@@ -69,8 +70,8 @@ struct Setup {
     uint64_t step = 0;
 };
 
-Setup Prepare(uint32_t worlds, bool dome) {
-    const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
+Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::Traversal::Auto) {
+    const Ref<Scene> scene = Scene::Create(bench::BenchDevice(traversal));
     scene->Define<Scope>("/Looks");
     scene->Define<Material>(
         "/Looks/Paint",
@@ -282,8 +283,17 @@ void Report(benchmark::State& state) {
 void Publish(benchmark::State& state, const Edit& edit) {
     const auto worlds = uint32_t(state.range(0));
     const bool dome = state.range(1) != 0;
-    Setup& setup = bench::Cached<Setup>(std::format("publish/{}/{}", worlds, dome),
-                                        [&] { return Prepare(worlds, dome); });
+    const device::Traversal traversal =
+        state.range(2) != 0 ? device::Traversal::Hardware : device::Traversal::Software;
+    Setup* found = nullptr;
+    try {
+        found = &bench::Cached<Setup>(std::format("publish/{}/{}/{}", worlds, dome, int(traversal)),
+                                      [&] { return Prepare(worlds, dome, traversal); });
+    } catch (const UnsupportedError& error) {
+        state.SkipWithMessage(error.what());
+        return;
+    }
+    Setup& setup = *found;
     const bool clocked = std::string_view(edit.name) == "clock";
     profiler::SetHistory(kHistory);
     profiler::Clear();
@@ -358,20 +368,28 @@ void Schedule(benchmark::State& state) {
 
 const bool kCore =
     bench::Core("^Scene/Publish/(idle|poses-device|points-device|camera|spawn)/worlds:(1|1024)/"
-                "dome:0") &&
+                "dome:0/hardware:1") &&
     bench::Core("^Scene/Plan/products:64/");
 
 const bool kRegistered = [] {
-    for (const int64_t worlds : {1, 64, 1024, 4096}) {
-        for (const int64_t dome : {0, 1}) {
-            for (const Edit& edit : kEdits) {
-                benchmark::RegisterBenchmark(std::format("Scene/Publish/{}", edit.name), Publish,
-                                             edit)
-                    ->ArgNames({"worlds", "dome"})
-                    ->Args({worlds, dome})
-                    ->MinTime(kMinTime)
-                    ->UseRealTime()
-                    ->Unit(benchmark::kMillisecond);
+    for (const int64_t hardware : {1, 0}) {
+        for (const int64_t worlds : {1, 64, 1024, 4096}) {
+            for (const int64_t dome : {0, 1}) {
+                for (const Edit& edit : kEdits) {
+                    const std::string_view name = edit.name;
+                    if (hardware == 0 &&
+                        (dome != 0 || (name != "poses-device" && name != "points-device" &&
+                                       name != "pose-one"))) {
+                        continue;
+                    }
+                    benchmark::RegisterBenchmark(std::format("Scene/Publish/{}", edit.name),
+                                                 Publish, edit)
+                        ->ArgNames({"worlds", "dome", "hardware"})
+                        ->Args({worlds, dome, hardware})
+                        ->MinTime(kMinTime)
+                        ->UseRealTime()
+                        ->Unit(benchmark::kMillisecond);
+                }
             }
         }
     }

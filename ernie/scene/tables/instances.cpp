@@ -125,8 +125,8 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
         }
     }
     std::set<uint32_t> touched = structural;
-    const bool global = relaid || store.LastWrite(kRenderProductCamera) > m_seen ||
-                        std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+    const bool global =
+        relaid || store.LastWrite(kRenderProductCamera) > m_seen || changes.Global();
     for (const uint32_t world : global ? std::vector<uint32_t>{kGlobalWorld} : changes.worlds) {
         touched.merge(Tlases(world));
     }

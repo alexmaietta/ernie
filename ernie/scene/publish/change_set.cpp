@@ -53,8 +53,11 @@ bool ChangeSet::Wrote(TableId table) const {
 }
 
 bool ChangeSet::World(uint32_t world) const {
-    return std::ranges::find(worlds, world) != worlds.end() ||
-           std::ranges::find(worlds, kGlobalWorld) != worlds.end();
+    return Global() || std::ranges::binary_search(worlds, world);
+}
+
+bool ChangeSet::Global() const {
+    return !worlds.empty() && worlds.back() == kGlobalWorld;
 }
 
 void TableVersions::Record(TableId table, std::span<const uint32_t> worlds) {
@@ -68,12 +71,10 @@ void TableVersions::Collect(TableId table, uint64_t since, std::vector<uint32_t>
         if (entry.table != table || entry.sequence <= since) {
             continue;
         }
-        for (const uint32_t world : entry.worlds) {
-            if (std::ranges::find(worlds, world) == worlds.end()) {
-                worlds.push_back(world);
-            }
-        }
+        worlds.insert(worlds.end(), entry.worlds.begin(), entry.worlds.end());
     }
+    std::ranges::sort(worlds);
+    worlds.erase(std::ranges::unique(worlds).begin(), worlds.end());
 }
 
 void TableVersions::Trim(uint64_t seen) {
