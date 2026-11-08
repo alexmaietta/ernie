@@ -4,10 +4,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <format>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
@@ -22,7 +22,7 @@ namespace {
 std::vector<std::string> Paths(std::string_view prefix, uint32_t count) {
     std::vector<std::string> paths;
     for (uint32_t i = 0; i < count; ++i) {
-        paths.push_back(std::format("{}{}", prefix, i));
+        paths.push_back(fmt::format("{}{}", prefix, i));
     }
     return paths;
 }

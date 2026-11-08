@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/bvh/builder.h"
@@ -157,7 +157,7 @@ TEST(GeometryTest, ClonesInEveryWorldShareOneBlas) {
         const uint32_t quad = s.Quad("/Env0/Quad");
         std::vector<std::string> targets;
         for (uint32_t i = 1; i < 8; ++i) {
-            targets.push_back(std::format("/Env{}", i));
+            targets.push_back(fmt::format("/Env{}", i));
         }
         s.catalog.Clone(s.catalog.Find("/Env0"), targets);
         s.Publish();
@@ -166,7 +166,7 @@ TEST(GeometryTest, ClonesInEveryWorldShareOneBlas) {
         EXPECT_EQ(s.geometry.Stats().built, 1u);
         const uint64_t blas = s.geometry.Find(quad)->blas->Handle();
         for (uint32_t i = 1; i < 8; ++i) {
-            const uint32_t clone = s.catalog.Find(std::format("/Env{}/Quad", i));
+            const uint32_t clone = s.catalog.Find(fmt::format("/Env{}/Quad", i));
             EXPECT_EQ(s.BlasCell(clone), blas);
         }
         EXPECT_EQ(s.geometry.Find(quad)->users, 8u);

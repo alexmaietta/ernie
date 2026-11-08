@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
-#include <format>
 #include <system_error>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/io/image.h"
 #include "ernie/util/log.h"
@@ -66,7 +67,7 @@ std::string ExpandPattern(std::string_view pattern, std::string_view scene, std:
         } else if (token == "time") {
             name += time;
         } else if (token == "frame") {
-            name += std::format("{:04}", frame);
+            name += fmt::format("{:04}", frame);
         } else {
             name += pattern.substr(at, close - at + 1);
         }
@@ -88,7 +89,7 @@ fs::path FreePath(const fs::path& path) {
         return path;
     }
     for (int copy = 1;; ++copy) {
-        fs::path candidate = path.parent_path() / std::format("{}_{}{}", path.stem().string(), copy,
+        fs::path candidate = path.parent_path() / fmt::format("{}_{}{}", path.stem().string(), copy,
                                                               path.extension().string());
         if (!fs::exists(candidate, error)) {
             return candidate;
@@ -200,7 +201,7 @@ void Capture::Update(const device::Tensor* shown, uint64_t frame, std::string_vi
     if (m_sequence.empty()) {
         m_sequence = FreePath(settings.folder / ExpandPattern(settings.pattern, scene, camera, 0));
     }
-    start(m_sequence / std::format("frame_{:04}{}", m_recorded, extension));
+    start(m_sequence / fmt::format("frame_{:04}{}", m_recorded, extension));
     if (++m_recorded >= settings.frames) {
         Stop();
     }
@@ -252,7 +253,7 @@ void Capture::Encode() {
     constexpr const char* kQuiet = " >/dev/null 2>&1";
 #endif
     const std::string command =
-        std::format("{} -y -framerate {} -i {} {} {}{}", Quoted(ffmpeg), settings.fps,
+        fmt::format("{} -y -framerate {} -i {} {} {}{}", Quoted(ffmpeg), settings.fps,
                     Quoted(m_sequence / (std::string("frame_%04d") + Extension(settings.format))),
                     codec, Quoted(video), kQuiet);
     m_recent.insert(m_recent.begin(), video);

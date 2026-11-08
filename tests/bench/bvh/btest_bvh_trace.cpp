@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <random>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/queue.h"
@@ -81,7 +82,7 @@ void TraceRays(benchmark::State& state) {
         state.SkipWithMessage("the device has no hardware ray tracing");
         return;
     }
-    Tracing& tracing = bench::Cached<Tracing>(std::format("{}/{}", int(traversal), triangles),
+    Tracing& tracing = bench::Cached<Tracing>(fmt::format("{}/{}", int(traversal), triangles),
                                               [&] { return Prepare(traversal, triangles); });
     const RayCastDesc desc{.mode = any ? RayCastMode::Any : RayCastMode::Closest,
                            .outputs = RayOutput::Distance};

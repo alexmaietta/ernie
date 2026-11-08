@@ -6,7 +6,6 @@
 #include <concepts>
 #include <cstdint>
 #include <deque>
-#include <format>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -16,6 +15,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/commands.h"
@@ -363,7 +364,7 @@ template <ComputeTraits Traits> class ComputeKernel : public Kernel {
         const SourceHeader prelude{kPreludeHeader, Traits::Prelude()};
         const RuntimeCompiler::Compiled binary =
             compiler.CompileCached(code.code, {&prelude, 1}, options,
-                                   std::format("kernel {} of program \"{}\" for {}", Name(),
+                                   fmt::format("kernel {} of program \"{}\" for {}", Name(),
                                                GetProgram().Label(), architecture),
                                    cache);
 

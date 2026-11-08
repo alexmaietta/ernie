@@ -120,6 +120,7 @@ function(ernie_object_library name)
             "${ERNIE_GENERATED_INCLUDE_DIR}"
     )
     target_compile_definitions(${name} PRIVATE ${ARG_EXPORTS})
+    target_link_libraries(${name} PUBLIC ernie_fmt)
     ernie_warnings(${name})
     ernie_coverage(${name})
 endfunction()
@@ -131,6 +132,7 @@ function(ernie_shared_library name)
         PRIVATE
             ${ARGN}
         INTERFACE
+            "$<BUILD_INTERFACE:ernie_fmt>"
             "$<BUILD_INTERFACE:ernie_dlpack>"
             "$<INSTALL_INTERFACE:Ernie::dlpack>"
     )

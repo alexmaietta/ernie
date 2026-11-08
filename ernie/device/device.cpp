@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <bit>
 #include <cstring>
-#include <format>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -13,6 +12,8 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/cuda/device.h"
 #include "ernie/device/hip/device.h"
@@ -179,7 +180,7 @@ void AddAdapters(std::vector<AdapterInfo>& adapters, const Implementation& imple
     }
 
     for (AdapterInfo& adapter : found) {
-        adapter.alias = std::format("{}:{}", implementation.name, adapter.ordinal);
+        adapter.alias = fmt::format("{}:{}", implementation.name, adapter.ordinal);
         if (!adapter.unsupported.empty()) {
             Log(LogLevel::Debug, "Ernie can't run on {} ({}): {}", adapter.alias, adapter.name,
                 adapter.unsupported);
@@ -219,9 +220,9 @@ std::string Describe(const std::vector<AdapterInfo>& adapters) {
     }
     std::string text = "Ernie found:";
     for (const AdapterInfo& adapter : adapters) {
-        text += std::format("\n  {}: {}", adapter.alias, adapter.name);
+        text += fmt::format("\n  {}: {}", adapter.alias, adapter.name);
         if (!adapter.unsupported.empty()) {
-            text += std::format(" (unsupported: {})", adapter.unsupported);
+            text += fmt::format(" (unsupported: {})", adapter.unsupported);
         }
     }
     return text;
@@ -238,9 +239,9 @@ const AdapterInfo& ChooseAdapter(const std::vector<AdapterInfo>& adapters, const
     if (matching.empty()) {
         std::string wanted = "adapter";
         if (!desc.adapter.empty()) {
-            wanted = std::format("adapter \"{}\"", desc.adapter);
+            wanted = fmt::format("adapter \"{}\"", desc.adapter);
         } else if (desc.backend) {
-            wanted = std::format("{} adapter", BackendName(*desc.backend));
+            wanted = fmt::format("{} adapter", BackendName(*desc.backend));
         }
         throw UnsupportedError("there is no {}. {}", wanted, Describe(adapters));
     }

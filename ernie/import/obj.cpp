@@ -3,7 +3,6 @@
 
 #include <cctype>
 #include <cmath>
-#include <format>
 #include <map>
 #include <set>
 #include <span>
@@ -12,6 +11,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include <fmt/format.h>
 #include <tiny_obj_loader.h>
 
 #include "ernie/util/error.h"
@@ -42,7 +42,7 @@ class ChildNames {
         }
         std::string taken = identifier;
         for (int n = 2; !m_taken.insert(taken).second; ++n) {
-            taken = std::format("{}_{}", identifier, n);
+            taken = fmt::format("{}_{}", identifier, n);
         }
         return taken;
     }
@@ -266,7 +266,7 @@ class SurfaceBuilder {
             return false;
         }
         if (FileBytes bytes = m_source.Find(name)) {
-            Set(std::format("{}Texture", input), m_plan.AddFile(name, std::move(bytes)));
+            Set(fmt::format("{}Texture", input), m_plan.AddFile(name, std::move(bytes)));
             return true;
         }
         const std::filesystem::path file = m_source.Locate(name);
@@ -275,7 +275,7 @@ class SurfaceBuilder {
                 statement, file.string(), input);
             return false;
         }
-        Set(std::format("{}Texture", input), file.generic_string());
+        Set(fmt::format("{}Texture", input), file.generic_string());
         return true;
     }
 
@@ -342,13 +342,13 @@ ImportPlan ObjImporter::Read(std::string_view path, const ImportSource& source,
 
     std::vector<std::string> looks;
     if (!materials.empty()) {
-        const std::string scope = std::format("{}/{}", path, children.Take("Looks", "Looks"));
+        const std::string scope = fmt::format("{}/{}", path, children.Take("Looks", "Looks"));
         plan.Define<Scope>(scope);
         ChildNames names;
         for (const tinyobj::material_t& material : materials) {
             context.Report("materials", looks.size(), materials.size());
             const std::string look =
-                std::format("{}/{}", scope, names.Take(material.name, "Material"));
+                fmt::format("{}/{}", scope, names.Take(material.name, "Material"));
             plan.Define<Material>(look, SurfaceBuilder(material, look, source, plan).Build());
             Log(LogLevel::Debug, "read OBJ material \"{}\" for {}", material.name, look);
             looks.push_back(look);
@@ -372,9 +372,9 @@ ImportPlan ObjImporter::Read(std::string_view path, const ImportSource& source,
             const bool bound = material >= 0 && size_t(material) < looks.size();
             const std::string name =
                 builders.size() > 1 && bound
-                    ? std::format("{}_{}", shape.name, materials[size_t(material)].name)
+                    ? fmt::format("{}_{}", shape.name, materials[size_t(material)].name)
                     : shape.name;
-            const std::string mesh = std::format("{}/{}", path, children.Take(name, "Mesh"));
+            const std::string mesh = fmt::format("{}/{}", path, children.Take(name, "Mesh"));
             const uint32_t faces = builder.FaceCount();
             const uint32_t points = builder.PointCount();
             plan.Define<Mesh>(mesh,

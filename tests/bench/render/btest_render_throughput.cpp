@@ -3,9 +3,10 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
-#include <format>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/io/image.h"
@@ -142,7 +143,7 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     scene->Define<Mesh>("/env_0/Ground", Ground());
     for (uint32_t i = 0; i < kBalls; ++i) {
         const double angle = i * 0.785;
-        scene->Define<Sphere>(std::format("/env_0/Ball_{}", i),
+        scene->Define<Sphere>(fmt::format("/env_0/Ball_{}", i),
                               {.materialBinding = {"/Looks/Hex"},
                                .translate = {3 * std::cos(angle), 3 * std::sin(angle), 0.6},
                                .radius = 0.5f});
@@ -153,12 +154,12 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     for (uint32_t c = 0; c < cameras; ++c) {
         const double angle = 2 * 3.14159265358979 * c / cameras;
         const Double3 eye = {7 * std::cos(angle), 7 * std::sin(angle), 4};
-        scene->Define<Camera>(std::format("/env_0/Cam_{}", c),
+        scene->Define<Camera>(fmt::format("/env_0/Cam_{}", c),
                               {.translate = eye, .orient = LookAt(eye, {0, 0, 0.5})});
     }
     std::vector<std::string> targets;
     for (uint32_t w = 1; w < worlds; ++w) {
-        targets.push_back(std::format("/env_{}", w));
+        targets.push_back(fmt::format("/env_{}", w));
     }
     if (!targets.empty()) {
         scene->Clone(*scene->Find("/env_0"), targets);
@@ -170,7 +171,7 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     std::vector<std::string> views;
     for (uint32_t w = 0; w < worlds; ++w) {
         for (uint32_t c = 0; c < cameras; ++c) {
-            views.push_back(std::format("/env_{}/Cam_{}", w, c));
+            views.push_back(fmt::format("/env_{}/Cam_{}", w, c));
         }
     }
     scene->Define<RenderProduct>("/Render/Product", {.mode = mode.minimal,
@@ -192,7 +193,7 @@ void Throughput(benchmark::State& state, const Mode& mode) {
     const auto worlds = uint32_t(state.range(1));
     const auto side = uint32_t(state.range(2));
     Setup& setup = bench::Cached<Setup>(
-        std::format("throughput/{}/{}/{}/{}", mode.name, cameras, worlds, side),
+        fmt::format("throughput/{}/{}/{}/{}", mode.name, cameras, worlds, side),
         [&] { return Prepare(mode, cameras, worlds, side); });
     std::deque<RenderOutput> flight;
     for (auto _ : state) {
@@ -215,7 +216,7 @@ const bool kCore = bench::Core("^Render/Throughput/(Depth|DisplayColor/shadows:1
 
 const bool kRegistered = [] {
     for (const Mode& mode : kModes) {
-        benchmark::RegisterBenchmark(std::format("Render/Throughput/{}", mode.name), Throughput,
+        benchmark::RegisterBenchmark(fmt::format("Render/Throughput/{}", mode.name), Throughput,
                                      mode)
             ->ArgNames({"cameras", "worlds", "side"})
             ->Args({1, 1, 512})

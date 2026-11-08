@@ -3,11 +3,11 @@
 #include <array>
 #include <chrono>
 #include <cstdio>
-#include <format>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <imgui.h>
 
 #include "ernie/app/viewer/panels/panels.h"
@@ -112,8 +112,8 @@ class Memory {
         Row("Readbacks", FormatBytes(uint64_t(m_rates[1])) + "/s");
         Row("Inline", FormatBytes(uint64_t(m_rates[2])) + "/s");
         Row("Copies", FormatBytes(uint64_t(m_rates[3])) + "/s");
-        Row("Submissions", std::format("{:.0f}/s", m_rates[4]));
-        Row("Host waits", std::format("{:.0f}/s", m_rates[5]));
+        Row("Submissions", fmt::format("{:.0f}/s", m_rates[4]));
+        Row("Host waits", fmt::format("{:.0f}/s", m_rates[5]));
     }
 
     Ref<device::Device> m_device;

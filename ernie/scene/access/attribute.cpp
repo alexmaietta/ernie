@@ -4,9 +4,10 @@
 
 #include <algorithm>
 #include <cstring>
-#include <format>
 #include <memory>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/commands.h"
@@ -402,7 +403,7 @@ device::Operation UntypedAttribute::AttachArrays(const Attachment& attachment,
     if (attachment.inPlace) {
         queue.Follow(producer);
         fresh = heap.Borrow(device.Borrow(source.device, uint64_t(TensorBytes(source)),
-                                          bytes * Size(), std::format("attached {}", column.field)),
+                                          bytes * Size(), fmt::format("attached {}", column.field)),
                             Size(), count);
     } else {
         fresh = heap.AllocateRun(std::vector<uint32_t>(Size(), count));
@@ -557,7 +558,7 @@ device::Operation UntypedAttribute::AttachTensor(const DLTensor* tensor, Stream 
         const uint64_t bytes = uint64_t(CellBytes()) * Size();
         Ref<device::Buffer> borrowed =
             device.Borrow(source.device, uint64_t(TensorBytes(source)), bytes,
-                          std::format("attached {}", column.field));
+                          fmt::format("attached {}", column.field));
         Table& table = GetTable();
         table.Flush();
         queue.Follow(producer);

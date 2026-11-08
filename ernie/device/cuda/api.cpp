@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/cuda/api.h"
 
-#include <format>
 #include <utility>
 #include <variant>
+
+#include <fmt/format.h>
 
 #include "ernie/util/error.h"
 #include "ernie/util/library.h"
@@ -98,7 +99,7 @@ Loaded<Api> Initialize(Api api) {
         return "the CUDA driver found no device";
     }
     if (initialized != CUDA_SUCCESS) {
-        return std::format("cuInit failed: {}", api.ErrorName(initialized));
+        return fmt::format("cuInit failed: {}", api.ErrorName(initialized));
     }
 
     Log(LogLevel::Debug, "the CUDA driver supports CUDA {}", api.driverVersion.ToString());
@@ -117,7 +118,7 @@ Loaded<Api> Load() {
     }
     GetProcAddress getProcAddress = nullptr;
     if (!library.Symbol("cuGetProcAddress_v2", getProcAddress)) {
-        return std::format("{} is older than CUDA 12.0", library.Name());
+        return fmt::format("{} is older than CUDA 12.0", library.Name());
     }
 
     constexpr int kAbi = 12000;
@@ -132,7 +133,7 @@ Loaded<Api> Load() {
     api.library = library.Name();
     ResolveFunctions(resolve, api);
     if (resolve.Missing() != nullptr) {
-        return std::format("{} lacks {}", api.library, resolve.Missing());
+        return fmt::format("{} lacks {}", api.library, resolve.Missing());
     }
     return Initialize(std::move(api));
 }

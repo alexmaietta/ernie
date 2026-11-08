@@ -2,7 +2,8 @@
 #include "ernie/device/cuda/device.h"
 
 #include <algorithm>
-#include <format>
+
+#include <fmt/format.h>
 
 #include "ernie/device/compute/compute.h"
 
@@ -40,13 +41,13 @@ AdapterInfo Describe(const Api& cuda, int ordinal) {
 
     const Version capability{Attribute(cuda, device, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR),
                              Attribute(cuda, device, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)};
-    adapter.architecture = std::format("sm_{}{}", capability.major, capability.minor);
+    adapter.architecture = fmt::format("sm_{}{}", capability.major, capability.minor);
     adapter.apiVersion = cuda.driverVersion;
     adapter.driverVersion = cuda.driverVersion;
 
     if (capability < kMinimumComputeCapability) {
         adapter.unsupported =
-            std::format("compute capability is {}; Ernie needs {} or later", capability.ToString(),
+            fmt::format("compute capability is {}; Ernie needs {} or later", capability.ToString(),
                         kMinimumComputeCapability.ToString());
     }
     return adapter;

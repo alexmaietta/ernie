@@ -2,8 +2,9 @@
 #include "ernie/scene/store/heap.h"
 
 #include <algorithm>
-#include <format>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/device/kernels/shared.h"
 
@@ -50,7 +51,7 @@ HeapBlock Heap::Allocate(uint64_t bytes, uint64_t alignment) {
             {m_device.CreateBuffer(
                  {.bytes = chunkBytes,
                   .usage = device::BufferUsage::Interop | device::BufferUsage::AccelBuildInput,
-                  .label = std::format("{} chunk {}", m_label, m_chunks.size())}),
+                  .label = fmt::format("{} chunk {}", m_label, m_chunks.size())}),
              0});
     }
     Chunk& chunk = m_chunks.back();

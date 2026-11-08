@@ -2,10 +2,11 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
-#include <format>
 #include <random>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/device.h"
@@ -82,7 +83,7 @@ std::vector<std::string> DefinePrototypes(Scene& scene, const std::string& paren
     std::vector<std::string> roots;
     scene.Define<Scope>(parent);
     for (uint32_t p = 0; p < prototypes; ++p) {
-        const std::string root = std::format("{}/Proto_{}", parent, p);
+        const std::string root = fmt::format("{}/Proto_{}", parent, p);
         scene.Define<Xform>(root);
         const float tint = float(p % 8) / 7;
         if (p % 2 == 0) {
@@ -109,7 +110,7 @@ Setup Prepare(const Shape& shape, device::Traversal traversal) {
         roots = {"/Forest/Protos/Lamp"};
     } else {
         for (uint32_t p = 0; p < shape.prototypes; ++p) {
-            roots.push_back(std::format("/Forest/Protos/Proto_{}", p));
+            roots.push_back(fmt::format("/Forest/Protos/Proto_{}", p));
         }
     }
     PointInstancer::Desc desc;
@@ -191,7 +192,7 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
         hardware ? device::Traversal::Hardware : device::Traversal::Software;
     Setup* setup = nullptr;
     try {
-        setup = &bench::Cached<Setup>(std::format("{}/{}/{}/{}/{}/{}/{}", int(shape.family),
+        setup = &bench::Cached<Setup>(fmt::format("{}/{}/{}/{}/{}/{}/{}", int(shape.family),
                                                   Name(shape.layout), shape.count, shape.inner,
                                                   shape.prototypes, shape.extent, hardware),
                                       [&] { return Prepare(shape, traversal); });

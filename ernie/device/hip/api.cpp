@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/hip/api.h"
 
-#include <format>
 #include <utility>
 #include <variant>
+
+#include <fmt/format.h>
 
 #include "ernie/util/error.h"
 #include "ernie/util/library.h"
@@ -95,7 +96,7 @@ Loaded<Api> Initialize(Api api) {
         return "the HIP runtime found no device";
     }
     if (initialized != hipSuccess) {
-        return std::format("hipInit failed: {}", api.ErrorName(initialized));
+        return fmt::format("hipInit failed: {}", api.ErrorName(initialized));
     }
 
     api.hipDriverGetVersion(&version);
@@ -123,7 +124,7 @@ Loaded<Api> Load() {
     api.directory = library.Directory();
     ResolveFunctions(resolve, api);
     if (resolve.Missing() != nullptr) {
-        return std::format("{} lacks {}", api.library, resolve.Missing());
+        return fmt::format("{} lacks {}", api.library, resolve.Missing());
     }
     return Initialize(std::move(api));
 }

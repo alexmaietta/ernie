@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <Python.h>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <format>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -205,7 +205,7 @@ nb::object ExportTensor(const device::Tensor& tensor, std::optional<int64_t> str
                                    "forbids one");
         }
         if (!toHost && (wanted != type || wantedId != id)) {
-            throw nb::buffer_error(std::format("This tensor is on device ({}, {}); it's exported "
+            throw nb::buffer_error(fmt::format("This tensor is on device ({}, {}); it's exported "
                                                "there or copied to the host, not to ({}, {})",
                                                type, id, wanted, wantedId)
                                        .c_str());

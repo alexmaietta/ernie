@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
-#include <format>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/algorithms/scan.h"
@@ -18,7 +19,7 @@ struct Scanning {
 
 void ExclusiveSum(benchmark::State& state) {
     const auto count = uint32_t(state.range(0));
-    Scanning& scanning = bench::Cached<Scanning>(std::format("{}", count), [&] {
+    Scanning& scanning = bench::Cached<Scanning>(fmt::format("{}", count), [&] {
         device::Device& device = bench::BenchDevice();
         std::vector<uint32_t> words = test::Random<uint32_t>(count, 1);
         for (uint32_t& word : words) {

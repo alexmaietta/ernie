@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <format>
+
+#include <fmt/format.h>
 
 namespace ernie {
 
@@ -86,7 +87,7 @@ std::string Digest(std::string_view bytes) {
     for (const char byte : bytes) {
         hash = (hash ^ uint8_t(byte)) * 0x100000001b3ull;
     }
-    return std::format("{:016x}", hash);
+    return fmt::format("{:016x}", hash);
 }
 
 }

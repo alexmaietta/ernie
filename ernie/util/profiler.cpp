@@ -5,7 +5,6 @@
 #include <atomic>
 #include <chrono>
 #include <deque>
-#include <format>
 #include <map>
 #include <mutex>
 #include <unordered_map>
@@ -18,6 +17,7 @@
 #include <unistd.h>
 #endif
 
+#include <fmt/format.h>
 #include <nvtx3/nvToolsExt.h>
 
 #include "ernie/util/environment.h"
@@ -74,7 +74,7 @@ uint32_t ThreadTrack() {
         State& state = GetState();
         const std::lock_guard lock(state.mutex);
         const auto index = uint32_t(state.tracks.size());
-        state.tracks.push_back({{std::format("Thread {}", index), false}, OsThread()});
+        state.tracks.push_back({{fmt::format("Thread {}", index), false}, OsThread()});
         return index;
     }();
     return track;
@@ -168,7 +168,7 @@ void Average(std::vector<ReportNode>& nodes, double frames, double frameMs) {
 }
 
 std::string TrackName(const std::vector<Track>& tracks, uint32_t index) {
-    return index < tracks.size() ? tracks[index].name : std::format("Track {}", index);
+    return index < tracks.size() ? tracks[index].name : fmt::format("Track {}", index);
 }
 
 bool IsGpuTrack(const std::vector<Track>& tracks, uint32_t index) {
@@ -191,7 +191,7 @@ void AddLines(std::string& text, const std::vector<ReportNode>& nodes, const Rep
         if (node->ms < filter.minMs) {
             continue;
         }
-        text += std::format("{:<56} {:12.3f} {:9.2f}%\n",
+        text += fmt::format("{:<56} {:12.3f} {:9.2f}%\n",
                             std::string(size_t(2) * (depth + 1), ' ') + node->name, node->ms,
                             node->percent);
         if (depth + 1 < filter.depth) {
@@ -214,7 +214,7 @@ std::string Quote(std::string_view text) {
 std::string ZonesJson(const std::vector<ReportNode>& nodes) {
     std::vector<std::string> zones;
     for (const ReportNode& node : nodes) {
-        zones.push_back(std::format(
+        zones.push_back(fmt::format(
             R"({{"name":{},"ms":{:.6g},"calls":{:.6g},"percent":{:.6g},"minMs":{:.6g},"maxMs":{:.6g},"children":{}}})",
             Quote(node.name), node.ms, node.calls, node.percent, node.minMs, node.maxMs,
             ZonesJson(node.children)));
@@ -224,13 +224,13 @@ std::string ZonesJson(const std::vector<ReportNode>& nodes) {
 
 std::string SpanEvent(std::string_view name, int pid, std::string_view tid, double start,
                       double duration) {
-    return std::format(R"({{"name":{},"ph":"X","pid":{},"tid":{},"ts":{:.3f},"dur":{:.3f}}})",
+    return fmt::format(R"({{"name":{},"ph":"X","pid":{},"tid":{},"ts":{:.3f},"dur":{:.3f}}})",
                        Quote(name), pid, tid, start, duration);
 }
 
 std::string MetaEvent(std::string_view kind, int pid, std::string_view tid, std::string_view name) {
-    return std::format(R"({{"name":"{}","ph":"M","pid":{}{},"args":{{"name":{}}}}})", kind, pid,
-                       tid.empty() ? "" : std::format(R"(,"tid":{})", tid), Quote(name));
+    return fmt::format(R"({{"name":"{}","ph":"M","pid":{}{},"args":{{"name":{}}}}})", kind, pid,
+                       tid.empty() ? "" : fmt::format(R"(,"tid":{})", tid), Quote(name));
 }
 
 }
@@ -415,11 +415,11 @@ Report Summarize(const std::vector<Frame>& frames) {
 }
 
 std::string ReportText(const Report& report, const ReportFilter& filter) {
-    std::string text = std::format("{:<56} {:>12} {:>10}\n", "", "Duration (ms)", "Percent");
-    text += std::format("{:<56} {:12.3f}   ({} frames)\n", "Frame", report.frameMs, report.frames);
+    std::string text = fmt::format("{:<56} {:>12} {:>10}\n", "", "Duration (ms)", "Percent");
+    text += fmt::format("{:<56} {:12.3f}   ({} frames)\n", "Frame", report.frameMs, report.frames);
     for (const ReportTrack& track : report.tracks) {
-        const std::string title = std::format("{} ({})", track.name, track.gpu ? "GPU" : "CPU");
-        text += std::format("\n{:<56} {:12.3f}\n", title, track.ms);
+        const std::string title = fmt::format("{} ({})", track.name, track.gpu ? "GPU" : "CPU");
+        text += fmt::format("\n{:<56} {:12.3f}\n", title, track.ms);
         AddLines(text, track.zones, filter, 0);
     }
     return text;
@@ -428,11 +428,11 @@ std::string ReportText(const Report& report, const ReportFilter& filter) {
 std::string ReportJson(const Report& report) {
     std::vector<std::string> tracks;
     for (const ReportTrack& track : report.tracks) {
-        tracks.push_back(std::format(R"({{"name":{},"gpu":{},"ms":{:.6g},"zones":{}}})",
+        tracks.push_back(fmt::format(R"({{"name":{},"gpu":{},"ms":{:.6g},"zones":{}}})",
                                      Quote(track.name), track.gpu, track.ms,
                                      ZonesJson(track.zones)));
     }
-    return std::format(R"({{"frames":{},"frameMs":{:.6g},"tracks":[{}]}})", report.frames,
+    return fmt::format(R"({{"frames":{},"frameMs":{:.6g},"tracks":[{}]}})", report.frames,
                        report.frameMs, Join(tracks, ",")) +
            "\n";
 }
@@ -449,7 +449,7 @@ std::string TraceJson(const std::vector<Frame>& frames) {
                                     MetaEvent("thread_name", kCpu, "\"frames\"", "Frames")};
     std::map<uint32_t, bool> used;
     for (const Frame& frame : frames) {
-        events.push_back(SpanEvent(std::format("Frame {}", frame.index), kCpu, "\"frames\"",
+        events.push_back(SpanEvent(fmt::format("Frame {}", frame.index), kCpu, "\"frames\"",
                                    us(frame.startNs), double(frame.endNs - frame.startNs) * 1e-3));
         for (const Zone& zone : frame.zones) {
             const bool gpu = IsGpuTrack(tracks, zone.track);

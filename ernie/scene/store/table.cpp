@@ -2,8 +2,9 @@
 #include "ernie/scene/store/table.h"
 
 #include <algorithm>
-#include <format>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/kernels/shared.h"
@@ -118,7 +119,7 @@ void Table::WritePages(uint32_t firstPage, uint32_t pageCount) {
         m_pageCapacity = std::max(pages, m_pageCapacity * 2);
         m_pageTable = m_heap.GetDevice().CreateBuffer(
             {.bytes = uint64_t(m_pageCapacity) * m_columns.size() * sizeof(uint64_t),
-             .label = std::format("{} pages", m_label)});
+             .label = fmt::format("{} pages", m_label)});
         ++m_layout;
         firstPage = 0;
         pageCount = pages;

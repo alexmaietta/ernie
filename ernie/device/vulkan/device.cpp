@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +13,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+#include <fmt/format.h>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
@@ -242,7 +243,7 @@ VmaAllocator CreateAllocator(VkInstance instance, VkPhysicalDevice physicalDevic
 std::string PipelineCacheKey(const AdapterInfo& adapter) {
     const std::string_view uuid(reinterpret_cast<const char*>(adapter.uuid.data()),
                                 adapter.uuid.size());
-    return std::format("vulkan pipelines {} {} driver {}", adapter.name, Digest(uuid),
+    return fmt::format("vulkan pipelines {} {} driver {}", adapter.name, Digest(uuid),
                        adapter.driverVersion.ToString());
 }
 
@@ -848,7 +849,7 @@ std::string Value(const VkPipelineExecutableStatisticKHR& statistic) {
     case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_UINT64_KHR:
         return std::to_string(statistic.value.u64);
     case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_FLOAT64_KHR:
-        return std::format("{}", statistic.value.f64);
+        return fmt::format("{}", statistic.value.f64);
     default:
         return "";
     }
@@ -930,7 +931,7 @@ KernelStats VulkanKernel::Load(const KernelCode& code, const DiskCache&, const D
     functions.vkDestroyShaderModule(device, module, nullptr);
     Check(created, "vkCreateComputePipelines");
     m_owner.Name(VK_OBJECT_TYPE_PIPELINE, uint64_t(m_pipeline),
-                 std::format("{} of program \"{}\"", Name(), GetProgram().Label()));
+                 fmt::format("{} of program \"{}\"", Name(), GetProgram().Label()));
 
     if (!m_owner.CapturesStatistics()) {
         return {.cached = true};

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
-#include <format>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/algorithms/radix_sort.h"
@@ -32,7 +33,7 @@ void SortKeys(benchmark::State& state) {
     const auto count = uint32_t(state.range(0));
     const auto keyBytes = uint32_t(state.range(1));
     const auto bits = uint32_t(state.range(2));
-    Sorting& sorting = bench::Cached<Sorting>(std::format("{}/{}", count, keyBytes),
+    Sorting& sorting = bench::Cached<Sorting>(fmt::format("{}/{}", count, keyBytes),
                                               [&] { return Prepare(count, keyBytes); });
     bench::TimeGpu(
         state,

@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -13,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include <fmt/chrono.h>
 #include <imgui.h>
 
 #include "ernie/app/viewer/panels/panels.h"
@@ -49,7 +49,7 @@ ImU32 NameColor(std::string_view name) {
 void Save(std::string_view name, const std::string& text) {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
     const std::filesystem::path path =
-        std::filesystem::absolute(std::format("ernie_{}_{:%Y%m%d_%H%M%S}.json", name, now));
+        std::filesystem::absolute(fmt::format("ernie_{}_{:%Y%m%d_%H%M%S}.json", name, now));
     std::ofstream out(path, std::ios::binary);
     if (out.write(text.data(), std::streamsize(text.size()))) {
         Log(LogLevel::Info, "saved {}", path.string());

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <algorithm>
 #include <cstdint>
-#include <format>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/bvh/builder.h"
@@ -90,9 +90,9 @@ template <class Test> void ForEachScene(Test test) {
 std::vector<uint32_t> Worlds(Scene& s, uint32_t count) {
     std::vector<uint32_t> balls;
     for (uint32_t world = 0; world < count; ++world) {
-        s.Define<World>(std::format("/Env{}", world), {.translate = {10.0 * (world + 1), 0, 0}});
+        s.Define<World>(fmt::format("/Env{}", world), {.translate = {10.0 * (world + 1), 0, 0}});
         balls.push_back(
-            s.Define<Sphere>(std::format("/Env{}/Ball", world), {.translate = {1, 0, 0}}));
+            s.Define<Sphere>(fmt::format("/Env{}/Ball", world), {.translate = {1, 0, 0}}));
     }
     return balls;
 }

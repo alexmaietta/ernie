@@ -3,9 +3,10 @@
 
 #include <algorithm>
 #include <exception>
-#include <format>
 #include <memory>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/util/log.h"
 
@@ -67,7 +68,7 @@ std::vector<std::string> Editor::SelectedRoots() const {
 
 std::string Editor::FreeSibling(const std::string& path) const {
     for (int copy = 1;; ++copy) {
-        std::string candidate = std::format("{}_{}", path, copy);
+        std::string candidate = fmt::format("{}_{}", path, copy);
         if (!m_scene->Find(candidate)) {
             return candidate;
         }
@@ -128,7 +129,7 @@ void Editor::SetVisible(const std::string& path, bool visible) {
             .Get(Imageable::kVisibility)
             .Set(shown ? Visibility::Inherited : Visibility::Invisible);
     };
-    m_history.Do({std::format("{} {}", visible ? "Show" : "Hide", Leaf(path)),
+    m_history.Do({fmt::format("{} {}", visible ? "Show" : "Hide", Leaf(path)),
                   [set, visible] { set(!visible); }, [set, visible] { set(visible); }});
 }
 
@@ -212,7 +213,7 @@ bool Editor::Rename(const std::string& path, std::string_view name) {
     }
     Retarget(path, to);
     const std::string old = Leaf(path);
-    m_history.Push({std::format("Rename {} to {}", old, name),
+    m_history.Push({fmt::format("Rename {} to {}", old, name),
                     [this, to, old, path] {
                         m_scene->Rename(*m_scene->Find(to), old);
                         Retarget(to, path);
@@ -237,7 +238,7 @@ bool Editor::Reparent(const std::string& path, const std::string& parent) {
         return false;
     }
     Retarget(path, to);
-    m_history.Push({std::format("Move {}", Leaf(path)),
+    m_history.Push({fmt::format("Move {}", Leaf(path)),
                     [this, to, path] {
                         m_scene->Move(*m_scene->Find(to), path);
                         Retarget(to, path);
@@ -271,7 +272,7 @@ void Editor::Duplicate() {
     };
     const std::vector<std::string> before = m_selection.paths;
     m_history.Do({pasted->size() == 1 ? "Duplicate " + Leaf(pasted->front().path)
-                                      : std::format("Duplicate {} prims", pasted->size()),
+                                      : fmt::format("Duplicate {} prims", pasted->size()),
                   [this, pasted, before] {
                       for (const Pasted& item : *pasted) {
                           if (const std::optional<Prim> prim = m_scene->Find(item.path)) {
@@ -306,7 +307,7 @@ void Editor::Delete() {
         m_selection.Clear();
     };
     m_history.Do({removed->size() == 1 ? "Delete " + Leaf(removed->front().path)
-                                       : std::format("Delete {} prims", removed->size()),
+                                       : fmt::format("Delete {} prims", removed->size()),
                   [this, removed, before] {
                       for (const Removed& item : *removed) {
                           m_scene->Paste(item.copy, item.path);

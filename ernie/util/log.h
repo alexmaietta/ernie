@@ -5,11 +5,8 @@
 #include <string_view>
 #include <utility>
 
-#if __has_include(<version>)
-#include <version>
-#endif
-#ifdef __cpp_lib_format
-#include <format>
+#ifdef ERNIE_FMT
+#include <fmt/format.h>
 #endif
 
 #include "ernie/export.h"
@@ -28,11 +25,11 @@ ERNIE_API void SetLogSink(LogSink sink);
 
 ERNIE_API void LogMessage(LogLevel level, std::string_view message);
 
-#ifdef __cpp_lib_format
+#ifdef ERNIE_FMT
 template <class... Args>
-void Log(LogLevel level, std::format_string<Args...> format, Args&&... args) {
+void Log(LogLevel level, fmt::format_string<Args...> format, Args&&... args) {
     if (level >= GetLogLevel()) {
-        LogMessage(level, std::format(format, std::forward<Args>(args)...));
+        LogMessage(level, fmt::format(format, std::forward<Args>(args)...));
     }
 }
 #endif

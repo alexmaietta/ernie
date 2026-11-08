@@ -2,9 +2,10 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
-#include <format>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/device.h"
@@ -179,7 +180,7 @@ Setup Prepare(const Mode& mode, Motion motion, const Shape& shape, device::Trave
     const std::vector<Double3> spots = Spots(shape.balls);
     for (uint32_t i = 0; i < shape.balls; ++i) {
         scene->Define<Sphere>(
-            std::format("/env_0/Ball_{}", i),
+            fmt::format("/env_0/Ball_{}", i),
             {.translate = spots[i],
              .displayColor = {0.2f + 0.6f * float(i % 8) / 7, 0.4f, 0.8f - 0.6f * float(i % 8) / 7},
              .radius = Radius(shape.balls)});
@@ -189,12 +190,12 @@ Setup Prepare(const Mode& mode, Motion motion, const Shape& shape, device::Trave
     for (uint32_t c = 0; c < shape.cameras; ++c) {
         const double angle = kTau * c / shape.cameras;
         const Double3 eye = {7 * std::cos(angle), 7 * std::sin(angle), 4};
-        scene->Define<Camera>(std::format("/env_0/Cam_{}", c),
+        scene->Define<Camera>(fmt::format("/env_0/Cam_{}", c),
                               {.translate = eye, .orient = LookAt(eye, {0, 0, 0.5})});
     }
     std::vector<std::string> targets;
     for (uint32_t w = 1; w < shape.worlds; ++w) {
-        targets.push_back(std::format("/env_{}", w));
+        targets.push_back(fmt::format("/env_{}", w));
     }
     if (!targets.empty()) {
         scene->Clone(*scene->Find("/env_0"), targets);
@@ -209,13 +210,13 @@ Setup Prepare(const Mode& mode, Motion motion, const Shape& shape, device::Trave
     std::vector<std::string> balls;
     std::vector<std::string> respawned;
     for (uint32_t w = 0; w < shape.worlds; ++w) {
-        grounds.push_back(std::format("/env_{}/Ground", w));
-        respawned.push_back(std::format("/env_{}/Ball_0", w));
+        grounds.push_back(fmt::format("/env_{}/Ground", w));
+        respawned.push_back(fmt::format("/env_{}/Ball_0", w));
         for (uint32_t c = 0; c < shape.cameras; ++c) {
-            views.push_back(std::format("/env_{}/Cam_{}", w, c));
+            views.push_back(fmt::format("/env_{}/Cam_{}", w, c));
         }
         for (uint32_t i = 0; i < shape.balls; ++i) {
-            balls.push_back(std::format("/env_{}/Ball_{}", w, i));
+            balls.push_back(fmt::format("/env_{}/Ball_{}", w, i));
         }
     }
     std::vector<std::string> vars = {mode.var};
@@ -334,7 +335,7 @@ void Run(benchmark::State& state, const Mode& mode, Motion motion, const Shape& 
     Setup* setup = nullptr;
     try {
         setup = &bench::Cached<Setup>(
-            std::format("{}/{}/{}/{}/{}/{}/{}/{}", mode.name, Name(motion), shape.worlds,
+            fmt::format("{}/{}/{}/{}/{}/{}/{}/{}", mode.name, Name(motion), shape.worlds,
                         shape.cameras, shape.cells, shape.balls, shape.outputs, hardware),
             [&] { return Prepare(mode, motion, shape, traversal); });
     } catch (const UnsupportedError& error) {
@@ -433,7 +434,7 @@ const bool kRegistered = [] {
                                   {4096, 1}, {1, 64}, {16, 16}, {256, 4}};
     for (const auto& [mode, motion] : scaled) {
         benchmark::internal::Benchmark* registered = benchmark::RegisterBenchmark(
-            std::format("Render/Scaling/{}/motion:{}", mode->name, Name(motion)), Scaling, *mode,
+            fmt::format("Render/Scaling/{}/motion:{}", mode->name, Name(motion)), Scaling, *mode,
             motion);
         registered->ArgNames({"worlds", "cameras", "hardware"});
         for (const auto& [worlds, cameras] : layouts) {
@@ -445,14 +446,14 @@ const bool kRegistered = [] {
     }
     for (const Motion motion : {Motion::Static, Motion::Deforming}) {
         benchmark::RegisterBenchmark(
-            std::format("Render/Complexity/{}/motion:{}", kShadowed.name, Name(motion)), Complexity,
+            fmt::format("Render/Complexity/{}/motion:{}", kShadowed.name, Name(motion)), Complexity,
             motion)
             ->ArgNames({"cells", "balls", "worlds", "hardware"})
             ->ArgsProduct({{32, 128, 256}, {8, 64, 512}, {16, 256}, {0, 1}})
             ->UseRealTime()
             ->Unit(benchmark::kMillisecond);
     }
-    benchmark::RegisterBenchmark(std::format("Render/Outputs/{}", kShadowed.name), Outputs)
+    benchmark::RegisterBenchmark(fmt::format("Render/Outputs/{}", kShadowed.name), Outputs)
         ->ArgNames({"outputs", "worlds", "hardware"})
         ->ArgsProduct({{1, 2, 4, 8}, {16, 1024}, {0, 1}})
         ->UseRealTime()

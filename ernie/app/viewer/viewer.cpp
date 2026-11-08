@@ -13,7 +13,6 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <functional>
 #include <iterator>
@@ -25,6 +24,7 @@
 #include <utility>
 
 #include <GLFW/glfw3.h>
+#include <fmt/format.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_internal.h>
@@ -209,7 +209,7 @@ class ViewerImpl {
         const Viewport* active = Active();
         std::string name;
         for (int number = 2; name.empty() || FindViewport(name) != nullptr; ++number) {
-            name = std::format("Viewport {}", number);
+            name = fmt::format("Viewport {}", number);
         }
         const ImGuiWindow* window =
             active != nullptr ? ImGui::FindWindowByName(active->Name().c_str()) : nullptr;
@@ -1015,7 +1015,7 @@ void ViewerImpl::DrawCreateMenu() {
             if (PrimGroup(group) == PrimGroup::Organize) {
                 ImGui::Separator();
             }
-        } else if (Shown(std::format("Create/{}", kPrimGroupNames[group])) &&
+        } else if (Shown(fmt::format("Create/{}", kPrimGroupNames[group])) &&
                    ImGui::BeginMenu(kPrimGroupNames[group])) {
             std::ranges::for_each(members, create);
             ImGui::EndMenu();
