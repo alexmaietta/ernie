@@ -14,7 +14,7 @@ project(
         C
         CXX
 )
-set(ERNIE_PRERELEASE "")
+set(ERNIE_PRERELEASE "rc1")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
 option(ERNIE_BUILD_BENCHMARKS "Build Ernie's benchmarks" OFF)
