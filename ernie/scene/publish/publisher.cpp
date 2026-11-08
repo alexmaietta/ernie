@@ -59,6 +59,7 @@ Ordinal Publisher::SealedOrdinal(Ordinal stamp, Ordinal sealing) const {
 ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
                            std::span<const ColumnRef> columns, std::span<const ColumnRef> rows,
                            std::vector<Ref<device::Buffer>>* reused) {
+    ERNIE_ZONE("Publisher/Changes");
     ColumnStore& store = m_structure.GetColumnStore();
     ChangeSet changes;
     changes.since = since == 0 ? 0 : SealedOrdinal(since, sealing);
@@ -66,33 +67,45 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
     changes.sinceStamp = since;
     changes.untilStamp = until;
     changes.resync = since == 0;
-    const std::span<const StructureEntry> log = m_structure.Log();
-    for (auto at = std::ranges::upper_bound(log, since, {}, &StructureEntry::ordinal);
-         at != log.end() && at->ordinal <= until; ++at) {
-        StructureEntry entry = *at;
-        entry.ordinal = SealedOrdinal(entry.ordinal, sealing);
-        if (entry.api != SchemaId::None) {
-            changes.apis.push_back(entry);
-        } else {
-            (entry.added ? changes.added : changes.removed).push_back(entry);
+    {
+        ERNIE_ZONE("Publisher/StructureLog");
+        const std::span<const StructureEntry> log = m_structure.Log();
+        for (auto at = std::ranges::upper_bound(log, since, {}, &StructureEntry::ordinal);
+             at != log.end() && at->ordinal <= until; ++at) {
+            StructureEntry entry = *at;
+            entry.ordinal = SealedOrdinal(entry.ordinal, sealing);
+            if (entry.api != SchemaId::None) {
+                changes.apis.push_back(entry);
+            } else {
+                (entry.added ? changes.added : changes.removed).push_back(entry);
+            }
+        }
+        changes.structure = !changes.added.empty() || !changes.removed.empty();
+    }
+    {
+        ERNIE_ZONE("Publisher/Worlds");
+        const uint32_t worlds = m_structure.GetPrims().WorldCount();
+        for (uint32_t slot = 0; slot <= worlds; ++slot) {
+            const uint32_t world = SlotWorld(slot);
+            const Ordinal stamp = store.WorldStamp(world);
+            if (stamp > since && stamp <= until) {
+                changes.worlds.push_back(world);
+            }
+        }
+        std::ranges::sort(changes.worlds);
+    }
+    {
+        ERNIE_ZONE("Publisher/ArrayRows");
+        for (const ColumnRef column : columns) {
+            if (IsArray(column.column->type)) {
+                changes.arrays.emplace_back(column, store.ArrayRows(column, since, until));
+            }
         }
     }
-    changes.structure = !changes.added.empty() || !changes.removed.empty();
-    const uint32_t worlds = m_structure.GetPrims().WorldCount();
-    for (uint32_t slot = 0; slot <= worlds; ++slot) {
-        const uint32_t world = SlotWorld(slot);
-        const Ordinal stamp = store.WorldStamp(world);
-        if (stamp > since && stamp <= until) {
-            changes.worlds.push_back(world);
-        }
+    if (rows.empty()) {
+        return changes;
     }
-    std::ranges::sort(changes.worlds);
-
-    for (const ColumnRef column : columns) {
-        if (IsArray(column.column->type)) {
-            changes.arrays.emplace_back(column, store.ArrayRows(column, since, until));
-        }
-    }
+    ERNIE_ZONE("Publisher/CompactRows");
     if (reused != nullptr) {
         reused->resize(rows.size());
     }
@@ -152,10 +165,13 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         ERNIE_ZONE("Publisher/Table");
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
                                   table.Inputs(), table.RowInputs(), &scheduled.changed);
-        for (const TableId id : table.TableInputs()) {
-            if (m_versions.Version(id) > scheduled.logged) {
-                changes.wrote.push_back(id);
-                m_versions.Collect(id, scheduled.logged, changes.worlds);
+        {
+            ERNIE_ZONE("Publisher/Versions");
+            for (const TableId id : table.TableInputs()) {
+                if (m_versions.Version(id) > scheduled.logged) {
+                    changes.wrote.push_back(id);
+                    m_versions.Collect(id, scheduled.logged, changes.worlds);
+                }
             }
         }
         const uint64_t writes = store.WriteSequence();
@@ -172,6 +188,7 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         scheduled.stamp = stamp;
         scheduled.ran = true;
     }
+    ERNIE_ZONE("Publisher/Trim");
     Ordinal seen = stamp;
     std::vector<std::pair<ColumnRef, Ordinal>> held;
     for (const Scheduled& scheduled : m_scheduled) {
@@ -245,6 +262,7 @@ ChangeSet Publisher::Changes(Ordinal since, std::span<const ColumnRef> columns) 
 }
 
 void Publisher::Seal() {
+    ERNIE_ZONE("Publisher/Seal");
     const AuthoredData data = m_structure.GetColumnStore().Data();
     m_tables.prims = {.schema = data.prims.schema,
                       .world = data.prims.world,
