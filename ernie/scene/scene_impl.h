@@ -21,6 +21,7 @@
 #include "ernie/scene/tables/lights.h"
 #include "ernie/scene/tables/materials.h"
 #include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/pipelines.h"
 #include "ernie/scene/tables/plans.h"
 #include "ernie/scene/tables/points.h"
 #include "ernie/scene/tables/products.h"
@@ -166,6 +167,10 @@ class SceneImpl {
         return m_products;
     }
 
+    const PipelineTable& GetPipelines() const {
+        return m_pipelines;
+    }
+
     ProductPlans& GetPlans() {
         return m_plans;
     }
@@ -204,6 +209,7 @@ class SceneImpl {
     SemanticTable m_semantics;
     SensorTable m_sensors;
     SimulationClock m_clock;
+    PipelineTable m_pipelines;
     ProductTable m_products;
     ProductPlans m_plans;
     CaptureSchedule m_captures;

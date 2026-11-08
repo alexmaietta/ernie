@@ -11,6 +11,7 @@ class CameraSignal : SensorNode (
 ) {
     token info:id = CameraSignal
     token inputs:layout = full (
+        enum = CameraSignalLayout
         tracked
         allowed = [full, mosaic]
         group = "Signal"
@@ -18,6 +19,7 @@ class CameraSignal : SensorNode (
         doc = "full gives every pixel all of the pattern's channels. mosaic gives each pixel only the channel at its site, as a Bayer or other mosaic sensor reads it, which is the raw signal and takes a third of the memory. Patterns without a mosaic always give full."
     )
     token inputs:precision = float (
+        enum = CameraSignalPrecision
         tracked
         allowed = [float, half]
         group = "Signal"
@@ -45,6 +47,7 @@ class Emva1288 : SensorNode (
 ) {
     token info:id = Emva1288
     token inputs:shot = poisson (
+        enum = ShotNoise
         tracked
         allowed = [poisson, gaussian, off]
         group = "Noise"
@@ -97,6 +100,7 @@ class Encode : SensorNode (
 ) {
     token info:id = Encode
     token inputs:transfer = srgb (
+        enum = EncodeTransfer
         tracked
         allowed = [srgb, rec709]
         group = "Encode"
@@ -110,6 +114,7 @@ class Demosaic : SensorNode (
 ) {
     token info:id = Demosaic
     token inputs:method = bilinear (
+        enum = DemosaicMethod
         tracked
         allowed = [bilinear]
         group = "Demosaic"
@@ -188,6 +193,7 @@ class Meter : SensorNode (
 ) {
     token info:id = Meter
     token inputs:mode = average (
+        enum = MeterMode
         tracked
         allowed = [average, centerWeighted, spot]
         group = "Meter"
@@ -267,6 +273,7 @@ class Tone : SensorNode (
 ) {
     token info:id = Tone
     token inputs:curve = none (
+        enum = ToneCurve
         tracked
         allowed = [none, reinhard, aces]
         group = "Tone"

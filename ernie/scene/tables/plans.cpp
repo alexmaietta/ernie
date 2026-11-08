@@ -65,6 +65,19 @@ std::shared_ptr<const ProductPlan> ProductPlans::Plan(std::span<const std::strin
             plan->captures[entry].push_back(capture);
             pixels += uint64_t(capture.width) * capture.height;
         }
+        if (product->pipeline != kNoPrim) {
+            for (const uint32_t sensor : product->sensors) {
+                const auto found =
+                    std::ranges::find_if(plan->pipelines, [&](const PlannedPipeline& run) {
+                        return run.pipeline == product->pipeline && run.sensor == sensor;
+                    });
+                PlannedPipeline& run = found != plan->pipelines.end()
+                                           ? *found
+                                           : plan->pipelines.emplace_back(
+                                                 PlannedPipeline{product->pipeline, sensor, {}});
+                run.products.push_back(uint32_t(plan->products.size()));
+            }
+        }
         plan->captureCount += uint32_t(product->sensors.size());
         plan->pixelCount += uint64_t(product->width) * product->height * product->sensors.size();
         plan->products.push_back(std::move(product));

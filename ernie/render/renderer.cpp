@@ -194,6 +194,9 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
                 .frames.emplace_back(FrameOutput{.startTime = result.simulationStartTime,
                                                  .endTime = result.simulationEndTime});
         for (const ResolvedVar& var : product.vars) {
+            if (!var.output.empty()) {
+                continue;
+            }
             RenderVarOutput& output = frame.renderVars[var.path];
             output.renderVarPath = var.path;
             output.sourceName = kRenderVarSourceTokens[uint32_t(var.source)];
@@ -292,6 +295,9 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         const ResolvedProduct& product = *planned.products[index];
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
         for (const ResolvedVar& var : product.vars) {
+            if (!var.output.empty()) {
+                continue;
+            }
             if (var.source == RenderVarSource::PointCloud) {
                 uint64_t& clouds = slots[uint32_t(var.source)];
                 clouds = AcquireCloud(set, index, path, product, var, clouds);

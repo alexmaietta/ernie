@@ -15,6 +15,12 @@
 
 namespace ernie {
 
+struct PlannedPipeline {
+    uint32_t pipeline = kNoPrim;
+    uint32_t sensor = kNoPrim;
+    std::vector<uint32_t> products;
+};
+
 struct ProductPlan {
     uint64_t id = 0;
     std::vector<std::string> paths;
@@ -24,6 +30,7 @@ struct ProductPlan {
     uint32_t captureCount = 0;
     uint64_t pixelCount = 0;
     std::vector<Token> taxonomies;
+    std::vector<PlannedPipeline> pipelines;
 };
 
 inline constexpr size_t kCachedPlans = 4;

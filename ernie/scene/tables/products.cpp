@@ -21,8 +21,9 @@ namespace ernie {
 namespace {
 
 std::vector<ColumnRef> ProductInputs() {
-    std::vector<ColumnRef> inputs = {kLidarFiringsPerScan, kLidarEmitterElevations,
-                                     kLidarMaxReturns, kRadarRays, kDetectorAPIDetectorPattern};
+    std::vector<ColumnRef> inputs = {
+        kLidarFiringsPerScan, kLidarEmitterElevations,     kLidarMaxReturns,
+        kRadarRays,           kDetectorAPIDetectorPattern, kSensorPipelineBinding};
     for (const SchemaId schema :
          {SchemaId::RenderProduct, SchemaId::RenderVar, SchemaId::MinimalAPI,
           SchemaId::BackgroundAPI, SchemaId::RealTimeAPI, SchemaId::SensorAPI,
@@ -154,12 +155,47 @@ const SensorKind& FindSensorKind(SchemaId schema) {
     throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
 }
 
+struct BoundPipeline {
+    std::shared_ptr<const PipelineInstance> instance;
+    std::vector<pipeline::SignalLayout> layouts;
+};
+
+ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
+                        const BoundPipeline& bound, const std::string& name) {
+    const auto found =
+        std::ranges::find(bound.instance->resolved.outputs, name, &pipeline::ResolvedOutput::name);
+    if (found == bound.instance->resolved.outputs.end()) {
+        throw Error("{} reads {}, which isn't an output the renderer writes or {} makes",
+                    prim.Path(), name, bound.instance->path);
+    }
+    const pipeline::SignalLayout& layout = bound.layouts[found->value];
+    ResolvedVar var{.prim = prim.Index(),
+                    .path = prim.Path(),
+                    .frame = prim.Get(RenderVar::kFrameOfReference),
+                    .type = device::DType::Float32,
+                    .output = name};
+    var.shape = {int64_t(product.sensors.size())};
+    if (layout.perCapture) {
+        var.shape.push_back(pipeline::kStatWords);
+        return var;
+    }
+    var.shape.insert(var.shape.end(), {int64_t(product.height), int64_t(product.width)});
+    if (layout.channels > 1) {
+        var.shape.push_back(layout.channels);
+    }
+    return var;
+}
+
 ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
-                       int64_t channels) {
+                       int64_t channels, const BoundPipeline& bound) {
     const std::string name = prim.Get(RenderVar::kSourceName);
     const std::optional<RenderVarSource> builtIn = FindRenderVarSource(name);
     if (!builtIn) {
-        throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(), name);
+        if (!bound.instance) {
+            throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(),
+                        name);
+        }
+        return PipelineVar(prim, product, bound, name);
     }
     const RenderVarSource source = *builtIn;
     ResolvedVar var{.prim = prim.Index(),
@@ -223,7 +259,7 @@ RenderEntry SelectEntry(const ResolvedProduct& product, const SensorKind& kind) 
     const bool shaded = std::ranges::any_of(product.vars, [](const ResolvedVar& var) {
         return var.source == RenderVarSource::LdrColor || var.source == RenderVarSource::HdrColor ||
                var.source == RenderVarSource::DiffuseAlbedo ||
-               var.source == RenderVarSource::ElectronRate;
+               var.source == RenderVarSource::ElectronRate || !var.output.empty();
     });
     if (!shaded) {
         return RenderEntry::MinimalData;
@@ -372,9 +408,50 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 channels = DetectorChannels(m_scene.ByIndex(sensor)) == channels ? channels : 0;
             }
         }
+        const auto binding = [&](ColumnRef column, uint32_t at) {
+            const View bound(m_structure, prims.Record(at).schema, std::vector<uint32_t>{at});
+            const std::vector<uint32_t> found = bound.GetArray<uint32_t>(column).Get(0);
+            return found.empty() || !prims.Alive(found.front()) ? kNoPrim : found.front();
+        };
+        product.pipeline = binding(kRenderProductPipelineBinding, index);
+        if (product.pipeline == kNoPrim) {
+            product.pipeline = binding(kSensorPipelineBinding, lead.Index());
+            for (const uint32_t sensor : product.sensors) {
+                if (binding(kSensorPipelineBinding, sensor) != product.pipeline) {
+                    throw Error("{} stacks {} and {}, which bind different pipelines", path,
+                                lead.Path(), m_scene.ByIndex(sensor).Path());
+                }
+            }
+        }
+        BoundPipeline bound;
+        if (product.pipeline != kNoPrim) {
+            if (!IsA(prims.Record(product.pipeline).schema, SchemaId::SensorPipeline)) {
+                throw Error("{} binds {}, which isn't a SensorPipeline", path,
+                            m_scene.ByIndex(product.pipeline).Path());
+            }
+            bound.instance = m_pipelines.Find(product.pipeline);
+            if (!bound.instance) {
+                throw Error("{} binds {}, which isn't resolved yet", path,
+                            m_scene.ByIndex(product.pipeline).Path());
+            }
+            if (!bound.instance->error.empty()) {
+                throw Error("{}", bound.instance->error);
+            }
+            const DetectorPattern pattern = lead.IsA<Camera>()
+                                                ? lead.Get(DetectorAPI::kDetectorPattern)
+                                                : DetectorPattern::Mono;
+            const bool mosaics = pattern != DetectorPattern::Mono &&
+                                 pattern != DetectorPattern::Rgb &&
+                                 pattern != DetectorPattern::Bands;
+            bound.layouts =
+                pipeline::PropagateLayouts(bound.instance->resolved, m_pipelines.Registry(),
+                                           {.channels = uint32_t(std::max<int64_t>(channels, 1)),
+                                            .pattern = uint32_t(pattern),
+                                            .mosaics = mosaics});
+        }
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
             const ResolvedVar& added = product.vars.emplace_back(
-                ResolveVar(m_scene.ByIndex(var), product, kind, channels));
+                ResolveVar(m_scene.ByIndex(var), product, kind, channels, bound));
             product.semantic |= added.semantic;
         }
         product.entry = SelectEntry(product, kind);
@@ -400,10 +477,12 @@ void ProductTable::Run(const ChangeSet& changes, TableVersions&) {
     ERNIE_ZONE("Products/Run");
     ColumnStore& store = m_structure.GetColumnStore();
     const bool edited = changes.resync || changes.structure || !changes.apis.empty() ||
+                        m_pipelines.Version() != m_pipelineVersion ||
                         std::ranges::any_of(Inputs(), [&](ColumnRef input) {
                             return store.LastWrite(input) > m_seen;
                         });
     m_seen = store.WriteSequence();
+    m_pipelineVersion = m_pipelines.Version();
     if (edited) {
         Resolve();
     }
@@ -423,8 +502,10 @@ void ProductTable::Resolve() {
         if (!same && product.error.empty()) {
             std::string sources;
             for (const ResolvedVar& var : product.vars) {
-                sources += std::format("{}{}", sources.empty() ? "" : ", ",
-                                       kRenderVarSourceTokens[uint32_t(var.source)]);
+                sources += std::format(
+                    "{}{}", sources.empty() ? "" : ", ",
+                    var.output.empty() ? std::string(kRenderVarSourceTokens[uint32_t(var.source)])
+                                       : var.output);
             }
             Log(LogLevel::Debug, "resolved {}: {} at {} x {} writing {}{}",
                 m_scene.ByIndex(prim).Path(), Counted(product.sensors.size(), "sensor"),

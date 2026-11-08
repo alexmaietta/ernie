@@ -13,6 +13,7 @@
 #include "ernie/device/tensor.h"
 #include "ernie/scene/records/products.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/pipelines.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
 
@@ -75,6 +76,7 @@ struct ResolvedVar {
     device::DType type = device::DType::UInt8;
     std::vector<int64_t> shape;
     std::vector<PointChannel> channels;
+    std::string output;
     bool semantic = false;
 
     bool operator==(const ResolvedVar&) const = default;
@@ -93,6 +95,7 @@ struct ProductShape {
     std::vector<std::string> overlays;
     Token taxonomy;
     RenderEntry entry = RenderEntry::MinimalData;
+    uint32_t pipeline = kNoPrim;
     bool semantic = false;
     std::string error;
 
@@ -107,7 +110,8 @@ struct ResolvedProduct : ProductShape {
 
 class ProductTable : public RenderTable {
   public:
-    ProductTable(Scene& scene, Structure& structure) : m_scene(scene), m_structure(structure) {}
+    ProductTable(Scene& scene, Structure& structure, const PipelineTable& pipelines)
+        : m_scene(scene), m_structure(structure), m_pipelines(pipelines) {}
 
     std::string_view Name() const override {
         return "products";
@@ -131,6 +135,8 @@ class ProductTable : public RenderTable {
 
     Scene& m_scene;
     Structure& m_structure;
+    const PipelineTable& m_pipelines;
+    uint64_t m_pipelineVersion = 0;
     mutable std::mutex m_mutex;
     std::map<uint32_t, std::shared_ptr<const ResolvedProduct>> m_products;
     RecordTable<ProductRecord> m_records{"product records"};
