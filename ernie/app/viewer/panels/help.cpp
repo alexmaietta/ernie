@@ -65,7 +65,7 @@ void DrawAbout(bool& open, device::Device& device) {
         return;
     }
     const BuildInfo& build = GetBuildInfo();
-    const std::string version = build.version.ToString();
+    const std::string version(build.fullVersion);
     ImGui::Text("Ernie %s", version.c_str());
     ImGui::TextDisabled("A physically based, spectral renderer for planetary robotics and sensing");
     std::string report = "Ernie " + version + "\n";

@@ -213,7 +213,8 @@ void RegisterTensor(nb::module_& module) {
 
 void RegisterBuild(nb::module_& module) {
     nb::class_<BuildInfo>(module, "BuildInfo")
-        .def_prop_ro("version", [](const BuildInfo& build) { return build.version.ToString(); })
+        .def_prop_ro("version",
+                     [](const BuildInfo& build) { return std::string(build.fullVersion); })
         .def_prop_ro("commit", [](const BuildInfo& build) { return std::string(build.commit); })
         .def_ro("modified", &BuildInfo::modified)
         .def_prop_ro("commit_date",

@@ -5,7 +5,8 @@ add_custom_target(
     ALL
     COMMAND
         "${CMAKE_COMMAND}" "-DSOURCE=${PROJECT_SOURCE_DIR}" "-DOUTPUT=${ernie_build_info}"
-        "-DVERSION=${PROJECT_VERSION}" -P "${PROJECT_SOURCE_DIR}/cmake/ErnieBuildInfo.cmake"
+        "-DVERSION=${PROJECT_VERSION}" "-DPRERELEASE=${ERNIE_PRERELEASE}" -P
+        "${PROJECT_SOURCE_DIR}/cmake/ErnieBuildInfo.cmake"
     BYPRODUCTS
         "${ernie_build_info}"
     VERBATIM

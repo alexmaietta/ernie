@@ -19,7 +19,8 @@ const BuildInfo& GetBuildInfo() {
                                 ERNIE_GIT_SHA,
                                 ERNIE_GIT_DIRTY,
                                 ERNIE_COMMIT_DATE,
-                                ERNIE_BUILD_DATE};
+                                ERNIE_BUILD_DATE,
+                                ERNIE_VERSION_FULL};
     return info;
 }
 
