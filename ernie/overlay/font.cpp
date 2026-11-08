@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <optional>
 
-#include "ernie/render/overlay/overlay_impl.h"
+#include "ernie/overlay/overlay_impl.h"
 #include "ernie/util/error.h"
 
 extern "C" {

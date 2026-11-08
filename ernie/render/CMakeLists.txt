@@ -1,9 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_render
-    overlay/font.cpp
-    overlay/overlay.cpp
-    ray_cast/ray_cast.cpp
     render_output.cpp
     renderer.cpp
 )
@@ -11,9 +8,7 @@ target_link_libraries(
     ernie_render
     PUBLIC
         ernie_scene
-    PRIVATE
-        ernie_fonts
-        ernie_stb
+        ernie_overlay
 )
 ernie_embed(
     ernie_render
@@ -29,15 +24,14 @@ ernie_embed(
 ernie_static_library(
     ernie_render_internal
     ernie_render
+    ernie_overlay
+    ernie_ray_cast
     ernie_scene_internal
     ernie_fonts
     ernie_stb
 )
 
 ernie_public_files(
-    kernels/overlay/style.h
-    overlay/overlay.h
-    ray_cast/ray_cast.h
     render_output.h
     renderer.h
 )

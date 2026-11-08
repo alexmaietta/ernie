@@ -18,8 +18,8 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/commands.h"
 #include "ernie/device/program.h"
-#include "ernie/render/kernels/overlay/overlay.h"
-#include "ernie/render/overlay/overlay.h"
+#include "ernie/overlay/kernels/overlay.h"
+#include "ernie/overlay/overlay.h"
 #include "ernie/scene/types.h"
 
 namespace ernie {

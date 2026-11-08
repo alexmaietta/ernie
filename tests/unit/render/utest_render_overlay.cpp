@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/render/overlay/overlay.h"
+#include "ernie/overlay/overlay.h"
 
 #include <cstdint>
 #include <optional>

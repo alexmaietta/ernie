@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/render/ray_cast/ray_cast.h"
+#include "ernie/ray_cast/ray_cast.h"
 
 #include <cmath>
 #include <cstdint>

@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ernie/device/kernels/shared.h"
-#include "ernie/render/kernels/overlay/style.h"
+#include "ernie/overlay/kernels/style.h"
 
 #ifndef __SLANG__
 #include "ernie/io/kernels/encoding.h"

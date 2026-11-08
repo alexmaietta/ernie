@@ -2,7 +2,7 @@
 
 import ernie.device.kernels.device;
 import ernie.render.kernels.surface.compute;
-#include "ernie/render/kernels/query/ray_cast.h"
+#include "ernie/ray_cast/kernels/ray_cast.h"
 
 using namespace ernie;
 

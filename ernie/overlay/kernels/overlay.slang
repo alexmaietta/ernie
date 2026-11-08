@@ -4,7 +4,7 @@ import ernie.device.kernels.device;
 import ernie.io.kernels.encoding;
 import ernie.render.kernels.sensors.camera.camera;
 
-#include "ernie/render/kernels/overlay/overlay.h"
+#include "ernie/overlay/kernels/overlay.h"
 
 using namespace ernie;
 

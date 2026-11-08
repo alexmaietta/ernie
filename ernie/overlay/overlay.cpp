@@ -12,8 +12,8 @@
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
 #include "ernie/device/slang/dispatch.h"
-#include "ernie/render/kernels.h"
-#include "ernie/render/overlay/overlay_impl.h"
+#include "ernie/overlay/kernels.h"
+#include "ernie/overlay/overlay_impl.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
@@ -1115,8 +1115,8 @@ bool OverlayData::Outlined() const {
 OverlayPass::OverlayPass(device::Device& device)
     : m_device(device),
       m_program(device.CreateProgram(
-          {.modules = {"ernie.render.kernels.overlay.overlay"},
-           .library = &kRenderKernels,
+          {.modules = {"ernie.overlay.kernels.overlay"},
+           .library = &kOverlayKernels,
            .entries = {"ProjectOverlays", "ScatterOverlays", "FindOverlayTiles", "FoldOverlayTiles",
                        "CompositeOverlays", "KeyOverlayRows", "StartOverlayGroups",
                        "MeasureOverlayGroups", "ClearOverlayBoxes", "UniteOverlayBoxes",
@@ -1920,8 +1920,8 @@ device::Tensor CompositeOverlay(const device::Tensor& color, const device::Tenso
     device::Tensor blended = device.CreateTensor(
         device::DType::UInt8, {color.Shape().begin(), color.Shape().end()}, "composited overlay");
     const Ref<device::Program> program =
-        device.CreateProgram({.modules = {"ernie.render.kernels.overlay.overlay"},
-                              .library = &kRenderKernels,
+        device.CreateProgram({.modules = {"ernie.overlay.kernels.overlay"},
+                              .library = &kOverlayKernels,
                               .entries = {"BlendOverlay"},
                               .label = "overlays"});
     device::Queue& queue = device.GetQueue();

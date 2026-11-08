@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/render/ray_cast/ray_cast.h"
+#include "ernie/ray_cast/ray_cast.h"
 
 #include <algorithm>
 #include <memory>
@@ -10,8 +10,8 @@
 #include "ernie/device/device.h"
 #include "ernie/device/program.h"
 #include "ernie/device/queue.h"
-#include "ernie/render/kernels.h"
-#include "ernie/render/kernels/query/ray_cast.h"
+#include "ernie/ray_cast/kernels.h"
+#include "ernie/ray_cast/kernels/ray_cast.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/util/error.h"
@@ -83,8 +83,8 @@ RayCaster::RayCaster(Ref<Scene> scene) : m_state(std::make_unique<State>()) {
     }
     m_state->scene = std::move(scene);
     m_state->program = m_state->scene->GetDevice().CreateProgram(
-        {.modules = {"ernie.render.kernels.query.ray_cast"},
-         .library = &kRenderKernels,
+        {.modules = {"ernie.ray_cast.kernels.ray_cast"},
+         .library = &kRayCastKernels,
          .entries = {"CastClosest", "CastAny"},
          .label = "ray cast",
          .traversal = SceneImpl::Get(*m_state->scene).GetBuilder().Format()});

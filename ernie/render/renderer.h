@@ -9,7 +9,7 @@
 #include "ernie/device/ref.h"
 #include "ernie/device/stream.h"
 #include "ernie/export.h"
-#include "ernie/render/overlay/overlay.h"
+#include "ernie/overlay/overlay.h"
 #include "ernie/render/render_output.h"
 #include "ernie/util/span.h"
 

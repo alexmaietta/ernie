@@ -14,7 +14,7 @@
 
 #include "bench.h"
 #include "ernie/device/queue.h"
-#include "ernie/render/overlay/overlay_impl.h"
+#include "ernie/overlay/overlay_impl.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/profiler.h"
