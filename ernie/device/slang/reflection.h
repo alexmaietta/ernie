@@ -23,7 +23,7 @@ struct ReflectedField {
     std::string displayName;
 };
 
-enum class NodeRole { Material, Surface, Pattern };
+enum class NodeRole { Material, Surface, Pattern, Primitive };
 
 enum class ParameterSource { Input, Context, Point };
 

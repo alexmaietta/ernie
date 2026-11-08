@@ -89,12 +89,10 @@ std::optional<std::string_view> FindEmbedded(const KernelLibrary& library, std::
 std::optional<std::string_view> FindFile(const KernelLibrary* library, const SourceFiles& sources,
                                          std::string_view path) {
     const std::string file = FilePath(path);
-    if (const std::optional<std::string_view> embedded =
-            FindEmbedded(library != nullptr ? *library : kDeviceKernels, file)) {
-        return embedded;
+    if (const auto found = sources.find(file); found != sources.end()) {
+        return std::optional<std::string_view>(found->second);
     }
-    const auto found = sources.find(file);
-    return found != sources.end() ? std::optional<std::string_view>(found->second) : std::nullopt;
+    return FindEmbedded(library != nullptr ? *library : kDeviceKernels, file);
 }
 
 std::string Normal(std::string_view path) {
@@ -471,6 +469,10 @@ std::optional<ReflectedNode> ReflectPattern(slang::IGlobalSession& global,
 
 std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::DeclReflection* decl,
                                          std::string_view label) {
+    if (decl->getType() != nullptr &&
+        decl->getType()->findUserAttributeByName("ClosurePrimitive") != nullptr) {
+        return ReflectedNode{.name = decl->getName(), .role = NodeRole::Primitive};
+    }
     bool material = false;
     bool surface = false;
     for (slang::DeclReflection* child : decl->getChildren()) {

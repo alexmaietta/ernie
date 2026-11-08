@@ -647,7 +647,8 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
             definitions.push_back(definition);
         }
     }
-    auto set = std::make_shared<const DefinitionSet>(std::move(definitions));
+    auto set = std::make_shared<const DefinitionSet>(std::move(definitions),
+                                                     PrimitiveSources(Primitives()));
     if (set->Hash() != m_definitions->Hash()) {
         Log(LogLevel::Debug, "the scene now uses {}",
             Counted(set->Definitions().size(), "generated material definition"));

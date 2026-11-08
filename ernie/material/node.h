@@ -44,6 +44,22 @@ std::shared_ptr<const NodeDefinition> FindNode(std::string_view name);
 
 uint64_t NodeVersion();
 
+inline constexpr uint32_t kFirstPrimitiveLobe = 3;
+
+struct PrimitiveDefinition {
+    std::string name;
+    uint32_t kind = 0;
+    std::string file;
+    std::string module;
+    std::string source;
+};
+
+uint32_t PrimitiveKind(std::string_view name);
+
+void RegisterPrimitive(PrimitiveDefinition primitive);
+
+std::vector<std::shared_ptr<const PrimitiveDefinition>> Primitives();
+
 uint32_t NodeInputBytes(NodeInputType type);
 
 }

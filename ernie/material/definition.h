@@ -2,6 +2,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -24,10 +26,15 @@ struct DefinitionModule {
 
 class DefinitionSet {
   public:
-    explicit DefinitionSet(std::vector<DefinitionModule> definitions = {});
+    explicit DefinitionSet(std::vector<DefinitionModule> definitions = {},
+                           std::map<std::string, std::string, std::less<>> files = {});
 
     std::span<const DefinitionModule> Definitions() const {
         return m_definitions;
+    }
+
+    const std::map<std::string, std::string, std::less<>>& Files() const {
+        return m_files;
     }
 
     uint64_t Hash() const {
@@ -38,6 +45,7 @@ class DefinitionSet {
 
   private:
     std::vector<DefinitionModule> m_definitions;
+    std::map<std::string, std::string, std::less<>> m_files;
     uint64_t m_hash = 0;
 };
 

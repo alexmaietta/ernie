@@ -17,8 +17,14 @@ uint64_t Mix(uint64_t hash, std::string_view bytes) {
 
 }
 
-DefinitionSet::DefinitionSet(std::vector<DefinitionModule> definitions)
-    : m_definitions(std::move(definitions)), m_hash(0xcbf29ce484222325ull) {
+DefinitionSet::DefinitionSet(std::vector<DefinitionModule> definitions,
+                             std::map<std::string, std::string, std::less<>> files)
+    : m_definitions(std::move(definitions)), m_files(std::move(files)),
+      m_hash(0xcbf29ce484222325ull) {
+    for (const auto& [path, source] : m_files) {
+        m_hash = Mix(m_hash, path);
+        m_hash = Mix(m_hash, source);
+    }
     std::ranges::sort(m_definitions, {}, &DefinitionModule::id);
     for (const DefinitionModule& definition : m_definitions) {
         m_hash = Mix(m_hash, std::to_string(definition.id));

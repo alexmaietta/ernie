@@ -363,6 +363,111 @@ TEST(MaterialNodeTest, ReloadedFilesChangeTheImageAndKeepInputValues) {
     });
 }
 
+constexpr const char* kLambert = R"(
+import ernie.primitive;
+
+[ClosurePrimitive]
+struct TestLambert : IClosurePrimitive {
+    static bool Glossy() {
+        return false;
+    }
+
+    [Differentiable]
+    static Spectrum Estimate<Spectrum : ISpectrum>(Spectrum tint, float alpha,
+                                                   no_diff float4 params,
+                                                   no_diff float3 outgoing) {
+        return tint.Scale(params.x);
+    }
+
+    [Differentiable]
+    static Spectrum Evaluate<Spectrum : ISpectrum>(Spectrum tint, float alpha,
+                                                   no_diff float4 params, no_diff float3 outgoing,
+                                                   no_diff float3 incoming) {
+        return tint.Scale(params.x / kPi);
+    }
+
+    static float Pdf(float alpha, float4 params, float3 outgoing, float3 incoming) {
+        return incoming.z / kPi;
+    }
+
+    static float3 Direction(float alpha, float4 params, float3 outgoing, float2 u) {
+        return CosineHemisphere(u);
+    }
+}
+)";
+
+constexpr const char* kLobes = R"(
+import ernie.material;
+
+struct TestBuiltinLobe {
+    void Shade<Spectrum : ISpectrum>(ShadeContext c, inout OpticalClosure<Spectrum> s) {
+        const Spectrum color = SpectralValue.Rgb(float3(0.2, 0.6, 0.4)).Evaluate<Spectrum>();
+        s.AddLobe(Lobe<Spectrum>.DiffuseReflection(color, 1));
+        s.albedo = color;
+    }
+}
+
+struct TestPrimitiveLobe {
+    float scale = 1;
+
+    void Shade<Spectrum : ISpectrum>(ShadeContext c, inout OpticalClosure<Spectrum> s) {
+        const Spectrum color = SpectralValue.Rgb(float3(0.2, 0.6, 0.4)).Evaluate<Spectrum>();
+        s.AddLobe(Lobe<Spectrum>.Primitive(kLobeTestLambert, color, 1, float4(scale, 0, 0, 0), 1));
+        s.albedo = color;
+    }
+}
+)";
+
+TEST(MaterialNodeTest, ClosurePrimitivesShadeLikeTheLobesTheyReproduce) {
+    const std::filesystem::path primitive = WriteFile("ernie_render_nodes_lambert.slang", kLambert);
+    const std::filesystem::path lobes = WriteFile("ernie_render_nodes_lobes.slang", kLobes);
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, true);
+        scene->Find("/Render/View")->Set(MinimalAPI::kMode, MinimalMode::Full);
+        EXPECT_EQ(LoadShaders(*scene, primitive), std::vector<std::string>{"TestLambert"});
+        EXPECT_EQ(LoadShaders(*scene, lobes).size(), 2u);
+        const Prim surface = Paint(*scene, "TestBuiltinLobe");
+        Renderer renderer(scene);
+        const Float3 builtin = Center(renderer);
+        EXPECT_GT(builtin.y, 0.05f);
+        surface.Set(Shader::kId, "TestPrimitiveLobe");
+        const Float3 custom = Center(renderer);
+        EXPECT_NEAR(custom.x, builtin.x, 1e-3f);
+        EXPECT_NEAR(custom.y, builtin.y, 1e-3f);
+        EXPECT_NEAR(custom.z, builtin.z, 1e-3f);
+        surface.Set("scale", 0.5f);
+        EXPECT_NEAR(Center(renderer).y, builtin.y * 0.5f, 1e-3f);
+    });
+}
+
+TEST(MaterialNodeTest, PrimitiveFilesStayApartFromNodesAndMustImplementTheInterface) {
+    const std::filesystem::path mixed = WriteFile(
+        "ernie_render_nodes_mixed.slang",
+        std::regex_replace(std::string(kLambert), std::regex("ernie.primitive"), "ernie.material"));
+    const std::filesystem::path partial = WriteFile("ernie_render_nodes_partial.slang", R"(
+import ernie.primitive;
+
+[ClosurePrimitive]
+struct TestPartial {
+    static bool Glossy() {
+        return false;
+    }
+}
+)");
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        EXPECT_THROW(LoadShaders(*scene, mixed), Error);
+        try {
+            LoadShaders(*scene, partial);
+            ADD_FAILURE() << "loading a primitive without the interface succeeded";
+        } catch (const Error& error) {
+            EXPECT_NE(std::string(error.what()).find("ernie_render_nodes_partial.slang"),
+                      std::string::npos)
+                << error.what();
+        }
+    });
+}
+
 TEST(MaterialNodeTest, FilesWithoutNodesOrWithBadInputsAreReported) {
     const std::filesystem::path empty = WriteFile("ernie_render_nodes_empty.slang", R"(
 import ernie.material;

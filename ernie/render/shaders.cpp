@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/render/shaders.h"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -8,6 +9,7 @@
 #include <mutex>
 
 #include "ernie/device/slang/reflection.h"
+#include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
 #include "ernie/render/kernels.h"
 #include "ernie/scene/schema/runtime.h"
@@ -133,17 +135,67 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
     std::string path = module;
     std::replace(path.begin(), path.end(), '.', '/');
     path += ".slang";
-    std::vector<device::ReflectedNode> nodes;
-    try {
-        nodes = device::ReflectMaterialNodes(scene.GetDevice().Adapter().backend, &kRenderKernels,
-                                             {{path, source}}, module, file.string());
-    } catch (const Error& error) {
+    const auto mapped = [&](const Error& error) {
         std::string message = Replaced(error.what(), "./" + path, file.string());
         message =
             Replaced(Replaced(message, path, file.string()), module + ".slang", file.string());
-        throw Error("{}", message);
+        return Error("{}", message);
+    };
+    const device::Backend backend = scene.GetDevice().Adapter().backend;
+    auto sources = PrimitiveSources(Primitives());
+    sources[path] = source;
+    std::vector<device::ReflectedNode> nodes;
+    try {
+        nodes = device::ReflectMaterialNodes(
+            backend, &kRenderKernels, {sources.begin(), sources.end()}, module, file.string());
+    } catch (const Error& error) {
+        throw mapped(error);
     }
     std::vector<std::string> names;
+    const auto primitive = [](const device::ReflectedNode& node) {
+        return node.role == device::NodeRole::Primitive;
+    };
+    if (std::ranges::any_of(nodes, primitive)) {
+        if (!std::ranges::all_of(nodes, primitive) ||
+            source.find("ernie.material") != std::string::npos) {
+            throw Error("{} defines a closure primitive, so it may only import ernie.primitive "
+                        "and define primitives",
+                        file.string());
+        }
+        std::vector<std::shared_ptr<const PrimitiveDefinition>> candidates = Primitives();
+        for (const device::ReflectedNode& reflected : nodes) {
+            auto definition = std::make_shared<const PrimitiveDefinition>(
+                PrimitiveDefinition{.name = reflected.name,
+                                    .kind = kFirstPrimitiveLobe + uint32_t(candidates.size()),
+                                    .file = file.string(),
+                                    .module = module,
+                                    .source = source});
+            const auto known = std::ranges::find(candidates, reflected.name,
+                                                 [](const auto& entry) { return entry->name; });
+            if (known != candidates.end()) {
+                *known = definition;
+            } else {
+                candidates.push_back(definition);
+            }
+        }
+        const auto checked = PrimitiveSources(candidates);
+        try {
+            device::ReflectMaterialNodes(backend, &kRenderKernels, {checked.begin(), checked.end()},
+                                         "ernie.render.kernels.material.registered", file.string());
+        } catch (const Error& error) {
+            throw mapped(error);
+        }
+        for (const device::ReflectedNode& reflected : nodes) {
+            RegisterPrimitive({.name = reflected.name,
+                               .file = file.string(),
+                               .module = module,
+                               .source = source});
+            Log(LogLevel::Debug, "loaded closure primitive {} from {} as lobe kind {}",
+                reflected.name, file.string(), PrimitiveKind(reflected.name));
+            names.push_back(reflected.name);
+        }
+        nodes.clear();
+    }
     for (const device::ReflectedNode& reflected : nodes) {
         RuntimeSchemaDesc desc{
             .name = reflected.name,

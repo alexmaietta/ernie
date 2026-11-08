@@ -15,6 +15,7 @@ struct Nodes {
     std::mutex mutex;
     std::map<std::string, std::shared_ptr<const NodeDefinition>, std::less<>> byName;
     std::atomic<uint64_t> version{0};
+    std::vector<std::shared_ptr<const PrimitiveDefinition>> primitives;
 };
 
 Nodes& Registry() {
@@ -48,6 +49,46 @@ std::shared_ptr<const NodeDefinition> FindNode(std::string_view name) {
     const std::lock_guard lock(nodes.mutex);
     const auto found = nodes.byName.find(name);
     return found == nodes.byName.end() ? nullptr : found->second;
+}
+
+uint32_t PrimitiveKind(std::string_view name) {
+    Nodes& nodes = Registry();
+    const std::lock_guard lock(nodes.mutex);
+    for (const std::shared_ptr<const PrimitiveDefinition>& primitive : nodes.primitives) {
+        if (primitive->name == name) {
+            return primitive->kind;
+        }
+    }
+    return kFirstPrimitiveLobe + uint32_t(nodes.primitives.size());
+}
+
+void RegisterPrimitive(PrimitiveDefinition primitive) {
+    Nodes& nodes = Registry();
+    const std::lock_guard lock(nodes.mutex);
+    for (std::shared_ptr<const PrimitiveDefinition>& known : nodes.primitives) {
+        if (known->name != primitive.name) {
+            continue;
+        }
+        if (known->file != primitive.file) {
+            throw Error("A closure primitive called {} is already loaded from {}", primitive.name,
+                        known->file);
+        }
+        if (known->source != primitive.source) {
+            primitive.kind = known->kind;
+            known = std::make_shared<const PrimitiveDefinition>(std::move(primitive));
+            ++nodes.version;
+        }
+        return;
+    }
+    primitive.kind = kFirstPrimitiveLobe + uint32_t(nodes.primitives.size());
+    nodes.primitives.push_back(std::make_shared<const PrimitiveDefinition>(std::move(primitive)));
+    ++nodes.version;
+}
+
+std::vector<std::shared_ptr<const PrimitiveDefinition>> Primitives() {
+    Nodes& nodes = Registry();
+    const std::lock_guard lock(nodes.mutex);
+    return nodes.primitives;
 }
 
 uint64_t NodeVersion() {

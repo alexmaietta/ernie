@@ -3,6 +3,7 @@
 __exported import ernie.render.kernels.material.ibsdf;
 import ernie.render.kernels.material.primitives.diffuse;
 import ernie.render.kernels.material.primitives.ggx;
+__exported import ernie.render.kernels.material.registered;
 
 static const uint kClosureLobes = 4;
 
@@ -15,6 +16,7 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
     float weight;
     Spectrum tint;
     float alpha;
+    no_diff LobeParams params;
 
     [Differentiable]
     static Lobe<Spectrum> None() {
@@ -23,6 +25,7 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
         lobe.weight = 0;
         lobe.tint = Spectrum.Constant(0);
         lobe.alpha = 1;
+        lobe.params = LobeParams(float4(0));
         return lobe;
     }
 
@@ -33,6 +36,7 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
         lobe.weight = weight;
         lobe.tint = tint;
         lobe.alpha = 1;
+        lobe.params = LobeParams(float4(0));
         return lobe;
     }
 
@@ -43,7 +47,24 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
         lobe.weight = weight;
         lobe.tint = f0;
         lobe.alpha = alpha;
+        lobe.params = LobeParams(float4(0));
         return lobe;
+    }
+
+    [Differentiable]
+    static Lobe<Spectrum> Primitive(no_diff uint kind, Spectrum tint, float alpha,
+                                    no_diff float4 params, float weight) {
+        Lobe<Spectrum> lobe;
+        lobe.kind = kind;
+        lobe.weight = weight;
+        lobe.tint = tint;
+        lobe.alpha = alpha;
+        lobe.params = LobeParams(params);
+        return lobe;
+    }
+
+    bool Registered() {
+        return kPrimitives && kind >= kFirstPrimitiveLobe;
     }
 
     bool Active() {
@@ -51,11 +72,14 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
     }
 
     bool Specular() {
-        return kind == kLobeMicrofacetGgx;
+        return kind == kLobeMicrofacetGgx || (Registered() && PrimitiveGlossy(kind));
     }
 
     [Differentiable]
     Spectrum Estimate(float3 outgoing) {
+        if (Registered()) {
+            return PrimitiveEstimate<Spectrum>(kind, tint, alpha, params, outgoing).Scale(weight);
+        }
         if (kind == kLobeMicrofacetGgx) {
             return MicrofacetGgxBsdf<Spectrum>(tint, alpha).Estimate(outgoing).Scale(weight);
         }
@@ -64,6 +88,10 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
 
     [Differentiable]
     Spectrum Evaluate(float3 outgoing, float3 incoming, float3 h) {
+        if (Registered()) {
+            return PrimitiveEvaluate<Spectrum>(kind, tint, alpha, params, outgoing, incoming)
+                .Scale(weight);
+        }
         if (kind == kLobeMicrofacetGgx) {
             return MicrofacetGgxBsdf<Spectrum>(tint, alpha)
                 .Evaluate(outgoing, incoming, h)
@@ -73,6 +101,9 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
     }
 
     float Pdf(float3 outgoing, float3 incoming, float3 h) {
+        if (Registered()) {
+            return PrimitivePdf(kind, alpha, params, outgoing, incoming);
+        }
         if (kind == kLobeMicrofacetGgx) {
             return MicrofacetGgxBsdf<Spectrum>(tint, alpha).Pdf(outgoing, h);
         }
@@ -80,6 +111,9 @@ struct Lobe<Spectrum : ISpectrum> : IDifferentiable {
     }
 
     float3 Direction(float3 outgoing, float2 u) {
+        if (Registered()) {
+            return PrimitiveDirection(kind, alpha, params, outgoing, u);
+        }
         if (kind == kLobeMicrofacetGgx) {
             return MicrofacetGgxBsdf<Spectrum>(tint, alpha).Direction(outgoing, u);
         }

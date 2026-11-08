@@ -52,6 +52,11 @@ std::string GraphKey(const ShadingGraph& graph);
 
 DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph);
 
+inline constexpr const char* kRegisteredFile = "ernie/render/kernels/material/registered.slang";
+
+std::map<std::string, std::string, std::less<>>
+PrimitiveSources(std::span<const std::shared_ptr<const PrimitiveDefinition>> primitives);
+
 std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set);
 
 }
