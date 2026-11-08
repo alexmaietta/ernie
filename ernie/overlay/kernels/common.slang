@@ -239,3 +239,12 @@ struct OverlayCamera {
         perspective = Projection(record.projection) != Projection::Orthographic;
     }
 }
+
+bool Outlined(OverlayOutline outline, uint id) {
+    const uint word = id / 32;
+    return id != kNoPrim && word < outline.bitWords && ((outline.bits[word] >> (id % 32)) & 1) != 0;
+}
+
+uint MaskIndex(OverlayView view, uint2 pixel) {
+    return pixel.y * view.width + pixel.x;
+}

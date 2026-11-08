@@ -92,6 +92,8 @@ struct AovDisplay {
 
 void CheckPixels(const device::Tensor& pixels);
 
+Extent FitAspect(Extent bounds, double aspect);
+
 struct GridGuide {
     bool shown = false;
     bool fixed = false;
@@ -378,6 +380,7 @@ class Viewport {
     Pending Receive(const device::Tensor& pixels, const device::Operation& ready,
                     const device::Tensor& overlay);
     device::Tensor Staging(Span<const int64_t> shape, uint64_t taken = 0);
+    bool OwnsCamera() const;
     bool Fit(Extent size);
     void Refresh();
     bool StartOrbit();

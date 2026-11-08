@@ -1151,6 +1151,10 @@ OverlayPass::OverlayPass(device::Device& device)
                        "OutlineOverlays", "ClearOverlayPicks", "MeasureOverlayPicks",
                        "ChooseOverlayPicks", "ResolveOverlayPicks"},
            .label = "overlays"})),
+      m_maskProgram(device.CreateProgram({.modules = {"ernie.overlay.kernels.mask"},
+                                          .library = &kOverlayKernels,
+                                          .entries = {"MaskOutlines"},
+                                          .label = "overlay outline masks"})),
       m_unused(device.CreateBuffer({.label = "overlay unused"}, std::vector<uint32_t>(16, ~0u))),
       m_pairCount(device.CreateBuffer({.bytes = 4, .label = "overlay pairs"})),
       m_pairsNeeded(device.CreateBuffer(
@@ -1725,15 +1729,25 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
     for (const OverlayOutline& outline : m_outlines) {
         outlineMask |= uint64_t(1) << outline.overlay;
     }
-    const bool outlined = std::ranges::any_of(targets, [&](const OverlayTarget& target) {
-        return target.primIds != 0 && (target.overlays & outlineMask) != 0;
-    });
+    const bool outlined = std::ranges::any_of(
+        targets, [&](const OverlayTarget& target) { return (target.overlays & outlineMask) != 0; });
     if (batches.empty() && !outlined && picks.empty()) {
         return;
     }
 
+    uint64_t maskPixels = 0;
+    for (const OverlayTarget& target : targets) {
+        if ((target.overlays & outlineMask) != 0) {
+            maskPixels += uint64_t(target.width) * target.height;
+        }
+    }
+    if (maskPixels > 0) {
+        Reserve(m_outlineMasks, maskPixels * 4, "overlay outline masks");
+        Reserve(m_outlineDepths, maskPixels * 4, "overlay outline depths");
+    }
     std::vector<OverlayView> views;
     uint32_t tileCount = 0;
+    uint64_t maskOffset = 0;
     for (const OverlayTarget& target : targets) {
         OverlayView view{};
         view.overlay = {target.overlay};
@@ -1746,8 +1760,14 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
         view.columnCount = (target.width + kOverlayTile - 1) / kOverlayTile;
         view.missDistance = target.missDistance;
         view.overlays = target.overlays;
-        view.primIds = {target.primIds != 0 ? target.primIds : m_unused->Address()};
-        view.outlined = target.primIds != 0 && (target.overlays & outlineMask) != 0 ? 1 : 0;
+        view.outlined = (target.overlays & outlineMask) != 0 ? 1 : 0;
+        view.mask = {m_unused->Address()};
+        view.maskDepth = {m_unused->Address()};
+        if (view.outlined != 0) {
+            view.mask = {m_outlineMasks->Address() + maskOffset * 4};
+            view.maskDepth = {m_outlineDepths->Address() + maskOffset * 4};
+            maskOffset += uint64_t(target.width) * target.height;
+        }
         tileCount += view.columnCount * ((target.height + kOverlayTile - 1) / kOverlayTile);
         views.push_back(view);
     }
@@ -1912,8 +1932,10 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
         encoder.Barrier();
         encoder.BeginZone(outlining);
         const uint32_t tiles = std::min(tileCount, kOverlayMostGroups);
-        encoder.Dispatch(m_program->Entry("OutlineOverlays"), params,
-                         {.x = tiles, .y = (tileCount + tiles - 1) / tiles});
+        const device::Size3 groups{.x = tiles, .y = (tileCount + tiles - 1) / tiles};
+        encoder.Dispatch(m_maskProgram->Entry("MaskOutlines"), params, groups);
+        encoder.Barrier();
+        encoder.Dispatch(m_program->Entry("OutlineOverlays"), params, groups);
         encoder.EndZone();
     };
     static const profiler::ZoneId picking = profiler::ZoneId::Named("Render/Overlays/Pick");

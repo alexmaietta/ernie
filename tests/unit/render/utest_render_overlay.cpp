@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/overlay/overlay.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "ernie/device/device.h"
+#include "ernie/device/queue.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
@@ -200,6 +203,60 @@ TEST(OverlayTest, OutlinesOnlyTheSelectedSurfacesEdges) {
         EXPECT_EQ(outlined("/Wall"), 0u);
         EXPECT_GT(outlined("/Box"), 0u);
     });
+}
+
+TEST(OverlayTest, OutlinesSelectedPrimsInsideOthers) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Empty(device);
+        scene->Define<Cube>("/Outer", {.size = 1});
+        scene->Define<Cube>("/Inner", {.size = 0.4f});
+        Renderer renderer(scene);
+        const auto brightest = [&](std::string_view path) {
+            const std::vector<uint32_t> prims = {scene->Find(path)->Index()};
+            Overlay overlay;
+            overlay.Outline(prims, {.color = {1, 0.5f, 0, 1}, .width = 2});
+            renderer.GetOverlays()->Set("outline", overlay);
+            const std::vector<uint8_t> drawn = Drawn(renderer);
+            uint8_t most = 0;
+            for (size_t at = 3; at < drawn.size(); at += 4) {
+                most = std::max(most, drawn[at]);
+            }
+            return most;
+        };
+        const uint8_t inner = brightest("/Inner");
+        EXPECT_GT(inner, 0);
+        EXPECT_LT(inner, 160);
+        EXPECT_GT(brightest("/Outer"), 200);
+    });
+}
+
+TEST(OverlayTest, OutlinesThroughCamerasWithoutClippingPlanesOnCpuAdapters) {
+    bool tested = false;
+    for (const device::AdapterInfo& adapter : device::EnumerateAdapters()) {
+        if (adapter.type != device::AdapterType::Cpu || !adapter.unsupported.empty()) {
+            continue;
+        }
+        SCOPED_TRACE(adapter.alias);
+        const Ref<Device> device = Device::Create({.adapter = adapter.alias});
+        const Ref<Scene> scene = Empty(*device);
+        scene->Define<Cube>("/Box", {.size = 1});
+        Renderer renderer(scene);
+        const std::vector<uint32_t> prims = {scene->Find("/Box")->Index()};
+        Overlay overlay;
+        overlay.Outline(prims, {.color = {1, 0.5f, 0, 1}, .width = 2});
+        renderer.GetOverlays()->Set("outline", overlay);
+        const std::vector<uint8_t> drawn = Drawn(renderer);
+        size_t count = 0;
+        for (size_t at = 3; at < drawn.size(); at += 4) {
+            count += drawn[at] > 0 ? 1 : 0;
+        }
+        EXPECT_GT(count, 0u);
+        device->GetQueue().WaitIdle();
+        tested = true;
+    }
+    if (!tested) {
+        GTEST_SKIP() << "no CPU adapter";
+    }
 }
 
 }

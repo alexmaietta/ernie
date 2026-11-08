@@ -127,7 +127,8 @@ static const uint kMostOverlays = 64;
 struct OverlayView {
     Ptr<uint> overlay;
     Ptr<float> depth;
-    Ptr<uint> primIds;
+    Ptr<uint> mask;
+    Ptr<float> maskDepth;
     uint64_t overlays;
     uint camera;
     uint layer;
@@ -139,7 +140,7 @@ struct OverlayView {
     uint outlined;
 };
 
-ERNIE_CHECK_SIZE(OverlayView, 64);
+ERNIE_CHECK_SIZE(OverlayView, 72);
 
 struct OverlayOutline {
     Ptr<uint> bits;

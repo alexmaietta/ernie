@@ -63,7 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changing how many copies a point instancer draws in the same publish as moving a prim every world holds rebuilds each TLAS instead of refitting it with the old instance counts.
 - Contact shadows and occlusion hold far from a world's origin, because new rays start from the hit's own floating point error bound instead of an offset that grew with distance.
 - The viewer frames the scene when it opens, which it skipped because it read the scene's bounds before the first publish.
-- A selection outline traces only the edges where the selected prims are in front, so selecting a ground no longer outlines everything standing on it.
+- A selection outline traces the whole silhouette of the selected prims over everything in front of them, drawing the hidden stretches dimmer. The overlay traces the selected prims on their own for it, so a prim inside another still shows its outline and selecting a ground no longer outlines everything standing on it.
+- Two viewer viewports looking through one scene camera with different shapes no longer fight over its aperture. The viewer only fits the apertures of its own views' cameras, and shows any other camera at the camera's own aspect, letterboxed.
+- Cameras without clipping planes no longer read their empty plane list, which crashed llvmpipe in kernels that generate camera rays.
 
 ## [0.1.0] - 2026-11-06
 

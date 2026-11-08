@@ -41,11 +41,6 @@ void UniteOverlayBoxes(uniform OverlayUniteParams u) {
     InterlockedMin(u.boxes[at + 6], tables->prims.world[prim]);
 }
 
-bool Outlined(OverlayOutline outline, uint id) {
-    const uint word = id / 32;
-    return id != kNoPrim && word < outline.bitWords && ((outline.bits[word] >> (id % 32)) & 1) != 0;
-}
-
 [shader("compute")]
 [numthreads(kOverlayTile, kOverlayTile, 1)]
 void OutlineOverlays(uniform OverlayParams p) {
@@ -65,16 +60,19 @@ void OutlineOverlays(uniform OverlayParams p) {
         return;
     }
     const uint index = view.PixelIndex(uint2(pixel));
+    const uint centreAt = MaskIndex(view, uint2(pixel));
+    const uint centreMask = view.mask[centreAt];
     float4 under = float4(0);
-    for (uint at = 0; at < p.outlineCount; ++at) {
+    for (uint at = 0; at < min(p.outlineCount, 32u); ++at) {
         const OverlayOutline outline = p.outlines[at];
         if (((view.overlays >> outline.overlay) & 1) == 0) {
             continue;
         }
-        const bool centre = Outlined(outline, view.primIds[index]);
-        const float centreDepth = view.depth[index];
+        const uint bit = 1u << at;
+        const bool centre = (centreMask & bit) != 0;
         const int reach = int(ceil(outline.width));
         float nearest = 1e9f;
+        bool hidden = false;
         for (int dy = -reach; dy <= reach; ++dy) {
             for (int dx = -reach; dx <= reach; ++dx) {
                 const float distance = length(float2(dx, dy));
@@ -82,24 +80,23 @@ void OutlineOverlays(uniform OverlayParams p) {
                     distance > outline.width + 0.5f) {
                     continue;
                 }
-                const int2 other = clamp(pixel + int2(dx, dy), int2(0), size - 1);
-                const uint otherIndex = view.PixelIndex(uint2(other));
-                if (Outlined(outline, view.primIds[otherIndex]) == centre) {
+                const uint2 other = uint2(clamp(pixel + int2(dx, dy), int2(0), size - 1));
+                const uint otherAt = MaskIndex(view, other);
+                if (((view.mask[otherAt] & bit) != 0) == centre) {
                     continue;
                 }
-                const float otherDepth = view.depth[otherIndex];
-                const float selectedDepth = centre ? centreDepth : otherDepth;
-                const float plainDepth = centre ? otherDepth : centreDepth;
-                if (plainDepth == view.missDistance ||
-                    plainDepth >= selectedDepth * (1 - kDepthSlack)) {
-                    nearest = distance;
-                }
+                const uint2 inside = centre ? uint2(pixel) : other;
+                const float sceneDepth = view.depth[view.PixelIndex(inside)];
+                nearest = distance;
+                hidden = sceneDepth != view.missDistance &&
+                         view.maskDepth[centre ? centreAt : otherAt] >
+                             sceneDepth * (1 + kDepthSlack);
             }
         }
         const float coverage = saturate(outline.width + 0.5f - nearest);
         if (coverage > 0) {
             const float4 color = DecodeOverlayColor(outline.color);
-            AddUnder(under, color.xyz, color.w * coverage);
+            AddUnder(under, color.xyz, color.w * coverage * (hidden ? kXRayOpacity : 1.0f));
         }
     }
     if (!(under.w > 0)) {

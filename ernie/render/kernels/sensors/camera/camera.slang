@@ -139,6 +139,9 @@ struct CameraClipping {
         if (distance < near || distance > far) {
             return false;
         }
+        if (planes.count == 0) {
+            return true;
+        }
         for (uint i = 0; i < planes.count; ++i) {
             const float4 plane = Plane(i);
             if (dot(plane.xyz, local) + plane.w < 0) {
@@ -150,6 +153,9 @@ struct CameraClipping {
 
     float2 Clip(float3 origin, float3 direction) {
         float2 interval = float2(near, far) / length(direction);
+        if (planes.count == 0) {
+            return interval;
+        }
         for (uint i = 0; i < planes.count; ++i) {
             const float4 plane = Plane(i);
             Narrow(interval, plane.xyz, plane.w, origin, direction);

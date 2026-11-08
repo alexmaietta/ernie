@@ -198,6 +198,7 @@ class OverlayPass {
 
     device::Device& m_device;
     Ref<device::Program> m_program;
+    Ref<device::Program> m_maskProgram;
     Ref<device::Buffer> m_unused;
     std::optional<algorithms::Scan> m_scan;
     std::optional<algorithms::RadixSort> m_sort;
@@ -230,6 +231,8 @@ class OverlayPass {
     std::vector<Ref<device::Buffer>> m_boxes;
     std::vector<OverlayOutline> m_outlines;
     Ref<device::Buffer> m_outlineBuffer;
+    Ref<device::Buffer> m_outlineMasks;
+    Ref<device::Buffer> m_outlineDepths;
     Ref<device::Buffer> m_fills;
     Ref<device::Buffer> m_fillCount;
     Ref<device::Buffer> m_cameraImages;

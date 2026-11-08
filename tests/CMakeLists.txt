@@ -212,6 +212,7 @@ if(ERNIE_BUILD_VIEWER)
             unit/app/viewer/utest_viewer_editor.cpp
             unit/app/viewer/utest_viewer_history.cpp
             unit/app/viewer/utest_viewer_orbit_camera.cpp
+            unit/app/viewer/utest_viewer_viewport.cpp
     )
 endif()
 
