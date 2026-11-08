@@ -30,8 +30,20 @@ if(DEFINED CPACK_TEMPORARY_INSTALL_DIRECTORY)
 endif()
 
 set(CPACK_PACKAGE_NAME ernie)
-set(ERNIE_PACKAGE_VERSION "${PROJECT_VERSION}" CACHE STRING "The version of the packages")
+set(ERNIE_PACKAGE_VERSION
+    "${PROJECT_VERSION}${ERNIE_PRERELEASE}"
+    CACHE STRING
+    "The version of the packages"
+)
 set(CPACK_PACKAGE_VERSION "${ERNIE_PACKAGE_VERSION}")
+string(
+    REGEX REPLACE "^([0-9.]+)((a|b|rc)[0-9]+)$"
+    "\\1~\\2"
+    ernie_distro_version
+    "${ERNIE_PACKAGE_VERSION}"
+)
+set(CPACK_DEBIAN_PACKAGE_VERSION "${ernie_distro_version}")
+set(CPACK_RPM_PACKAGE_VERSION "${ernie_distro_version}")
 set(CPACK_PACKAGE_VENDOR "Alex Maietta")
 set(CPACK_PACKAGE_CONTACT "Alex Maietta <maiettaalex@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
@@ -116,15 +128,15 @@ set(CPACK_DEBIAN_ERNIE_PACKAGE_DEPENDS "libc6 (>= 2.34), libstdc++6 (>= 11), lib
 set(CPACK_DEBIAN_ERNIE_PACKAGE_RECOMMENDS "mesa-vulkan-drivers")
 set(CPACK_DEBIAN_ERNIE_PACKAGE_SECTION graphics)
 set(CPACK_DEBIAN_DEV_PACKAGE_NAME ernie-dev)
-set(CPACK_DEBIAN_DEV_PACKAGE_DEPENDS "ernie (= ${ERNIE_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_DEV_PACKAGE_DEPENDS "ernie (= ${ernie_distro_version})")
 set(CPACK_DEBIAN_DEV_PACKAGE_SECTION libdevel)
 set(CPACK_DEBIAN_VIEWER_PACKAGE_NAME ernie-viewer)
-set(CPACK_DEBIAN_VIEWER_PACKAGE_DEPENDS "ernie (= ${ERNIE_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_VIEWER_PACKAGE_DEPENDS "ernie (= ${ernie_distro_version})")
 set(CPACK_DEBIAN_VIEWER_PACKAGE_RECOMMENDS "libx11-6 | libwayland-client0")
 set(CPACK_DEBIAN_VIEWER_PACKAGE_SECTION graphics)
 set(CPACK_DEBIAN_VIEWER_DEV_PACKAGE_NAME ernie-viewer-dev)
 set(CPACK_DEBIAN_VIEWER_DEV_PACKAGE_DEPENDS
-    "ernie-dev (= ${ERNIE_PACKAGE_VERSION}), ernie-viewer (= ${ERNIE_PACKAGE_VERSION})"
+    "ernie-dev (= ${ernie_distro_version}), ernie-viewer (= ${ernie_distro_version})"
 )
 set(CPACK_DEBIAN_VIEWER_DEV_PACKAGE_SECTION libdevel)
 
@@ -134,14 +146,14 @@ set(CPACK_RPM_ERNIE_PACKAGE_NAME ernie)
 set(CPACK_RPM_ERNIE_PACKAGE_REQUIRES "vulkan-loader")
 set(CPACK_RPM_ERNIE_PACKAGE_GROUP "Applications/Graphics")
 set(CPACK_RPM_DEV_PACKAGE_NAME ernie-devel)
-set(CPACK_RPM_DEV_PACKAGE_REQUIRES "ernie = ${ERNIE_PACKAGE_VERSION}")
+set(CPACK_RPM_DEV_PACKAGE_REQUIRES "ernie = ${ernie_distro_version}")
 set(CPACK_RPM_DEV_PACKAGE_GROUP "Development/Libraries")
 set(CPACK_RPM_VIEWER_PACKAGE_NAME ernie-viewer)
-set(CPACK_RPM_VIEWER_PACKAGE_REQUIRES "ernie = ${ERNIE_PACKAGE_VERSION}")
+set(CPACK_RPM_VIEWER_PACKAGE_REQUIRES "ernie = ${ernie_distro_version}")
 set(CPACK_RPM_VIEWER_PACKAGE_GROUP "Applications/Graphics")
 set(CPACK_RPM_VIEWER_DEV_PACKAGE_NAME ernie-viewer-devel)
 set(CPACK_RPM_VIEWER_DEV_PACKAGE_REQUIRES
-    "ernie-devel = ${ERNIE_PACKAGE_VERSION}, ernie-viewer = ${ERNIE_PACKAGE_VERSION}"
+    "ernie-devel = ${ernie_distro_version}, ernie-viewer = ${ernie_distro_version}"
 )
 set(CPACK_RPM_VIEWER_DEV_PACKAGE_GROUP "Development/Libraries")
 

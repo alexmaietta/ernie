@@ -78,6 +78,10 @@ jobs:
       - name: Checksums
         run: cd assets && sha256sum -- * > SHA256SUMS
       - name: Release
-        run: >
-          gh release create "$GITHUB_REF_NAME" assets/*
-          --title "Ernie ${GITHUB_REF_NAME#v}" --generate-notes
+        run: |
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" =~ (a|b|rc)[0-9]+$ ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" assets/* \
+            --title "Ernie ${GITHUB_REF_NAME#v}" --generate-notes "${prerelease[@]}"
