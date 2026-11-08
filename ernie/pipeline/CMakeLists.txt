@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_pipeline
+    codegen.cpp
     definition.cpp
     node.cpp
     resolve.cpp

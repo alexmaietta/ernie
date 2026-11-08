@@ -43,7 +43,9 @@ ernie_test(
     ernie_pipeline_tests
     LINK
         ernie_pipeline_internal
+        ernie_render_internal
     SOURCES
+        unit/pipeline/utest_pipeline_codegen.cpp
         unit/pipeline/utest_pipeline_resolve.cpp
         unit/pipeline/utest_pipeline_segments.cpp
 )

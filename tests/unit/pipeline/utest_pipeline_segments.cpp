@@ -79,6 +79,12 @@ TEST(PipelineSegmentsTest, StencilsAndReductionsSplitPassesAndShareTheArena) {
     EXPECT_EQ(arena.offsets[digital], arena.offsets[pipeline.nodes[0].outputs[0]]);
     EXPECT_EQ(arena.bytes, 2 * slot);
     EXPECT_EQ(arena.offsets[pipeline.nodes[5].outputs[0]], kNotStored);
+
+    std::vector<SignalLayout> halves = layouts;
+    for (SignalLayout& layout : halves) {
+        layout.element = ElementType::F16;
+    }
+    EXPECT_EQ(LayoutArena(plan, halves, 1000).bytes, 2 * 8192u);
 }
 
 }
