@@ -161,6 +161,8 @@ if(UNIX AND NOT APPLE)
         PROPERTIES
             OUTPUT_NAME
                 ernie_beside
+            DEBUG_POSTFIX
+                ""
             LIBRARY_OUTPUT_DIRECTORY
                 "${CMAKE_CURRENT_BINARY_DIR}/beside"
     )
