@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
+#include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
 
 #include "ernie/device/queue.h"
@@ -724,6 +726,24 @@ void RegisterPrim(nb::module_& module) {
         .def_prop_ro(
             "children",
             [](const ScenePrim& prim) { return ScenePrims(prim.scene, prim.prim.Children()); })
+        .def_prop_ro("connections",
+                     [](const ScenePrim& prim) {
+                         std::vector<std::tuple<std::string, std::string, std::string>> found;
+                         for (const Connection& connection : prim.prim.Connections()) {
+                             found.emplace_back(connection.input, connection.source,
+                                                connection.output);
+                         }
+                         return found;
+                     })
+        .def(
+            "connect",
+            [](const ScenePrim& prim, std::string_view input, const ScenePrim& source,
+               std::string_view output) { prim.prim.Connect(input, source.prim, output); },
+            nb::arg("input"), nb::arg("source"), nb::arg("output"))
+        .def(
+            "disconnect",
+            [](const ScenePrim& prim, std::string_view input) { prim.prim.Disconnect(input); },
+            nb::arg("input"))
         .def(
             "is_a",
             [](const ScenePrim& prim, std::string_view schema) {

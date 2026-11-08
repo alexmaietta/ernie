@@ -19,6 +19,12 @@ namespace ernie {
 
 class Scene;
 
+struct Connection {
+    std::string input;
+    std::string source;
+    std::string output;
+};
+
 class ERNIE_API Prim {
   public:
     Prim() = default;
@@ -43,6 +49,9 @@ class ERNIE_API Prim {
     std::string_view Name() const;
     std::optional<Prim> Parent() const;
     std::vector<Prim> Children() const;
+    std::vector<Connection> Connections() const;
+    void Connect(std::string_view input, const Prim& source, std::string_view output) const;
+    void Disconnect(std::string_view input) const;
     bool IsA(SchemaId schema) const;
     bool HasApi(SchemaId api) const;
     std::vector<std::string> Instances(SchemaId api) const;

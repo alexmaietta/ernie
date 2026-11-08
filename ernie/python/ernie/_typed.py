@@ -40,6 +40,16 @@ class SchemaPrim:
     def name(self) -> str:
         return self.prim.name
 
+    @property
+    def connections(self) -> list[tuple[str, str, str]]:
+        return self.prim.connections
+
+    def connect(self, input: str, source: Prim | SchemaPrim, output: str) -> None:
+        self.prim.connect(input, source.prim if isinstance(source, SchemaPrim) else source, output)
+
+    def disconnect(self, input: str) -> None:
+        self.prim.disconnect(input)
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, SchemaPrim) and self.prim == other.prim
 

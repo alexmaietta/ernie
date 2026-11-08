@@ -655,6 +655,13 @@ function(_ernie_schema_python_name field out)
         "${field}"
     )
     string(TOLOWER "${field}" field)
+    if(
+        field
+            MATCHES
+            "^(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)$"
+    )
+        string(APPEND field "_")
+    endif()
     set(${out} "${field}" PARENT_SCOPE)
 endfunction()
 
@@ -713,10 +720,16 @@ function(_ernie_schema_python name out_prim out_selection)
         _ernie_schema_python_types(${desc_type_${field}} value input many many_input)
         string(APPEND parameters "        ${python}: ${input} | None = None,\n")
         string(APPEND fields "        \"${python}\": \"${field}\",\n")
+        set(keyword "${field}=")
+        set(close ",")
+        if(NOT python STREQUAL field AND python STREQUAL "${field}_")
+            set(keyword "**{\"${field}\": ")
+            set(close "},")
+        endif()
         if(desc_type_${field} STREQUAL "prim_array")
-            string(APPEND values "                    ${field}=_targets(${python}),\n")
+            string(APPEND values "                    ${keyword}_targets(${python})${close}\n")
         else()
-            string(APPEND values "                    ${field}=${python},\n")
+            string(APPEND values "                    ${keyword}${python}${close}\n")
         endif()
     endforeach()
     set(api_values "")

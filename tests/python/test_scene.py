@@ -121,3 +121,24 @@ def test_prim_bounds_cover_each_prim(scene):
     assert bounds.shape == (2, 2, 3)
     assert bounds[0].tolist() == [[-1, 0, 1], [3, 4, 5]]
     assert not bounds[1].any()
+
+
+def test_shaders_connect_reconnect_and_disconnect(scene):
+    look = ernie.NodeGraph.define(scene, "/Look")
+    albedo = ernie.UsdUVTexture.define(scene, "/Look/Albedo", file="albedo.png")
+    uv = ernie.UsdPrimvarReader_float2.define(scene, "/Look/Uv")
+    moved = ernie.UsdTransform2d.define(scene, "/Look/Moved", in_=(1, 2))
+    assert moved.in_ == (1, 2)
+
+    albedo.connect("st", uv, "result")
+    look.connect("surface", albedo.prim, "rgb")
+    assert albedo.connections == [("st", "/Look/Uv", "result")]
+    assert look.connections == [("surface", "/Look/Albedo", "rgb")]
+
+    albedo.connect("st", moved, "result")
+    assert albedo.connections == [("st", "/Look/Moved", "result")]
+
+    albedo.disconnect("st")
+    assert albedo.connections == []
+    with pytest.raises(RuntimeError):
+        ernie.Sphere.define(scene, "/Ball").connect("st", albedo, "rgb")

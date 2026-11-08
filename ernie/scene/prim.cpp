@@ -6,6 +6,7 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/util/error.h"
+#include "ernie/util/log.h"
 
 namespace ernie {
 
@@ -73,6 +74,75 @@ std::vector<Prim> Prim::Children() const {
         children.push_back(SceneImpl::Get(*m_scene).Handle(child));
     }
     return children;
+}
+
+std::vector<Connection> Prim::Connections() const {
+    CheckSchema(SchemaId::Connectable);
+    const std::vector<std::string> sources = Get(Connectable::kConnectionsSources);
+    const std::vector<std::string> inputs = Get(Connectable::kConnectionsInputs);
+    const std::vector<std::string> outputs = Get(Connectable::kConnectionsOutputs);
+    const size_t count = std::min({sources.size(), inputs.size(), outputs.size()});
+    std::vector<Connection> connections;
+    connections.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        connections.push_back({inputs[i], sources[i], outputs[i]});
+    }
+    return connections;
+}
+
+namespace {
+
+void WriteConnections(const Prim& prim, const std::vector<Connection>& connections) {
+    std::vector<std::string> sources;
+    std::vector<std::string> inputs;
+    std::vector<std::string> outputs;
+    for (const Connection& connection : connections) {
+        sources.push_back(connection.source);
+        inputs.push_back(connection.input);
+        outputs.push_back(connection.output);
+    }
+    prim.Set(Connectable::kConnectionsSources, sources);
+    prim.Set(Connectable::kConnectionsInputs, inputs);
+    prim.Set(Connectable::kConnectionsOutputs, outputs);
+}
+
+}
+
+void Prim::Connect(std::string_view input, const Prim& source, std::string_view output) const {
+    CheckSchema(SchemaId::Connectable);
+    source.CheckSchema(SchemaId::Connectable);
+    if (&source.GetScene() != &GetScene()) {
+        throw Error("{} can't connect {} to {}, which is in another scene", Path(), input,
+                    source.Path());
+    }
+    if (input.empty() || output.empty()) {
+        throw Error("Connecting {} to {} needs both an input and an output name", Path(),
+                    source.Path());
+    }
+    std::vector<Connection> connections = Connections();
+    const auto found = std::ranges::find(connections, input, &Connection::input);
+    if (found != connections.end()) {
+        Log(LogLevel::Debug, "{}'s {} reconnects from {}.{} to {}.{}", Path(), input, found->source,
+            found->output, source.Path(), output);
+        found->source = source.Path();
+        found->output = std::string(output);
+    } else {
+        Log(LogLevel::Debug, "{}'s {} connects to {}.{}", Path(), input, source.Path(), output);
+        connections.push_back({std::string(input), source.Path(), std::string(output)});
+    }
+    WriteConnections(*this, connections);
+}
+
+void Prim::Disconnect(std::string_view input) const {
+    std::vector<Connection> connections = Connections();
+    const auto found = std::ranges::find(connections, input, &Connection::input);
+    if (found == connections.end()) {
+        return;
+    }
+    Log(LogLevel::Debug, "{}'s {} disconnects from {}.{}", Path(), input, found->source,
+        found->output);
+    connections.erase(found);
+    WriteConnections(*this, connections);
 }
 
 View Prim::Single() const {

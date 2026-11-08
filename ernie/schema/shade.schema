@@ -189,7 +189,222 @@ api class SurfaceDetailAPI (
     )
 }
 
-abstract class Material : Typed (
+abstract class Connectable : Typed (
+    doc = "A prim whose inputs and outputs can connect to other shading prims' outputs, as UsdShadeConnectableAPI does."
+) {
+    prim[] connections:sources (
+        tracked
+        group = "Connections"
+        displayName = "Sources"
+        doc = "The shader each connection reads from, one per connected input."
+    )
+    token[] connections:inputs (
+        tracked
+        group = "Connections"
+        displayName = "Inputs"
+        doc = "The input or output each connection drives, such as diffuseColor or surface, in the same order as sources."
+    )
+    token[] connections:outputs (
+        tracked
+        group = "Connections"
+        displayName = "Outputs"
+        doc = "The output of the source each connection reads, such as rgb or r, in the same order as sources."
+    )
+}
+
+abstract class Shader : Connectable (
+    doc = "A shading node. A built-in node names itself with info:id."
+) {
+    token info:id (
+        tracked
+        group = "Shader"
+        displayName = "Shader Type"
+        doc = "The node this shader runs."
+    )
+}
+
+class NodeGraph : Connectable (
+    doc = "Groups shaders and can expose their outputs, such as outputs:surface."
+) {
+}
+
+class UsdUVTexture : Shader (
+    doc = "Reads a texture at a coordinate. Its outputs rgb, r, g, b and a pick the channels a connection reads."
+) {
+    token info:id = UsdUVTexture
+    asset inputs:file (
+        tracked
+        group = "Texture"
+        displayName = "File"
+        doc = "The image to read."
+    )
+    float2 inputs:st = (0, 0) (
+        group = "Texture"
+        displayName = "Coordinate"
+        doc = "The texture coordinate, usually connected to a primvar reader, a transform or a placement."
+    )
+    token inputs:wrapS = repeat (
+        tracked
+        allowed = [repeat, mirror, clamp, black]
+        enum = TextureWrapMode
+        group = "Texture"
+        displayName = "Wrap S"
+        doc = "How coordinates outside 0 to 1 wrap horizontally. Black reads transparent black."
+    )
+    token inputs:wrapT = repeat (
+        tracked
+        allowed = [repeat, mirror, clamp, black]
+        enum = TextureWrapMode
+        group = "Texture"
+        displayName = "Wrap T"
+        doc = "How coordinates outside 0 to 1 wrap vertically. Black reads transparent black."
+    )
+    float4 inputs:fallback = (0, 0, 0, 1) (
+        group = "Texture"
+        displayName = "Fallback"
+        doc = "The value read when the file is missing or can't be loaded."
+    )
+    float4 inputs:scale = (1, 1, 1, 1) (
+        group = "Texture"
+        displayName = "Scale"
+        doc = "Multiplies each channel read from the file, applied before bias. Normal maps use 2 and DirectX ones flip green with -2."
+    )
+    float4 inputs:bias = (0, 0, 0, 0) (
+        group = "Texture"
+        displayName = "Bias"
+        doc = "Added to each channel after scale. Normal maps use -1 and DirectX ones use 1 on green."
+    )
+    token inputs:sourceColorSpace = auto (
+        tracked
+        allowed = [auto, raw, sRGB]
+        enum = TextureColorSpace
+        group = "Texture"
+        displayName = "Color Space"
+        doc = "How to decode the file. Auto treats colour inputs as sRGB and everything else as raw."
+    )
+}
+
+class UsdPrimvarReader_float2 : Shader (
+    doc = "Reads a float2 primvar, usually texture coordinates."
+) {
+    token info:id = UsdPrimvarReader_float2
+    token inputs:varname = st (
+        tracked
+        group = "Primvar"
+        displayName = "Primvar"
+        doc = "The primvar to read."
+    )
+    float2 inputs:fallback = (0, 0) (
+        group = "Primvar"
+        displayName = "Fallback"
+        doc = "The value read where the primvar is missing."
+    )
+}
+
+class UsdTransform2d : Shader (
+    doc = "Transforms a texture coordinate by scale, then rotation, then translation."
+) {
+    token info:id = UsdTransform2d
+    float2 inputs:in = (0, 0) (
+        group = "Transform"
+        displayName = "In"
+        doc = "The coordinate to transform, usually connected to a primvar reader."
+    )
+    float inputs:rotation = 0 (
+        unit = degrees
+        group = "Transform"
+        displayName = "Rotation"
+        doc = "Counterclockwise rotation about the origin."
+    )
+    float2 inputs:scale = (1, 1) (
+        group = "Transform"
+        displayName = "Scale"
+        doc = "Scale about the origin, applied first."
+    )
+    float2 inputs:translation = (0, 0) (
+        group = "Transform"
+        displayName = "Translation"
+        doc = "Shift applied last."
+    )
+}
+
+class TexturePlacement : Shader (
+    doc = "Places textures from a primvar or projected from the shaded position, then transformed and optionally hex tiled. Textures whose coordinates connect to one placement share it."
+) {
+    token info:id = TexturePlacement
+    token inputs:projection = uv (
+        allowed = [uv, planar, box, triplanar]
+        enum = TextureProjection
+        group = "Placement"
+        displayName = "Projection"
+        doc = "Where texture coordinates come from, either a primvar or the position projected onto the xy plane, onto the box face the normal points at, or onto all three axes blended."
+    )
+    token inputs:projectionSpace = object (
+        allowed = [object, world]
+        enum = TextureSpace
+        group = "Placement"
+        displayName = "Projection Space"
+        doc = "Whether projected textures move with the object or stay fixed in the world."
+    )
+    token inputs:uvPrimvar = st (
+        group = "Placement"
+        displayName = "UV Primvar"
+        doc = "The float2 primvar read when projection is uv."
+    )
+    float inputs:tileSize = 1 (
+        unit = meters
+        group = "Placement"
+        displayName = "Tile Size"
+        doc = "Length of one texture repeat for planar, box and triplanar projections."
+    )
+    float inputs:triplanarBlend = 0.25 (
+        group = "Placement"
+        displayName = "Triplanar Blend"
+        min = 0
+        max = 1
+        doc = "How widely triplanar projections blend across edges. 0 gives hard box seams."
+    )
+    float2 inputs:uvScale = (1, 1) (
+        group = "Placement"
+        displayName = "Tiling"
+        doc = "Repeats per unit of texture coordinate, applied after rotation."
+    )
+    float2 inputs:uvOffset = (0, 0) (
+        group = "Placement"
+        displayName = "Offset"
+        doc = "Shift applied after rotation and tiling."
+    )
+    float inputs:uvRotation = 0 (
+        unit = degrees
+        group = "Placement"
+        displayName = "Rotation"
+        doc = "Rotation about the texture origin, applied first."
+    )
+    bool inputs:hexTiling = false (
+        group = "Hex Tiling"
+        displayName = "Hex Tiling"
+        doc = "Blend randomly rotated and offset copies on a hex grid to hide repetition."
+    )
+    float inputs:hexTilingContrast = 0.5 (
+        group = "Hex Tiling"
+        displayName = "Contrast"
+        min = 0
+        max = 1
+        enabledBy = "hexTiling"
+        doc = "How sharply neighbouring hex tiles blend."
+    )
+    float inputs:hexTilingRotation = 180 (
+        unit = degrees
+        group = "Hex Tiling"
+        displayName = "Rotation"
+        min = 0
+        max = 180
+        enabledBy = "hexTiling"
+        doc = "Largest random rotation of each hex tile."
+    )
+}
+
+abstract class Material : Connectable (
     doc = "A material bound to geometry. Each concrete material is one shading model with all its inputs."
 ) {
     token info:id (
