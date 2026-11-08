@@ -30,7 +30,7 @@ namespace device {
 class Buffer;
 }
 
-class Store;
+class ColumnStore;
 class Table;
 struct Attachment;
 struct ViewRows;
@@ -95,7 +95,7 @@ class ERNIE_API UntypedAttribute {
     };
 
     const ViewRows& Rows() const;
-    Store& GetStore() const;
+    ColumnStore& GetColumnStore() const;
     Table& GetTable() const;
     void CheckWritable(bool arrays = false) const;
     void CheckNotAttached() const;

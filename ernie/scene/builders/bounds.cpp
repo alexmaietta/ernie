@@ -51,13 +51,13 @@ uint32_t Ordered(float value) {
 
 }
 
-std::span<const ColumnRef> Bounds::Inputs() const {
+std::span<const ColumnRef> BoundsBuilder::Inputs() const {
     return kInputs;
 }
 
-void Bounds::Relayout() {
-    const Prims& prims = m_catalog.GetPrims();
-    device::Device& device = m_catalog.GetStore().GetDevice();
+void BoundsBuilder::Relayout() {
+    const Prims& prims = m_structure.GetPrims();
+    device::Device& device = m_structure.GetColumnStore().GetDevice();
     const uint32_t worlds = prims.WorldCount();
     std::vector<uint32_t> origins(std::max(worlds, 1u), kNoRow);
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
@@ -73,14 +73,14 @@ void Bounds::Relayout() {
             {.bytes = uint64_t(m_boxes.Rows()) * 6 * sizeof(uint32_t), .label = "world extents"});
     }
     m_primBounds.Reserve(device, prims.Size());
-    m_epoch = m_catalog.Epoch();
+    m_epoch = m_structure.Epoch();
 }
 
-void Bounds::Run(const ChangeSet& changes, TableLog&) {
+void BoundsBuilder::Run(const ChangeSet& changes, TableWrites&) {
     ERNIE_ZONE("Bounds/Run");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
-    if (changes.resync || changes.structure || m_epoch != m_catalog.Epoch()) {
+    if (changes.resync || changes.structure || m_epoch != m_structure.Epoch()) {
         Relayout();
     }
     BoundsParams params{};
@@ -92,7 +92,7 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
     params.primBounds.address = m_primBounds.Address();
-    params.primCount = m_catalog.GetPrims().Size();
+    params.primCount = m_structure.GetPrims().Size();
     params.slotCount = m_boxes.Rows();
     const uint64_t instancerBytes = std::max<uint64_t>(params.primCount, 1) * 6 * sizeof(uint32_t);
     if (!m_instancerExtents || m_instancerExtents->Bytes() < instancerBytes) {
@@ -137,15 +137,15 @@ void Bounds::Run(const ChangeSet& changes, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-device::Download Bounds::ReadWorldsAsync() const {
+device::Download BoundsBuilder::ReadWorldsAsync() const {
     if (!m_boxes.Buffer()) {
         return {};
     }
-    return m_catalog.GetStore().GetDevice().GetQueue().ReadAsync(
+    return m_structure.GetColumnStore().GetDevice().GetQueue().ReadAsync(
         m_boxes.Buffer()->Slice(0, uint64_t(m_boxes.Rows()) * sizeof(BvhBox)));
 }
 
-device::Download Bounds::ReadWorldAsync(uint32_t world) const {
+device::Download BoundsBuilder::ReadWorldAsync(uint32_t world) const {
     if (!m_boxes.Buffer()) {
         return {};
     }
@@ -153,11 +153,11 @@ device::Download Bounds::ReadWorldAsync(uint32_t world) const {
     if (slot >= m_boxes.Rows()) {
         throw Error("The scene has no world {}", world);
     }
-    return m_catalog.GetStore().GetDevice().GetQueue().ReadAsync(
+    return m_structure.GetColumnStore().GetDevice().GetQueue().ReadAsync(
         m_boxes.Buffer()->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)));
 }
 
-std::optional<BvhBox> Bounds::World(uint32_t world) const {
+std::optional<BvhBox> BoundsBuilder::World(uint32_t world) const {
     if (!m_boxes.Buffer()) {
         return std::nullopt;
     }
@@ -166,7 +166,7 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
         throw Error("The scene has no world {}", world);
     }
     BvhBox box{};
-    m_catalog.GetStore().GetDevice().GetQueue().Read(
+    m_structure.GetColumnStore().GetDevice().GetQueue().Read(
         m_boxes.Buffer()->Slice(uint64_t(slot) * sizeof(BvhBox), sizeof(BvhBox)), &box);
     if (box.lower[0] > box.upper[0]) {
         return std::nullopt;
@@ -174,17 +174,17 @@ std::optional<BvhBox> Bounds::World(uint32_t world) const {
     return box;
 }
 
-void Bounds::Describe(RenderTables& tables) const {
+void BoundsBuilder::Describe(RenderTables& tables) const {
     tables.primBounds.address = m_primBounds.Address();
 }
 
-void Bounds::Prepare() {
+void BoundsBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Bounds::Kernels() {
+device::Program& BoundsBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.bounds"},
              .library = &kSceneKernels,
              .entries = {"PrimBounds", "SlotBounds", "InstancerBounds", "FinishBoxes"},

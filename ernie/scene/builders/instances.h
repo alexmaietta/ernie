@@ -29,9 +29,9 @@ struct InstanceStats {
     bool relaid = false;
 };
 
-class Instances : public System {
+class InstanceBuilder : public TableBuilder {
   public:
-    Instances(Catalog& catalog, bvh::Builder& builder, uint32_t maxRefits = 16);
+    InstanceBuilder(Structure& structure, bvh::Builder& builder, uint32_t maxRefits = 16);
 
     std::string_view Name() const override {
         return "instances";
@@ -51,7 +51,7 @@ class Instances : public System {
     }
 
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     const InstanceStats& Stats() const {
         return m_stats;
@@ -131,7 +131,7 @@ class Instances : public System {
     bool ShowsGlobals(uint32_t tlas) const;
     void Compose();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     bvh::Builder& m_builder;
     uint32_t m_maxRefits;
     Ref<device::Buffer> m_unitBoxes;

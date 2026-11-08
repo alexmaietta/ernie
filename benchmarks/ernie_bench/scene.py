@@ -19,7 +19,7 @@ class Material:
 
 
 @dataclass
-class Instances:
+class InstanceBuilder:
     world: np.ndarray
     mesh: np.ndarray
     material: np.ndarray

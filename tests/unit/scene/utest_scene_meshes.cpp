@@ -28,14 +28,14 @@ const std::vector<Float3> kQuad = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}};
 
 struct Scene {
     device::Device& device;
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Geometry& geometry;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    MeshBuilder& geometry;
     Ordinal ordinal = 0;
 
     uint32_t Quad(const std::string& path) {
-        return catalog
+        return structure
             .Define<Mesh>(
                 std::vector<std::string>{path},
                 {.points = kQuad, .faceVertexIndices = {0, 1, 2, 3}, .faceVertexCounts = {4}})
@@ -43,15 +43,15 @@ struct Scene {
     }
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     uint32_t PointsRow(uint32_t prim) {
-        return catalog.GetPrims().Row(prim, SchemaId::PointBased);
+        return structure.GetPrims().Row(prim, SchemaId::PointBased);
     }
 
     const MeshRecord& Record(uint32_t prim) {
-        return geometry.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh));
+        return geometry.Record(structure.GetPrims().Row(prim, SchemaId::Mesh));
     }
 
     template <class T> std::vector<T> Derived(uint32_t prim, ArrayRef MeshRecord::* field) {
@@ -75,18 +75,18 @@ template <class Test> void ForEachScene(Test test) {
         if (device.Adapter().backend == device::Backend::Hip) {
             return;
         }
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        Geometry geometry(catalog, *builder);
-        timeline.Add(geometry);
-        Scene scene{device, store, catalog, timeline, geometry};
+        MeshBuilder geometry(structure, *builder);
+        publisher.Add(geometry);
+        Scene scene{device, store, structure, publisher, geometry};
         test(scene);
     });
 }
 
-TEST(GeometryTest, AMeshGetsABlasTablesAndSmoothNormals) {
+TEST(MeshesTest, AMeshGetsABlasTablesAndSmoothNormals) {
     ForEachScene([](Scene& s) {
         const uint32_t prim = s.Quad("/Quad");
         s.Publish();
@@ -102,16 +102,16 @@ TEST(GeometryTest, AMeshGetsABlasTablesAndSmoothNormals) {
     });
 }
 
-TEST(GeometryTest, FacesAreFannedOnTheDeviceAndInvalidOnesSkipped) {
+TEST(MeshesTest, FacesAreFannedOnTheDeviceAndInvalidOnesSkipped) {
     ForEachScene([](Scene& s) {
-        const uint32_t mixed = s.catalog
+        const uint32_t mixed = s.structure
                                    .Define<Mesh>(std::vector<std::string>{"/Mixed"},
                                                  {.points = std::vector<Float3>(8),
                                                   .faceVertexIndices = {0, 1, 2, 1, 3, 4, 2, 5, 6,
                                                                         0, -1, 2, 4, 3, 5, 6, 7},
                                                   .faceVertexCounts = {3, 4, 2, 3, 5}})
                                    .firstPrim;
-        const uint32_t overrun = s.catalog
+        const uint32_t overrun = s.structure
                                      .Define<Mesh>(std::vector<std::string>{"/Overrun"},
                                                    {.points = kQuad,
                                                     .faceVertexIndices = {0, 1, 2, 3, 0},
@@ -140,10 +140,10 @@ TEST(GeometryTest, FacesAreFannedOnTheDeviceAndInvalidOnesSkipped) {
     });
 }
 
-TEST(GeometryTest, AMeshIndexingPastItsPointsHasNoShape) {
+TEST(MeshesTest, AMeshIndexingPastItsPointsHasNoShape) {
     ForEachScene([](Scene& s) {
         const uint32_t prim =
-            s.catalog
+            s.structure
                 .Define<Mesh>(
                     std::vector<std::string>{"/Short"},
                     {.points = kQuad, .faceVertexIndices = {0, 1, 4}, .faceVertexCounts = {3}})
@@ -155,29 +155,29 @@ TEST(GeometryTest, AMeshIndexingPastItsPointsHasNoShape) {
     });
 }
 
-TEST(GeometryTest, ClonesInEveryWorldShareOneBlas) {
+TEST(MeshesTest, ClonesInEveryWorldShareOneBlas) {
     ForEachScene([](Scene& s) {
-        s.catalog.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
+        s.structure.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
         const uint32_t quad = s.Quad("/Env0/Quad");
         std::vector<std::string> targets;
         for (uint32_t i = 1; i < 8; ++i) {
             targets.push_back(fmt::format("/Env{}", i));
         }
-        s.catalog.Clone(s.catalog.Find("/Env0"), targets);
+        s.structure.Clone(s.structure.Find("/Env0"), targets);
         s.Publish();
         EXPECT_EQ(s.geometry.Stats().meshes, 8u);
         EXPECT_EQ(s.geometry.Stats().shapes, 1u);
         EXPECT_EQ(s.geometry.Stats().built, 1u);
         const uint64_t blas = s.geometry.Find(quad)->blas->Handle();
         for (uint32_t i = 1; i < 8; ++i) {
-            const uint32_t clone = s.catalog.Find(fmt::format("/Env{}/Quad", i));
+            const uint32_t clone = s.structure.Find(fmt::format("/Env{}/Quad", i));
             EXPECT_EQ(s.BlasCell(clone), blas);
         }
         EXPECT_EQ(s.geometry.Find(quad)->users, 8u);
     });
 }
 
-TEST(GeometryTest, PointsMovedInPlaceRefitAndRecomputeNormals) {
+TEST(MeshesTest, PointsMovedInPlaceRefitAndRecomputeNormals) {
     ForEachScene([](Scene& s) {
         const uint32_t prim = s.Quad("/Quad");
         s.Publish();
@@ -198,10 +198,10 @@ TEST(GeometryTest, PointsMovedInPlaceRefitAndRecomputeNormals) {
     });
 }
 
-TEST(GeometryTest, AClonesOwnPointsGiveItItsOwnShape) {
+TEST(MeshesTest, AClonesOwnPointsGiveItItsOwnShape) {
     ForEachScene([](Scene& s) {
         const uint32_t quad = s.Quad("/Quad");
-        const PrimBlock copies = s.catalog.Clone(quad, std::vector<std::string>{"/A", "/B"});
+        const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         s.Publish();
         ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
         const ArrayRef own = float3s.Allocate(4);
@@ -217,10 +217,10 @@ TEST(GeometryTest, AClonesOwnPointsGiveItItsOwnShape) {
     });
 }
 
-TEST(GeometryTest, PointsReusingAFreedAddressGetTheirOwnShape) {
+TEST(MeshesTest, PointsReusingAFreedAddressGetTheirOwnShape) {
     ForEachScene([](Scene& s) {
         const uint32_t quad = s.Quad("/Quad");
-        const PrimBlock copies = s.catalog.Clone(quad, std::vector<std::string>{"/A", "/B"});
+        const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         const uint32_t a = copies.Prim(0, 0);
         const uint32_t b = copies.Prim(1, 0);
         ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
@@ -262,7 +262,7 @@ TEST(GeometryTest, PointsReusingAFreedAddressGetTheirOwnShape) {
     });
 }
 
-TEST(GeometryTest, NewTopologyRebuilds) {
+TEST(MeshesTest, NewTopologyRebuilds) {
     ForEachScene([](Scene& s) {
         const uint32_t prim = s.Quad("/Quad");
         s.Publish();
@@ -273,7 +273,7 @@ TEST(GeometryTest, NewTopologyRebuilds) {
         ints.Write(faces, std::as_bytes(std::span(counts)));
         const ArrayRef corners = ints.Allocate(6);
         ints.Write(corners, std::as_bytes(std::span(indices)));
-        const uint32_t row = s.catalog.GetPrims().Row(prim, SchemaId::Mesh);
+        const uint32_t row = s.structure.GetPrims().Row(prim, SchemaId::Mesh);
         s.store.SetArray(kMeshFaceVertexCounts, row, faces);
         s.store.SetArray(kMeshFaceVertexIndices, row, corners);
         s.Publish();
@@ -284,16 +284,16 @@ TEST(GeometryTest, NewTopologyRebuilds) {
     });
 }
 
-TEST(GeometryTest, RemovingTheLastUserFreesTheShape) {
+TEST(MeshesTest, RemovingTheLastUserFreesTheShape) {
     ForEachScene([](Scene& s) {
         const uint32_t a = s.Quad("/A");
-        const PrimBlock b = s.catalog.Clone(a, std::vector<std::string>{"/B"});
+        const PrimBlock b = s.structure.Clone(a, std::vector<std::string>{"/B"});
         s.Publish();
-        s.catalog.Remove(a);
+        s.structure.Remove(a);
         s.Publish();
         EXPECT_EQ(s.geometry.Stats().shapes, 1u);
         EXPECT_EQ(s.geometry.Find(b.Prim(0, 0))->users, 1u);
-        s.catalog.Remove(b.Prim(0, 0));
+        s.structure.Remove(b.Prim(0, 0));
         s.Publish();
         EXPECT_EQ(s.geometry.Stats().shapes, 0u);
         EXPECT_EQ(s.geometry.Stats().topologies, 0u);
@@ -301,12 +301,12 @@ TEST(GeometryTest, RemovingTheLastUserFreesTheShape) {
     });
 }
 
-TEST(GeometryTest, MeshesWithoutFacesHaveNoBlas) {
+TEST(MeshesTest, MeshesWithoutFacesHaveNoBlas) {
     ForEachScene([](Scene& s) {
         const uint32_t empty =
-            s.catalog.Define(SchemaId::Mesh, std::vector<std::string>{"/Empty"}).firstPrim;
+            s.structure.Define(SchemaId::Mesh, std::vector<std::string>{"/Empty"}).firstPrim;
         const uint32_t loose =
-            s.catalog
+            s.structure
                 .Define<Mesh>(
                     std::vector<std::string>{"/Loose"},
                     {.points = kQuad, .faceVertexIndices = {0, 9, 2}, .faceVertexCounts = {3}})
@@ -319,15 +319,15 @@ TEST(GeometryTest, MeshesWithoutFacesHaveNoBlas) {
     });
 }
 
-TEST(GeometryTest, UnrelatedWritesBuildNothing) {
+TEST(MeshesTest, UnrelatedWritesBuildNothing) {
     ForEachScene([](Scene& s) {
         s.Quad("/Quad");
-        s.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"});
+        s.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"});
         s.Publish();
         const uint64_t submitted = s.device.GetQueue().Submitted();
         s.Publish();
         EXPECT_EQ(s.device.GetQueue().Submitted(), submitted);
-        s.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Other"});
+        s.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Other"});
         s.Publish();
         EXPECT_EQ(s.geometry.Stats().built, 0u);
         EXPECT_EQ(s.geometry.Stats().refit, 0u);

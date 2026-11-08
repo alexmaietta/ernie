@@ -84,7 +84,7 @@ Poses::Poses(std::shared_ptr<ViewState> view)
 device::Operation Poses::Write(const DLTensor& source, Stream producer, QuaternionOrder order,
                                const DLTensor* rows, const DLTensor* mask) {
     SourceRows(source, kPoseWords, "Poses");
-    device::Device& device = m_translate.GetStore().GetDevice();
+    device::Device& device = m_translate.GetColumnStore().GetDevice();
     return Write(device.Import(source, producer, "pose staging"), producer, order,
                  rows ? device.Import(*rows, producer, "pose rows") : device::Tensor(),
                  mask ? device.Import(*mask, producer, "pose mask") : device::Tensor());
@@ -97,7 +97,7 @@ device::Operation Poses::Write(const DLTensor& translation, const DLTensor& rota
         translation.dtype.bits != rotation.dtype.bits) {
         throw Error("Translations and rotations need as many rows and the same precision");
     }
-    device::Device& device = m_translate.GetStore().GetDevice();
+    device::Device& device = m_translate.GetColumnStore().GetDevice();
     return Write(device.Import(translation, producer, "translation staging"),
                  device.Import(rotation, producer, "rotation staging"), producer, order,
                  rows ? device.Import(*rows, producer, "pose rows") : device::Tensor(),
@@ -112,7 +112,7 @@ device::Operation Poses::Write(const device::Tensor& source, Stream producer, Qu
 device::Operation Poses::Write(const device::Tensor& translation, const device::Tensor& rotation,
                                Stream producer, QuaternionOrder order, const device::Tensor& rows,
                                const device::Tensor& mask) {
-    device::Device& device = m_translate.GetStore().GetDevice();
+    device::Device& device = m_translate.GetColumnStore().GetDevice();
     if (TensorRows(device, translation, 3, "Translations") !=
             TensorRows(device, rotation, 4, "Rotations") ||
         translation.Type() != rotation.Type()) {
@@ -128,7 +128,7 @@ device::Operation Poses::Dispatch(const device::Tensor& values, const device::Te
     if (Size() == 0) {
         return {};
     }
-    Store& store = m_translate.GetStore();
+    ColumnStore& store = m_translate.GetColumnStore();
     device::Device& device = store.GetDevice();
     const uint32_t width = rotations ? 3 : kPoseWords;
     const uint32_t sourceRows = TensorRows(device, values, width, "Poses");
@@ -177,7 +177,7 @@ device::Tensor Poses::Read(device::DType type, Stream consumer, QuaternionOrder 
     if (type != device::DType::Float32 && type != device::DType::Float64) {
         throw Error("Poses are gathered as float32 or float64");
     }
-    Store& store = m_translate.GetStore();
+    ColumnStore& store = m_translate.GetColumnStore();
     device::Device& device = store.GetDevice();
     const bool doubles = type == device::DType::Float64;
     store.Flush();

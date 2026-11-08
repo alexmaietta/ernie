@@ -334,12 +334,12 @@ TEST(ArrayHeapTest, SharedArraysLiveUntilTheirLastReference) {
     });
 }
 
-TEST(StoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
+TEST(ColumnStoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
+        ColumnStore store(device);
         Table& xformable = store.Schema(SchemaId::Xformable);
         xformable.Allocate(1);
-        const SceneData data = store.Data();
+        const AuthoredData data = store.Data();
         EXPECT_EQ(data.schemas.xformable.translate.pages.address,
                   xformable.Pages(kXformableTranslate.index));
         EXPECT_EQ(data.schemas.xformable.prim.pages.address,
@@ -350,9 +350,9 @@ TEST(StoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
     });
 }
 
-TEST(StoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
+TEST(ColumnStoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
+        ColumnStore store(device);
         store.SetCounts(4, 3);
         Table& prims = store.Prims();
         prims.Allocate(4);
@@ -385,18 +385,18 @@ TEST(StoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
     });
 }
 
-TEST(StoreTest, UntrackedColumnsStampNothing) {
+TEST(ColumnStoreTest, UntrackedColumnsStampNothing) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
+        ColumnStore store(device);
         EXPECT_FALSE(store.Tracked(kSphereRadius));
         EXPECT_EQ(store.Stamps(kSphereRadius).stamps.address, 0u);
         EXPECT_TRUE(store.Tracked(kXformableTranslate));
     });
 }
 
-TEST(StoreTest, WritesBumpOnlyTheirColumnsSequence) {
+TEST(ColumnStoreTest, WritesBumpOnlyTheirColumnsSequence) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
+        ColumnStore store(device);
         EXPECT_EQ(store.LastWrite(kXformableTranslate), 0u);
         store.Touch(kXformableTranslate);
         const uint64_t translate = store.LastWrite(kXformableTranslate);
@@ -408,9 +408,9 @@ TEST(StoreTest, WritesBumpOnlyTheirColumnsSequence) {
     });
 }
 
-TEST(StoreTest, SceneDataIsUploadedOnlyWhenItChanges) {
+TEST(ColumnStoreTest, SceneDataIsUploadedOnlyWhenItChanges) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
+        ColumnStore store(device);
         const uint64_t address = store.DeviceData();
         const uint64_t uploaded = device.Traffic().uploadBytes;
         EXPECT_EQ(store.DeviceData(), address);

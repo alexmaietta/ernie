@@ -76,18 +76,18 @@ Mesh::Desc TexturedQuad() {
 }
 
 struct Scene {
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Tangents& tangents;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    TangentBuilder& tangents;
     Ordinal ordinal = 0;
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     ArrayRef Cell(uint32_t prim) {
-        return tangents.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh)).tangents;
+        return tangents.Record(structure.GetPrims().Row(prim, SchemaId::Mesh)).tangents;
     }
 
     std::vector<Float4> Read(uint32_t prim) {
@@ -96,7 +96,7 @@ struct Scene {
 
     void GivePoints(uint32_t prim, const ArrayRef& array, const std::vector<Float3>& points) {
         store.Arrays(ColumnType::Float3Array).Write(array, std::as_bytes(std::span(points)));
-        store.SetArray(kPointBasedPoints, catalog.GetPrims().Row(prim, SchemaId::PointBased),
+        store.SetArray(kPointBasedPoints, structure.GetPrims().Row(prim, SchemaId::PointBased),
                        array);
     }
 
@@ -115,21 +115,21 @@ struct Scene {
     }
 
     uint32_t Follows(uint32_t prim) {
-        return tangents.Record(catalog.GetPrims().Row(prim, SchemaId::Mesh)).primvar;
+        return tangents.Record(structure.GetPrims().Row(prim, SchemaId::Mesh)).primvar;
     }
 };
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        Geometry geometry(catalog, *builder);
-        Tangents tangents(catalog, geometry);
-        timeline.Add(geometry);
-        timeline.Add(tangents);
-        Scene scene{store, catalog, timeline, tangents};
+        MeshBuilder geometry(structure, *builder);
+        TangentBuilder tangents(structure, geometry);
+        publisher.Add(geometry);
+        publisher.Add(tangents);
+        Scene scene{store, structure, publisher, tangents};
         test(scene);
     });
 }
@@ -139,13 +139,13 @@ TEST(TangentTest, MeshesWithStGetTangentsPerFaceVertex) {
         Mesh::Desc plain = TexturedQuad();
         plain.primvars.clear();
         const uint32_t with =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/With"}, TexturedQuad()).firstPrim;
+            s.structure.Define<Mesh>(std::vector<std::string>{"/With"}, TexturedQuad()).firstPrim;
         const uint32_t without =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Without"}, plain).firstPrim;
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Without"}, plain).firstPrim;
         s.Publish();
         EXPECT_EQ(s.Cell(with).count, 16u);
         EXPECT_NE(s.Cell(with).address, 0u);
-        EXPECT_EQ(s.Follows(with), s.catalog.GetTokens().Find("st").id);
+        EXPECT_EQ(s.Follows(with), s.structure.GetTokens().Find("st").id);
         EXPECT_EQ(s.Cell(without).count, 0u);
         EXPECT_EQ(s.Follows(without), 0u);
     });
@@ -154,8 +154,9 @@ TEST(TangentTest, MeshesWithStGetTangentsPerFaceVertex) {
 TEST(TangentTest, ClonesShareOneTangentSet) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
-        const PrimBlock copies = s.catalog.Clone(quad, std::vector<std::string>{"/A", "/B", "/C"});
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+        const PrimBlock copies =
+            s.structure.Clone(quad, std::vector<std::string>{"/A", "/B", "/C"});
         s.Publish();
         EXPECT_EQ(s.tangents.Stats().meshes, 4u);
         EXPECT_EQ(s.tangents.Stats().sets, 1u);
@@ -170,8 +171,8 @@ const std::vector<Float3> kTurned = {{0, 0, 0}, {0, 1, 0}, {-1, 1, 0}, {-1, 0, 0
 TEST(TangentTest, PointsReusingAFreedAddressGetTheirOwnTangents) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
-        const PrimBlock copies = s.catalog.Clone(quad, std::vector<std::string>{"/A", "/B"});
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+        const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         const uint32_t first = copies.Prim(0, 0);
         const uint32_t second = copies.Prim(1, 0);
         ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
@@ -195,14 +196,15 @@ TEST(TangentTest, PointsReusingAFreedAddressGetTheirOwnTangents) {
 TEST(TangentTest, AMeshAddedOnARemovedMeshsArraysGetsItsOwnTangents) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
-        const uint32_t gone = s.catalog.Clone(quad, std::vector<std::string>{"/Gone"}).firstPrim;
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+        const uint32_t gone = s.structure.Clone(quad, std::vector<std::string>{"/Gone"}).firstPrim;
         const ArrayRef old = s.store.Arrays(ColumnType::Float3Array).Allocate(4);
         s.GivePoints(gone, old, kFlat);
         s.Publish();
 
-        s.catalog.Remove(gone);
-        const uint32_t added = s.catalog.Clone(quad, std::vector<std::string>{"/Added"}).firstPrim;
+        s.structure.Remove(gone);
+        const uint32_t added =
+            s.structure.Clone(quad, std::vector<std::string>{"/Added"}).firstPrim;
         const ArrayRef reused = s.Reuse(old);
         ASSERT_EQ(reused.address, old.address);
         s.GivePoints(added, reused, kTurned);
@@ -216,9 +218,9 @@ TEST(TangentTest, AMeshAddedOnARemovedMeshsArraysGetsItsOwnTangents) {
 TEST(TangentTest, RemovingStRemovesTheTangents) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
         s.Publish();
-        s.store.SetArray(kGprimPrimvars, s.catalog.GetPrims().Row(quad, SchemaId::Gprim), {});
+        s.store.SetArray(kGprimPrimvars, s.structure.GetPrims().Row(quad, SchemaId::Gprim), {});
         s.Publish();
         EXPECT_EQ(s.Cell(quad).count, 0u);
         EXPECT_EQ(s.Follows(quad), 0u);
@@ -229,10 +231,10 @@ TEST(TangentTest, RemovingStRemovesTheTangents) {
 TEST(TangentTest, SharedPointsMovedInPlaceRecomputeOnce) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
-        const PrimBlock copy = s.catalog.Clone(quad, std::vector<std::string>{"/Copy"});
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+        const PrimBlock copy = s.structure.Clone(quad, std::vector<std::string>{"/Copy"});
         s.Publish();
-        const uint32_t row = s.catalog.GetPrims().Row(quad, SchemaId::PointBased);
+        const uint32_t row = s.structure.GetPrims().Row(quad, SchemaId::PointBased);
         const ArrayRef points = s.store.Array(kPointBasedPoints, row);
         const std::vector<Float3> turned = {{0, 0, 0}, {0, 1, 0}, {-1, 1, 0}, {-1, 0, 0}};
         s.store.Arrays(ColumnType::Float3Array).Write(points, std::as_bytes(std::span(turned)));
@@ -247,10 +249,10 @@ TEST(TangentTest, SharedPointsMovedInPlaceRecomputeOnce) {
 TEST(TangentTest, TransformsAloneComputeNothing) {
     ForEachScene([](Scene& s) {
         const uint32_t quad =
-            s.catalog.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
+            s.structure.Define<Mesh>(std::vector<std::string>{"/Quad"}, TexturedQuad()).firstPrim;
         s.Publish();
         const uint32_t runs = s.tangents.Runs();
-        View(s.catalog, SchemaId::Xformable, std::vector<uint32_t>{quad})
+        View(s.structure, SchemaId::Xformable, std::vector<uint32_t>{quad})
             .Get<Double3>(kXformableTranslate)
             .Set(Double3{1, 0, 0});
         s.Publish();

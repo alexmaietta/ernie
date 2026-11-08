@@ -16,10 +16,10 @@
 
 namespace ernie {
 
-class Surfaces : public System {
+class SurfaceBuilder : public TableBuilder {
   public:
-    Surfaces(Catalog& catalog, const Instances& instances)
-        : m_catalog(catalog), m_instances(instances) {}
+    SurfaceBuilder(Structure& structure, const InstanceBuilder& instances)
+        : m_structure(structure), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "surfaces";
@@ -37,7 +37,7 @@ class Surfaces : public System {
     }
 
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
@@ -51,8 +51,8 @@ class Surfaces : public System {
   private:
     device::Program& Kernels();
 
-    Catalog& m_catalog;
-    const Instances& m_instances;
+    Structure& m_structure;
+    const InstanceBuilder& m_instances;
     Ref<device::Program> m_program;
     DeviceTable<SurfaceRecord> m_surfaces{"instance surfaces"};
     uint32_t m_written = 0;

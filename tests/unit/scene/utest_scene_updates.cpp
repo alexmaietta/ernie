@@ -30,14 +30,14 @@ const std::vector<Float3> kQuad = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}};
 
 struct Fixture {
     device::Device& device;
-    Store& store;
-    Catalog& catalog;
+    ColumnStore& store;
+    Structure& structure;
     uint32_t balls[2];
     uint32_t quads[2];
     uint32_t sun;
 
     View One(uint32_t prim, SchemaId schema) {
-        return View(catalog, schema, std::vector<uint32_t>{prim});
+        return View(structure, schema, std::vector<uint32_t>{prim});
     }
 
     void Move(uint32_t prim, Double3 to) {
@@ -45,7 +45,7 @@ struct Fixture {
     }
 
     uint32_t PointsRow(uint32_t prim) {
-        return catalog.GetPrims().Row(prim, SchemaId::PointBased);
+        return structure.GetPrims().Row(prim, SchemaId::PointBased);
     }
 
     ArrayRef NewArray(ColumnType type, std::span<const std::byte> bytes, uint32_t count) {
@@ -147,7 +147,7 @@ const Case kCases[] = {
      [](Fixture& f) {
          const std::vector<int32_t> counts = {3, 3};
          const std::vector<int32_t> indices = {0, 1, 2, 0, 2, 3};
-         const uint32_t row = f.catalog.GetPrims().Row(f.quads[0], SchemaId::Mesh);
+         const uint32_t row = f.structure.GetPrims().Row(f.quads[0], SchemaId::Mesh);
          f.store.SetArray(kMeshFaceVertexCounts, row,
                           f.NewArray(ColumnType::IntArray, std::as_bytes(std::span(counts)), 2));
          f.store.SetArray(kMeshFaceVertexIndices, row,
@@ -156,17 +156,17 @@ const Case kCases[] = {
      {.blasBuilt = 1, .tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"defining a prim updates and rebuilds only its world",
      [](Fixture& f) {
-         f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/Extra"});
+         f.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/Extra"});
      },
      {.hierarchyRows = 4, .tlasBuilt = 1, .instancesWritten = 4, .surfacesWritten = 4}},
     {"removing a prim updates and rebuilds only its world",
-     [](Fixture& f) { f.catalog.Remove(f.balls[1]); },
+     [](Fixture& f) { f.structure.Remove(f.balls[1]); },
      {.hierarchyRows = 2, .tlasBuilt = 1, .instancesWritten = 2, .surfacesWritten = 2}},
     {"defining a global prim rebuilds every TLAS, since every world holds it",
-     [](Fixture& f) { f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Moon"}); },
+     [](Fixture& f) { f.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Moon"}); },
      {.hierarchyRows = 8, .tlasBuilt = 3, .instancesWritten = 10, .surfacesWritten = 10}},
     {"defining a world lays everything out again",
-     [](Fixture& f) { f.catalog.Define(SchemaId::World, std::vector<std::string>{"/Env2"}); },
+     [](Fixture& f) { f.structure.Define(SchemaId::World, std::vector<std::string>{"/Env2"}); },
      {.hierarchyRows = 8,
       .tlasBuilt = 4,
       .instancesWritten = 8,
@@ -182,34 +182,34 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
         }
         for (const Case& c : kCases) {
             SCOPED_TRACE(c.name);
-            Store store(device);
-            Catalog catalog(store);
-            Timeline timeline(catalog);
+            ColumnStore store(device);
+            Structure structure(store);
+            Publisher publisher(structure);
             const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-            Hierarchy hierarchy(catalog);
-            Geometry geometry(catalog, *builder);
-            Instances instances(catalog, *builder);
-            Surfaces surfaces(catalog, instances);
-            timeline.Add(hierarchy);
-            timeline.Add(geometry);
-            timeline.Add(instances);
-            timeline.Add(surfaces);
+            TransformBuilder hierarchy(structure);
+            MeshBuilder geometry(structure, *builder);
+            InstanceBuilder instances(structure, *builder);
+            SurfaceBuilder surfaces(structure, instances);
+            publisher.Add(hierarchy);
+            publisher.Add(geometry);
+            publisher.Add(instances);
+            publisher.Add(surfaces);
 
-            Fixture f{device, store, catalog, {}, {}, kNoPrim};
-            catalog.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
-            f.balls[0] =
-                catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/Ball"}).firstPrim;
-            f.quads[0] = catalog
+            Fixture f{device, store, structure, {}, {}, kNoPrim};
+            structure.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
+            f.balls[0] = structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/Ball"})
+                             .firstPrim;
+            f.quads[0] = structure
                              .Define<Mesh>(std::vector<std::string>{"/Env0/Quad"},
                                            {.points = kQuad,
                                             .faceVertexIndices = {0, 1, 2, 3},
                                             .faceVertexCounts = {4}})
                              .firstPrim;
-            catalog.Clone(catalog.Find("/Env0"), std::vector<std::string>{"/Env1"});
-            f.balls[1] = catalog.Find("/Env1/Ball");
-            f.quads[1] = catalog.Find("/Env1/Quad");
-            f.sun = catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Sun"}).firstPrim;
-            timeline.Publish(1).Wait();
+            structure.Clone(structure.Find("/Env0"), std::vector<std::string>{"/Env1"});
+            f.balls[1] = structure.Find("/Env1/Ball");
+            f.quads[1] = structure.Find("/Env1/Quad");
+            f.sun = structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Sun"}).firstPrim;
+            publisher.Publish(1).Wait();
 
             const uint32_t hierarchyRebuilds = hierarchy.Rebuilds();
             const uint32_t instanceRelayouts = instances.Relayouts();
@@ -219,7 +219,7 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
             const uint32_t surfacesRuns = surfaces.Runs();
             const uint64_t submitted = device.GetQueue().Submitted();
             c.change(f);
-            timeline.Publish(2).Wait();
+            publisher.Publish(2).Wait();
 
             Work work;
             if (hierarchy.Runs() != hierarchyRuns) {

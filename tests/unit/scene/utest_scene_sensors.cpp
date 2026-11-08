@@ -34,7 +34,7 @@ TEST(SensorsTest, RecordsHoldResolvedParametersAndFollowEdits) {
         const Prim lidar = scene->Define<Lidar>("/Lidar", {.beamSamples = 10});
         scene->Define<Radar>("/Radar", {.fieldOfView = {90, 30}});
         scene->Publish().Wait();
-        const Prims& prims = SceneImpl::Get(*scene).GetCatalog().GetPrims();
+        const Prims& prims = SceneImpl::Get(*scene).GetStructure().GetPrims();
         const uint32_t cameraRow = prims.Row(camera.Index(), SchemaId::Camera);
 
         Snapshot snapshot = scene->Acquire(Stream::Host());
@@ -70,7 +70,7 @@ TEST(SensorsTest, LightShapesKeepAuthoredSizesForGuides) {
             scene->Define<RectLight>("/Panel", {.scale = {2, 2, 2}, .width = 3, .height = 4});
         const Prim bulb = scene->Define<SphereLight>("/Bulb", {.radius = 0.5f});
         scene->Publish().Wait();
-        const Prims& prims = SceneImpl::Get(*scene).GetCatalog().GetPrims();
+        const Prims& prims = SceneImpl::Get(*scene).GetStructure().GetPrims();
         const auto shape = [&](const Prim& light) {
             const Snapshot snapshot = scene->Acquire(Stream::Host());
             const LightShapeRecord record = ReadRecord<LightShapeRecord>(

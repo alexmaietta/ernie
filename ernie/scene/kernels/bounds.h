@@ -11,7 +11,7 @@
 namespace ernie {
 
 struct BoundsParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<uint> origins;
     Ptr<uint> extents;
     Ptr<BvhBox> boxes;

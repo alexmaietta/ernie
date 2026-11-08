@@ -17,9 +17,9 @@
 
 namespace ernie {
 
-class Hierarchy : public System {
+class TransformBuilder : public TableBuilder {
   public:
-    explicit Hierarchy(Catalog& catalog) : m_catalog(catalog) {}
+    explicit TransformBuilder(Structure& structure) : m_structure(structure) {}
 
     std::string_view Name() const override {
         return "hierarchy";
@@ -30,7 +30,7 @@ class Hierarchy : public System {
     void Describe(RenderTables& tables) const override;
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     uint32_t Segments() const {
         return m_segments.Size();
@@ -58,7 +58,7 @@ class Hierarchy : public System {
     bool Apply(const ChangeSet& changes);
     uint32_t ParentRow(uint32_t prim) const;
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     device::Program& Kernels();
 
     Ref<device::Program> m_program;

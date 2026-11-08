@@ -64,47 +64,48 @@ std::vector<std::byte> PackIdMap(std::span<const std::pair<StableId, std::string
     return bytes;
 }
 
-void Semantics::Describe(RenderTables& tables) const {
+void SemanticBuilder::Describe(RenderTables& tables) const {
     tables.semantics = Data();
 }
 
-std::span<const ColumnRef> Semantics::Inputs() const {
+std::span<const ColumnRef> SemanticBuilder::Inputs() const {
     static constexpr ColumnRef kInputs[] = {kSemanticsLabelsAPISemanticsLabels};
     return kInputs;
 }
 
-bool Semantics::Pending() const {
+bool SemanticBuilder::Pending() const {
     return m_wanted != m_taxonomies;
 }
 
-void Semantics::Require(std::span<const Token> taxonomies) {
+void SemanticBuilder::Require(std::span<const Token> taxonomies) {
     m_wanted.assign(taxonomies.begin(), taxonomies.end());
 }
 
-uint32_t Semantics::TaxonomyIndex(Token taxonomy) const {
+uint32_t SemanticBuilder::TaxonomyIndex(Token taxonomy) const {
     const auto found = std::ranges::find(m_taxonomies, taxonomy);
     if (found == m_taxonomies.end()) {
-        throw Error("Semantics has no taxonomy {}", m_catalog.GetTokens().Text(taxonomy));
+        throw Error("Semantics has no taxonomy {}", m_structure.GetTokens().Text(taxonomy));
     }
     return uint32_t(found - m_taxonomies.begin());
 }
 
-uint32_t Semantics::SemanticId(Token taxonomy, uint32_t prim) const {
+uint32_t SemanticBuilder::SemanticId(Token taxonomy, uint32_t prim) const {
     return m_semanticIds[size_t(TaxonomyIndex(taxonomy)) * m_stride + prim];
 }
 
-uint32_t Semantics::LabeledPrim(Token taxonomy, uint32_t prim) const {
+uint32_t SemanticBuilder::LabeledPrim(Token taxonomy, uint32_t prim) const {
     return m_semanticPrims[size_t(TaxonomyIndex(taxonomy)) * m_stride + prim];
 }
 
-const Semantics::Labels* Semantics::FindLabels(uint32_t prim, Token taxonomy,
-                                               std::map<uint64_t, Labels>& reads) const {
+const SemanticBuilder::Labels*
+SemanticBuilder::FindLabels(uint32_t prim, Token taxonomy,
+                            std::map<uint64_t, Labels>& reads) const {
     const uint32_t row =
-        m_catalog.GetPrims().InstanceRow(prim, SchemaId::SemanticsLabelsAPI, taxonomy.id);
+        m_structure.GetPrims().InstanceRow(prim, SchemaId::SemanticsLabelsAPI, taxonomy.id);
     if (row == kNoRow) {
         return nullptr;
     }
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     const ArrayRef array = store.Array(kSemanticsLabelsAPISemanticsLabels, row);
     if (array.address == 0) {
         return nullptr;
@@ -116,14 +117,14 @@ const Semantics::Labels* Semantics::FindLabels(uint32_t prim, Token taxonomy,
     return &found->second;
 }
 
-void Semantics::TrackRows(uint32_t prim) {
+void SemanticBuilder::TrackRows(uint32_t prim) {
     if (const auto rows = m_labelRows.find(prim); rows != m_labelRows.end()) {
         for (const uint32_t row : rows->second) {
             m_byLabelRow.erase(row);
         }
         m_labelRows.erase(rows);
     }
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     if (!prims.Alive(prim)) {
         return;
     }
@@ -133,8 +134,8 @@ void Semantics::TrackRows(uint32_t prim) {
     }
 }
 
-void Semantics::Resolve(uint32_t prim, std::map<uint64_t, Labels>& reads) {
-    const Prims& prims = m_catalog.GetPrims();
+void SemanticBuilder::Resolve(uint32_t prim, std::map<uint64_t, Labels>& reads) {
+    const Prims& prims = m_structure.GetPrims();
     for (uint32_t taxonomy = 0; taxonomy < m_taxonomies.size(); ++taxonomy) {
         uint32_t at = prim;
         std::span<const uint32_t> tokens;
@@ -159,7 +160,7 @@ void Semantics::Resolve(uint32_t prim, std::map<uint64_t, Labels>& reads) {
     ++m_stats.resolved;
 }
 
-void Semantics::Grow(uint32_t prims) {
+void SemanticBuilder::Grow(uint32_t prims) {
     if (prims <= m_stride) {
         return;
     }
@@ -180,8 +181,8 @@ void Semantics::Grow(uint32_t prims) {
     m_stats.reallocated = true;
 }
 
-void Semantics::Upload(std::span<const uint32_t> prims) {
-    device::Device& device = m_catalog.GetStore().GetDevice();
+void SemanticBuilder::Upload(std::span<const uint32_t> prims) {
+    device::Device& device = m_structure.GetColumnStore().GetDevice();
     device::Queue& queue = device.GetQueue();
     if (m_stats.reallocated || !m_stableBuffer || prims.size() > 256) {
         m_stableBuffer = device.CreateBuffer({.label = "stable ids"}, m_stableIds);
@@ -213,11 +214,11 @@ void Semantics::Upload(std::span<const uint32_t> prims) {
     m_data.taxonomyCount = uint32_t(m_taxonomies.size());
 }
 
-void Semantics::Run(const ChangeSet& changes, TableLog&) {
+void SemanticBuilder::Run(const ChangeSet& changes, TableWrites&) {
     ERNIE_ZONE("Semantics/Run");
     m_stats = {};
-    const Prims& prims = m_catalog.GetPrims();
-    const Paths& paths = m_catalog.GetPaths();
+    const Prims& prims = m_structure.GetPrims();
+    const Paths& paths = m_structure.GetPaths();
     const bool full = !m_built || changes.resync || m_wanted != m_taxonomies;
     std::map<uint64_t, Labels> reads;
     std::vector<uint32_t> changed;
@@ -295,8 +296,8 @@ void Semantics::Run(const ChangeSet& changes, TableLog&) {
     m_built = true;
 }
 
-std::vector<std::vector<std::string>> Semantics::SetTexts(uint32_t taxonomy) const {
-    const Tokens& tokens = m_catalog.GetTokens();
+std::vector<std::vector<std::string>> SemanticBuilder::SetTexts(uint32_t taxonomy) const {
+    const Tokens& tokens = m_structure.GetTokens();
     std::vector<std::vector<std::string>> texts(m_sets[taxonomy].size());
     for (const auto& [labels, id] : m_sets[taxonomy]) {
         for (const uint32_t label : labels) {
@@ -306,8 +307,8 @@ std::vector<std::vector<std::string>> Semantics::SetTexts(uint32_t taxonomy) con
     return texts;
 }
 
-IdEntries Semantics::SemanticIdEntries(Token taxonomy) const {
-    const std::string name(m_catalog.GetTokens().Text(taxonomy));
+IdEntries SemanticBuilder::SemanticIdEntries(Token taxonomy) const {
+    const std::string name(m_structure.GetTokens().Text(taxonomy));
     IdEntries entries = {
         {StableId{{0, 0, 0, 0}}, "BACKGROUND", "", {{name, {"BACKGROUND"}}}},
         {StableId{{1, 0, 0, 0}}, "UNLABELLED", "", {{name, {"UNLABELLED"}}}},
@@ -323,8 +324,8 @@ IdEntries Semantics::SemanticIdEntries(Token taxonomy) const {
     return entries;
 }
 
-std::set<uint32_t> Semantics::LabeledPrims(Token taxonomy) const {
-    const Prims& prims = m_catalog.GetPrims();
+std::set<uint32_t> SemanticBuilder::LabeledPrims(Token taxonomy) const {
+    const Prims& prims = m_structure.GetPrims();
     const size_t first = size_t(TaxonomyIndex(taxonomy)) * m_stride;
     std::set<uint32_t> labeled;
     for (uint32_t prim = 0; prim < std::min(prims.Size(), m_stride); ++prim) {
@@ -336,8 +337,8 @@ std::set<uint32_t> Semantics::LabeledPrims(Token taxonomy) const {
     return labeled;
 }
 
-IdEntries Semantics::PrimEntries(Token taxonomy, bool stable) const {
-    const std::string name(m_catalog.GetTokens().Text(taxonomy));
+IdEntries SemanticBuilder::PrimEntries(Token taxonomy, bool stable) const {
+    const std::string name(m_structure.GetTokens().Text(taxonomy));
     const uint32_t index = TaxonomyIndex(taxonomy);
     IdEntries entries = {
         {StableId{{0, 0, 0, 0}}, "BACKGROUND", "", {{name, {"BACKGROUND"}}}},
@@ -349,7 +350,7 @@ IdEntries Semantics::PrimEntries(Token taxonomy, bool stable) const {
     const std::vector<std::vector<std::string>> texts = SetTexts(index);
     for (const uint32_t prim : LabeledPrims(taxonomy)) {
         const uint32_t id = m_semanticIds[size_t(index) * m_stride + prim];
-        std::string path = m_catalog.GetPaths().Path(prim);
+        std::string path = m_structure.GetPaths().Path(prim);
         entries.push_back({stable ? m_stableIds[prim] : StableId{{prim + 2, 0, 0, 0}},
                            path,
                            path,
@@ -358,16 +359,16 @@ IdEntries Semantics::PrimEntries(Token taxonomy, bool stable) const {
     return entries;
 }
 
-IdEntries Semantics::InstanceIdEntries(Token taxonomy) const {
+IdEntries SemanticBuilder::InstanceIdEntries(Token taxonomy) const {
     return PrimEntries(taxonomy, false);
 }
 
-IdEntries Semantics::SemanticInstanceIdEntries(Token taxonomy) const {
+IdEntries SemanticBuilder::SemanticInstanceIdEntries(Token taxonomy) const {
     return PrimEntries(taxonomy, true);
 }
 
-IdEntries Semantics::StableIdEntries() const {
-    const Prims& prims = m_catalog.GetPrims();
+IdEntries SemanticBuilder::StableIdEntries() const {
+    const Prims& prims = m_structure.GetPrims();
     std::vector<std::vector<std::vector<std::string>>> texts;
     for (uint32_t taxonomy = 0; taxonomy < m_taxonomies.size(); ++taxonomy) {
         texts.push_back(SetTexts(taxonomy));
@@ -380,11 +381,11 @@ IdEntries Semantics::StableIdEntries() const {
         }
         IdEntry& entry = entries.emplace_back();
         entry.id = m_stableIds[prim];
-        entry.path = entry.text = m_catalog.GetPaths().Path(prim);
+        entry.path = entry.text = m_structure.GetPaths().Path(prim);
         for (uint32_t taxonomy = 0; prim < m_stride && taxonomy < m_taxonomies.size(); ++taxonomy) {
             const uint32_t id = m_semanticIds[size_t(taxonomy) * m_stride + prim];
             if (id >= 2) {
-                entry.labels.emplace_back(m_catalog.GetTokens().Text(m_taxonomies[taxonomy]),
+                entry.labels.emplace_back(m_structure.GetTokens().Text(m_taxonomies[taxonomy]),
                                           texts[taxonomy][id - 2]);
             }
         }

@@ -9,7 +9,7 @@
 namespace ernie {
 
 struct SurfaceParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<InstanceLayout> layout;
     Ptr<MeshRecord> meshes;
     Ptr<SurfaceRecord> surfaces;

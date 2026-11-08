@@ -18,7 +18,7 @@ ERNIE_CHECK_SIZE(HierarchyTree, 40);
 
 struct ResolveParams {
     HierarchyTree tree;
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<uint> segments;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
@@ -33,7 +33,7 @@ struct ResolveParams {
 ERNIE_CHECK_SIZE(ResolveParams, 104);
 
 struct MotionParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<MotionRecord> motions;
     uint rows;
     uint padding;

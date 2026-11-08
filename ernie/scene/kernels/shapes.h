@@ -68,7 +68,7 @@ UnitShape PlaceAlong(WorldTransform w, ShapeKind kind, uint axis, float3 scale, 
     return shape;
 }
 
-UnitShape PlaceShape(SceneData* scene, uint prim, WorldTransform w) {
+UnitShape PlaceShape(AuthoredData* scene, uint prim, WorldTransform w) {
     switch (SchemaId(scene->prims.schema[prim])) {
     case SchemaId::Sphere: {
         const float radius = scene->schemas.sphere.radius[PrimRow(scene, prim, kSlotSphere)];

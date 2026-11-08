@@ -71,27 +71,27 @@ bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
 
 }
 
-std::span<const ColumnRef> Products::Inputs() const {
+std::span<const ColumnRef> ProductBuilder::Inputs() const {
     static const std::vector<ColumnRef> inputs = ProductInputs();
     return inputs;
 }
 
-void Products::Describe(RenderTables& tables) const {
+void ProductBuilder::Describe(RenderTables& tables) const {
     tables.products.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }
 
-const ResolvedProduct* Products::Find(uint32_t prim) const {
+const ResolvedProduct* ProductBuilder::Find(uint32_t prim) const {
     const auto found = m_products.find(prim);
     return found == m_products.end() ? nullptr : &found->second;
 }
 
-ResolvedProduct Products::Resolve(uint32_t index) const {
-    const Prims& prims = m_catalog.GetPrims();
+ResolvedProduct ProductBuilder::Resolve(uint32_t index) const {
+    const Prims& prims = m_structure.GetPrims();
     ResolvedProduct product;
     product.prim = index;
     const Prim prim = m_scene.At(index);
     const std::string path = prim.Path();
-    const View view(m_catalog, SchemaId::RenderProduct, std::vector<uint32_t>{index});
+    const View view(m_structure, SchemaId::RenderProduct, std::vector<uint32_t>{index});
     const auto targets = [&](ColumnRef column, SchemaId schema) {
         const std::vector<uint32_t> found = view.GetArray<uint32_t>(column).Get(0);
         for (const uint32_t target : found) {
@@ -133,10 +133,10 @@ ResolvedProduct Products::Resolve(uint32_t index) const {
     record.minimalMode = uint32_t(prim.Get(MinimalAPI::kMode));
     record.spectralMode = uint32_t(prim.Get(RenderProduct::kSpectralMode));
     record.missDistance = prim.Get(RenderProduct::kMissDistance);
-    record.sensors =
-        m_catalog.GetStore().Array(kRenderProductCamera, prims.Row(index, SchemaId::RenderProduct));
-    record.vars = m_catalog.GetStore().Array(kRenderProductOrderedVars,
-                                             prims.Row(index, SchemaId::RenderProduct));
+    record.sensors = m_structure.GetColumnStore().Array(kRenderProductCamera,
+                                                        prims.Row(index, SchemaId::RenderProduct));
+    record.vars = m_structure.GetColumnStore().Array(kRenderProductOrderedVars,
+                                                     prims.Row(index, SchemaId::RenderProduct));
     product.taxonomy = view.Get<Token>(kRenderProductSemanticTaxonomy).Get().front();
     try {
         product.sensors = targets(kRenderProductCamera, SchemaId::Sensor);
@@ -186,9 +186,9 @@ ResolvedProduct Products::Resolve(uint32_t index) const {
     return product;
 }
 
-void Products::Run(const ChangeSet&, TableLog&) {
+void ProductBuilder::Run(const ChangeSet&, TableWrites&) {
     ERNIE_ZONE("Products/Run");
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     std::map<uint32_t, ResolvedProduct> resolved;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim) || prims.At(prim).schema != SchemaId::RenderProduct) {
@@ -203,8 +203,8 @@ void Products::Run(const ChangeSet&, TableLog&) {
         resolved.emplace(prim, std::move(product));
     }
     m_products = std::move(resolved);
-    m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::RenderProduct).Capacity());
-    m_records.Upload(m_catalog.GetStore().GetDevice());
+    m_records.Reserve(m_structure.GetColumnStore().Schema(SchemaId::RenderProduct).Capacity());
+    m_records.Upload(m_structure.GetColumnStore().GetDevice());
 }
 
 }

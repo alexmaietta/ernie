@@ -15,9 +15,9 @@
 
 namespace ernie {
 
-class Sensors : public System {
+class SensorBuilder : public TableBuilder {
   public:
-    explicit Sensors(Catalog& catalog) : m_catalog(catalog) {}
+    explicit SensorBuilder(Structure& structure) : m_structure(structure) {}
 
     std::string_view Name() const override {
         return "sensors";
@@ -25,7 +25,7 @@ class Sensors : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
@@ -35,7 +35,7 @@ class Sensors : public System {
   private:
     device::Program& Kernels();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     Ref<device::Program> m_program;
     DeviceTable<CameraRecord> m_cameras{"camera records"};
     DeviceTable<LidarRecord> m_lidars{"lidar records"};

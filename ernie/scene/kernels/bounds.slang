@@ -7,7 +7,7 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-bool Infinite(SceneData* scene, uint prim) {
+bool Infinite(AuthoredData* scene, uint prim) {
     if (SchemaId(scene->prims.schema[prim]) != SchemaId::Plane) {
         return false;
     }
@@ -26,7 +26,7 @@ float3 OriginOffset(BoundsParams p, WorldTransform w, uint world) {
 [numthreads(kBoundsGroup, 1, 1)]
 void PrimBounds(uniform BoundsParams p) {
     const uint prim = LinearThreadIndex();
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     if (prim >= p.primCount || (scene->prims.flags[prim] & kPrimAlive) == 0) {
         return;
     }
@@ -100,7 +100,7 @@ void SlotBounds(uniform BoundsParams p) {
     if (record.blas == 0 || (record.custom >> 24) != kGeometryMask) {
         return;
     }
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     const SlotHit drawn = layout->hits[slot];
     const uint owner = drawn.instancer != kNoPrim ? drawn.instancer : drawn.prim;
     const uint world = scene->prims.world[owner];
@@ -139,7 +139,7 @@ void SlotBounds(uniform BoundsParams p) {
 [numthreads(kBoundsGroup, 1, 1)]
 void InstancerBounds(uniform BoundsParams p) {
     const uint prim = LinearThreadIndex();
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     if (prim >= p.primCount || (scene->prims.flags[prim] & kPrimAlive) == 0 ||
         SchemaId(scene->prims.schema[prim]) != SchemaId::PointInstancer) {
         return;

@@ -51,7 +51,7 @@ std::vector<TableColumn> SchemaColumns(SchemaId schema, std::vector<uint32_t>& s
 
 }
 
-Store::Store(device::Device& device)
+ColumnStore::ColumnStore(device::Device& device)
     : m_device(device), m_heap(device, "scene"),
       m_prims(m_heap, "prims",
               {{4, 0}, {4, kNoPrimFill}, {4, kNoPrimFill}, {4, 0}, {4, kNoPrimFill}, {8, 0}}),
@@ -70,34 +70,34 @@ Store::Store(device::Device& device)
     m_worlds.Allocate(1);
 }
 
-const Store::Entry& Store::At(SchemaId schema) const {
+const ColumnStore::Entry& ColumnStore::At(SchemaId schema) const {
     if (uint32_t(schema) >= m_entries.size()) {
         throw Error("No data for schema {}", uint32_t(schema));
     }
     return m_entries[uint32_t(schema)];
 }
 
-Table& Store::Schema(SchemaId schema) {
+Table& ColumnStore::Schema(SchemaId schema) {
     return *At(schema).table;
 }
 
-const Table& Store::Schema(SchemaId schema) const {
+const Table& ColumnStore::Schema(SchemaId schema) const {
     return *At(schema).table;
 }
 
-void Store::Pin(SchemaId schema) {
+void ColumnStore::Pin(SchemaId schema) {
     At(schema);
     ++m_entries[uint32_t(schema)].pins;
 }
 
-void Store::Unpin(SchemaId schema) {
+void ColumnStore::Unpin(SchemaId schema) {
     if (!Pinned(schema)) {
         throw Error("{} data isn't pinned", Info(schema).name);
     }
     --m_entries[uint32_t(schema)].pins;
 }
 
-Store::~Store() {
+ColumnStore::~ColumnStore() {
     if (!m_attachments.empty()) {
         try {
             m_device.GetQueue().Mark().Wait();
@@ -114,7 +114,7 @@ bool SameColumn(ColumnRef a, ColumnRef b) {
 
 }
 
-void Store::Attach(Attachment attachment) {
+void ColumnStore::Attach(Attachment attachment) {
     if (Attached(attachment.column, attachment.rows)) {
         throw Error("{}'s {} is already attached for some of these prims",
                     Info(attachment.column.schema).name, attachment.column.column->field);
@@ -125,7 +125,8 @@ void Store::Attach(Attachment attachment) {
     m_attachments.push_back(std::move(attachment));
 }
 
-const Attachment* Store::FindAttachment(ColumnRef column, std::span<const uint32_t> rows) const {
+const Attachment* ColumnStore::FindAttachment(ColumnRef column,
+                                              std::span<const uint32_t> rows) const {
     for (const Attachment& attachment : m_attachments) {
         if (SameColumn(attachment.column, column) && std::ranges::equal(attachment.rows, rows)) {
             return &attachment;
@@ -134,7 +135,7 @@ const Attachment* Store::FindAttachment(ColumnRef column, std::span<const uint32
     return nullptr;
 }
 
-bool Store::Attached(ColumnRef column, std::span<const uint32_t> rows) const {
+bool ColumnStore::Attached(ColumnRef column, std::span<const uint32_t> rows) const {
     for (const Attachment& attachment : m_attachments) {
         if (!SameColumn(attachment.column, column)) {
             continue;
@@ -148,7 +149,7 @@ bool Store::Attached(ColumnRef column, std::span<const uint32_t> rows) const {
     return false;
 }
 
-Attachment Store::Detach(ColumnRef column, std::span<const uint32_t> rows) {
+Attachment ColumnStore::Detach(ColumnRef column, std::span<const uint32_t> rows) {
     const auto found = std::ranges::find_if(m_attachments, [&](const Attachment& attachment) {
         return SameColumn(attachment.column, column) && std::ranges::equal(attachment.rows, rows);
     });
@@ -162,11 +163,11 @@ Attachment Store::Detach(ColumnRef column, std::span<const uint32_t> rows) {
     return attachment;
 }
 
-bool Store::Pinned(SchemaId schema) const {
+bool ColumnStore::Pinned(SchemaId schema) const {
     return At(schema).pins > 0;
 }
 
-ArrayHeap& Store::Arrays(ColumnType type) {
+ArrayHeap& ColumnStore::Arrays(ColumnType type) {
     const uint32_t item = ItemBytes(type);
     if (item == 0) {
         throw Error("Column type {} holds no arrays", uint32_t(type));
@@ -178,12 +179,12 @@ ArrayHeap& Store::Arrays(ColumnType type) {
     return *arrays;
 }
 
-uint32_t Store::PrimsColumn(SchemaId schema) const {
+uint32_t ColumnStore::PrimsColumn(SchemaId schema) const {
     At(schema);
     return Info(schema).columnCount;
 }
 
-uint32_t Store::StampColumn(ColumnRef column) const {
+uint32_t ColumnStore::StampColumn(ColumnRef column) const {
     const std::vector<uint32_t>& stamps = At(column.schema).stamps;
     if (column.index >= stamps.size()) {
         throw Error("{} has no column {}", Info(column.schema).name, column.index);
@@ -191,21 +192,21 @@ uint32_t Store::StampColumn(ColumnRef column) const {
     return stamps[column.index];
 }
 
-bool Store::Tracked(ColumnRef column) const {
+bool ColumnStore::Tracked(ColumnRef column) const {
     return StampColumn(column) != kNoStamp;
 }
 
-void Store::Touch(ColumnRef column) {
+void ColumnStore::Touch(ColumnRef column) {
     StampColumn(column);
     m_entries[uint32_t(column.schema)].writes[column.index] = ++m_writes;
 }
 
-uint64_t Store::LastWrite(ColumnRef column) const {
+uint64_t ColumnStore::LastWrite(ColumnRef column) const {
     StampColumn(column);
     return At(column.schema).writes[column.index];
 }
 
-StampTarget Store::Stamps(ColumnRef column) {
+StampTarget ColumnStore::Stamps(ColumnRef column) {
     const uint32_t stamps = StampColumn(column);
     const Table& table = Schema(column.schema);
     StampTarget target{};
@@ -216,7 +217,7 @@ StampTarget Store::Stamps(ColumnRef column) {
     return target;
 }
 
-void Store::StampWorld(uint32_t world) {
+void ColumnStore::StampWorld(uint32_t world) {
     const uint32_t slot = WorldSlot(world);
     if (slot >= m_worlds.Rows()) {
         throw Error("World {} of a scene of {}", world, m_worldCount);
@@ -225,7 +226,7 @@ void Store::StampWorld(uint32_t world) {
     m_worldStamps[slot] = m_stamp;
 }
 
-Ordinal Store::WorldStamp(uint32_t world) const {
+Ordinal ColumnStore::WorldStamp(uint32_t world) const {
     const uint32_t slot = WorldSlot(world);
     if (slot >= m_worldStamps.size()) {
         throw Error("World {} of a scene of {}", world, m_worldCount);
@@ -233,7 +234,7 @@ Ordinal Store::WorldStamp(uint32_t world) const {
     return m_worldStamps[slot];
 }
 
-device::Program& Store::Kernels() {
+device::Program& ColumnStore::Kernels() {
     if (!m_program) {
         m_program = m_device.CreateProgram(
             {.modules = {"ernie.scene.kernels.attributes", "ernie.scene.kernels.changes"},
@@ -245,8 +246,8 @@ device::Program& Store::Kernels() {
     return *m_program;
 }
 
-void Store::FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,
-                      std::span<const std::byte> cell) {
+void ColumnStore::FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,
+                            std::span<const std::byte> cell) {
     if (cell.size() != table.CellBytes(column)) {
         throw Error("{} bytes for a cell of {} bytes in {}", cell.size(), table.CellBytes(column),
                     table.Label());
@@ -271,7 +272,7 @@ void Store::FillWords(Table& table, uint32_t column, uint32_t first, uint32_t co
     Dispatch("FillCells", params, uint64_t(count) * params.words);
 }
 
-void Store::StampRows(ColumnRef column, uint32_t first, uint32_t count) {
+void ColumnStore::StampRows(ColumnRef column, uint32_t first, uint32_t count) {
     const uint32_t stamps = StampColumn(column);
     if (stamps != kNoStamp) {
         FillWords(Schema(column.schema), stamps, first, count,
@@ -279,14 +280,14 @@ void Store::StampRows(ColumnRef column, uint32_t first, uint32_t count) {
     }
 }
 
-void Store::StageLive(ColumnRef column, uint32_t first, std::span<const std::byte> cells) {
+void ColumnStore::StageLive(ColumnRef column, uint32_t first, std::span<const std::byte> cells) {
     Table& table = Schema(column.schema);
     table.Stage(column.index, first, cells);
     Touch(column);
     StampRows(column, first, uint32_t(cells.size() / table.CellBytes(column.index)));
 }
 
-bool Store::OverridesBetween(ColumnRef column, uint32_t first, uint32_t count) const {
+bool ColumnStore::OverridesBetween(ColumnRef column, uint32_t first, uint32_t count) const {
     if (m_overrides.empty() || count == 0) {
         return false;
     }
@@ -294,7 +295,7 @@ bool Store::OverridesBetween(ColumnRef column, uint32_t first, uint32_t count) c
     return found != m_overrides.end() && found->first <= ArrayKey(column, first + count - 1);
 }
 
-void Store::Stage(ColumnRef column, uint32_t first, std::span<const std::byte> cells) {
+void ColumnStore::Stage(ColumnRef column, uint32_t first, std::span<const std::byte> cells) {
     const uint32_t cell = Schema(column.schema).CellBytes(column.index);
     const auto count = uint32_t(cells.size() / cell);
     if (!OverridesBetween(column, first, count)) {
@@ -311,8 +312,8 @@ void Store::Stage(ColumnRef column, uint32_t first, std::span<const std::byte> c
     StageLive(column, first, live);
 }
 
-void Store::Fill(ColumnRef column, uint32_t first, uint32_t count,
-                 std::span<const std::byte> cell) {
+void ColumnStore::Fill(ColumnRef column, uint32_t first, uint32_t count,
+                       std::span<const std::byte> cell) {
     if (OverridesBetween(column, first, count)) {
         Stage(column, first, Repeat(cell, count));
         return;
@@ -322,7 +323,7 @@ void Store::Fill(ColumnRef column, uint32_t first, uint32_t count,
     StampRows(column, first, count);
 }
 
-void Store::LandAuthored(bool wait) const {
+void ColumnStore::LandAuthored(bool wait) const {
     std::erase_if(m_authoredReads, [&](AuthoredRead& pending) {
         if (!wait && !pending.read.Ready()) {
             return false;
@@ -338,8 +339,8 @@ void Store::LandAuthored(bool wait) const {
     });
 }
 
-void Store::Override(ColumnRef column, uint32_t row, uint64_t owner,
-                     std::span<const std::byte> authored, std::span<const std::byte> value) {
+void ColumnStore::Override(ColumnRef column, uint32_t row, uint64_t owner,
+                           std::span<const std::byte> authored, std::span<const std::byte> value) {
     LandAuthored(true);
     const uint32_t cell = Schema(column.schema).CellBytes(column.index);
     if (value.size() != cell) {
@@ -360,7 +361,7 @@ void Store::Override(ColumnRef column, uint32_t row, uint64_t owner,
     StageLive(column, row, entry.layers.back().value);
 }
 
-void Store::ClearOverride(ColumnRef column, uint32_t row, uint64_t owner) {
+void ColumnStore::ClearOverride(ColumnRef column, uint32_t row, uint64_t owner) {
     LandAuthored(true);
     const auto found = m_overrides.find(ArrayKey(column, row));
     if (found == m_overrides.end()) {
@@ -377,17 +378,17 @@ void Store::ClearOverride(ColumnRef column, uint32_t row, uint64_t owner) {
     }
 }
 
-bool Store::Overridden(ColumnRef column, uint32_t row) const {
+bool ColumnStore::Overridden(ColumnRef column, uint32_t row) const {
     return m_overrides.contains(ArrayKey(column, row));
 }
 
-std::vector<std::byte> Store::Authored(ColumnRef column, uint32_t row) const {
+std::vector<std::byte> ColumnStore::Authored(ColumnRef column, uint32_t row) const {
     LandAuthored(true);
     const auto found = m_overrides.find(ArrayKey(column, row));
     return found == m_overrides.end() ? std::vector<std::byte>() : found->second.authored;
 }
 
-void Store::Reassert(ColumnRef column, std::span<const uint32_t> rows) {
+void ColumnStore::Reassert(ColumnRef column, std::span<const uint32_t> rows) {
     if (m_overrides.empty()) {
         return;
     }
@@ -405,7 +406,7 @@ void Store::Reassert(ColumnRef column, std::span<const uint32_t> rows) {
     }
 }
 
-void Store::DropOverrides(SchemaId table, uint32_t row) {
+void ColumnStore::DropOverrides(SchemaId table, uint32_t row) {
     if (m_overrides.empty()) {
         return;
     }
@@ -415,8 +416,8 @@ void Store::DropOverrides(SchemaId table, uint32_t row) {
     }
 }
 
-void Store::CloneRows(SchemaId table, std::span<const uint32_t> sources, uint32_t first,
-                      uint32_t copies) {
+void ColumnStore::CloneRows(SchemaId table, std::span<const uint32_t> sources, uint32_t first,
+                            uint32_t copies) {
     if (sources.empty() || copies == 0) {
         return;
     }
@@ -450,26 +451,26 @@ void Store::CloneRows(SchemaId table, std::span<const uint32_t> sources, uint32_
     }
 }
 
-uint64_t Store::ArrayKey(ColumnRef column, uint32_t row) {
+uint64_t ColumnStore::ArrayKey(ColumnRef column, uint32_t row) {
     return (uint64_t(column.schema) << 48) | (uint64_t(column.index) << 32) | row;
 }
 
-ArrayRef Store::Array(ColumnRef column, uint32_t row) const {
+ArrayRef ColumnStore::Array(ColumnRef column, uint32_t row) const {
     const auto found = m_arrays.find(ArrayKey(column, row));
     return found == m_arrays.end() ? ArrayRef{} : found->second;
 }
 
-bool Store::Exclusive(ColumnRef column, uint32_t row) const {
+bool ColumnStore::Exclusive(ColumnRef column, uint32_t row) const {
     const ArrayRef array = Array(column, row);
     if (array.address == 0) {
         return false;
     }
     const uint32_t rows[] = {row};
     return Attached(column, rows) ||
-           const_cast<Store&>(*this).Arrays(column.column->type).Borrowed(array);
+           const_cast<ColumnStore&>(*this).Arrays(column.column->type).Borrowed(array);
 }
 
-void Store::SetArray(ColumnRef column, uint32_t row, const ArrayRef& array) {
+void ColumnStore::SetArray(ColumnRef column, uint32_t row, const ArrayRef& array) {
     const uint64_t key = ArrayKey(column, row);
     if (const auto found = m_arrays.find(key); found != m_arrays.end()) {
         const ArrayRef old = found->second;
@@ -485,7 +486,7 @@ void Store::SetArray(ColumnRef column, uint32_t row, const ArrayRef& array) {
     m_arrayWrites[ArrayKey(column, 0)].push_back({m_stamp, row});
 }
 
-std::vector<uint32_t> Store::ArrayRows(ColumnRef column, Ordinal since, Ordinal until) const {
+std::vector<uint32_t> ColumnStore::ArrayRows(ColumnRef column, Ordinal since, Ordinal until) const {
     std::vector<uint32_t> rows;
     const auto found = m_arrayWrites.find(ArrayKey(column, 0));
     if (found == m_arrayWrites.end()) {
@@ -501,7 +502,7 @@ std::vector<uint32_t> Store::ArrayRows(ColumnRef column, Ordinal since, Ordinal 
     return rows;
 }
 
-void Store::LogArrayRows(ColumnRef column, std::span<const uint32_t> rows) {
+void ColumnStore::LogArrayRows(ColumnRef column, std::span<const uint32_t> rows) {
     std::vector<ArrayWrite>& writes = m_arrayWrites[ArrayKey(column, 0)];
     for (const uint32_t row : rows) {
         if (row != kNoRow) {
@@ -510,13 +511,13 @@ void Store::LogArrayRows(ColumnRef column, std::span<const uint32_t> rows) {
     }
 }
 
-void Store::TrimArrayWrites(Ordinal through) {
+void ColumnStore::TrimArrayWrites(Ordinal through) {
     for (auto& [key, writes] : m_arrayWrites) {
         std::erase_if(writes, [&](const ArrayWrite& write) { return write.stamp <= through; });
     }
 }
 
-void Store::SetCounts(uint32_t prims, uint32_t worlds) {
+void ColumnStore::SetCounts(uint32_t prims, uint32_t worlds) {
     m_primCount = prims;
     m_worldCount = worlds;
     if (worlds + 1 > m_worlds.Rows()) {
@@ -525,12 +526,12 @@ void Store::SetCounts(uint32_t prims, uint32_t worlds) {
     m_worldStamps.resize(worlds + 1, 0);
 }
 
-void Store::Place(std::byte* data, uint32_t offset, uint64_t address) const {
+void ColumnStore::Place(std::byte* data, uint32_t offset, uint64_t address) const {
     std::memcpy(data + offset, &address, sizeof(address));
 }
 
-void Store::Flush() {
-    ERNIE_ZONE("Store/Flush");
+void ColumnStore::Flush() {
+    ERNIE_ZONE("ColumnStore/Flush");
     LandAuthored(false);
 
     struct Scattered {
@@ -601,8 +602,8 @@ void Store::Flush() {
     }
 }
 
-SceneData Store::Data() const {
-    SceneData data{};
+AuthoredData ColumnStore::Data() const {
+    AuthoredData data{};
     data.prims.schema.pages.address = m_prims.Pages(kPrimSchema);
     data.prims.parent.pages.address = m_prims.Pages(kPrimParent);
     data.prims.world.pages.address = m_prims.Pages(kPrimWorld);
@@ -636,13 +637,14 @@ SceneData Store::Data() const {
     return data;
 }
 
-uint64_t Store::DeviceData() {
-    ERNIE_ZONE("Store/DeviceData");
+uint64_t ColumnStore::DeviceData() {
+    ERNIE_ZONE("ColumnStore/DeviceData");
     Flush();
     if (!m_deviceData) {
-        m_deviceData = m_device.CreateBuffer({.bytes = sizeof(SceneData), .label = "scene data"});
+        m_deviceData =
+            m_device.CreateBuffer({.bytes = sizeof(AuthoredData), .label = "scene data"});
     }
-    const SceneData data = Data();
+    const AuthoredData data = Data();
     const std::span<const std::byte> bytes = std::as_bytes(std::span(&data, 1));
     if (m_uploaded.size() != bytes.size() ||
         std::memcmp(m_uploaded.data(), bytes.data(), bytes.size()) != 0) {

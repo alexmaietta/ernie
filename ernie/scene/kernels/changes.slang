@@ -41,7 +41,7 @@ void CompactChanged(uniform CompactParams p) {
 [numthreads(kChangesGroup, 1, 1)]
 void CompactWorlds(uniform WorldsParams p) {
     const uint slot = LinearThreadIndex();
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     if (slot > scene->worldCount) {
         return;
     }

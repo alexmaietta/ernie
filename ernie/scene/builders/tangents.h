@@ -83,10 +83,10 @@ struct TangentStats {
     uint32_t deformed = 0;
 };
 
-class Tangents : public System {
+class TangentBuilder : public TableBuilder {
   public:
-    Tangents(Catalog& catalog, const Geometry& geometry)
-        : m_catalog(catalog), m_geometry(geometry) {}
+    TangentBuilder(Structure& structure, const MeshBuilder& geometry)
+        : m_structure(structure), m_geometry(geometry) {}
 
     std::string_view Name() const override {
         return "tangents";
@@ -112,7 +112,7 @@ class Tangents : public System {
     }
 
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     const TangentStats& Stats() const {
         return m_stats;
@@ -177,8 +177,8 @@ class Tangents : public System {
     void Link(uint32_t prim, const Mesh& mesh);
     void Process(const ChangeSet& changes);
 
-    Catalog& m_catalog;
-    const Geometry& m_geometry;
+    Structure& m_structure;
+    const MeshBuilder& m_geometry;
     RecordTable<TangentRecord> m_records{"tangent records"};
     std::vector<uint32_t> m_relinked;
     std::unordered_map<uint32_t, Mesh> m_meshes;

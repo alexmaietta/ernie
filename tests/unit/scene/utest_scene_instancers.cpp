@@ -26,7 +26,7 @@ struct Slots {
 
 Slots Read(Scene& scene, device::Device& device) {
     scene.Publish({.wait = true});
-    const Instances& instances = SceneImpl::Get(scene).GetInstances();
+    const InstanceBuilder& instances = SceneImpl::Get(scene).GetInstances();
     Slots slots;
     slots.count = instances.InstanceCounts()[0];
     slots.hits.resize(slots.count);
@@ -132,7 +132,7 @@ TEST(InstancersTest, CountChangesAndHiddenIdsKeepTheLayoutAndBoundsFollowCopies)
         EXPECT_NE(slots.records[2].blas, 0u);
         EXPECT_EQ(slots.records[4].blas, 0u);
 
-        const Instances& instances = SceneImpl::Get(*scene).GetInstances();
+        const InstanceBuilder& instances = SceneImpl::Get(*scene).GetInstances();
         const uint32_t relayouts = instances.Relayouts();
         inst.Set(PointInstancer::kInvisibleIds, std::vector<int64_t>{});
         inst.Set(PointInstancer::kPositions, std::vector<Float3>{{5, 0, 0}, {10, 0, 0}});
@@ -164,7 +164,7 @@ TEST(InstancersTest, RestackingAlongsideAGlobalMoveRebuildsInsteadOfRefitting) {
         Prototype(*scene);
         const Prim sun = scene->Define<Sphere>("/Sun");
         scene->Publish({.wait = true});
-        const Instances& instances = SceneImpl::Get(*scene).GetInstances();
+        const InstanceBuilder& instances = SceneImpl::Get(*scene).GetInstances();
         const uint32_t relayouts = instances.Relayouts();
 
         inst.Set(PointInstancer::kPositions, std::vector<Float3>{{5, 0, 0}, {10, 0, 0}});
@@ -214,7 +214,7 @@ TEST(InstancersTest, LightsInPrototypesLightFromEveryCopyAndNotInPlace) {
                                                      .positions = {{0, 0, 2}, {5, 0, 2}}});
         scene->Define<SphereLight>("/Lamps/Lamp", {.intensity = 3, .treatAsPoint = true});
         scene->Publish({.wait = true});
-        const Lights& lights = SceneImpl::Get(*scene).GetLights();
+        const LightBuilder& lights = SceneImpl::Get(*scene).GetLights();
         uint32_t total = 0;
         for (const uint32_t count : lights.Counts()) {
             total += count;

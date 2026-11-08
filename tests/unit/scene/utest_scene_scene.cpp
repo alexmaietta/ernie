@@ -326,7 +326,7 @@ TEST(SceneTest, MarkChangedingAttachedPointsRefitsTheirBlas) {
         UntypedAttribute points = scene.Select(quads, SchemaId::Mesh).Get(kPointBasedPoints);
         points.Attach(&owned->managed);
         scene.Publish().Wait();
-        const GeometryStats& stats = SceneImpl::Get(scene).GetGeometry().Stats();
+        const GeometryStats& stats = SceneImpl::Get(scene).GetMeshes().Stats();
         EXPECT_EQ(stats.built, 2u);
 
         owned->values[2] = 1;
@@ -421,9 +421,9 @@ TEST(SceneTest, DeformedMeshesRecomputeTangentsOnTheDevice) {
         deformed.st = *CornerValues<Float2>(st, {}, Interpolation::Vertex, indices, counts);
         const std::vector<Float4> expected = MikkTangents(deformed);
         SceneImpl& impl = SceneImpl::Get(scene);
-        const uint32_t meshRow = impl.GetCatalog().GetPrims().Row(grid.Index(), SchemaId::Mesh);
+        const uint32_t meshRow = impl.GetStructure().GetPrims().Row(grid.Index(), SchemaId::Mesh);
         const std::vector<Float4> found =
-            Items<Float4>(impl.GetStore()
+            Items<Float4>(impl.GetColumnStore()
                               .Arrays(ColumnType::IntArray)
                               .Read(impl.GetTangents().Record(meshRow).tangents));
         ASSERT_EQ(found.size(), expected.size());

@@ -142,7 +142,7 @@ struct InstancePlacement {
 }
 
 InstancePlacement
-PlaceCopy(SceneData* scene, InstancerBlock block, uint instance) {
+PlaceCopy(AuthoredData* scene, InstancerBlock block, uint instance) {
 
     InstancePlacement placement;
     placement.valid = true;
@@ -173,7 +173,7 @@ PlaceCopy(SceneData* scene, InstancerBlock block, uint instance) {
     return placement;
 }
 
-WorldTransform CopyWorld(SceneData* scene, Ptr<WorldTransform> transforms, InstancerBlock block,
+WorldTransform CopyWorld(AuthoredData* scene, Ptr<WorldTransform> transforms, InstancerBlock block,
                          InstancePlacement placement, WorldTransform g, uint parent) {
     float3 axes[3] = {g.x.Vector(), g.y.Vector(), g.z.Vector()};
     float3 offset = g.Translation();
@@ -223,7 +223,7 @@ bool HiddenCopy(InstanceLayout* layout, InstancerBlock block, int64_t id) {
     return false;
 }
 
-bool ShownPrim(SceneData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
+bool ShownPrim(AuthoredData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
     return ImageableShown(PrimImageable(scene, imageables, prim));
 }
 
@@ -238,7 +238,7 @@ struct ResolvedCopy {
 }
 
 ResolvedCopy
-ResolveCopy(SceneData* scene, Ptr<WorldTransform> transforms, Ptr<ResolvedImageable> imageables,
+ResolveCopy(AuthoredData* scene, Ptr<WorldTransform> transforms, Ptr<ResolvedImageable> imageables,
             InstanceLayout* layout, uint top, uint offset, bool lights) {
 
     ResolvedCopy resolved;
@@ -319,7 +319,7 @@ ResolveCopy(SceneData* scene, Ptr<WorldTransform> transforms, Ptr<ResolvedImagea
     return resolved;
 }
 
-WorldTransform SlotWorld(SceneData* scene, Ptr<WorldTransform> transforms,
+WorldTransform SlotWorld(AuthoredData* scene, Ptr<WorldTransform> transforms,
                          Ptr<ResolvedImageable> imageables, InstanceLayout* layout, uint slot) {
     const SlotHit drawn = layout->hits[slot];
     const uint item = layout->instancePrims[slot];

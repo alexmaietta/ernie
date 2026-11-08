@@ -46,7 +46,7 @@ void Mapping::Release() noexcept {
     if (m_open) {
         m_open = false;
         try {
-            m_view->GetStore().Unpin(m_column.schema);
+            m_view->GetColumnStore().Unpin(m_column.schema);
         } catch (...) {
         }
     }
@@ -59,7 +59,7 @@ device::Operation Mapping::Close(Stream producer, const DLTensor* mask) {
     Release();
     UntypedAttribute attribute(m_view, m_column);
     if (m_access == MapAccess::Read || m_values.Empty()) {
-        attribute.GetStore().GetDevice().GetQueue().Follow(producer);
+        attribute.GetColumnStore().GetDevice().GetQueue().Follow(producer);
         return {};
     }
     if (m_rows.Empty()) {

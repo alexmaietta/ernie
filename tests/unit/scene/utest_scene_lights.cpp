@@ -30,7 +30,7 @@ template <class Test> void ForEachScene(Test test) {
 
 std::vector<LightRecord> Records(Scene& scene, device::Device& device) {
     scene.Publish({.wait = true});
-    const Lights& lights = SceneImpl::Get(scene).GetLights();
+    const LightBuilder& lights = SceneImpl::Get(scene).GetLights();
     uint32_t total = 0;
     for (const uint32_t count : lights.Counts()) {
         total += count;
@@ -94,7 +94,7 @@ TEST(LightsTest, WorldsListTheirOwnLightsThenGlobalOnes) {
         scene.Define<SphereLight>("/Env/Lamp", {.intensity = 3});
         scene.Clone(world, std::vector<std::string>{"/Env1"});
         const std::vector<LightRecord> records = Records(scene, device);
-        const Lights& lights = SceneImpl::Get(scene).GetLights();
+        const LightBuilder& lights = SceneImpl::Get(scene).GetLights();
         ASSERT_EQ(lights.Counts().size(), 3u);
         EXPECT_EQ(lights.Counts()[0], 2u);
         EXPECT_EQ(lights.Counts()[1], 2u);
@@ -324,8 +324,8 @@ TEST(LightsTest, DomesTurnTheirPoleUpAndListTheirPortals) {
         EXPECT_EQ(LightType(dome.type), LightType::Dome);
         EXPECT_EQ(dome.portals, 1u);
         SceneImpl& impl = SceneImpl::Get(scene);
-        const uint32_t row = impl.GetCatalog().GetPrims().Row(sky.Index(), SchemaId::DomeLight);
-        EXPECT_EQ(dome.portalPrims, impl.GetStore().Array(kDomeLightPortals, row).address);
+        const uint32_t row = impl.GetStructure().GetPrims().Row(sky.Index(), SchemaId::DomeLight);
+        EXPECT_EQ(dome.portalPrims, impl.GetColumnStore().Array(kDomeLightPortals, row).address);
         EXPECT_NE(dome.portalPrims, 0u);
         EXPECT_NEAR(dome.power, 2 * kPi, 2 * kPi * 1e-3f);
         EXPECT_FLOAT_EQ(dome.axisY.z, 1);

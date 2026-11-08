@@ -87,35 +87,35 @@ std::vector<ColumnRef> InputColumns(const std::map<SchemaId, std::vector<Texture
 
 }
 
-Textures::Textures(Catalog& catalog, unsigned threads)
-    : m_catalog(catalog),
+TextureBuilder::TextureBuilder(Structure& structure, unsigned threads)
+    : m_structure(structure),
       m_cache(
-          catalog.GetStore().GetDevice(),
-          [&catalog](const std::string& path) { return catalog.FindFile(path); }, threads),
+          structure.GetColumnStore().GetDevice(),
+          [&structure](const std::string& path) { return structure.FindFile(path); }, threads),
       m_slots(MaterialSlots()), m_inputs(InputColumns(m_slots)) {
     UploadBindings();
 }
 
-Textures::~Textures() = default;
+TextureBuilder::~TextureBuilder() = default;
 
-void Textures::Describe(RenderTables& tables) const {
+void TextureBuilder::Describe(RenderTables& tables) const {
     tables.textures.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
     tables.textureBindings.address = m_bindingAddress;
 }
 
-void Textures::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void TextureBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_records.Buffer()});
 }
 
-bool Textures::Pending() const {
+bool TextureBuilder::Pending() const {
     return m_cache.Pending();
 }
 
-void Textures::Finish() {
+void TextureBuilder::Finish() {
     m_cache.Finish();
 }
 
-uint64_t Textures::Handle(uint32_t prim, std::string_view input) const {
+uint64_t TextureBuilder::Handle(uint32_t prim, std::string_view input) const {
     const auto found = m_materials.find(prim);
     if (found == m_materials.end()) {
         return 0;
@@ -128,15 +128,15 @@ uint64_t Textures::Handle(uint32_t prim, std::string_view input) const {
     return 0;
 }
 
-void Textures::UploadBindings() {
+void TextureBuilder::UploadBindings() {
     const uint64_t address = m_cache.UploadBindings();
     if (address != m_bindingAddress) {
         m_bindingAddress = address;
-        m_catalog.GetStore().SetTextureBindings(address);
+        m_structure.GetColumnStore().SetTextureBindings(address);
     }
 }
 
-std::set<uint32_t> Textures::Collect() {
+std::set<uint32_t> TextureBuilder::Collect() {
     const std::set<TextureKey> finished = m_cache.Collect();
     std::set<uint32_t> dirty;
     for (const TextureKey& key : finished) {
@@ -151,7 +151,7 @@ std::set<uint32_t> Textures::Collect() {
     return dirty;
 }
 
-void Textures::Refresh(uint32_t prim) {
+void TextureBuilder::Refresh(uint32_t prim) {
     Material& material = m_materials.at(prim);
     bool resolved = false;
     for (Bound& bound : material.slots) {
@@ -172,8 +172,8 @@ void Textures::Refresh(uint32_t prim) {
     Publish(prim, material);
 }
 
-void Textures::Publish(uint32_t prim, const Material& material) {
-    const Prims& prims = m_catalog.GetPrims();
+void TextureBuilder::Publish(uint32_t prim, const Material& material) {
+    const Prims& prims = m_structure.GetPrims();
     const SchemaId schema = prims.At(prim).schema;
     TextureRecord record{};
     if (IsA(schema, SchemaId::Material) || schema == SchemaId::DomeLight) {
@@ -199,19 +199,19 @@ void Textures::Publish(uint32_t prim, const Material& material) {
     Rebound(prims.At(prim).world);
 }
 
-void Textures::Rebound(uint32_t world) {
+void TextureBuilder::Rebound(uint32_t world) {
     if (std::ranges::find(m_rebound, world) == m_rebound.end()) {
         m_rebound.push_back(world);
     }
 }
 
-void Textures::Release(uint32_t prim) {
+void TextureBuilder::Release(uint32_t prim) {
     const auto found = m_materials.find(prim);
     if (found == m_materials.end()) {
         return;
     }
     m_records.Set(prim, TextureRecord{});
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     if (prims.Alive(prim)) {
         Rebound(prims.At(prim).world);
     } else {
@@ -235,17 +235,17 @@ void Textures::Release(uint32_t prim) {
     m_materials.erase(found);
 }
 
-const std::vector<uint32_t>& Textures::Read(Cells& cells, SchemaId table, uint32_t column) {
+const std::vector<uint32_t>& TextureBuilder::Read(Cells& cells, SchemaId table, uint32_t column) {
     auto [found, added] = cells.columns.try_emplace({table, column});
     if (added) {
-        Table& rows = m_catalog.GetStore().Schema(table);
+        Table& rows = m_structure.GetColumnStore().Schema(table);
         found->second = Items<uint32_t>(rows.Read(column, 0, rows.Rows()));
     }
     return found->second;
 }
 
-void Textures::Rebind(uint32_t prim, Cells& cells) {
-    const Prims& prims = m_catalog.GetPrims();
+void TextureBuilder::Rebind(uint32_t prim, Cells& cells) {
+    const Prims& prims = m_structure.GetPrims();
     const SchemaId schema = prims.At(prim).schema;
     Material material;
     TextureWrap wrap = TextureWrap::Repeat;
@@ -274,7 +274,7 @@ void Textures::Rebind(uint32_t prim, Cells& cells) {
             }
             const uint32_t row = prims.Row(prim, slot.table);
             std::string path(
-                m_catalog.GetTokens().Text(Token{Read(cells, slot.table, slot.texture)[row]}));
+                m_structure.GetTokens().Text(Token{Read(cells, slot.table, slot.texture)[row]}));
             const bool srgb = slot.color && !path.empty() && IsPngOrJpeg(path);
             const TextureWrap slotWrap = IsA(schema, SchemaId::Material) ? wrap
                                          : schema == SchemaId::DomeLight ? TextureWrap::Repeat
@@ -307,13 +307,13 @@ void Textures::Rebind(uint32_t prim, Cells& cells) {
     for (const RowKey& row : material.rows) {
         m_byRow[row] = prim;
     }
-    m_catalog.GetStore().StampWorld(prims.At(prim).world);
+    m_structure.GetColumnStore().StampWorld(prims.At(prim).world);
     m_materials[prim] = std::move(material);
 }
 
-void Textures::Run(const ChangeSet& changes, TableLog& log) {
+void TextureBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     ERNIE_ZONE("Textures/Run");
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     const auto textured = [&](uint32_t prim) {
         return prims.Alive(prim) && (m_slots.contains(prims.At(prim).schema) ||
                                      IsA(prims.At(prim).schema, SchemaId::Plane));
@@ -378,11 +378,11 @@ void Textures::Run(const ChangeSet& changes, TableLog& log) {
     }
     UploadBindings();
     m_records.Reserve(prims.Size());
-    if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
+    if (m_records.Upload(m_structure.GetColumnStore().GetDevice())) {
         Rebound(kGlobalWorld);
     }
     if (!m_rebound.empty()) {
-        log.Wrote(TableId::Textures, m_rebound);
+        writes.Add(TableId::Textures, m_rebound);
     }
     m_rebound.clear();
 

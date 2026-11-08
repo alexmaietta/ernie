@@ -45,12 +45,12 @@ uint32_t RowWriter::RowCount(const BlockTable& rows) const {
 void RowWriter::Fill(ColumnRef column, std::span<const std::byte> cell) {
     const BlockTable& rows = Rows(column.schema);
     if (RowCount(rows) > 0) {
-        m_catalog.m_store.Fill(column, rows.first, RowCount(rows), cell);
+        m_structure.m_store.Fill(column, rows.first, RowCount(rows), cell);
     }
 }
 
 void RowWriter::SetToken(ColumnRef column, std::string_view text) {
-    const uint32_t id = m_catalog.m_tokens.Intern(text).id;
+    const uint32_t id = m_structure.m_tokens.Intern(text).id;
     Fill(column, std::as_bytes(std::span(&id, 1)));
 }
 
@@ -58,7 +58,7 @@ void RowWriter::SetArray(ColumnRef column, std::span<const std::byte> bytes, uin
     if (count == 0) {
         return;
     }
-    Store& store = m_catalog.m_store;
+    ColumnStore& store = m_structure.m_store;
     ArrayHeap& arrays = store.Arrays(column.column->type);
     if (bytes.size() != size_t(count) * arrays.ItemBytes()) {
         throw Error("{} bytes for {} items of {}'s {}, whose items are {} bytes", bytes.size(),
@@ -77,13 +77,13 @@ void RowWriter::SetArray(ColumnRef column, std::span<const std::byte> bytes, uin
 }
 
 void RowWriter::SetTokens(ColumnRef column, std::span<const std::string> texts) {
-    const std::vector<uint32_t> ids = InternTokens(m_catalog.m_tokens, texts);
+    const std::vector<uint32_t> ids = InternTokens(m_structure.m_tokens, texts);
     SetArray(column, std::as_bytes(std::span(ids)), uint32_t(ids.size()));
 }
 
 void RowWriter::SetTargets(ColumnRef column, std::span<const std::string> paths) {
-    const std::vector<uint32_t> targets = m_catalog.ResolveTargets(paths);
-    m_catalog.MarkTargets(targets);
+    const std::vector<uint32_t> targets = m_structure.ResolveTargets(paths);
+    m_structure.MarkTargets(targets);
     SetArray(column, std::as_bytes(std::span(targets)), uint32_t(targets.size()));
     if (std::ranges::find(targets, kNoPrim) == targets.end()) {
         return;
@@ -92,26 +92,26 @@ void RowWriter::SetTargets(ColumnRef column, std::span<const std::string> paths)
     for (uint32_t copy = 0; copy < m_block.copies; ++copy) {
         for (uint32_t index = 0; index < m_block.count; ++index) {
             const uint32_t prim = m_prims.empty() ? m_block.Prim(copy, index) : m_prims[copy];
-            const uint32_t row = m_catalog.m_prims.FindRow(prim, column.schema);
-            m_catalog.m_pending.push_back({prim, m_catalog.m_prims.Generation(prim), column,
-                                           IsMultipleApi(column.schema) ? rows.first + copy : row,
-                                           std::vector<std::string>(paths.begin(), paths.end())});
+            const uint32_t row = m_structure.m_prims.FindRow(prim, column.schema);
+            m_structure.m_pending.push_back({prim, m_structure.m_prims.Generation(prim), column,
+                                             IsMultipleApi(column.schema) ? rows.first + copy : row,
+                                             std::vector<std::string>(paths.begin(), paths.end())});
         }
     }
 }
 
 void RowWriter::SetPrimvars(ColumnRef column, std::span<const Primvar> primvars) {
-    const std::vector<int32_t> table = PackPrimvars(m_catalog.m_tokens, primvars);
+    const std::vector<int32_t> table = PackPrimvars(m_structure.m_tokens, primvars);
     SetArray(column, std::as_bytes(std::span(table)), uint32_t(table.size()));
 }
 
-Catalog::Catalog(Store& store) : m_store(store), m_paths(m_tokens), m_prims(store) {}
+Structure::Structure(ColumnStore& store) : m_store(store), m_paths(m_tokens), m_prims(store) {}
 
-uint32_t Catalog::Find(std::string_view path) const {
+uint32_t Structure::Find(std::string_view path) const {
     return m_paths.Find(path);
 }
 
-std::vector<uint32_t> Catalog::Select(std::string_view pattern, SchemaId schema) const {
+std::vector<uint32_t> Structure::Select(std::string_view pattern, SchemaId schema) const {
     if (pattern.empty() || pattern.front() != '/' || pattern == "/") {
         throw Error("Pattern \"{}\" isn't an absolute path", pattern);
     }
@@ -135,7 +135,7 @@ std::vector<uint32_t> Catalog::Select(std::string_view pattern, SchemaId schema)
     return level;
 }
 
-uint32_t Catalog::NewParent(std::string_view path) const {
+uint32_t Structure::NewParent(std::string_view path) const {
     if (const uint32_t existing = m_paths.Find(path); existing != Paths::kNone) {
         throw Error("\"{}\" is already a {}", path, Info(m_prims.At(existing).schema).name);
     }
@@ -156,8 +156,8 @@ uint32_t Catalog::NewParent(std::string_view path) const {
     return parent;
 }
 
-PrimBlock Catalog::Allocate(SchemaId schema, std::span<const std::string> paths, uint64_t apis,
-                            bool attachable) {
+PrimBlock Structure::Allocate(SchemaId schema, std::span<const std::string> paths, uint64_t apis,
+                              bool attachable) {
     std::set<std::string_view> seen;
     std::vector<uint32_t> parents;
     for (const std::string& path : paths) {
@@ -187,11 +187,11 @@ PrimBlock Catalog::Allocate(SchemaId schema, std::span<const std::string> paths,
     return block;
 }
 
-PrimBlock Catalog::Define(SchemaId schema, std::span<const std::string> paths) {
+PrimBlock Structure::Define(SchemaId schema, std::span<const std::string> paths) {
     return Define(schema, paths, [&](RowWriter& writer) { WriteFallbacks(schema, writer); });
 }
 
-void Catalog::RemoveBlock(const PrimBlock& block) {
+void Structure::RemoveBlock(const PrimBlock& block) {
     for (uint32_t prim = block.firstPrim + block.PrimCount(); prim-- > block.firstPrim;) {
         if (m_prims.Alive(prim)) {
             RemovePrim(prim);
@@ -199,13 +199,13 @@ void Catalog::RemoveBlock(const PrimBlock& block) {
     }
 }
 
-void Catalog::Logged(uint32_t prim, bool added, SchemaId api) {
+void Structure::Logged(uint32_t prim, bool added, SchemaId api) {
     m_log.push_back(
         {m_store.Stamp(), prim, m_prims.Generation(prim), m_prims.At(prim).world, added, api});
 }
 
-std::vector<uint32_t> Catalog::Applicable(std::span<const uint32_t> prims, SchemaId api,
-                                          bool multiple) const {
+std::vector<uint32_t> Structure::Applicable(std::span<const uint32_t> prims, SchemaId api,
+                                            bool multiple) const {
     if (!IsApi(api)) {
         throw Error("{} isn't an API schema", Info(api).name);
     }
@@ -233,12 +233,12 @@ std::vector<uint32_t> Catalog::Applicable(std::span<const uint32_t> prims, Schem
     return targets;
 }
 
-void Catalog::Apply(std::span<const uint32_t> prims, SchemaId api) {
+void Structure::Apply(std::span<const uint32_t> prims, SchemaId api) {
     Apply(prims, api, [&](RowWriter& writer) { WriteFallbacks(api, writer); });
 }
 
-void Catalog::Unapply(std::span<const uint32_t> prims, SchemaId api,
-                      std::optional<std::string_view> instance) {
+void Structure::Unapply(std::span<const uint32_t> prims, SchemaId api,
+                        std::optional<std::string_view> instance) {
     if (!IsApi(api)) {
         throw Error("{} isn't an API schema", Info(api).name);
     }
@@ -321,7 +321,7 @@ void Catalog::Unapply(std::span<const uint32_t> prims, SchemaId api,
     ++m_epoch;
 }
 
-void Catalog::RemovePrim(uint32_t prim) {
+void Structure::RemovePrim(uint32_t prim) {
     ReleaseFiles(prim);
     if (m_paths.Contains(prim)) {
         m_paths.Erase(prim);
@@ -331,7 +331,7 @@ void Catalog::RemovePrim(uint32_t prim) {
     ++m_epoch;
 }
 
-void Catalog::MarkTargets(std::span<const uint32_t> targets) {
+void Structure::MarkTargets(std::span<const uint32_t> targets) {
     for (const uint32_t target : targets) {
         if (target == kNoPrim) {
             continue;
@@ -343,11 +343,11 @@ void Catalog::MarkTargets(std::span<const uint32_t> targets) {
     }
 }
 
-void Catalog::MarkUntrackedTargets() {
+void Structure::MarkUntrackedTargets() {
     m_untrackedTargets = true;
 }
 
-std::vector<Catalog::Referrer> Catalog::Referrers(std::span<const uint32_t> removed) {
+std::vector<Structure::Referrer> Structure::Referrers(std::span<const uint32_t> removed) {
     struct Cell {
         uint32_t prim;
         ColumnRef column;
@@ -404,7 +404,7 @@ std::vector<Catalog::Referrer> Catalog::Referrers(std::span<const uint32_t> remo
     return referrers;
 }
 
-void Catalog::Remove(uint32_t prim) {
+void Structure::Remove(uint32_t prim) {
     if (!m_prims.Alive(prim)) {
         throw Error("Prim {} was removed", prim);
     }
@@ -456,7 +456,7 @@ void Catalog::Remove(uint32_t prim) {
     }
 }
 
-void Catalog::Move(uint32_t prim, std::string_view path) {
+void Structure::Move(uint32_t prim, std::string_view path) {
     if (!m_prims.Alive(prim)) {
         throw Error("Prim {} was removed", prim);
     }
@@ -487,8 +487,8 @@ void Catalog::Move(uint32_t prim, std::string_view path) {
     ++m_epoch;
 }
 
-void Catalog::SetTargets(uint32_t prim, uint32_t row, ColumnRef column,
-                         std::span<const std::string> paths) {
+void Structure::SetTargets(uint32_t prim, uint32_t row, ColumnRef column,
+                           std::span<const std::string> paths) {
     std::erase_if(m_pending, [&](const PendingTargets& pending) {
         return pending.row == row && pending.column.schema == column.schema &&
                pending.column.index == column.index;
@@ -505,7 +505,7 @@ void Catalog::SetTargets(uint32_t prim, uint32_t row, ColumnRef column,
     }
 }
 
-std::vector<uint32_t> Catalog::ResolveTargets(std::span<const std::string> paths) const {
+std::vector<uint32_t> Structure::ResolveTargets(std::span<const std::string> paths) const {
     std::vector<uint32_t> targets;
     targets.reserve(paths.size());
     for (const std::string& path : paths) {
@@ -514,7 +514,7 @@ std::vector<uint32_t> Catalog::ResolveTargets(std::span<const std::string> paths
     return targets;
 }
 
-void Catalog::ResolvePending(std::span<const std::string> defined) {
+void Structure::ResolvePending(std::span<const std::string> defined) {
     std::erase_if(m_pending, [&](const PendingTargets& pending) {
         if (!m_prims.Alive(pending.prim) ||
             m_prims.Generation(pending.prim) != pending.generation) {
@@ -536,8 +536,8 @@ void Catalog::ResolvePending(std::span<const std::string> defined) {
     });
 }
 
-PrimBlock Catalog::Clone(uint32_t source, std::span<const std::string> targets,
-                         const CloneDesc& desc) {
+PrimBlock Structure::Clone(uint32_t source, std::span<const std::string> targets,
+                           const CloneDesc& desc) {
     if (!m_prims.Alive(source)) {
         throw Error("Prim {} was removed", source);
     }
@@ -621,7 +621,7 @@ PrimBlock Catalog::Clone(uint32_t source, std::span<const std::string> targets,
     return block;
 }
 
-void Catalog::CloneArrays(const PrimBlock& block, std::span<const uint32_t> sources) {
+void Structure::CloneArrays(const PrimBlock& block, std::span<const uint32_t> sources) {
     m_store.Flush();
     std::unordered_map<uint32_t, uint32_t> position;
     for (uint32_t i = 0; i < sources.size(); ++i) {
@@ -639,8 +639,8 @@ void Catalog::CloneArrays(const PrimBlock& block, std::span<const uint32_t> sour
     CloneInstances(block, sources, position);
 }
 
-void Catalog::CloneInstances(const PrimBlock& block, std::span<const uint32_t> sources,
-                             const std::unordered_map<uint32_t, uint32_t>& position) {
+void Structure::CloneInstances(const PrimBlock& block, std::span<const uint32_t> sources,
+                               const std::unordered_map<uint32_t, uint32_t>& position) {
     for (uint32_t i = 0; i < sources.size(); ++i) {
         const uint64_t apis = m_prims.At(sources[i]).apis;
         std::vector<uint32_t> copies;
@@ -664,9 +664,9 @@ void Catalog::CloneInstances(const PrimBlock& block, std::span<const uint32_t> s
     }
 }
 
-void Catalog::CloneTableArrays(SchemaId table, std::span<const uint32_t> rows, uint32_t first,
-                               uint32_t perCopy, const PrimBlock& block,
-                               const std::unordered_map<uint32_t, uint32_t>& position) {
+void Structure::CloneTableArrays(SchemaId table, std::span<const uint32_t> rows, uint32_t first,
+                                 uint32_t perCopy, const PrimBlock& block,
+                                 const std::unordered_map<uint32_t, uint32_t>& position) {
     for (uint32_t index = 0; index < Info(table).columnCount; ++index) {
         const ColumnRef column{table, &Columns(table)[index], index};
         if (!IsArray(column.column->type)) {
@@ -715,7 +715,7 @@ void Catalog::CloneTableArrays(SchemaId table, std::span<const uint32_t> rows, u
     }
 }
 
-void Catalog::AddFile(std::string path, FileBytes bytes, std::optional<uint32_t> owner) {
+void Structure::AddFile(std::string path, FileBytes bytes, std::optional<uint32_t> owner) {
     if (!bytes) {
         throw Error("Adding file \"{}\": it has no bytes", path);
     }
@@ -728,7 +728,7 @@ void Catalog::AddFile(std::string path, FileBytes bytes, std::optional<uint32_t>
     }
 }
 
-void Catalog::RemoveFile(std::string_view path) {
+void Structure::RemoveFile(std::string_view path) {
     const auto found = m_files.find(path);
     if (found == m_files.end()) {
         return;
@@ -737,12 +737,12 @@ void Catalog::RemoveFile(std::string_view path) {
     std::erase_if(m_fileOwners, [&](const auto& owner) { return owner.second == path; });
 }
 
-FileBytes Catalog::FindFile(std::string_view path) const {
+FileBytes Structure::FindFile(std::string_view path) const {
     const auto found = m_files.find(path);
     return found == m_files.end() ? nullptr : found->second.bytes;
 }
 
-std::vector<std::pair<std::string, FileBytes>> Catalog::OwnedFiles(uint32_t prim) const {
+std::vector<std::pair<std::string, FileBytes>> Structure::OwnedFiles(uint32_t prim) const {
     std::vector<std::pair<std::string, FileBytes>> files;
     const auto [first, last] = m_fileOwners.equal_range(prim);
     for (auto owner = first; owner != last; ++owner) {
@@ -753,12 +753,12 @@ std::vector<std::pair<std::string, FileBytes>> Catalog::OwnedFiles(uint32_t prim
     return files;
 }
 
-void Catalog::OwnFile(uint32_t prim, const std::string& path) {
+void Structure::OwnFile(uint32_t prim, const std::string& path) {
     ++m_files.at(path).owners;
     m_fileOwners.emplace(prim, path);
 }
 
-void Catalog::ReleaseFiles(uint32_t prim) {
+void Structure::ReleaseFiles(uint32_t prim) {
     const auto [first, last] = m_fileOwners.equal_range(prim);
     for (auto owner = first; owner != last; ++owner) {
         const auto file = m_files.find(owner->second);

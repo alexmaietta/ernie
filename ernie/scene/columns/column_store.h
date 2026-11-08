@@ -50,12 +50,12 @@ struct Attachment {
     std::shared_ptr<const DLTensor> tensor;
 };
 
-class Store {
+class ColumnStore {
   public:
-    explicit Store(device::Device& device);
-    ~Store();
-    Store(const Store&) = delete;
-    Store& operator=(const Store&) = delete;
+    explicit ColumnStore(device::Device& device);
+    ~ColumnStore();
+    ColumnStore(const ColumnStore&) = delete;
+    ColumnStore& operator=(const ColumnStore&) = delete;
 
     device::Device& GetDevice() const {
         return m_device;
@@ -144,7 +144,7 @@ class Store {
     }
 
     void Flush();
-    SceneData Data() const;
+    AuthoredData Data() const;
     uint64_t DeviceData();
 
     void Prepare() {
@@ -159,8 +159,8 @@ class Store {
         }
         device::CommandEncoder encoder = queue.CreateEncoder();
         {
-            const device::ZoneScope zone(encoder,
-                                         profiler::ZoneId::Named(std::string("Store/") + entry));
+            const device::ZoneScope zone(
+                encoder, profiler::ZoneId::Named(std::string("ColumnStore/") + entry));
             encoder.Dispatch(Kernels().Entry(entry), params,
                              {.x = device::GroupCount(threads, kCellsGroup)});
         }

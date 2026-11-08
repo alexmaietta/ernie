@@ -93,11 +93,11 @@ bool Changed(uint64_t stamp, uint64_t since, uint64_t until) {
     return stamp > since && stamp <= until;
 }
 
-uint BindingRow(SceneData* scene, uint prim) {
+uint BindingRow(AuthoredData* scene, uint prim) {
     return ApiRow(scene, prim, kApiMaterialBindingAPI);
 }
 
-uint BoundMaterial(SceneData* scene, uint prim, out bool binds) {
+uint BoundMaterial(AuthoredData* scene, uint prim, out bool binds) {
     const ArrayRef binding = scene->schemas.materialBindingAPI.materialBinding[BindingRow(scene, prim)];
     binds = binding.count > 0;
     if (!binds) {
@@ -118,7 +118,7 @@ void ResolveRows(uniform ResolveParams p) {
         return;
     }
     const uint row = p.tree.segmentRows[p.tree.segmentStart[segment] + thread.x];
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     ImageableData image = scene->schemas.imageable;
     XformableData xform = scene->schemas.xformable;
     if (image.prim[row] == kNoPrim) {

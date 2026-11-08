@@ -17,7 +17,7 @@
 
 namespace ernie {
 
-class Catalog;
+class Structure;
 
 enum class QuaternionOrder : uint8_t { Xyzw, Wxyz };
 
@@ -30,9 +30,10 @@ template <class T> class ArrayAttribute;
 class ERNIE_API View {
   public:
     View() = default;
-    View(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims);
-    View(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims, std::string_view instance);
-    View(Catalog& catalog, SchemaId schema, const PrimBlock& block, uint32_t index = 0);
+    View(Structure& structure, SchemaId schema, std::vector<uint32_t> prims);
+    View(Structure& structure, SchemaId schema, std::vector<uint32_t> prims,
+         std::string_view instance);
+    View(Structure& structure, SchemaId schema, const PrimBlock& block, uint32_t index = 0);
 
     uint32_t PrimCount() const;
     SchemaId Schema() const;

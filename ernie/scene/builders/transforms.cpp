@@ -34,26 +34,26 @@ constexpr TableId kTableOutputs[] = {TableId::Transforms, TableId::Imageables};
 
 }
 
-std::span<const ColumnRef> Hierarchy::Inputs() const {
+std::span<const ColumnRef> TransformBuilder::Inputs() const {
     return kInputs;
 }
 
-std::span<const TableId> Hierarchy::TableOutputs() const {
+std::span<const TableId> TransformBuilder::TableOutputs() const {
     return kTableOutputs;
 }
 
-void Hierarchy::Describe(RenderTables& tables) const {
+void TransformBuilder::Describe(RenderTables& tables) const {
     tables.transforms.address = m_transforms.Address();
     tables.imageables.address = m_imageables.Address();
     tables.motions.address = m_motions.Address();
 }
 
-void Hierarchy::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void TransformBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_transforms.Buffer(), m_imageables.Buffer(), m_motions.Buffer()});
 }
 
-uint32_t Hierarchy::ParentRow(uint32_t prim) const {
-    const Prims& prims = m_catalog.GetPrims();
+uint32_t TransformBuilder::ParentRow(uint32_t prim) const {
+    const Prims& prims = m_structure.GetPrims();
     uint32_t up = prims.At(prim).parent;
     while (up != kNoPrim && !IsA(prims.At(up).schema, SchemaId::Imageable)) {
         up = prims.At(up).parent;
@@ -61,10 +61,10 @@ uint32_t Hierarchy::ParentRow(uint32_t prim) const {
     return up == kNoPrim ? kNoRow : prims.Row(up, SchemaId::Imageable);
 }
 
-void Hierarchy::Rebuild() {
+void TransformBuilder::Rebuild() {
     ERNIE_ZONE("Hierarchy/Rebuild");
-    const Prims& prims = m_catalog.GetPrims();
-    Store& store = m_catalog.GetStore();
+    const Prims& prims = m_structure.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     const uint32_t capacity = std::max(store.Schema(SchemaId::Imageable).Capacity(), 1u);
     m_transforms.Allocate(device, store.Schema(SchemaId::Xformable).Capacity());
@@ -105,9 +105,9 @@ void Hierarchy::Rebuild() {
         m_segments.Size());
 }
 
-bool Hierarchy::Apply(const ChangeSet& changes) {
+bool TransformBuilder::Apply(const ChangeSet& changes) {
     ERNIE_ZONE("Hierarchy/Apply");
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     if (m_segments.Size() != prims.WorldCount() + 1) {
         return false;
     }
@@ -157,7 +157,7 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
         }
     }
 
-    device::Device& device = m_catalog.GetStore().GetDevice();
+    device::Device& device = m_structure.GetColumnStore().GetDevice();
     m_parents.Upload(device);
     m_xforms.Upload(device);
     device::Queue& queue = device.GetQueue();
@@ -173,9 +173,9 @@ bool Hierarchy::Apply(const ChangeSet& changes) {
     return true;
 }
 
-void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
+void TransformBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     ERNIE_ZONE("Hierarchy/Run");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     const bool rebuild = changes.resync || !m_built || (changes.structure && !Apply(changes));
     if (rebuild) {
         Rebuild();
@@ -244,10 +244,10 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
         }
     }
     if (moved) {
-        log.Wrote(TableId::Transforms, worlds);
+        writes.Add(TableId::Transforms, worlds);
     }
     if (inherited) {
-        log.Wrote(TableId::Imageables, worlds);
+        writes.Add(TableId::Imageables, worlds);
     }
     device::Queue& queue = store.GetDevice().GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Hierarchy/Resolve");
@@ -261,8 +261,8 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     queue.Submit(encoder.Finish());
 }
 
-void Hierarchy::WriteMotions(bool restructured) {
-    Store& store = m_catalog.GetStore();
+void TransformBuilder::WriteMotions(bool restructured) {
+    ColumnStore& store = m_structure.GetColumnStore();
     const bool written = store.LastWrite(kMotionAPIMotionVelocity) > m_motionSeen ||
                          store.LastWrite(kMotionAPIMotionAngularVelocity) > m_motionSeen;
     m_motionSeen = store.WriteSequence();
@@ -283,13 +283,13 @@ void Hierarchy::WriteMotions(bool restructured) {
     queue.Submit(encoder.Finish());
 }
 
-void Hierarchy::Prepare() {
+void TransformBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Hierarchy::Kernels() {
+device::Program& TransformBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.transforms"},
              .library = &kSceneKernels,
              .entries = {"ResolveRows", "WriteMotions"},

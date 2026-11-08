@@ -188,38 +188,38 @@ std::vector<ColumnRef> LightInputs() {
 
 }
 
-std::span<const ColumnRef> Lights::Inputs() const {
+std::span<const ColumnRef> LightBuilder::Inputs() const {
     static const std::vector<ColumnRef> inputs = LightInputs();
     return inputs;
 }
 
-void Lights::Describe(RenderTables& tables) const {
+void LightBuilder::Describe(RenderTables& tables) const {
     tables.lights.address = m_layout ? m_layout->Address() : 0;
     tables.collections.address = m_collections.Address();
     tables.lightShapes.address = m_shapes.Address();
 }
 
-void Lights::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void LightBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_layout, m_records, m_cdf, m_maps, m_spectra, m_collections.Buffer(),
                        m_shapes.Buffer()});
 }
 
-void Lights::Prepare() {
+void LightBuilder::Prepare() {
     Kernels();
     Spectra();
 }
 
-const Ref<device::Buffer>& Lights::Spectra() {
+const Ref<device::Buffer>& LightBuilder::Spectra() {
     if (!m_spectra) {
         const std::vector<SpectralTables> tables = {BuildSpectralTables()};
-        m_spectra =
-            m_catalog.GetStore().GetDevice().CreateBuffer({.label = "spectral tables"}, tables);
+        m_spectra = m_structure.GetColumnStore().GetDevice().CreateBuffer(
+            {.label = "spectral tables"}, tables);
     }
     return m_spectra;
 }
 
-bool Lights::Restructured(const ChangeSet& changes) const {
-    if (m_catalog.GetPrims().WorldCount() != m_worlds || changes.Wrote(TableId::Instances)) {
+bool LightBuilder::Restructured(const ChangeSet& changes) const {
+    if (m_structure.GetPrims().WorldCount() != m_worlds || changes.Wrote(TableId::Instances)) {
         return true;
     }
     for (const StructureEntry& entry : changes.removed) {
@@ -227,7 +227,7 @@ bool Lights::Restructured(const ChangeSet& changes) const {
             return true;
         }
     }
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     for (const StructureEntry& entry : changes.added) {
         if (prims.Alive(entry.prim) && prims.Generation(entry.prim) == entry.generation &&
             (prims.HasApi(entry.prim, SchemaId::LightAPI) ||
@@ -239,10 +239,10 @@ bool Lights::Restructured(const ChangeSet& changes) const {
         changes.apis, [](const StructureEntry& entry) { return entry.api == SchemaId::LightAPI; });
 }
 
-void Lights::Relayout() {
+void LightBuilder::Relayout() {
     ERNIE_ZONE("Lights/Relayout");
-    const Prims& prims = m_catalog.GetPrims();
-    device::Device& device = m_catalog.GetStore().GetDevice();
+    const Prims& prims = m_structure.GetPrims();
+    device::Device& device = m_structure.GetColumnStore().GetDevice();
     m_worlds = prims.WorldCount();
     m_lights.clear();
     m_worldPrims.clear();
@@ -273,9 +273,9 @@ void Lights::Relayout() {
     std::vector<uint32_t> copies;
     std::vector<uint32_t> starts = {0};
     m_counts.clear();
-    m_compositions = m_catalog.CompositionVersion();
+    m_compositions = m_structure.CompositionVersion();
     m_shownIn.clear();
-    const std::map<uint32_t, ComposedWorldDesc>& composed = m_catalog.Compositions();
+    const std::map<uint32_t, ComposedWorldDesc>& composed = m_structure.Compositions();
     for (uint32_t tlas = 0; tlas <= m_worlds; ++tlas) {
         items.insert(items.end(), lists[tlas].begin(), lists[tlas].end());
         const auto composition = tlas < m_worlds ? composed.find(tlas) : composed.end();
@@ -363,15 +363,15 @@ void Lights::Relayout() {
     device.GetQueue().Write(*m_layout, words.data());
 }
 
-void Lights::Run(const ChangeSet& changes, TableLog&) {
+void LightBuilder::Run(const ChangeSet& changes, TableWrites&) {
     ERNIE_ZONE("Lights/Run");
     m_written = 0;
     const bool relaid = changes.resync || !m_layout || Restructured(changes) ||
-                        m_catalog.CompositionVersion() != m_compositions;
+                        m_structure.CompositionVersion() != m_compositions;
     if (relaid) {
         Relayout();
     }
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     WriteCollectionsAndShapes();
     const bool viewed = store.LastWrite(kRenderProductCamera) > m_seen;
     m_seen = store.WriteSequence();
@@ -413,8 +413,8 @@ void Lights::Run(const ChangeSet& changes, TableLog&) {
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
     params.tlasCount = uint32_t(dirty.size());
-    params.lightLink = m_catalog.GetTokens().Intern("lightLink").id;
-    params.shadowLink = m_catalog.GetTokens().Intern("shadowLink").id;
+    params.lightLink = m_structure.GetTokens().Intern("lightLink").id;
+    params.shadowLink = m_structure.GetTokens().Intern("shadowLink").id;
     device::Queue& queue = device.GetQueue();
     device::CommandEncoder encoder = queue.CreateEncoder();
     if (m_domes > 0) {
@@ -436,8 +436,8 @@ void Lights::Run(const ChangeSet& changes, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-void Lights::WriteCollectionsAndShapes() {
-    Store& store = m_catalog.GetStore();
+void LightBuilder::WriteCollectionsAndShapes() {
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     LightParams params{};
     params.collectionRows = store.Schema(SchemaId::CollectionAPI).Rows();
@@ -460,9 +460,9 @@ void Lights::WriteCollectionsAndShapes() {
     queue.Submit(encoder.Finish());
 }
 
-device::Program& Lights::Kernels() {
+device::Program& LightBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.lights"},
              .library = &kSceneKernels,
              .entries = {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights",

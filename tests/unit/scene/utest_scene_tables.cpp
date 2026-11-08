@@ -18,7 +18,7 @@
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/publish/publisher.h"
-#include "ernie/scene/publish/table_versions.h"
+#include "ernie/scene/publish/table_writes.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/structure/structure.h"
@@ -30,33 +30,33 @@ namespace ernie {
 namespace {
 
 TEST(TableLogTest, CollectsTheWorldsWrittenSinceASequence) {
-    TableLog log;
-    EXPECT_EQ(log.Version(TableId::Transforms), 0u);
+    TableWrites writes;
+    EXPECT_EQ(writes.Version(TableId::Transforms), 0u);
     const uint32_t first[] = {1, 2};
-    log.Wrote(TableId::Transforms, first);
-    const uint64_t seen = log.Sequence();
+    writes.Add(TableId::Transforms, first);
+    const uint64_t seen = writes.Sequence();
     const uint32_t other[] = {7};
-    log.Wrote(TableId::Imageables, other);
+    writes.Add(TableId::Imageables, other);
     const uint32_t second[] = {2, 3};
-    log.Wrote(TableId::Transforms, second);
-    EXPECT_EQ(log.Version(TableId::Transforms), 3u);
-    EXPECT_EQ(log.Version(TableId::Imageables), 2u);
+    writes.Add(TableId::Transforms, second);
+    EXPECT_EQ(writes.Version(TableId::Transforms), 3u);
+    EXPECT_EQ(writes.Version(TableId::Imageables), 2u);
 
     std::vector<uint32_t> all;
-    log.Collect(TableId::Transforms, 0, all);
+    writes.Collect(TableId::Transforms, 0, all);
     EXPECT_EQ(all, (std::vector<uint32_t>{1, 2, 3}));
     std::vector<uint32_t> later;
-    log.Collect(TableId::Transforms, seen, later);
+    writes.Collect(TableId::Transforms, seen, later);
     EXPECT_EQ(later, (std::vector<uint32_t>{2, 3}));
 
-    log.Trim(seen);
+    writes.Trim(seen);
     std::vector<uint32_t> trimmed;
-    log.Collect(TableId::Transforms, 0, trimmed);
+    writes.Collect(TableId::Transforms, 0, trimmed);
     EXPECT_EQ(trimmed, (std::vector<uint32_t>{2, 3}));
-    EXPECT_EQ(log.Version(TableId::Transforms), 3u);
+    EXPECT_EQ(writes.Version(TableId::Transforms), 3u);
 }
 
-class Probe : public System {
+class Probe : public TableBuilder {
   public:
     std::string_view Name() const override {
         return "probe";
@@ -75,7 +75,7 @@ class Probe : public System {
         return false;
     }
 
-    void Run(const ChangeSet& changes, TableLog&) override {
+    void Run(const ChangeSet& changes, TableWrites&) override {
         if (fail) {
             fail = false;
             throw Error("probe failed");
@@ -102,31 +102,32 @@ class Loop : public Probe {
 };
 
 struct Fixture {
-    Store store;
-    Catalog catalog;
-    Timeline timeline;
-    Hierarchy hierarchy;
+    ColumnStore store;
+    Structure structure;
+    Publisher publisher;
+    TransformBuilder hierarchy;
     Probe probe;
     Readback readback;
     Ordinal ordinal = 0;
 
     explicit Fixture(device::Device& device)
-        : store(device), catalog(store), timeline(catalog), hierarchy(catalog), readback(device) {
-        timeline.Add(hierarchy);
-        timeline.Add(probe);
+        : store(device), structure(store), publisher(structure), hierarchy(structure),
+          readback(device) {
+        publisher.Add(hierarchy);
+        publisher.Add(probe);
     }
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     View One(uint32_t prim, SchemaId schema) {
-        return View(catalog, schema, std::vector<uint32_t>{prim});
+        return View(structure, schema, std::vector<uint32_t>{prim});
     }
 
     std::vector<WorldTransform> Transforms(const std::vector<uint32_t>& prims) {
         return readback.Read<WorldTransform>(
-            hierarchy.Transforms(), TableRows(catalog.GetPrims(), prims, SchemaId::Xformable));
+            hierarchy.Transforms(), TableRows(structure.GetPrims(), prims, SchemaId::Xformable));
     }
 };
 
@@ -135,8 +136,8 @@ TEST(TableTrackingTest, ReadersRunOnlyWhenTheirTablesAreWritten) {
         Fixture f(device);
         std::vector<uint32_t> balls;
         for (uint32_t i = 0; i < 2; ++i) {
-            f.catalog.Define(SchemaId::World, std::vector<std::string>{std::format("/Env{}", i)});
-            balls.push_back(f.catalog
+            f.structure.Define(SchemaId::World, std::vector<std::string>{std::format("/Env{}", i)});
+            balls.push_back(f.structure
                                 .Define(SchemaId::Sphere,
                                         std::vector<std::string>{std::format("/Env{}/Ball", i)})
                                 .firstPrim);
@@ -167,15 +168,15 @@ TEST(TableTrackingTest, ReadersRunOnlyWhenTheirTablesAreWritten) {
 
 TEST(TableTrackingTest, ReadersMustBeAddedAfterTheirWriters) {
     test::ForEachDevice([](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
-        Hierarchy hierarchy(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
+        TransformBuilder hierarchy(structure);
         Probe probe;
-        timeline.Add(probe);
-        EXPECT_THROW(timeline.Add(hierarchy), Error);
+        publisher.Add(probe);
+        EXPECT_THROW(publisher.Add(hierarchy), Error);
         Loop loop;
-        EXPECT_THROW(timeline.Add(loop), Error);
+        EXPECT_THROW(publisher.Add(loop), Error);
     });
 }
 
@@ -232,25 +233,25 @@ TEST(TableTrackingTest, AFailedPublishLeavesTheTimelineUsable) {
     test::ForEachDevice([](device::Device& device) {
         Fixture f(device);
         const uint32_t ball =
-            f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"}).firstPrim;
+            f.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"}).firstPrim;
         f.Publish();
-        const Snapshot before = f.timeline.Acquire(Stream::Host());
-        f.timeline.Release(before);
+        const Snapshot before = f.publisher.Acquire(Stream::Host());
+        f.publisher.Release(before);
 
         f.probe.fail = true;
         f.One(ball, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 0, 9});
-        EXPECT_THROW(f.timeline.Publish(++f.ordinal), Error);
-        EXPECT_EQ(f.timeline.Published(), f.ordinal - 1);
+        EXPECT_THROW(f.publisher.Publish(++f.ordinal), Error);
+        EXPECT_EQ(f.publisher.Published(), f.ordinal - 1);
 
         f.One(ball, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 0, 4});
         f.Publish();
-        EXPECT_EQ(f.timeline.Published(), f.ordinal);
+        EXPECT_EQ(f.publisher.Published(), f.ordinal);
         EXPECT_TRUE(f.probe.wrote);
         const WorldTransform moved = f.Transforms({ball}).front();
         EXPECT_FLOAT_EQ(moved.high.z + moved.low.z, 4.0f);
-        const Snapshot after = f.timeline.Acquire(Stream::Host());
+        const Snapshot after = f.publisher.Acquire(Stream::Host());
         EXPECT_NE(after.tables, 0u);
-        f.timeline.Release(after);
+        f.publisher.Release(after);
     });
 }
 
@@ -258,12 +259,12 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
     test::ForEachDevice([](device::Device& device) {
         Fixture f(device);
         const uint32_t group =
-            f.catalog.Define(SchemaId::Xform, std::vector<std::string>{"/Group"}).firstPrim;
+            f.structure.Define(SchemaId::Xform, std::vector<std::string>{"/Group"}).firstPrim;
         std::vector<std::string> pads;
         for (uint32_t i = 0; i < 150; ++i) {
             pads.push_back(std::format("/Pad{}", i));
         }
-        f.catalog.Define(SchemaId::Sphere, pads);
+        f.structure.Define(SchemaId::Sphere, pads);
         f.Publish();
         const uint32_t rebuilds = f.hierarchy.Rebuilds();
         const Table& imageables = f.store.Schema(SchemaId::Imageable);
@@ -275,7 +276,7 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
         for (uint32_t i = 0; i < 70; ++i) {
             paths.push_back(std::format("/Group/Ball{}", i));
         }
-        const uint32_t first = f.catalog.Define(SchemaId::Sphere, paths).firstPrim;
+        const uint32_t first = f.structure.Define(SchemaId::Sphere, paths).firstPrim;
         f.One(group, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 3, 0});
         f.Publish();
         EXPECT_EQ(f.hierarchy.Rebuilds(), rebuilds);
@@ -388,7 +389,7 @@ class MeshProbe : public Probe {
         return kTables;
     }
 
-    void Run(const ChangeSet& changes, TableLog&) override {
+    void Run(const ChangeSet& changes, TableWrites&) override {
         ++runs;
         relinked = changes.Wrote(TableId::Meshes);
         updated = changes.Wrote(TableId::MeshPoints);
@@ -404,49 +405,49 @@ TEST(TableTrackingTest, DeformingAMeshUpdatesItsDataAndReshapingRelinksIt) {
         if (device.Adapter().backend == device::Backend::Hip) {
             return;
         }
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        Geometry geometry(catalog, *builder);
+        MeshBuilder geometry(structure, *builder);
         MeshProbe probe;
-        timeline.Add(geometry);
-        timeline.Add(probe);
+        publisher.Add(geometry);
+        publisher.Add(probe);
         Ordinal ordinal = 0;
-        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env"});
+        structure.Define(SchemaId::World, std::vector<std::string>{"/Env"});
         const uint32_t quad =
-            catalog
+            structure
                 .Define<Mesh>(std::vector<std::string>{"/Env/Quad"},
                               {.points = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},
                                .faceVertexIndices = {0, 1, 2, 3},
                                .faceVertexCounts = {4}})
                 .firstPrim;
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
         EXPECT_TRUE(probe.relinked);
-        const uint32_t meshRow = catalog.GetPrims().Row(quad, SchemaId::Mesh);
+        const uint32_t meshRow = structure.GetPrims().Row(quad, SchemaId::Mesh);
         const uint64_t blas = geometry.Record(meshRow).blas;
         EXPECT_NE(blas, 0u);
 
-        const uint32_t pointsRow = catalog.GetPrims().Row(quad, SchemaId::PointBased);
+        const uint32_t pointsRow = structure.GetPrims().Row(quad, SchemaId::PointBased);
         const ArrayRef points = store.Array(kPointBasedPoints, pointsRow);
         const std::vector<Float3> lifted = {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
         store.Arrays(ColumnType::Float3Array).Write(points, std::as_bytes(std::span(lifted)));
         store.SetArray(kPointBasedPoints, pointsRow, points);
         const uint32_t runs = probe.runs;
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
         EXPECT_EQ(probe.runs, runs + 1);
         EXPECT_FALSE(probe.relinked);
         EXPECT_TRUE(probe.updated);
         EXPECT_EQ(probe.worlds, (std::vector<uint32_t>{0}));
         EXPECT_EQ(geometry.Record(meshRow).blas, blas);
 
-        View(catalog, SchemaId::Mesh, std::vector<uint32_t>{quad})
+        View(structure, SchemaId::Mesh, std::vector<uint32_t>{quad})
             .GetArray<int32_t>(kMeshFaceVertexIndices)
             .Set(0, std::vector<int32_t>{0, 1, 2});
-        View(catalog, SchemaId::Mesh, std::vector<uint32_t>{quad})
+        View(structure, SchemaId::Mesh, std::vector<uint32_t>{quad})
             .GetArray<int32_t>(kMeshFaceVertexCounts)
             .Set(0, std::vector<int32_t>{3});
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
         EXPECT_TRUE(probe.relinked);
         EXPECT_EQ(geometry.Record(meshRow).faces.count, 1u);
     });

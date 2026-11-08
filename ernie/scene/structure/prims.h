@@ -62,7 +62,7 @@ struct PrimBlock {
 
 class Prims {
   public:
-    explicit Prims(Store& store) : m_store(store) {}
+    explicit Prims(ColumnStore& store) : m_store(store) {}
 
     uint32_t Size() const {
         return uint32_t(m_records.size());
@@ -110,7 +110,7 @@ class Prims {
     void ReleaseRow(SchemaId table, uint32_t row);
     void SetHead(uint32_t prim, SchemaId api, uint32_t row);
 
-    Store& m_store;
+    ColumnStore& m_store;
     std::vector<PrimRecord> m_records;
     std::vector<uint32_t> m_slotRows;
     std::vector<uint32_t> m_freePrims;

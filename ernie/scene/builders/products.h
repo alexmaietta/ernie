@@ -37,16 +37,16 @@ struct ResolvedProduct {
     uint64_t version = 0;
 };
 
-class Products : public System {
+class ProductBuilder : public TableBuilder {
   public:
-    Products(Scene& scene, Catalog& catalog) : m_scene(scene), m_catalog(catalog) {}
+    ProductBuilder(Scene& scene, Structure& structure) : m_scene(scene), m_structure(structure) {}
 
     std::string_view Name() const override {
         return "products";
     }
 
     std::span<const ColumnRef> Inputs() const override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
@@ -59,7 +59,7 @@ class Products : public System {
     ResolvedProduct Resolve(uint32_t prim) const;
 
     Scene& m_scene;
-    Catalog& m_catalog;
+    Structure& m_structure;
     std::map<uint32_t, ResolvedProduct> m_products;
     RecordTable<ProductRecord> m_records{"product records"};
     uint64_t m_versions = 0;

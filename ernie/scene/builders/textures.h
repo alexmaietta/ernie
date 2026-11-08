@@ -35,12 +35,12 @@ struct TextureSlot {
 
 std::vector<TextureSlot> TextureSlots(SchemaId material);
 
-class Textures : public System {
+class TextureBuilder : public TableBuilder {
   public:
-    explicit Textures(Catalog& catalog, unsigned threads = 4);
-    ~Textures() override;
-    Textures(const Textures&) = delete;
-    Textures& operator=(const Textures&) = delete;
+    explicit TextureBuilder(Structure& structure, unsigned threads = 4);
+    ~TextureBuilder() override;
+    TextureBuilder(const TextureBuilder&) = delete;
+    TextureBuilder& operator=(const TextureBuilder&) = delete;
 
     std::string_view Name() const override {
         return "textures";
@@ -63,7 +63,7 @@ class Textures : public System {
     }
 
     bool Pending() const override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     void Finish() override;
     uint64_t Handle(uint32_t prim, std::string_view input) const;
@@ -104,7 +104,7 @@ class Textures : public System {
     void Rebind(uint32_t prim, Cells& cells);
     void UploadBindings();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     TextureCache m_cache;
     std::map<SchemaId, std::vector<TextureSlot>> m_slots;
     std::vector<ColumnRef> m_inputs;

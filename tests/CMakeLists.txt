@@ -109,9 +109,9 @@ ernie_test(
         unit/scene/utest_scene_access.cpp
         unit/scene/utest_scene_attachment.cpp
         unit/scene/utest_scene_bounds.cpp
-        unit/scene/utest_scene_catalog.cpp
-        unit/scene/utest_scene_geometry.cpp
-        unit/scene/utest_scene_hierarchy.cpp
+        unit/scene/utest_scene_structure.cpp
+        unit/scene/utest_scene_meshes.cpp
+        unit/scene/utest_scene_transforms.cpp
         unit/scene/utest_scene_instancers.cpp
         unit/scene/utest_scene_instances.cpp
         unit/scene/utest_scene_lights.cpp
@@ -122,11 +122,11 @@ ernie_test(
         unit/scene/utest_scene_semantics.cpp
         unit/scene/utest_scene_sensors.cpp
         unit/scene/utest_scene_snapshots.cpp
-        unit/scene/utest_scene_store.cpp
+        unit/scene/utest_scene_column_store.cpp
         unit/scene/utest_scene_tables.cpp
         unit/scene/utest_scene_tangents.cpp
         unit/scene/utest_scene_textures.cpp
-        unit/scene/utest_scene_timeline.cpp
+        unit/scene/utest_scene_publisher.cpp
         unit/scene/utest_scene_tokens.cpp
         unit/scene/utest_scene_updates.cpp
 )

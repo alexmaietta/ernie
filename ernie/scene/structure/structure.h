@@ -23,7 +23,7 @@
 
 namespace ernie {
 
-class Catalog;
+class Structure;
 
 struct StructureEntry {
     Ordinal ordinal = 0;
@@ -36,8 +36,8 @@ struct StructureEntry {
 
 class RowWriter {
   public:
-    RowWriter(Catalog& catalog, const PrimBlock& block, std::span<const uint32_t> prims = {})
-        : m_catalog(catalog), m_block(block), m_prims(prims) {}
+    RowWriter(Structure& structure, const PrimBlock& block, std::span<const uint32_t> prims = {})
+        : m_structure(structure), m_block(block), m_prims(prims) {}
 
     template <class T> void Set(SchemaId owner, uint32_t column, const T& value) {
         const ColumnRef ref{owner, &Columns(owner)[column], column};
@@ -79,16 +79,16 @@ class RowWriter {
     void SetTargets(ColumnRef column, std::span<const std::string> paths);
     void SetPrimvars(ColumnRef column, std::span<const Primvar> primvars);
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     const PrimBlock& m_block;
     std::span<const uint32_t> m_prims;
 };
 
-class Catalog {
+class Structure {
   public:
-    explicit Catalog(Store& store);
+    explicit Structure(ColumnStore& store);
 
-    Store& GetStore() {
+    ColumnStore& GetColumnStore() {
         return m_store;
     }
 
@@ -325,7 +325,7 @@ class Catalog {
     void OwnFile(uint32_t prim, const std::string& path);
     void ReleaseFiles(uint32_t prim);
 
-    Store& m_store;
+    ColumnStore& m_store;
     Tokens m_tokens;
     Paths m_paths;
     Prims m_prims;
@@ -342,7 +342,7 @@ class Catalog {
 
 template <class F>
 void RowWriter::Instance(SchemaId api, std::string_view instance, const F& write) {
-    m_catalog.ApplyInstance(Prims(), api, instance, [&](RowWriter& writer) { write(writer); });
+    m_structure.ApplyInstance(Prims(), api, instance, [&](RowWriter& writer) { write(writer); });
 }
 
 }

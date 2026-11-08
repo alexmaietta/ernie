@@ -27,12 +27,12 @@ bool Drawable(SchemaId schema) {
 
 }
 
-bool Instances::ShowsGlobals(uint32_t tlas) const {
+bool InstanceBuilder::ShowsGlobals(uint32_t tlas) const {
     const auto composed = m_composed.find(tlas);
     return composed == m_composed.end() || composed->second.global;
 }
 
-std::vector<uint32_t> Instances::RegionItems(uint32_t tlas) const {
+std::vector<uint32_t> InstanceBuilder::RegionItems(uint32_t tlas) const {
     std::vector<uint32_t> items = m_blockItems[tlas];
     if (tlas < m_worlds) {
         items.insert(items.end(), m_own[tlas].begin(), m_own[tlas].end());
@@ -50,11 +50,11 @@ std::vector<uint32_t> Instances::RegionItems(uint32_t tlas) const {
     return items;
 }
 
-void Instances::Compose() {
-    m_compositions = m_catalog.CompositionVersion();
+void InstanceBuilder::Compose() {
+    m_compositions = m_structure.CompositionVersion();
     m_composed.clear();
     m_shownIn.clear();
-    for (const auto& [world, desc] : m_catalog.Compositions()) {
+    for (const auto& [world, desc] : m_structure.Compositions()) {
         if (world >= m_worlds) {
             continue;
         }
@@ -67,9 +67,9 @@ void Instances::Compose() {
     }
 }
 
-std::vector<Instances::Instancer> Instances::GatherInstancers() const {
-    const Prims& prims = m_catalog.GetPrims();
-    Store& store = m_catalog.GetStore();
+std::vector<InstanceBuilder::Instancer> InstanceBuilder::GatherInstancers() const {
+    const Prims& prims = m_structure.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
     const auto targets = [&](ColumnRef column, uint32_t row) {
         const ArrayRef array = store.Array(column, row);
         std::vector<uint32_t> found =
@@ -107,8 +107,8 @@ std::vector<Instances::Instancer> Instances::GatherInstancers() const {
     return instancers;
 }
 
-bool Instances::Member(uint32_t prim) const {
-    const Prims& prims = m_catalog.GetPrims();
+bool InstanceBuilder::Member(uint32_t prim) const {
+    const Prims& prims = m_structure.GetPrims();
     for (uint32_t at = prim; at != kNoPrim; at = prims.At(at).parent) {
         if (m_roots.contains(at)) {
             return true;
@@ -117,10 +117,10 @@ bool Instances::Member(uint32_t prim) const {
     return false;
 }
 
-void Instances::Relayout() {
+void InstanceBuilder::Relayout() {
     ERNIE_ZONE("Instances/Relayout");
-    const Prims& prims = m_catalog.GetPrims();
-    device::Device& device = m_catalog.GetStore().GetDevice();
+    const Prims& prims = m_structure.GetPrims();
+    device::Device& device = m_structure.GetColumnStore().GetDevice();
     m_worlds = prims.WorldCount();
     m_own.assign(m_worlds, {});
     m_globals.clear();
@@ -260,9 +260,9 @@ void Instances::Relayout() {
         m_worlds + 1, m_regions.Items().size(), m_globals.size(), m_instancers.size());
 }
 
-void Instances::BuildInstancing() {
-    const Prims& prims = m_catalog.GetPrims();
-    Store& store = m_catalog.GetStore();
+void InstanceBuilder::BuildInstancing() {
+    const Prims& prims = m_structure.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
 
     struct Placed {
         uint32_t first = 0;
@@ -463,27 +463,28 @@ void Instances::BuildInstancing() {
     m_header.hiddenIds = instancing + hiddenAt;
 }
 
-void Instances::WriteLayoutHeader() {
+void InstanceBuilder::WriteLayoutHeader() {
     m_header.handles.address = m_tlas->Handles().Address();
     m_header.shapes.address = m_shapes.Address();
     m_header.hits.address = m_hits.Address();
     m_header.records = m_records.Address();
     m_header.worldCount = m_worlds;
-    m_header.displayColorName = m_catalog.GetTokens().Intern("displayColor").id;
-    m_catalog.GetStore().GetDevice().GetQueue().Write(m_layout->Slice(0, sizeof(m_header)),
-                                                      &m_header);
+    m_header.displayColorName = m_structure.GetTokens().Intern("displayColor").id;
+    m_structure.GetColumnStore().GetDevice().GetQueue().Write(m_layout->Slice(0, sizeof(m_header)),
+                                                              &m_header);
 }
 
-device::BufferRange Instances::LayoutWords(uint64_t address, uint32_t first, uint32_t count) const {
+device::BufferRange InstanceBuilder::LayoutWords(uint64_t address, uint32_t first,
+                                                 uint32_t count) const {
     return m_layout->Slice(address - m_layout->Address() + uint64_t(first) * sizeof(uint32_t),
                            uint64_t(count) * sizeof(uint32_t));
 }
 
-void Instances::WriteRegions(const std::set<uint32_t>& tlases) {
+void InstanceBuilder::WriteRegions(const std::set<uint32_t>& tlases) {
     if (tlases.empty()) {
         return;
     }
-    device::Queue& queue = m_catalog.GetStore().GetDevice().GetQueue();
+    device::Queue& queue = m_structure.GetColumnStore().GetDevice().GetQueue();
     for (const uint32_t tlas : tlases) {
         const uint32_t start = m_regions.Starts()[tlas];
         queue.Write(LayoutWords(m_header.instancePrims.address, start, m_regions.Capacity(tlas)),
@@ -493,7 +494,7 @@ void Instances::WriteRegions(const std::set<uint32_t>& tlases) {
                 m_regions.Counts().data());
 }
 
-bool Instances::Restack() {
+bool InstanceBuilder::Restack() {
     BuildInstancing();
     std::set<uint32_t> tlases;
     for (uint32_t tlas = 0; tlas < m_regions.Size(); ++tlas) {
@@ -507,9 +508,9 @@ bool Instances::Restack() {
     return true;
 }
 
-std::optional<std::set<uint32_t>> Instances::Apply(const ChangeSet& changes) {
+std::optional<std::set<uint32_t>> InstanceBuilder::Apply(const ChangeSet& changes) {
     ERNIE_ZONE("Instances/Apply");
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     if (prims.WorldCount() != m_worlds) {
         return std::nullopt;
     }

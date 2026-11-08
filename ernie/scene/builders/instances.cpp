@@ -61,9 +61,9 @@ const std::vector<ColumnRef>& InputColumns() {
 
 }
 
-Instances::Instances(Catalog& catalog, bvh::Builder& builder, uint32_t maxRefits)
-    : m_catalog(catalog), m_builder(builder), m_maxRefits(maxRefits) {
-    device::Device& device = catalog.GetStore().GetDevice();
+InstanceBuilder::InstanceBuilder(Structure& structure, bvh::Builder& builder, uint32_t maxRefits)
+    : m_structure(structure), m_builder(builder), m_maxRefits(maxRefits) {
+    device::Device& device = structure.GetColumnStore().GetDevice();
     const BvhBox unit = {{-1, -1, -1}, {1, 1, 1}};
     m_unitBoxes = device.CreateBuffer(
         {.usage = device::BufferUsage::AccelBuildInput, .label = "unit box"}, std::span(&unit, 1));
@@ -75,15 +75,15 @@ Instances::Instances(Catalog& catalog, bvh::Builder& builder, uint32_t maxRefits
     queue.Submit(encoder.Finish());
 }
 
-std::span<const ColumnRef> Instances::Inputs() const {
+std::span<const ColumnRef> InstanceBuilder::Inputs() const {
     return InputColumns();
 }
 
-void Instances::Run(const ChangeSet& changes, TableLog& log) {
+void InstanceBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     ERNIE_ZONE("Instances/Run");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     const uint64_t seen = store.WriteSequence();
-    bool relaid = changes.resync || !m_tlas || m_catalog.CompositionVersion() != m_compositions;
+    bool relaid = changes.resync || !m_tlas || m_structure.CompositionVersion() != m_compositions;
     bool restacked = false;
     if (!relaid &&
         (std::ranges::any_of(kLayoutInputs,
@@ -116,7 +116,7 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
         Relayout();
     }
     if (relaid || restacked) {
-        log.Wrote(TableId::Instances, std::vector<uint32_t>{kGlobalWorld});
+        writes.Add(TableId::Instances, std::vector<uint32_t>{kGlobalWorld});
     }
     const uint32_t tlases = m_regions.Size();
     if (restacked) {
@@ -177,7 +177,7 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
         for (const uint32_t tlas : built) {
             rebuilt.push_back(TlasWorld(tlas, m_worlds));
         }
-        log.Wrote(TableId::Slots, rebuilt);
+        writes.Add(TableId::Slots, rebuilt);
     }
     m_stats.refit = uint32_t(refit.size());
 
@@ -232,7 +232,7 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
     queue.Submit(encoder.Finish());
 }
 
-std::set<uint32_t> Instances::Tlases(uint32_t world) const {
+std::set<uint32_t> InstanceBuilder::Tlases(uint32_t world) const {
     std::set<uint32_t> tlases;
     if (world == kGlobalWorld) {
         for (uint32_t tlas = 0; tlas < m_regions.Size(); ++tlas) {
@@ -251,13 +251,13 @@ std::set<uint32_t> Instances::Tlases(uint32_t world) const {
     return tlases;
 }
 
-void Instances::Describe(RenderTables& tables) const {
+void InstanceBuilder::Describe(RenderTables& tables) const {
     tables.instances.address = m_layout ? m_layout->Address() : 0;
     tables.origins.address = m_renderOrigins.Address();
     tables.slotWorlds.address = m_slotWorlds.Address();
 }
 
-void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void InstanceBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_layout, m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(),
                        m_slotWorlds.Buffer(), m_instancing, m_renderOrigins.Buffer()});
     if (m_tlas) {
@@ -268,13 +268,13 @@ void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
     }
 }
 
-void Instances::Prepare() {
+void InstanceBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Instances::Kernels() {
+device::Program& InstanceBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.instances"},
              .library = &kSceneKernels,
              .entries = {"WriteInstances", "GatherViewers", "PlaceOrigins"},

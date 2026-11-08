@@ -13,30 +13,31 @@
 
 namespace ernie {
 
-void Timeline::Finish() {
+void Publisher::Finish() {
     for (const Scheduled& scheduled : m_systems) {
         scheduled.system->Finish();
     }
 }
 
-bool Timeline::Pending() const {
-    return m_catalog.GetStore().WriteSequence() != m_writes || m_catalog.Epoch() != m_epoch ||
+bool Publisher::Pending() const {
+    return m_structure.GetColumnStore().WriteSequence() != m_writes ||
+           m_structure.Epoch() != m_epoch ||
            std::ranges::any_of(
                m_systems, [](const Scheduled& scheduled) { return scheduled.system->Pending(); });
 }
 
-void Timeline::Add(System& system) {
+void Publisher::Add(TableBuilder& system) {
     for (const TableId output : system.TableOutputs()) {
         for (const TableId input : system.TableInputs()) {
             if (input == output) {
-                throw Error("System {} reads its own table output", system.Name());
+                throw Error("TableBuilder {} reads its own table output", system.Name());
             }
         }
         for (const Scheduled& earlier : m_systems) {
             for (const TableId input : earlier.system->TableInputs()) {
                 if (input == output) {
-                    throw Error("System {} writes a table {} reads, so add {} first", system.Name(),
-                                earlier.system->Name(), system.Name());
+                    throw Error("TableBuilder {} writes a table {} reads, so add {} first",
+                                system.Name(), earlier.system->Name(), system.Name());
                 }
             }
         }
@@ -44,27 +45,27 @@ void Timeline::Add(System& system) {
     m_systems.push_back({&system});
 }
 
-Ordinal Timeline::StampAt(Ordinal ordinal) const {
+Ordinal Publisher::StampAt(Ordinal ordinal) const {
     const auto after = std::ranges::upper_bound(m_sealed, ordinal, {}, &Sealed::ordinal);
     return after == m_sealed.begin() ? 0 : std::prev(after)->stamp;
 }
 
-Ordinal Timeline::OrdinalAt(Ordinal stamp, Ordinal sealing) const {
+Ordinal Publisher::OrdinalAt(Ordinal stamp, Ordinal sealing) const {
     const auto found = std::ranges::lower_bound(m_sealed, stamp, {}, &Sealed::stamp);
     return found == m_sealed.end() ? sealing : found->ordinal;
 }
 
-ChangeSet Timeline::Build(Ordinal since, Ordinal until, Ordinal sealing,
-                          std::span<const ColumnRef> columns,
-                          std::vector<Ref<device::Buffer>>* reused) {
-    Store& store = m_catalog.GetStore();
+ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
+                           std::span<const ColumnRef> columns,
+                           std::vector<Ref<device::Buffer>>* reused) {
+    ColumnStore& store = m_structure.GetColumnStore();
     ChangeSet changes;
     changes.since = since == 0 ? 0 : OrdinalAt(since, sealing);
     changes.until = OrdinalAt(until, sealing);
     changes.sinceStamp = since;
     changes.untilStamp = until;
     changes.resync = since == 0;
-    for (StructureEntry entry : m_catalog.Log()) {
+    for (StructureEntry entry : m_structure.Log()) {
         if (entry.ordinal <= since || entry.ordinal > until) {
             continue;
         }
@@ -76,7 +77,7 @@ ChangeSet Timeline::Build(Ordinal since, Ordinal until, Ordinal sealing,
         }
     }
     changes.structure = !changes.added.empty() || !changes.removed.empty();
-    const uint32_t worlds = m_catalog.GetPrims().WorldCount();
+    const uint32_t worlds = m_structure.GetPrims().WorldCount();
     for (uint32_t slot = 0; slot <= worlds; ++slot) {
         const uint32_t world = SlotWorld(slot);
         const Ordinal stamp = store.WorldStamp(world);
@@ -126,35 +127,35 @@ ChangeSet Timeline::Build(Ordinal since, Ordinal until, Ordinal sealing,
     return changes;
 }
 
-void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
-    Store& store = m_catalog.GetStore();
+void Publisher::RunBuilders(Ordinal stamp, Ordinal ordinal) {
+    ColumnStore& store = m_structure.GetColumnStore();
     for (Scheduled& scheduled : m_systems) {
-        System& system = *scheduled.system;
+        TableBuilder& system = *scheduled.system;
         const bool written = std::ranges::any_of(system.Inputs(), [&](ColumnRef input) {
             return store.LastWrite(input) > scheduled.writes;
         });
-        const bool restructured = system.Structural() && m_catalog.Epoch() != scheduled.epoch;
+        const bool restructured = system.Structural() && m_structure.Epoch() != scheduled.epoch;
         const bool tabled = std::ranges::any_of(system.TableInputs(), [&](TableId table) {
-            return m_log.Version(table) > scheduled.logged;
+            return m_tableWrites.Version(table) > scheduled.logged;
         });
         if (scheduled.ran && !written && !restructured && !tabled && !system.Pending()) {
             continue;
         }
-        ERNIE_ZONE("Timeline/System");
+        ERNIE_ZONE("Publisher/TableBuilder");
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
                                   system.Inputs(), &scheduled.changed);
         for (const TableId table : system.TableInputs()) {
-            if (m_log.Version(table) > scheduled.logged) {
+            if (m_tableWrites.Version(table) > scheduled.logged) {
                 changes.wrote.push_back(table);
-                m_log.Collect(table, scheduled.logged, changes.worlds);
+                m_tableWrites.Collect(table, scheduled.logged, changes.worlds);
             }
         }
         const uint64_t writes = store.WriteSequence();
-        const uint64_t epoch = m_catalog.Epoch();
-        const uint64_t logged = m_log.Sequence();
+        const uint64_t epoch = m_structure.Epoch();
+        const uint64_t logged = m_tableWrites.Sequence();
         changes.tables = &m_tables;
         ++system.m_runs;
-        system.Run(changes, m_log);
+        system.Run(changes, m_tableWrites);
         system.Describe(m_tables);
         scheduled.writes = writes;
         scheduled.epoch = epoch;
@@ -167,22 +168,22 @@ void Timeline::RunSystems(Ordinal stamp, Ordinal ordinal) {
         seen = std::min(seen, scheduled.stamp);
     }
     store.TrimArrayWrites(seen);
-    uint64_t logged = m_log.Sequence();
+    uint64_t logged = m_tableWrites.Sequence();
     for (const Scheduled& scheduled : m_systems) {
         if (!scheduled.system->TableInputs().empty()) {
             logged = std::min(logged, scheduled.logged);
         }
     }
-    m_log.Trim(logged);
+    m_tableWrites.Trim(logged);
 }
 
-device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {
-    ERNIE_ZONE("Timeline/Publish");
+device::Operation Publisher::Publish(Ordinal ordinal, Stream producer) {
+    ERNIE_ZONE("Publisher/Publish");
     if (!m_sealed.empty() && ordinal <= m_sealed.back().ordinal) {
         throw Error("Publishing ordinal {}, but {} is already published", ordinal,
                     m_sealed.back().ordinal);
     }
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Queue& queue = store.GetDevice().GetQueue();
     queue.Follow(producer);
     const Ordinal stamp = store.Stamp();
@@ -191,7 +192,7 @@ device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {
         queue.BeginBatch();
         try {
             store.Flush();
-            RunSystems(stamp, ordinal);
+            RunBuilders(stamp, ordinal);
             Seal();
             store.DeviceData();
         } catch (...) {
@@ -204,11 +205,11 @@ device::Operation Timeline::Publish(Ordinal ordinal, Stream producer) {
     m_sealed.push_back({ordinal, stamp});
     store.SetStamp(stamp + 1);
     m_writes = store.WriteSequence();
-    m_epoch = m_catalog.Epoch();
+    m_epoch = m_structure.Epoch();
     return done;
 }
 
-ChangeSet Timeline::Changes(Ordinal since, std::span<const ColumnRef> columns) {
+ChangeSet Publisher::Changes(Ordinal since, std::span<const ColumnRef> columns) {
     if (since > Published()) {
         throw Error("Changes since {}, but only {} is published", since, Published());
     }
@@ -216,8 +217,8 @@ ChangeSet Timeline::Changes(Ordinal since, std::span<const ColumnRef> columns) {
     return Build(StampAt(since), until, Published(), columns);
 }
 
-void Timeline::Seal() {
-    const SceneData data = m_catalog.GetStore().Data();
+void Publisher::Seal() {
+    const AuthoredData data = m_structure.GetColumnStore().Data();
     m_tables.prims = {.schema = data.prims.schema,
                       .world = data.prims.world,
                       .flags = data.prims.flags,
@@ -227,13 +228,13 @@ void Timeline::Seal() {
                       .parent = data.prims.parent,
                       .count = data.primCount};
     RenderTables tables = m_tables;
-    tables.worldCount = m_catalog.GetPrims().WorldCount();
+    tables.worldCount = m_structure.GetPrims().WorldCount();
     m_tables.worldCount = tables.worldCount;
     auto pinned = std::make_shared<PinnedTables>();
     if (m_pinned && std::memcmp(&tables, &m_pinned->tables, sizeof(tables)) == 0) {
         pinned->header = m_pinned->header;
     } else {
-        pinned->header = m_catalog.GetStore().GetDevice().CreateBuffer(
+        pinned->header = m_structure.GetColumnStore().GetDevice().CreateBuffer(
             {.label = "render tables"}, std::span<const RenderTables>(&tables, 1));
     }
     pinned->tables = tables;
@@ -244,11 +245,11 @@ void Timeline::Seal() {
     m_pinned = std::move(pinned);
 }
 
-Snapshot Timeline::Acquire(Stream consumer) {
+Snapshot Publisher::Acquire(Stream consumer) {
     if (m_sealed.empty()) {
         throw Error("Nothing is published yet");
     }
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     Snapshot snapshot;
     snapshot.ordinal = Published();
     store.DeviceData();
@@ -263,11 +264,11 @@ Snapshot Timeline::Acquire(Stream consumer) {
     return snapshot;
 }
 
-void Timeline::Release(const Snapshot& snapshot, Stream consumer) {
+void Publisher::Release(const Snapshot& snapshot, Stream consumer) {
     if (m_outstanding == 0 || snapshot.ordinal == 0) {
         throw Error("Releasing a snapshot that wasn't acquired");
     }
-    m_catalog.GetStore().GetDevice().GetQueue().Follow(consumer);
+    m_structure.GetColumnStore().GetDevice().GetQueue().Follow(consumer);
     --m_outstanding;
 }
 

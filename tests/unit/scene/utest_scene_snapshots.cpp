@@ -64,7 +64,7 @@ TEST(SnapshotTest, TheHeaderCarriesThePrimTableAsPublished) {
         scene.Publish().Wait();
         const Snapshot first = scene.Acquire(Stream::Host());
         const RenderTables before = ReadHeader(device, first);
-        const SceneData data = SceneImpl::Get(scene).GetStore().Data();
+        const AuthoredData data = SceneImpl::Get(scene).GetColumnStore().Data();
         EXPECT_EQ(before.prims.count, data.primCount);
         EXPECT_EQ(before.prims.schema.pages.address, data.prims.schema.pages.address);
         EXPECT_EQ(before.prims.rows.pages.address, data.rows.pages.address);
@@ -128,7 +128,7 @@ TEST(SnapshotTest, HeldSnapshotsKeepRemovedMeshesTraceable) {
                                                        .faceVertexIndices = {0, 1, 2},
                                                        .faceVertexCounts = {3}});
         scene.Publish().Wait();
-        std::optional<MeshShape> shape = SceneImpl::Get(scene).GetGeometry().Find(quad.Index());
+        std::optional<MeshShape> shape = SceneImpl::Get(scene).GetMeshes().Find(quad.Index());
         ASSERT_TRUE(shape && shape->blas);
         const bvh::Blas* blas = shape->blas.Get();
         shape.reset();
@@ -136,7 +136,7 @@ TEST(SnapshotTest, HeldSnapshotsKeepRemovedMeshesTraceable) {
 
         scene.Remove(quad);
         scene.Publish().Wait();
-        EXPECT_FALSE(SceneImpl::Get(scene).GetGeometry().Find(quad.Index()));
+        EXPECT_FALSE(SceneImpl::Get(scene).GetMeshes().Find(quad.Index()));
         bool pinned = false;
         for (const Ref<const RefCounted>& item : PinnedTables::From(held).held) {
             pinned = pinned || item.Get() == blas;

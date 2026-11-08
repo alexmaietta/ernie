@@ -21,7 +21,7 @@ struct PrimData {
 
 ERNIE_CHECK_SIZE(PrimData, 48);
 
-struct SceneData {
+struct AuthoredData {
     PrimData prims;
     Paged<uint> rows;
     Paged<uint64_t> worldStamps;
@@ -31,20 +31,20 @@ struct SceneData {
     uint worldCount;
 };
 
-ERNIE_CHECK_SIZE(SceneData, 80 + sizeof(Schemas));
+ERNIE_CHECK_SIZE(AuthoredData, 80 + sizeof(Schemas));
 
 #ifdef __SLANG__
 
-uint PrimRow(SceneData* scene, uint prim, uint slot) {
+uint PrimRow(AuthoredData* scene, uint prim, uint slot) {
     return scene->rows[scene->prims.slots[prim] + slot];
 }
 
-bool HasApi(SceneData* scene, uint prim, uint api) {
+bool HasApi(AuthoredData* scene, uint prim, uint api) {
     const uint64_t apis = scene->prims.apis[prim];
     return ((api < 32 ? uint(apis) >> api : uint(apis >> 32) >> (api - 32)) & 1) != 0;
 }
 
-uint ApiRow(SceneData* scene, uint prim, uint api) {
+uint ApiRow(AuthoredData* scene, uint prim, uint api) {
     const uint64_t apis = scene->prims.apis[prim];
     const uint low = uint(apis);
     const uint below =
@@ -54,7 +54,7 @@ uint ApiRow(SceneData* scene, uint prim, uint api) {
     return scene->rows[scene->prims.slots[prim] + typed + below];
 }
 
-uint ApiInstanceRow(SceneData* scene, uint prim, uint api, uint instance, Paged<uint> names,
+uint ApiInstanceRow(AuthoredData* scene, uint prim, uint api, uint instance, Paged<uint> names,
                     Paged<uint> next) {
     if (!HasApi(scene, prim, api)) {
         return kNoRow;
@@ -66,11 +66,11 @@ uint ApiInstanceRow(SceneData* scene, uint prim, uint api, uint instance, Paged<
     return row;
 }
 
-WorldTransform PrimWorld(SceneData* scene, Ptr<WorldTransform> transforms, uint prim) {
+WorldTransform PrimWorld(AuthoredData* scene, Ptr<WorldTransform> transforms, uint prim) {
     return transforms[PrimRow(scene, prim, kSlotXformable)];
 }
 
-ResolvedImageable PrimImageable(SceneData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
+ResolvedImageable PrimImageable(AuthoredData* scene, Ptr<ResolvedImageable> imageables, uint prim) {
     return imageables[PrimRow(scene, prim, kSlotImageable)];
 }
 

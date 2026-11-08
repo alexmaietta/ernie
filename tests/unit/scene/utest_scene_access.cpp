@@ -31,29 +31,29 @@ std::vector<std::string> Paths(std::string_view prefix, uint32_t count) {
     return paths;
 }
 
-std::vector<float> Radii(Catalog& catalog, std::span<const uint32_t> prims) {
+std::vector<float> Radii(Structure& structure, std::span<const uint32_t> prims) {
     std::vector<float> radii;
     for (const uint32_t prim : prims) {
-        const View one(catalog, SchemaId::Sphere, std::vector<uint32_t>{prim});
+        const View one(structure, SchemaId::Sphere, std::vector<uint32_t>{prim});
         radii.push_back(one.Get<float>(kSphereRadius).Get().front());
     }
     return radii;
 }
 
-uint64_t RowStamp(Store& store, Catalog& catalog, ColumnRef column, uint32_t prim) {
-    const uint32_t row = catalog.GetPrims().Row(prim, column.schema);
+uint64_t RowStamp(ColumnStore& store, Structure& structure, ColumnRef column, uint32_t prim) {
+    const uint32_t row = structure.GetPrims().Row(prim, column.schema);
     return Items<uint64_t>(store.Schema(column.schema).Read(store.StampColumn(column), row, 1))
         .front();
 }
 
-uint64_t WorldStamp(Store& store, uint32_t world) {
+uint64_t WorldStamp(ColumnStore& store, uint32_t world) {
     const uint32_t slot = WorldSlot(world);
     return Items<uint64_t>(store.Worlds().Read(0, slot, 1)).front();
 }
 
-std::vector<uint32_t> Interleaved(Catalog& catalog, uint32_t count) {
-    const PrimBlock a = catalog.Define(SchemaId::Sphere, Paths("/A", count));
-    const PrimBlock b = catalog.Define(SchemaId::Sphere, Paths("/B", count));
+std::vector<uint32_t> Interleaved(Structure& structure, uint32_t count) {
+    const PrimBlock a = structure.Define(SchemaId::Sphere, Paths("/A", count));
+    const PrimBlock b = structure.Define(SchemaId::Sphere, Paths("/B", count));
     std::vector<uint32_t> prims;
     for (uint32_t i = 0; i < count; ++i) {
         prims.push_back(i % 2 == 0 ? a.Prim(i, 0) : b.Prim(i, 0));
@@ -63,38 +63,38 @@ std::vector<uint32_t> Interleaved(Catalog& catalog, uint32_t count) {
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        test(device, store, catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        test(device, store, structure);
     });
 }
 
 TEST(ViewTest, ResolvesOnceUntilTheStructureChanges) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 8));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 8));
+        const View view(structure, SchemaId::Sphere, block);
         ViewState& state = *view.State();
         const Ref<device::Buffer> first = state.DeviceRows(SchemaId::Sphere);
         EXPECT_EQ(state.DeviceRows(SchemaId::Sphere), first);
-        catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Other"});
+        structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Other"});
         EXPECT_NE(state.DeviceRows(SchemaId::Sphere), first);
     });
 }
 
 TEST(ViewTest, ABlockIsDenseAndAMixIsNot) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 8));
-        EXPECT_TRUE(View(catalog, SchemaId::Sphere, block).Dense(SchemaId::Sphere));
-        EXPECT_TRUE(View(catalog, SchemaId::Sphere, block).Dense(SchemaId::Xformable));
-        const View mixed(catalog, SchemaId::Sphere, Interleaved(catalog, 6));
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 8));
+        EXPECT_TRUE(View(structure, SchemaId::Sphere, block).Dense(SchemaId::Sphere));
+        EXPECT_TRUE(View(structure, SchemaId::Sphere, block).Dense(SchemaId::Xformable));
+        const View mixed(structure, SchemaId::Sphere, Interleaved(structure, 6));
         EXPECT_FALSE(mixed.Dense(SchemaId::Sphere));
     });
 }
 
 TEST(ViewTest, ADenseViewNeverBuildsARowIndex) {
-    ForEachScene([](device::Device& device, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 8));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device& device, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 8));
+        const View view(structure, SchemaId::Sphere, block);
         UntypedAttribute radius = view.Get(kSphereRadius);
         const std::vector<float> radii = {1, 2, 3, 4, 5, 6, 7, 8};
         view.Get<float>(kSphereRadius).Set(radii);
@@ -117,46 +117,46 @@ TEST(ViewTest, ADenseViewNeverBuildsARowIndex) {
         EXPECT_FALSE(view.State()->Rows(SchemaId::Sphere).device);
         EXPECT_FALSE(view.State()->Rows(SchemaId::Xformable).device);
 
-        const View mixed(catalog, SchemaId::Sphere, Interleaved(catalog, 6));
+        const View mixed(structure, SchemaId::Sphere, Interleaved(structure, 6));
         mixed.Get(kSphereRadius).MarkChanged().Wait();
         EXPECT_TRUE(mixed.State()->Rows(SchemaId::Sphere).device);
     });
 }
 
 TEST(ViewTest, RefusesPrimsOfAnotherSchema) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
         const uint32_t cube =
-            catalog.Define(SchemaId::Cube, std::vector<std::string>{"/Box"}).firstPrim;
-        EXPECT_THROW(View(catalog, SchemaId::Sphere, std::vector<uint32_t>{cube}), Error);
-        const View view(catalog, SchemaId::Cube, std::vector<uint32_t>{cube});
+            structure.Define(SchemaId::Cube, std::vector<std::string>{"/Box"}).firstPrim;
+        EXPECT_THROW(View(structure, SchemaId::Sphere, std::vector<uint32_t>{cube}), Error);
+        const View view(structure, SchemaId::Cube, std::vector<uint32_t>{cube});
         EXPECT_THROW(view.Get<float>(kSphereRadius), Error);
         EXPECT_NO_THROW(view.Get<Double3>(kXformableTranslate));
     });
 }
 
 TEST(AttributeTest, HostWritesLandOnTheirPrimsDenseOrScattered) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 5));
-        const View dense(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 5));
+        const View dense(structure, SchemaId::Sphere, block);
         dense.Get<float>(kSphereRadius).Set(std::vector<float>{1, 2, 3, 4, 5});
         EXPECT_EQ(dense.Get<float>(kSphereRadius).Get(), (std::vector<float>{1, 2, 3, 4, 5}));
 
-        const std::vector<uint32_t> prims = Interleaved(catalog, 6);
-        const View mixed(catalog, SchemaId::Sphere, prims);
+        const std::vector<uint32_t> prims = Interleaved(structure, 6);
+        const View mixed(structure, SchemaId::Sphere, prims);
         mixed.Get<float>(kSphereRadius).Set(std::vector<float>{6, 7, 8, 9, 10, 11});
         EXPECT_EQ(mixed.Get<float>(kSphereRadius).Get(), (std::vector<float>{6, 7, 8, 9, 10, 11}));
-        EXPECT_EQ(Radii(catalog, prims), (std::vector<float>{6, 7, 8, 9, 10, 11}));
+        EXPECT_EQ(Radii(structure, prims), (std::vector<float>{6, 7, 8, 9, 10, 11}));
         mixed.Get<float>(kSphereRadius).Set(0.5f);
-        EXPECT_EQ(Radii(catalog, prims), std::vector<float>(6, 0.5f));
+        EXPECT_EQ(Radii(structure, prims), std::vector<float>(6, 0.5f));
     });
 }
 
 TEST(AttributeTest, ManyScatteredRunsLandAndStampTheirRows) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const std::vector<uint32_t> prims = Interleaved(catalog, 100);
-        const View mixed(catalog, SchemaId::Sphere, prims);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const std::vector<uint32_t> prims = Interleaved(structure, 100);
+        const View mixed(structure, SchemaId::Sphere, prims);
         const uint32_t skipped = prims[1] - 1;
-        const View one(catalog, SchemaId::Sphere, std::vector<uint32_t>{skipped});
+        const View one(structure, SchemaId::Sphere, std::vector<uint32_t>{skipped});
         one.Get<float>(kSphereRadius).Set(7.0f);
         store.Flush();
         store.SetStamp(9);
@@ -170,40 +170,40 @@ TEST(AttributeTest, ManyScatteredRunsLandAndStampTheirRows) {
         mixed.Get<Double3>(kXformableTranslate).Set(places);
         store.Flush();
         EXPECT_EQ(mixed.Get<float>(kSphereRadius).Get(), radii);
-        EXPECT_EQ(Radii(catalog, prims), radii);
+        EXPECT_EQ(Radii(structure, prims), radii);
         EXPECT_EQ(mixed.Get<Double3>(kXformableTranslate).Get(), places);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, prims[0]), 9u);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, prims[99]), 9u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, prims[0]), 9u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, prims[99]), 9u);
         EXPECT_EQ(one.Get<float>(kSphereRadius).Get().front(), 7.0f);
-        EXPECT_NE(RowStamp(store, catalog, kXformableTranslate, skipped), 9u);
+        EXPECT_NE(RowStamp(store, structure, kXformableTranslate, skipped), 9u);
     });
 }
 
 TEST(AttributeTest, WritesStampExactlyTheirRowsAndWorlds) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
-        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env1"});
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        structure.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
+        structure.Define(SchemaId::World, std::vector<std::string>{"/Env1"});
         const uint32_t a =
-            catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/A"}).firstPrim;
+            structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/A"}).firstPrim;
         const uint32_t b =
-            catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Env1/B"}).firstPrim;
+            structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Env1/B"}).firstPrim;
         store.SetStamp(9);
-        const View view(catalog, SchemaId::Sphere, std::vector<uint32_t>{a});
+        const View view(structure, SchemaId::Sphere, std::vector<uint32_t>{a});
         view.Get<Double3>(kXformableTranslate).Set(Double3{1, 2, 3});
         store.Flush();
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, a), 9u);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, b), 1u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, a), 9u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, b), 1u);
         EXPECT_EQ(WorldStamp(store, 0), 9u);
         EXPECT_EQ(WorldStamp(store, 1), 1u);
     });
 }
 
 TEST(AttributeTest, UntrackedWritesStillStampTheirWorlds) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Env0/Ball", 4));
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        structure.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Env0/Ball", 4));
         store.SetStamp(4);
-        View(catalog, SchemaId::Sphere, block).Get<float>(kSphereRadius).Set(3.0f);
+        View(structure, SchemaId::Sphere, block).Get<float>(kSphereRadius).Set(3.0f);
         store.Flush();
         EXPECT_EQ(WorldStamp(store, 0), 4u);
         EXPECT_EQ(WorldStamp(store, kGlobalWorld), 0u);
@@ -211,9 +211,9 @@ TEST(AttributeTest, UntrackedWritesStillStampTheirWorlds) {
 }
 
 TEST(AttributeTest, DeviceTensorsWriteInPlaceOnEveryBackend) {
-    ForEachScene([](device::Device& device, Store&, Catalog& catalog) {
-        const View view(catalog, SchemaId::Sphere,
-                        catalog.Define(SchemaId::Sphere, Paths("/Ball", 4)));
+    ForEachScene([](device::Device& device, ColumnStore&, Structure& structure) {
+        const View view(structure, SchemaId::Sphere,
+                        structure.Define(SchemaId::Sphere, Paths("/Ball", 4)));
         const std::vector<float> radii = {1, 2, 3, 4};
         const device::Tensor values(device.CreateBuffer({.label = "radii"}, radii), 0,
                                     device::DType::Float32, {4});
@@ -229,7 +229,7 @@ TEST(AttributeTest, DeviceTensorsWriteInPlaceOnEveryBackend) {
         view.Get(kSphereRadius).Write(more, Stream::None(), mask).Wait();
         EXPECT_EQ(view.Get<float>(kSphereRadius).Get(), (std::vector<float>{1, 20, 30, 4}));
 
-        const View other(catalog, SchemaId::Sphere, Interleaved(catalog, 4));
+        const View other(structure, SchemaId::Sphere, Interleaved(structure, 4));
         other.Get(kSphereRadius).Write(view.Get(kSphereRadius).Read()).Wait();
         EXPECT_EQ(other.Get<float>(kSphereRadius).Get(), (std::vector<float>{1, 20, 30, 4}));
 
@@ -241,9 +241,9 @@ TEST(AttributeTest, DeviceTensorsWriteInPlaceOnEveryBackend) {
 }
 
 TEST(AttributeTest, AMaskedWriteLeavesOtherRowsAlone) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 4));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 4));
+        const View view(structure, SchemaId::Sphere, block);
         store.SetStamp(6);
         std::vector<Double3> values = {{1, 0, 0}, {2, 0, 0}, {3, 0, 0}, {4, 0, 0}};
         int64_t shape[] = {4, 3};
@@ -267,31 +267,31 @@ TEST(AttributeTest, AMaskedWriteLeavesOtherRowsAlone) {
         EXPECT_EQ(after[1].x, 0.0);
         EXPECT_EQ(after[2].x, 3.0);
         EXPECT_EQ(after[3].x, 0.0);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, block.Prim(1, 0)), 1u);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, block.Prim(2, 0)), 6u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, block.Prim(1, 0)), 1u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, block.Prim(2, 0)), 6u);
     });
 }
 
 TEST(AttributeTest, RemovedPrimsAreSkippedAndTheirIndexIsntReclaimed) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
         const uint32_t a =
-            catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/A"}).firstPrim;
+            structure.Define(SchemaId::Sphere, std::vector<std::string>{"/A"}).firstPrim;
         const uint32_t b =
-            catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/B"}).firstPrim;
-        const View view(catalog, SchemaId::Sphere, std::vector<uint32_t>{a, b});
-        catalog.Remove(a);
+            structure.Define(SchemaId::Sphere, std::vector<std::string>{"/B"}).firstPrim;
+        const View view(structure, SchemaId::Sphere, std::vector<uint32_t>{a, b});
+        structure.Remove(a);
         const uint32_t c =
-            catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/C"}).firstPrim;
+            structure.Define(SchemaId::Sphere, std::vector<std::string>{"/C"}).firstPrim;
         ASSERT_EQ(c, a);
         view.Get<float>(kSphereRadius).Set(std::vector<float>{7, 8});
-        EXPECT_EQ(Radii(catalog, std::vector<uint32_t>{c, b}), (std::vector<float>{1, 8}));
+        EXPECT_EQ(Radii(structure, std::vector<uint32_t>{c, b}), (std::vector<float>{1, 8}));
     });
 }
 
 TEST(AttributeTest, ArraysArentFilled) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 2));
-        const View view(catalog, SchemaId::Mesh, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 2));
+        const View view(structure, SchemaId::Mesh, block);
         const ArrayRef none{};
         EXPECT_THROW(view.Get(kPointBasedPoints).Fill(std::as_bytes(std::span(&none, 1))), Error);
         EXPECT_NO_THROW(view.Get(kPointBasedPoints).MarkChanged());
@@ -299,14 +299,14 @@ TEST(AttributeTest, ArraysArentFilled) {
 }
 
 TEST(MappingTest, ADenseMappingAliasesTheColumnAndStampsOnClose) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 300));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 300));
+        const View view(structure, SchemaId::Sphere, block);
         UntypedAttribute radius = view.Get(kSphereRadius);
         store.SetStamp(5);
         Mapping mapping = radius.Map(MapAccess::Write);
         ASSERT_TRUE(mapping.Aliased());
-        const uint32_t first = catalog.GetPrims().Row(block.Prim(0, 0), SchemaId::Sphere);
+        const uint32_t first = structure.GetPrims().Row(block.Prim(0, 0), SchemaId::Sphere);
         const device::BufferRange column =
             *store.Schema(SchemaId::Sphere).Contiguous(kSphereRadius.index, first, 300);
         EXPECT_EQ(mapping.Values().Address(), column.Address());
@@ -319,9 +319,9 @@ TEST(MappingTest, ADenseMappingAliasesTheColumnAndStampsOnClose) {
 }
 
 TEST(MappingTest, AScatteredMappingStagesAndScattersOnClose) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
-        const std::vector<uint32_t> prims = Interleaved(catalog, 6);
-        const View view(catalog, SchemaId::Sphere, prims);
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
+        const std::vector<uint32_t> prims = Interleaved(structure, 6);
+        const View view(structure, SchemaId::Sphere, prims);
         view.Get<float>(kSphereRadius).Set(std::vector<float>{1, 2, 3, 4, 5, 6});
         store.SetStamp(8);
         Mapping mapping = view.Get(kXformableTranslate).Map(MapAccess::ReadWrite);
@@ -339,49 +339,49 @@ TEST(MappingTest, AScatteredMappingStagesAndScattersOnClose) {
         const std::vector<Double3> after = view.Get<Double3>(kXformableTranslate).Get();
         for (uint32_t i = 0; i < 6; ++i) {
             EXPECT_EQ(after[i].x, i + 10.0);
-            EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, prims[i]), 8u);
+            EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, prims[i]), 8u);
         }
     });
 }
 
 TEST(MappingTest, AnOpenMappingBlocksRemovalUntilItCloses) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 3));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 3));
+        const View view(structure, SchemaId::Sphere, block);
         {
             Mapping mapping = view.Get(kSphereRadius).Map(MapAccess::Write);
-            EXPECT_THROW(catalog.Remove(block.Prim(0, 0)), Error);
-            catalog.Define(SchemaId::Sphere, Paths("/More", 600));
+            EXPECT_THROW(structure.Remove(block.Prim(0, 0)), Error);
+            structure.Define(SchemaId::Sphere, Paths("/More", 600));
             mapping.Close();
         }
-        EXPECT_NO_THROW(catalog.Remove(block.Prim(0, 0)));
+        EXPECT_NO_THROW(structure.Remove(block.Prim(0, 0)));
         {
             Mapping dropped = view.Get(kSphereRadius).Map(MapAccess::Write);
         }
-        EXPECT_NO_THROW(catalog.Remove(block.Prim(1, 0)));
+        EXPECT_NO_THROW(structure.Remove(block.Prim(1, 0)));
         Mapping moved = view.Get(kSphereRadius).Map(MapAccess::Read);
         Mapping target = std::move(moved);
         EXPECT_FALSE(moved.Open());
-        EXPECT_THROW(catalog.Remove(block.Prim(2, 0)), Error);
+        EXPECT_THROW(structure.Remove(block.Prim(2, 0)), Error);
         target.Close();
         EXPECT_THROW(target.Close(), Error);
     });
 }
 
 TEST(AttributeTest, DeviceTensorsWriteAndReadWithoutTheHost) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!device.SharedDevice()) {
             return;
         }
-        const PrimBlock source = catalog.Define(SchemaId::Sphere, Paths("/Source", 6));
-        const View from(catalog, SchemaId::Sphere, source);
+        const PrimBlock source = structure.Define(SchemaId::Sphere, Paths("/Source", 6));
+        const View from(structure, SchemaId::Sphere, source);
         from.Get<float>(kSphereRadius).Set(std::vector<float>{1, 2, 3, 4, 5, 6});
         const device::Tensor gathered = from.Get(kSphereRadius).Read();
-        const std::vector<uint32_t> prims = Interleaved(catalog, 6);
-        const View to(catalog, SchemaId::Sphere, prims);
+        const std::vector<uint32_t> prims = Interleaved(structure, 6);
+        const View to(structure, SchemaId::Sphere, prims);
         store.SetStamp(12);
         to.Get(kSphereRadius).Write(gathered.DLPack()).Wait();
-        EXPECT_EQ(Radii(catalog, prims), (std::vector<float>{1, 2, 3, 4, 5, 6}));
+        EXPECT_EQ(Radii(structure, prims), (std::vector<float>{1, 2, 3, 4, 5, 6}));
         EXPECT_EQ(WorldStamp(store, kGlobalWorld), 12u);
     });
 }
@@ -399,9 +399,9 @@ DLTensor HostTensor(void* data, int64_t* shape, uint8_t bits) {
 const std::vector<Float3> kTriangle = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
 
 TEST(ArrayAttributeTest, ArraysAreSetAndReadPerPrim) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 2));
-        const View view(catalog, SchemaId::Mesh, block);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 2));
+        const View view(structure, SchemaId::Mesh, block);
         ArrayAttribute<Float3> points = view.GetArray<Float3>(kPointBasedPoints);
         points.Set(1, kTriangle);
         EXPECT_TRUE(points.Get(0).empty());
@@ -413,19 +413,19 @@ TEST(ArrayAttributeTest, ArraysAreSetAndReadPerPrim) {
 }
 
 TEST(ArrayAttributeTest, AWriteMappingUnsharesClonesIntoOneRun) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         const uint32_t mesh =
-            catalog.Define<Mesh>(std::vector<std::string>{"/Mesh"}, {.points = kTriangle})
+            structure.Define<Mesh>(std::vector<std::string>{"/Mesh"}, {.points = kTriangle})
                 .firstPrim;
-        const PrimBlock copies = catalog.Clone(mesh, Paths("/Copy", 3));
+        const PrimBlock copies = structure.Clone(mesh, Paths("/Copy", 3));
         std::vector<uint32_t> prims = {mesh};
         for (uint32_t copy = 0; copy < 3; ++copy) {
             prims.push_back(copies.Prim(copy, 0));
         }
-        const View view(catalog, SchemaId::Mesh, prims);
+        const View view(structure, SchemaId::Mesh, prims);
         ArrayHeap& heap = store.Arrays(ColumnType::Float3Array);
         const ArrayRef shared =
-            store.Array(kPointBasedPoints, catalog.GetPrims().Row(mesh, SchemaId::PointBased));
+            store.Array(kPointBasedPoints, structure.GetPrims().Row(mesh, SchemaId::PointBased));
         ASSERT_EQ(heap.References(shared), 4u);
 
         Mapping mapping = view.Get(kPointBasedPoints).Map(MapAccess::Write);
@@ -436,8 +436,8 @@ TEST(ArrayAttributeTest, AWriteMappingUnsharesClonesIntoOneRun) {
         EXPECT_EQ(heap.ArrayCount(), 4u);
         std::vector<Float3> moved = kTriangle;
         moved[0].z = 5;
-        const ArrayRef second =
-            store.Array(kPointBasedPoints, catalog.GetPrims().Row(prims[1], SchemaId::PointBased));
+        const ArrayRef second = store.Array(
+            kPointBasedPoints, structure.GetPrims().Row(prims[1], SchemaId::PointBased));
         EXPECT_EQ(heap.References(second), 1u);
         device.GetQueue().Write(heap.Range(second).Slice(0, 36), moved.data());
         const Ordinal stamp = store.Stamp();
@@ -451,9 +451,9 @@ TEST(ArrayAttributeTest, AWriteMappingUnsharesClonesIntoOneRun) {
 }
 
 TEST(ArrayAttributeTest, ArraysOfDifferentLengthsMapAsPackedValuesWithOffsets) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 3));
-        const View view(catalog, SchemaId::Mesh, block);
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 3));
+        const View view(structure, SchemaId::Mesh, block);
         ArrayAttribute<Float3> points = view.GetArray<Float3>(kPointBasedPoints);
         points.Set(0, kTriangle);
         points.Set(2, std::vector<Float3>(4, Float3{2, 2, 2}));
@@ -488,12 +488,12 @@ TEST(ArrayAttributeTest, ArraysOfDifferentLengthsMapAsPackedValuesWithOffsets) {
 }
 
 TEST(ArrayAttributeTest, AReadMappingLeavesClonesShared) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
         const uint32_t mesh =
-            catalog.Define<Mesh>(std::vector<std::string>{"/Mesh"}, {.points = kTriangle})
+            structure.Define<Mesh>(std::vector<std::string>{"/Mesh"}, {.points = kTriangle})
                 .firstPrim;
-        const PrimBlock copies = catalog.Clone(mesh, Paths("/Copy", 2));
-        const View view(catalog, SchemaId::Mesh,
+        const PrimBlock copies = structure.Clone(mesh, Paths("/Copy", 2));
+        const View view(structure, SchemaId::Mesh,
                         std::vector<uint32_t>{mesh, copies.Prim(0, 0), copies.Prim(1, 0)});
         Mapping mapping = view.Get(kPointBasedPoints).Map(MapAccess::Read);
         EXPECT_FALSE(mapping.Aliased());
@@ -502,15 +502,15 @@ TEST(ArrayAttributeTest, AReadMappingLeavesClonesShared) {
         EXPECT_TRUE(mapping.Offsets().Empty());
         mapping.Close();
         const ArrayRef shared =
-            store.Array(kPointBasedPoints, catalog.GetPrims().Row(mesh, SchemaId::PointBased));
+            store.Array(kPointBasedPoints, structure.GetPrims().Row(mesh, SchemaId::PointBased));
         EXPECT_EQ(store.Arrays(ColumnType::Float3Array).References(shared), 3u);
     });
 }
 
 TEST(PosesTest, Float32AndFloat64PosesLandExactlyAndStampBothColumns) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 2));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 2));
+        const View view(structure, SchemaId::Sphere, block);
         store.SetStamp(4);
         std::vector<float> narrow = {0.1f, 2, 3, 0, 0, 0, 1, -4, 5.5f, 1e7f, 0, 1, 0, 0};
         int64_t shape[] = {2, 7};
@@ -521,8 +521,8 @@ TEST(PosesTest, Float32AndFloat64PosesLandExactlyAndStampBothColumns) {
         EXPECT_EQ(translates[1].z, 1e7);
         EXPECT_EQ(orients[0].w, 1.0);
         EXPECT_EQ(orients[1].y, 1.0);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableTranslate, block.Prim(1, 0)), 4u);
-        EXPECT_EQ(RowStamp(store, catalog, kXformableOrient, block.Prim(1, 0)), 4u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableTranslate, block.Prim(1, 0)), 4u);
+        EXPECT_EQ(RowStamp(store, structure, kXformableOrient, block.Prim(1, 0)), 4u);
 
         std::vector<double> wide = {1e9 + 0.25, 0, 0, 0, 0, 0, 1, 0, 0, -6371000.125, 1, 0, 0, 0};
         view.WritePoses(HostTensor(wide.data(), shape, 64));
@@ -535,9 +535,9 @@ TEST(PosesTest, Float32AndFloat64PosesLandExactlyAndStampBothColumns) {
 }
 
 TEST(PosesTest, WxyzPosesLandAsXyzwAndReadBackInEitherOrder) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 2));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 2));
+        const View view(structure, SchemaId::Sphere, block);
         int64_t shape[] = {2, 7};
         std::vector<float> narrow = {1, 2, 3, 0.5f, 0.1f, 0.2f, 0.3f, 4, 5, 6, 1, 0, 0, 0};
         view.WritePoses(HostTensor(narrow.data(), shape, 32), Stream::None(),
@@ -566,9 +566,9 @@ TEST(PosesTest, WxyzPosesLandAsXyzwAndReadBackInEitherOrder) {
 }
 
 TEST(PosesTest, SplitSourcesAndRowsGatherPosesFromBodyBuffers) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 2));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 2));
+        const View view(structure, SchemaId::Sphere, block);
         std::vector<float> positions = {0, 0, 0, 1, 2, 3, 4, 5, 6};
         std::vector<float> rotations = {1, 0, 0, 0, 0.5f, 0.1f, 0.2f, 0.3f, 0, 0, 0, 1};
         std::vector<int32_t> rows = {2, 1};
@@ -604,9 +604,9 @@ TEST(PosesTest, SplitSourcesAndRowsGatherPosesFromBodyBuffers) {
 }
 
 TEST(PosesTest, AMaskedPoseWriteLeavesOtherPrimsAlone) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 2));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 2));
+        const View view(structure, SchemaId::Sphere, block);
         std::vector<float> poses = {1, 1, 1, 0, 0, 0, 1, 2, 2, 2, 0, 0, 0, 1};
         int64_t shape[] = {2, 7};
         uint64_t bits = 0b10;
@@ -626,9 +626,9 @@ TEST(PosesTest, AMaskedPoseWriteLeavesOtherPrimsAlone) {
 }
 
 TEST(PosesTest, DevicePosesWriteWithoutTheHost) {
-    ForEachScene([](device::Device& device, Store&, Catalog& catalog) {
-        const PrimBlock from = catalog.Define(SchemaId::Sphere, Paths("/From", 3));
-        const View source(catalog, SchemaId::Sphere, from);
+    ForEachScene([](device::Device& device, ColumnStore&, Structure& structure) {
+        const PrimBlock from = structure.Define(SchemaId::Sphere, Paths("/From", 3));
+        const View source(structure, SchemaId::Sphere, from);
         std::vector<float> poses(21, 0);
         for (uint32_t i = 0; i < 3; ++i) {
             poses[i * 7] = float(i + 1);
@@ -637,13 +637,13 @@ TEST(PosesTest, DevicePosesWriteWithoutTheHost) {
         int64_t shape[] = {3, 7};
         source.WritePoses(HostTensor(poses.data(), shape, 32));
         const device::Tensor gathered = source.ReadPoses();
-        const View target(catalog, SchemaId::Sphere, Interleaved(catalog, 3));
+        const View target(structure, SchemaId::Sphere, Interleaved(structure, 3));
         target.WritePoses(gathered).Wait();
         EXPECT_EQ(target.Get<Double3>(kXformableTranslate).Get()[2].x, 3.0);
         EXPECT_THROW(target.WritePoses(gathered, gathered), Error);
         if (device.SharedDevice()) {
-            const View again(catalog, SchemaId::Sphere,
-                             catalog.Define(SchemaId::Sphere, Paths("/Again", 3)));
+            const View again(structure, SchemaId::Sphere,
+                             structure.Define(SchemaId::Sphere, Paths("/Again", 3)));
             again.WritePoses(gathered.DLPack()).Wait();
             EXPECT_EQ(again.Get<Double3>(kXformableTranslate).Get()[2].x, 3.0);
         }

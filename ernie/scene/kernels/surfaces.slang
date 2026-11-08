@@ -8,7 +8,7 @@ using namespace ernie;
 
 SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
     SurfaceRecord surface = {};
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     const uint prim = hit.prim;
     if (prim == kNoPrim || prim >= scene->primCount) {
         return surface;

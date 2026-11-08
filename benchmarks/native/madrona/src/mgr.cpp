@@ -44,7 +44,7 @@ struct Manager::Impl {
     }
 };
 
-static HeapArray<imp::SourceMesh> sourceMeshes(const Geometry& geometry) {
+static HeapArray<imp::SourceMesh> sourceMeshes(const MeshBuilder& geometry) {
     HeapArray<imp::SourceMesh> meshes(geometry.meshCount);
     for (uint32_t mesh = 0; mesh < geometry.meshCount; mesh++) {
         uint32_t first_vertex = geometry.vertexOffsets[mesh];
@@ -69,7 +69,7 @@ static HeapArray<imp::SourceMesh> sourceMeshes(const Geometry& geometry) {
     return meshes;
 }
 
-Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* instance_objects,
+Manager::Manager(const Config& cfg, const MeshBuilder& geometry, const int32_t* instance_objects,
                  uint32_t instance_count, uint32_t camera_count) {
     HeapArray<imp::SourceMesh> meshes = sourceMeshes(geometry);
     HeapArray<imp::SourceMesh> object_meshes(geometry.objectCount);

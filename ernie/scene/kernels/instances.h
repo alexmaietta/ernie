@@ -10,7 +10,7 @@
 namespace ernie {
 
 struct InstanceParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<InstanceLayout> layout;
     Ptr<InstanceRecord> instances;
     Ptr<ShapeRecord> shapes;
@@ -27,7 +27,7 @@ struct InstanceParams {
 ERNIE_CHECK_SIZE(InstanceParams, 96);
 
 struct OriginParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<InstanceLayout> layout;
     Ptr<uint> products;
     Ptr<RenderOrigin> origins;

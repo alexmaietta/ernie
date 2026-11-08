@@ -29,20 +29,20 @@ std::vector<ColumnRef> SensorInputs() {
 
 }
 
-std::span<const ColumnRef> Sensors::Inputs() const {
+std::span<const ColumnRef> SensorBuilder::Inputs() const {
     static const std::vector<ColumnRef> inputs = SensorInputs();
     return inputs;
 }
 
-void Sensors::Describe(RenderTables& tables) const {
+void SensorBuilder::Describe(RenderTables& tables) const {
     tables.cameras.address = m_cameras.Address();
     tables.lidars.address = m_lidars.Address();
     tables.radars.address = m_radars.Address();
 }
 
-void Sensors::Run(const ChangeSet&, TableLog&) {
+void SensorBuilder::Run(const ChangeSet&, TableWrites&) {
     ERNIE_ZONE("Sensors/Run");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     SensorParams params{};
     params.cameraRows = store.Schema(SchemaId::Camera).Rows();
@@ -72,13 +72,13 @@ void Sensors::Run(const ChangeSet&, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-void Sensors::Prepare() {
+void SensorBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Sensors::Kernels() {
+device::Program& SensorBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.sensors"},
              .library = &kSceneKernels,
              .entries = {"WriteCameras", "WriteLidars", "WriteRadars"},

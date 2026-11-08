@@ -8,7 +8,7 @@ namespace ernie {
 struct StampTarget {
     Ptr<uint64_t> stamps;
     Ptr<uint64_t> tablePrims;
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     uint64_t stamp;
 };
 
@@ -37,7 +37,7 @@ struct CompactParams {
 ERNIE_CHECK_SIZE(CompactParams, 48);
 
 struct WorldsParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<uint> out;
     uint64_t since;
     uint64_t until;
@@ -71,7 +71,7 @@ void StampRow(StampTarget target, uint row) {
     if (prim == kNoPrim) {
         return;
     }
-    SceneData* scene = target.scene;
+    AuthoredData* scene = target.scene;
     scene->worldStamps[WorldSlot(scene->prims.world[prim])] = target.stamp;
 }
 

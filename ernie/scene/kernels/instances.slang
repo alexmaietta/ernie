@@ -21,7 +21,7 @@ InstanceRecord MakeInstance(InstanceParams p, uint prim, uint world, uint local,
 
 InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool shown, uint world,
                              uint local, uint slot) {
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
     const UnitShape shape = PlaceShape(scene, prim, w);
     p.shapes[slot] = shape.record;
@@ -125,7 +125,7 @@ void GatherViewers(uniform OriginParams p) {
     if (index >= p.productCount) {
         return;
     }
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     InstanceLayout* layout = p.layout;
     const uint product = p.products[index];
     const ArrayRef sensors =
@@ -146,7 +146,7 @@ void PlaceOrigins(uniform OriginParams p) {
     if (tlas >= p.tlasCount) {
         return;
     }
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     InstanceLayout* layout = p.layout;
     const uint viewer = p.viewers[tlas];
     p.viewers[tlas] = kNoPrim;

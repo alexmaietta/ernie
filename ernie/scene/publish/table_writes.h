@@ -21,9 +21,9 @@ enum class TableId : uint32_t {
 
 inline constexpr uint32_t kTableCount = 8;
 
-class TableLog {
+class TableWrites {
   public:
-    void Wrote(TableId table, std::span<const uint32_t> worlds);
+    void Add(TableId table, std::span<const uint32_t> worlds);
 
     uint64_t Sequence() const {
         return m_sequence;

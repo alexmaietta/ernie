@@ -154,25 +154,25 @@ constexpr ColumnRef kInputs[] = {
 
 }
 
-std::span<const ColumnRef> Tangents::Inputs() const {
+std::span<const ColumnRef> TangentBuilder::Inputs() const {
     return kInputs;
 }
 
-void Tangents::Describe(RenderTables& tables) const {
+void TangentBuilder::Describe(RenderTables& tables) const {
     tables.tangents.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }
 
-void Tangents::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void TangentBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_records.Buffer()});
 }
 
-void Tangents::CacheCells(Mesh& mesh, const Cells& cells) const {
+void TangentBuilder::CacheCells(Mesh& mesh, const Cells& cells) const {
     mesh.interpolation = cells.interpolation[mesh.pointsRow];
     mesh.smooth = cells.scheme[mesh.meshRow] != uint32_t(SubdivisionScheme::None) ? 1 : 0;
 }
 
-Tangents::Key Tangents::KeyFor(const Mesh& mesh) const {
-    Store& store = m_catalog.GetStore();
+TangentBuilder::Key TangentBuilder::KeyFor(const Mesh& mesh) const {
+    ColumnStore& store = m_structure.GetColumnStore();
     Key key;
     key.points = store.Array(kPointBasedPoints, mesh.pointsRow).address;
     key.indices = store.Array(kMeshFaceVertexIndices, mesh.meshRow).address;
@@ -184,10 +184,10 @@ Tangents::Key Tangents::KeyFor(const Mesh& mesh) const {
     return key;
 }
 
-void Tangents::Compute(const Mesh& mesh, const Key& key, Set& set) {
+void TangentBuilder::Compute(const Mesh& mesh, const Key& key, Set& set) {
     ERNIE_ZONE("Tangents/Compute");
     ++m_stats.computed;
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     store.Arrays(ColumnType::IntArray).Free(set.tangents);
     set.tangents = {};
     set.words = 0;
@@ -202,7 +202,7 @@ void Tangents::Compute(const Mesh& mesh, const Key& key, Set& set) {
     ArrayHeap& ints = store.Arrays(ColumnType::IntArray);
     ArrayHeap& float3s = store.Arrays(ColumnType::Float3Array);
     const std::vector<Primvar> primvars =
-        UnpackPrimvars(m_catalog.GetTokens(), Items<int32_t>(ints.Read(table)));
+        UnpackPrimvars(m_structure.GetTokens(), Items<int32_t>(ints.Read(table)));
     const auto st = std::ranges::find_if(primvars, [](const Primvar& primvar) {
         return primvar.name == "st" && primvar.type == PrimvarType::Float2;
     });
@@ -289,8 +289,8 @@ void Tangents::Compute(const Mesh& mesh, const Key& key, Set& set) {
     set.deform = std::move(deform);
 }
 
-void Tangents::Recompute(const Mesh& mesh, const Key& key, Set& set,
-                         device::CommandEncoder& encoder) {
+void TangentBuilder::Recompute(const Mesh& mesh, const Key& key, Set& set,
+                               device::CommandEncoder& encoder) {
     ++m_stats.deformed;
     const Deform& deform = *set.deform;
     TangentParams params{};
@@ -313,16 +313,16 @@ void Tangents::Recompute(const Mesh& mesh, const Key& key, Set& set,
                      {.x = device::GroupCount(params.cornerCount, kTangentsGroup)});
 }
 
-void Tangents::Link(uint32_t prim, const Mesh& mesh) {
+void TangentBuilder::Link(uint32_t prim, const Mesh& mesh) {
     TangentRecord record{};
     if (mesh.key) {
         const Set& set = m_sets.at(*mesh.key);
         if (set.words > 0) {
             record.tangents = set.tangents;
-            record.primvar = m_catalog.GetTokens().Find("st").id;
+            record.primvar = m_structure.GetTokens().Find("st").id;
         }
     }
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     if (m_records.Set(mesh.meshRow, record) && prims.Alive(prim)) {
         const uint32_t world = prims.At(prim).world;
         if (std::ranges::find(m_relinked, world) == m_relinked.end()) {
@@ -331,8 +331,8 @@ void Tangents::Link(uint32_t prim, const Mesh& mesh) {
     }
 }
 
-void Tangents::Place(uint32_t prim, const Cells& cells) {
-    const Prims& prims = m_catalog.GetPrims();
+void TangentBuilder::Place(uint32_t prim, const Cells& cells) {
+    const Prims& prims = m_structure.GetPrims();
     Mesh mesh;
     mesh.generation = prims.Generation(prim);
     mesh.pointsRow = prims.Row(prim, SchemaId::PointBased);
@@ -354,12 +354,12 @@ void Tangents::Place(uint32_t prim, const Cells& cells) {
     m_meshes[prim] = mesh;
 }
 
-void Tangents::Prune() {
+void TangentBuilder::Prune() {
     if (!m_stale) {
         return;
     }
     m_stale = false;
-    ArrayHeap& words = m_catalog.GetStore().Arrays(ColumnType::IntArray);
+    ArrayHeap& words = m_structure.GetColumnStore().Arrays(ColumnType::IntArray);
     std::erase_if(m_sets, [&](const auto& entry) {
         if (entry.second.users > 0) {
             return false;
@@ -369,7 +369,7 @@ void Tangents::Prune() {
     });
 }
 
-void Tangents::Release(Mesh& mesh) {
+void TangentBuilder::Release(Mesh& mesh) {
     if (mesh.key) {
         --m_sets.at(*mesh.key).users;
         mesh.key.reset();
@@ -378,7 +378,7 @@ void Tangents::Release(Mesh& mesh) {
     }
 }
 
-void Tangents::Forget(uint32_t prim) {
+void TangentBuilder::Forget(uint32_t prim) {
     Mesh& mesh = m_meshes.at(prim);
     Release(mesh);
     m_byPointsRow.erase(mesh.pointsRow);
@@ -387,23 +387,23 @@ void Tangents::Forget(uint32_t prim) {
     m_meshes.erase(prim);
 }
 
-void Tangents::Run(const ChangeSet& changes, TableLog& log) {
+void TangentBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     Process(changes);
-    m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
-    if (m_records.Upload(m_catalog.GetStore().GetDevice())) {
+    m_records.Reserve(m_structure.GetColumnStore().Schema(SchemaId::Mesh).Capacity());
+    if (m_records.Upload(m_structure.GetColumnStore().GetDevice())) {
         m_relinked = {kGlobalWorld};
     }
     if (!m_relinked.empty()) {
-        log.Wrote(TableId::Tangents, m_relinked);
+        writes.Add(TableId::Tangents, m_relinked);
     }
     m_relinked.clear();
 }
 
-void Tangents::Process(const ChangeSet& changes) {
+void TangentBuilder::Process(const ChangeSet& changes) {
     ERNIE_ZONE("Tangents/Run");
     m_stats.computed = 0;
-    Store& store = m_catalog.GetStore();
-    const Prims& prims = m_catalog.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
+    const Prims& prims = m_structure.GetPrims();
     const bool rekey = changes.resync ||
                        store.LastWrite(kPointBasedNormalsInterpolation) > m_seen ||
                        store.LastWrite(kMeshSubdivisionScheme) > m_seen;
@@ -560,13 +560,13 @@ void Tangents::Process(const ChangeSet& changes) {
     }
 }
 
-void Tangents::Prepare() {
+void TangentBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Tangents::Kernels() {
+device::Program& TangentBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.tangents"},
              .library = &kSceneKernels,
              .entries = {"GroupTangents", "CornerTangents"},

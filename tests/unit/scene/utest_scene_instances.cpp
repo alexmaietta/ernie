@@ -31,26 +31,26 @@ const std::vector<Float3> kQuad = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}};
 
 struct Scene {
     device::Device& device;
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Instances& instances;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    InstanceBuilder& instances;
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
-        return catalog.Define(schema, std::vector<std::string>{path}).firstPrim;
+        return structure.Define(schema, std::vector<std::string>{path}).firstPrim;
     }
 
     template <class T> uint32_t Define(const std::string& path, const typename T::Desc& desc) {
-        return catalog.Define<T>(std::vector<std::string>{path}, desc).firstPrim;
+        return structure.Define<T>(std::vector<std::string>{path}, desc).firstPrim;
     }
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     void Move(uint32_t prim, Double3 to) {
-        View(catalog, SchemaId::Xformable, std::vector<uint32_t>{prim})
+        View(structure, SchemaId::Xformable, std::vector<uint32_t>{prim})
             .Get<Double3>(kXformableTranslate)
             .Set(to);
     }
@@ -72,17 +72,17 @@ struct Scene {
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        Hierarchy hierarchy(catalog);
-        Geometry geometry(catalog, *builder);
-        Instances instances(catalog, *builder, 2);
-        timeline.Add(hierarchy);
-        timeline.Add(geometry);
-        timeline.Add(instances);
-        Scene scene{device, store, catalog, timeline, instances};
+        TransformBuilder hierarchy(structure);
+        MeshBuilder geometry(structure, *builder);
+        InstanceBuilder instances(structure, *builder, 2);
+        publisher.Add(hierarchy);
+        publisher.Add(geometry);
+        publisher.Add(instances);
+        Scene scene{device, store, structure, publisher, instances};
         test(scene);
     });
 }
@@ -154,7 +154,7 @@ TEST(InstancesTest, HidingAPrimRebuildsWithItInactive) {
     ForEachScene([](Scene& s) {
         const std::vector<uint32_t> balls = Worlds(s, 2);
         s.Publish();
-        View(s.catalog, SchemaId::Imageable, std::vector<uint32_t>{balls[0]})
+        View(s.structure, SchemaId::Imageable, std::vector<uint32_t>{balls[0]})
             .Get<Visibility>(kImageableVisibility)
             .Set(Visibility::Invisible);
         s.Publish();
@@ -184,15 +184,15 @@ TEST(InstancesTest, ANewBlasMarksOnlyItsWorld) {
         const uint32_t quad = s.Define<Mesh>(
             "/Env0/Quad",
             {.points = kQuad, .faceVertexIndices = {0, 1, 2, 3}, .faceVertexCounts = {4}});
-        s.catalog.Clone(s.catalog.Find("/Env0"), std::vector<std::string>{"/Env1", "/Env2"});
+        s.structure.Clone(s.structure.Find("/Env0"), std::vector<std::string>{"/Env1", "/Env2"});
         s.Publish();
-        const uint32_t clone = s.catalog.Find("/Env2/Quad");
+        const uint32_t clone = s.structure.Find("/Env2/Quad");
         EXPECT_EQ(s.Record(clone, 2).blas, s.Record(quad, 0).blas);
 
         ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
         const ArrayRef own = float3s.Allocate(4);
         float3s.Write(own, std::as_bytes(std::span(kQuad)));
-        s.store.SetArray(kPointBasedPoints, s.catalog.GetPrims().Row(clone, SchemaId::PointBased),
+        s.store.SetArray(kPointBasedPoints, s.structure.GetPrims().Row(clone, SchemaId::PointBased),
                          own);
         s.Publish();
         EXPECT_EQ(s.instances.Stats().written, 1u);

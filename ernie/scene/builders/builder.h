@@ -10,16 +10,16 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/kernels/schema/schema.h"
-#include "ernie/scene/publish/table_versions.h"
+#include "ernie/scene/publish/table_writes.h"
 
 namespace ernie {
 
 struct ChangeSet;
 struct RenderTables;
 
-class System {
+class TableBuilder {
   public:
-    virtual ~System() = default;
+    virtual ~TableBuilder() = default;
 
     virtual std::string_view Name() const = 0;
     virtual std::span<const ColumnRef> Inputs() const = 0;
@@ -48,14 +48,14 @@ class System {
 
     virtual void Hold(std::vector<Ref<const RefCounted>>&) const {}
 
-    virtual void Run(const ChangeSet& changes, TableLog& log) = 0;
+    virtual void Run(const ChangeSet& changes, TableWrites& writes) = 0;
 
     uint32_t Runs() const {
         return m_runs;
     }
 
   private:
-    friend class Timeline;
+    friend class Publisher;
 
     uint32_t m_runs = 0;
 };

@@ -19,10 +19,10 @@
 
 namespace ernie {
 
-class Bounds : public System {
+class BoundsBuilder : public TableBuilder {
   public:
-    Bounds(Catalog& catalog, const Instances& instances)
-        : m_catalog(catalog), m_instances(instances) {}
+    BoundsBuilder(Structure& structure, const InstanceBuilder& instances)
+        : m_structure(structure), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "bounds";
@@ -38,7 +38,7 @@ class Bounds : public System {
     }
 
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     void Describe(RenderTables& tables) const override;
 
@@ -57,8 +57,8 @@ class Bounds : public System {
   private:
     void Relayout();
 
-    Catalog& m_catalog;
-    const Instances& m_instances;
+    Structure& m_structure;
+    const InstanceBuilder& m_instances;
     device::Program& Kernels();
 
     Ref<device::Program> m_program;

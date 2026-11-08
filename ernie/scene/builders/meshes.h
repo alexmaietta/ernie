@@ -40,9 +40,10 @@ struct MeshShape {
     uint32_t users = 0;
 };
 
-class Geometry : public System {
+class MeshBuilder : public TableBuilder {
   public:
-    Geometry(Catalog& catalog, bvh::Builder& builder) : m_catalog(catalog), m_builder(builder) {}
+    MeshBuilder(Structure& structure, bvh::Builder& builder)
+        : m_structure(structure), m_builder(builder) {}
 
     std::string_view Name() const override {
         return "geometry";
@@ -52,7 +53,7 @@ class Geometry : public System {
     std::span<const TableId> TableOutputs() const override;
     void Describe(RenderTables& tables) const override;
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     const GeometryStats& Stats() const {
         return m_stats;
@@ -125,7 +126,7 @@ class Geometry : public System {
     void Link(const Mesh& mesh);
     void Update(std::vector<uint32_t>& updated);
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     bvh::Builder& m_builder;
     device::Program& Kernels();
 

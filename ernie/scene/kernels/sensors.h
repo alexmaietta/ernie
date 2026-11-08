@@ -7,7 +7,7 @@
 namespace ernie {
 
 struct SensorParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<CameraRecord> cameras;
     Ptr<LidarRecord> lidars;
     Ptr<RadarRecord> radars;

@@ -22,34 +22,34 @@ namespace ernie {
 namespace {
 
 struct World {
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Hierarchy& hierarchy;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    TransformBuilder& hierarchy;
     Readback readback{store.GetDevice()};
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
-        return catalog.Define(schema, std::vector<std::string>{path}).firstPrim;
+        return structure.Define(schema, std::vector<std::string>{path}).firstPrim;
     }
 
     template <class T> uint32_t Define(const std::string& path, const typename T::Desc& desc) {
-        return catalog.Define<T>(std::vector<std::string>{path}, desc).firstPrim;
+        return structure.Define<T>(std::vector<std::string>{path}, desc).firstPrim;
     }
 
     View One(uint32_t prim, SchemaId schema = SchemaId::Imageable) {
-        return View(catalog, schema, std::vector<uint32_t>{prim});
+        return View(structure, schema, std::vector<uint32_t>{prim});
     }
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     WorldTransform Transform(uint32_t prim) {
         const std::vector<uint32_t> prims = {prim};
         return readback
             .Read<WorldTransform>(hierarchy.Transforms(),
-                                  TableRows(catalog.GetPrims(), prims, SchemaId::Xformable))
+                                  TableRows(structure.GetPrims(), prims, SchemaId::Xformable))
             .front();
     }
 
@@ -64,19 +64,19 @@ struct World {
         const std::vector<uint32_t> prims = {prim};
         return readback
             .Read<ResolvedImageable>(hierarchy.Imageables(),
-                                     TableRows(catalog.GetPrims(), prims, SchemaId::Imageable))
+                                     TableRows(structure.GetPrims(), prims, SchemaId::Imageable))
             .front();
     }
 };
 
 template <class Test> void ForEachWorld(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
-        Hierarchy hierarchy(catalog);
-        timeline.Add(hierarchy);
-        World world{store, catalog, timeline, hierarchy};
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
+        TransformBuilder hierarchy(structure);
+        publisher.Add(hierarchy);
+        World world{store, structure, publisher, hierarchy};
         test(world);
     });
 }
@@ -88,7 +88,7 @@ void ExpectNear(const std::vector<double>& actual, const std::vector<double>& ex
     }
 }
 
-TEST(HierarchyTest, ChildrenComposeWithTheirParents) {
+TEST(TransformsTest, ChildrenComposeWithTheirParents) {
     ForEachWorld([](World& w) {
         const double s = std::sqrt(0.5);
         const uint32_t parent =
@@ -104,7 +104,7 @@ TEST(HierarchyTest, ChildrenComposeWithTheirParents) {
     });
 }
 
-TEST(HierarchyTest, ResettingTheStackIgnoresAncestors) {
+TEST(TransformsTest, ResettingTheStackIgnoresAncestors) {
     ForEachWorld([](World& w) {
         w.Define<Xform>("/Parent", {.translate = {10, 0, 0}, .scale = {2, 2, 2}});
         const uint32_t body =
@@ -116,7 +116,7 @@ TEST(HierarchyTest, ResettingTheStackIgnoresAncestors) {
     });
 }
 
-TEST(HierarchyTest, MovingAParentMovesItsSubtreeAndNothingElse) {
+TEST(TransformsTest, MovingAParentMovesItsSubtreeAndNothingElse) {
     ForEachWorld([](World& w) {
         const uint32_t parent = w.Define(SchemaId::Xform, "/Parent");
         const uint32_t child = w.Define<Sphere>("/Parent/Child", {.translate = {0, 1, 0}});
@@ -129,7 +129,7 @@ TEST(HierarchyTest, MovingAParentMovesItsSubtreeAndNothingElse) {
     });
 }
 
-TEST(HierarchyTest, OnlyDirtyWorldsAreDispatched) {
+TEST(TransformsTest, OnlyDirtyWorldsAreDispatched) {
     ForEachWorld([](World& w) {
         std::vector<uint32_t> balls;
         for (uint32_t i = 0; i < 3; ++i) {
@@ -152,7 +152,7 @@ TEST(HierarchyTest, OnlyDirtyWorldsAreDispatched) {
         w.Publish();
         EXPECT_EQ(w.hierarchy.Dispatched(), dispatched);
 
-        w.One(w.catalog.Find("/Sun"), SchemaId::Xformable)
+        w.One(w.structure.Find("/Sun"), SchemaId::Xformable)
             .Get<Double3>(kXformableTranslate)
             .Set(Double3{0, 0, 1});
         w.Publish();
@@ -160,7 +160,7 @@ TEST(HierarchyTest, OnlyDirtyWorldsAreDispatched) {
     });
 }
 
-TEST(HierarchyTest, VisibilityPurposeAndMaterialAreInherited) {
+TEST(TransformsTest, VisibilityPurposeAndMaterialAreInherited) {
     ForEachWorld([](World& w) {
         const uint32_t look = w.Define(SchemaId::UsdPreviewSurface, "/Look");
         const uint32_t other = w.Define(SchemaId::UsdPreviewSurface, "/Other");
@@ -183,13 +183,13 @@ TEST(HierarchyTest, VisibilityPurposeAndMaterialAreInherited) {
         w.Publish();
         EXPECT_EQ(w.Resolved(child).visibility, uint32_t(Visibility::Inherited));
 
-        w.catalog.Remove(look);
+        w.structure.Remove(look);
         w.Publish();
         EXPECT_EQ(w.Resolved(child).material, kNoPrim);
     });
 }
 
-TEST(HierarchyTest, TranslationKeepsDoublePrecision) {
+TEST(TransformsTest, TranslationKeepsDoublePrecision) {
     ForEachWorld([](World& w) {
         w.Define<Xform>("/Far", {.translate = {1e7 + 0.25, -3e6, 0}});
         const uint32_t near = w.Define<Sphere>("/Far/Near", {.translate = {0.125, 0.5, 0}});
@@ -200,7 +200,7 @@ TEST(HierarchyTest, TranslationKeepsDoublePrecision) {
     });
 }
 
-TEST(HierarchyTest, NothingWrittenRunsNothing) {
+TEST(TransformsTest, NothingWrittenRunsNothing) {
     ForEachWorld([](World& w) {
         w.Define(SchemaId::Sphere, "/Ball");
         w.Publish();

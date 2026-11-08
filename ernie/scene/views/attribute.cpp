@@ -95,12 +95,12 @@ bool UntypedAttribute::Dense() const {
     return Rows().Dense();
 }
 
-Store& UntypedAttribute::GetStore() const {
-    return m_view->GetStore();
+ColumnStore& UntypedAttribute::GetColumnStore() const {
+    return m_view->GetColumnStore();
 }
 
 Table& UntypedAttribute::GetTable() const {
-    return GetStore().Schema(m_column.schema);
+    return GetColumnStore().Schema(m_column.schema);
 }
 
 uint32_t UntypedAttribute::CellBytes() const {
@@ -109,7 +109,7 @@ uint32_t UntypedAttribute::CellBytes() const {
 
 void UntypedAttribute::CheckWritable(bool arrays) const {
     if (Has(m_column.column->flags, ColumnFlags::Internal)) {
-        throw Error("{}'s {} is internal; the catalog writes it", Info(m_column.schema).name,
+        throw Error("{}'s {} is internal; the structure writes it", Info(m_column.schema).name,
                     m_column.column->field);
     }
     if (!arrays && IsArray(m_column.column->type)) {
@@ -119,7 +119,8 @@ void UntypedAttribute::CheckWritable(bool arrays) const {
 }
 
 void UntypedAttribute::CheckNotAttached() const {
-    if (GetStore().AttachmentCount() > 0 && GetStore().Attached(m_column, Rows().rows)) {
+    if (GetColumnStore().AttachmentCount() > 0 &&
+        GetColumnStore().Attached(m_column, Rows().rows)) {
         throw Error("{}'s {} is attached; write the attached tensor and touch the attribute",
                     Info(m_column.schema).name, m_column.column->field);
     }
@@ -127,7 +128,7 @@ void UntypedAttribute::CheckNotAttached() const {
 
 void UntypedAttribute::StampWorlds() const {
     for (const uint32_t world : Rows().worlds) {
-        GetStore().StampWorld(world);
+        GetColumnStore().StampWorld(world);
     }
 }
 
@@ -140,7 +141,7 @@ void UntypedAttribute::Fill(Span<const std::byte> cell) {
     }
     const ViewRows& rows = Rows();
     for (const ViewBlock& block : rows.blocks) {
-        GetStore().Fill(m_column, block.firstRow, block.count, cell);
+        GetColumnStore().Fill(m_column, block.firstRow, block.count, cell);
     }
     StampWorlds();
 }
@@ -160,8 +161,9 @@ void UntypedAttribute::StageCells(Span<const std::byte> cells) {
     }
     const ViewRows& rows = Rows();
     for (const ViewBlock& block : rows.blocks) {
-        GetStore().Stage(m_column, block.firstRow,
-                         cells.subspan(size_t(block.first) * cell, size_t(block.count) * cell));
+        GetColumnStore().Stage(
+            m_column, block.firstRow,
+            cells.subspan(size_t(block.first) * cell, size_t(block.count) * cell));
     }
     StampWorlds();
 }
@@ -182,7 +184,7 @@ device::Operation UntypedAttribute::WriteTensor(const DLTensor& source, Stream p
     const ColumnInfo& column = *m_column.column;
     const std::byte* data = TensorBytes(source);
     if (OnHost(source.device)) {
-        WaitOnHost(GetStore().GetDevice(), producer);
+        WaitOnHost(GetColumnStore().GetDevice(), producer);
         std::vector<uint64_t> words;
         if (mask) {
             if (!OnHost(mask->device)) {
@@ -214,8 +216,8 @@ device::Operation UntypedAttribute::WriteTensor(const DLTensor& source, Stream p
         const ViewRows& rows = Rows();
         for (uint32_t i = 0; i < Size(); ++i) {
             if (rows.rows[i] != kNoRow && Selected(words, i)) {
-                GetStore().Stage(m_column, rows.rows[i],
-                                 std::span(cells).subspan(size_t(i) * cell, cell));
+                GetColumnStore().Stage(m_column, rows.rows[i],
+                                       std::span(cells).subspan(size_t(i) * cell, cell));
             }
         }
         StampWorlds();
@@ -225,7 +227,7 @@ device::Operation UntypedAttribute::WriteTensor(const DLTensor& source, Stream p
     if (TensorRows(source, Layout(column.type), column.field) != Size()) {
         throw Error("A tensor of {} rows for {} prims' {}", source.shape[0], Size(), column.field);
     }
-    device::Device& device = GetStore().GetDevice();
+    device::Device& device = GetColumnStore().GetDevice();
     CheckReadable(device, source.device);
     uint64_t cells = uint64_t(data);
     Ref<device::Buffer> staging;
@@ -246,7 +248,7 @@ device::Operation UntypedAttribute::Write(const device::Tensor& source, Stream p
         return {};
     }
     const ColumnInfo& column = *m_column.column;
-    device::Device& device = GetStore().GetDevice();
+    device::Device& device = GetColumnStore().GetDevice();
     if (source.Empty() || &source.GetDevice() != &device) {
         throw Error("{} is written from tensors on the scene's {}; Device::Copy or "
                     "Device::Import moves them",
@@ -270,7 +272,7 @@ UntypedAttribute::Mask UntypedAttribute::Upload(const DLTensor* mask, Stream pro
                     "words",
                     Size(), words);
     }
-    device::Device& device = GetStore().GetDevice();
+    device::Device& device = GetColumnStore().GetDevice();
     const std::byte* bits = TensorBytes(*mask);
     Mask uploaded;
     if (OnHost(mask->device)) {
@@ -302,7 +304,7 @@ UntypedAttribute::Mask UntypedAttribute::Upload(const device::Tensor& mask) cons
                     "take {} words",
                     Size(), words);
     }
-    device::Device& device = GetStore().GetDevice();
+    device::Device& device = GetColumnStore().GetDevice();
     if (&mask.GetDevice() != &device) {
         throw Error("A mask on {} for a scene on {}; Device::Copy or Device::Import moves it",
                     mask.GetDevice().Adapter().alias, device.Adapter().alias);
@@ -311,7 +313,7 @@ UntypedAttribute::Mask UntypedAttribute::Upload(const device::Tensor& mask) cons
 }
 
 device::Operation UntypedAttribute::Scatter(uint64_t cells, Stream producer, const Mask& selected) {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     store.GetDevice().GetQueue().Follow(producer);
     CellsParams params{};
@@ -333,7 +335,7 @@ device::Operation UntypedAttribute::Scatter(uint64_t cells, Stream producer, con
 }
 
 device::Operation UntypedAttribute::Stamp(Stream producer, const DLTensor* mask) {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.GetDevice().GetQueue().Follow(producer);
     const Mask selected = Upload(mask, producer);
     StampParams params{};
@@ -358,8 +360,8 @@ device::Operation UntypedAttribute::MarkChanged(Stream producer, const DLTensor*
     if (Size() == 0) {
         return {};
     }
-    if (GetStore().AttachmentCount() > 0) {
-        const Attachment* attachment = GetStore().FindAttachment(m_column, Rows().rows);
+    if (GetColumnStore().AttachmentCount() > 0) {
+        const Attachment* attachment = GetColumnStore().FindAttachment(m_column, Rows().rows);
         if (attachment && !attachment->inPlace) {
             const DLTensor& source = *attachment->tensor;
             return IsArray(m_column.column->type) ? CopyArrays(source, producer, mask)
@@ -375,9 +377,9 @@ device::Operation UntypedAttribute::AttachArrays(const Attachment& attachment,
     const ColumnInfo& column = *m_column.column;
     const uint32_t count = TensorItems(source, Layout(column.type), Size(), column.field);
     if (column.type == ColumnType::PrimArray) {
-        m_view->GetCatalog().MarkUntrackedTargets();
+        m_view->GetStructure().MarkUntrackedTargets();
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     ArrayHeap& heap = store.Arrays(column.type);
     device::Device& device = store.GetDevice();
@@ -436,7 +438,7 @@ device::Operation UntypedAttribute::AttachArrays(const Attachment& attachment,
 
 device::Operation UntypedAttribute::CopyArrays(const DLTensor& source, Stream producer,
                                                const DLTensor* mask) {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     ArrayHeap& heap = store.Arrays(m_column.column->type);
     const ArrayRef first = store.Array(m_column, Rows().rows.front());
@@ -453,7 +455,7 @@ device::Operation UntypedAttribute::CopyArrays(const DLTensor& source, Stream pr
 }
 
 void UntypedAttribute::ReleaseArrays() {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     ArrayHeap& heap = store.Arrays(m_column.column->type);
     const std::vector<uint32_t>& rows = Rows().rows;
@@ -479,13 +481,14 @@ device::Operation UntypedAttribute::WaitForReads(Stream consumer) const {
         throw Error("{}'s {} isn't attached, so nothing of it waits", Info(m_column.schema).name,
                     m_column.column->field);
     }
-    const device::Operation read = GetStore().GetDevice().GetQueue().Mark();
+    const device::Operation read = GetColumnStore().GetDevice().GetQueue().Mark();
     read.Wait(consumer);
     return read;
 }
 
 bool UntypedAttribute::Attached() const {
-    return GetStore().AttachmentCount() > 0 && GetStore().FindAttachment(m_column, Rows().rows);
+    return GetColumnStore().AttachmentCount() > 0 &&
+           GetColumnStore().FindAttachment(m_column, Rows().rows);
 }
 
 device::Operation UntypedAttribute::Attach(DLManagedTensor* tensor, Stream producer,
@@ -533,7 +536,7 @@ device::Operation UntypedAttribute::AttachTensor(const DLTensor* tensor, Stream 
     if (rows.live != Size()) {
         throw Error("A view with removed prims can't attach {}", column.field);
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     if (store.Attached(m_column, rows.rows)) {
         throw Error("{}'s {} is already attached for some of these prims",
                     Info(m_column.schema).name, column.field);
@@ -600,7 +603,7 @@ device::Operation UntypedAttribute::AttachTensor(const DLTensor* tensor, Stream 
 }
 
 device::Operation UntypedAttribute::Detach(Stream consumer) {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     const ViewRows& rows = Rows();
     Attachment attachment = store.Detach(m_column, rows.rows);
     device::Queue& queue = store.GetDevice().GetQueue();
@@ -627,7 +630,7 @@ device::Operation UntypedAttribute::Detach(Stream consumer) {
 }
 
 Ref<device::Buffer> UntypedAttribute::GatherCells() const {
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     device::Device& device = store.GetDevice();
     const Ref<device::Buffer> cells =
@@ -654,7 +657,7 @@ device::Download UntypedAttribute::ReadHostAsync() const {
     if (Size() == 0) {
         return {};
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     device::Queue& queue = store.GetDevice().GetQueue();
     if (Dense()) {
         store.Flush();
@@ -676,7 +679,7 @@ std::vector<std::byte> UntypedAttribute::ReadHost() const {
 device::Tensor UntypedAttribute::Read(Stream consumer) const {
     ERNIE_ZONE("Scene/Read");
     const Ref<device::Buffer> cells = GatherCells();
-    GetStore().GetDevice().GetQueue().Mark().Wait(consumer);
+    GetColumnStore().GetDevice().GetQueue().Mark().Wait(consumer);
     return device::Tensor(cells, 0, Layout(m_column.column->type).type,
                           Shape(Size(), Layout(m_column.column->type)));
 }
@@ -692,7 +695,7 @@ void UntypedAttribute::SetArray(uint32_t index, Span<const std::byte> items) {
     if (row == kNoRow) {
         throw Error("Prim {} of the view was removed", index);
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     ArrayHeap& arrays = store.Arrays(m_column.column->type);
     if (items.size() % arrays.ItemBytes() != 0) {
         throw Error("{} bytes for items of {} bytes", items.size(), arrays.ItemBytes());
@@ -707,9 +710,9 @@ void UntypedAttribute::SetArray(uint32_t index, Span<const std::byte> items) {
     if (m_column.column->type == ColumnType::PrimArray) {
         std::vector<uint32_t> targets(count);
         std::memcpy(targets.data(), items.data(), items.size());
-        m_view->GetCatalog().MarkTargets(targets);
+        m_view->GetStructure().MarkTargets(targets);
     }
-    store.StampWorld(m_view->GetCatalog().GetPrims().At(m_view->Prims()[index]).world);
+    store.StampWorld(m_view->GetStructure().GetPrims().At(m_view->Prims()[index]).world);
 }
 
 std::vector<std::byte> UntypedAttribute::GetArray(uint32_t index) const {
@@ -718,7 +721,7 @@ std::vector<std::byte> UntypedAttribute::GetArray(uint32_t index) const {
     if (row == kNoRow) {
         throw Error("Prim {} of the view was removed", index);
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     const ArrayRef array = store.Array(m_column, row);
     return array.address == 0 ? std::vector<std::byte>{}
@@ -739,19 +742,19 @@ void UntypedAttribute::SetTargets(uint32_t index, const std::vector<std::string>
     if (Rows().rows.at(index) == kNoRow) {
         throw Error("Prim {} of the view was removed", index);
     }
-    Catalog& catalog = m_view->GetCatalog();
+    Structure& structure = m_view->GetStructure();
     const uint32_t prim = m_view->Prims()[index];
-    catalog.SetTargets(prim, Rows().rows.at(index), m_column, paths);
-    GetStore().StampWorld(catalog.GetPrims().At(prim).world);
+    structure.SetTargets(prim, Rows().rows.at(index), m_column, paths);
+    GetColumnStore().StampWorld(structure.GetPrims().At(prim).world);
 }
 
 std::vector<std::string> UntypedAttribute::GetTargets(uint32_t index) const {
     CheckArrayType(ColumnType::PrimArray);
-    const Catalog& catalog = m_view->GetCatalog();
+    const Structure& structure = m_view->GetStructure();
     std::vector<std::string> paths;
     for (const uint32_t prim : Items<uint32_t>(GetArray(index))) {
-        if (prim != kNoPrim && catalog.GetPrims().Alive(prim)) {
-            paths.push_back(catalog.GetPaths().Path(prim));
+        if (prim != kNoPrim && structure.GetPrims().Alive(prim)) {
+            paths.push_back(structure.GetPaths().Path(prim));
         }
     }
     return paths;
@@ -759,13 +762,13 @@ std::vector<std::string> UntypedAttribute::GetTargets(uint32_t index) const {
 
 void UntypedAttribute::SetTokens(uint32_t index, const std::vector<std::string>& texts) {
     CheckArrayType(ColumnType::TokenArray);
-    const std::vector<uint32_t> ids = InternTokens(m_view->GetCatalog().GetTokens(), texts);
+    const std::vector<uint32_t> ids = InternTokens(m_view->GetStructure().GetTokens(), texts);
     SetArray(index, AsBytes(Span<const uint32_t>(ids)));
 }
 
 std::vector<std::string> UntypedAttribute::GetTokens(uint32_t index) const {
     CheckArrayType(ColumnType::TokenArray);
-    const Tokens& tokens = m_view->GetCatalog().GetTokens();
+    const Tokens& tokens = m_view->GetStructure().GetTokens();
     std::vector<std::string> texts;
     for (const uint32_t id : Items<uint32_t>(GetArray(index))) {
         texts.emplace_back(tokens.Text(Token{id}));
@@ -778,7 +781,7 @@ void UntypedAttribute::SetPrimvars(uint32_t index, const std::vector<Primvar>& p
         throw Error("{}'s {} holds no primvars", Info(m_column.schema).name,
                     m_column.column->field);
     }
-    const std::vector<int32_t> table = PackPrimvars(m_view->GetCatalog().GetTokens(), primvars);
+    const std::vector<int32_t> table = PackPrimvars(m_view->GetStructure().GetTokens(), primvars);
     SetArray(index, AsBytes(Span<const int32_t>(table)));
 }
 
@@ -787,18 +790,18 @@ std::vector<Primvar> UntypedAttribute::GetPrimvars(uint32_t index) const {
         throw Error("{}'s {} holds no primvars", Info(m_column.schema).name,
                     m_column.column->field);
     }
-    return UnpackPrimvars(m_view->GetCatalog().GetTokens(), Items<int32_t>(GetArray(index)));
+    return UnpackPrimvars(m_view->GetStructure().GetTokens(), Items<int32_t>(GetArray(index)));
 }
 
 void UntypedAttribute::MapArray(Mapping& mapping) {
     const ViewRows& rows = Rows();
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     ArrayHeap& heap = store.Arrays(m_column.column->type);
     const ColumnLayout layout = Layout(m_column.column->type);
     const bool writes = mapping.m_access != MapAccess::Read;
     if (writes && m_column.column->type == ColumnType::PrimArray) {
-        m_view->GetCatalog().MarkUntrackedTargets();
+        m_view->GetStructure().MarkUntrackedTargets();
     }
     std::vector<ArrayRef> arrays;
     std::vector<uint32_t> offsets = {0};
@@ -908,8 +911,8 @@ void UntypedAttribute::MapArray(Mapping& mapping) {
 Mapping UntypedAttribute::Map(MapAccess access, Stream consumer) {
     if (access != MapAccess::Read) {
         CheckWritable(true);
-        const Attachment* attachment = GetStore().AttachmentCount() > 0
-                                           ? GetStore().FindAttachment(m_column, Rows().rows)
+        const Attachment* attachment = GetColumnStore().AttachmentCount() > 0
+                                           ? GetColumnStore().FindAttachment(m_column, Rows().rows)
                                            : nullptr;
         if (attachment == nullptr) {
             CheckNotAttached();
@@ -919,7 +922,7 @@ Mapping UntypedAttribute::Map(MapAccess access, Stream consumer) {
                         Info(m_column.schema).name, m_column.column->field);
         }
     }
-    Store& store = GetStore();
+    ColumnStore& store = GetColumnStore();
     store.Flush();
     const ColumnLayout layout = Layout(m_column.column->type);
     device::Queue& queue = store.GetDevice().GetQueue();

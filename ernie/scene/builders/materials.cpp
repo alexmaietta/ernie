@@ -29,25 +29,25 @@ std::vector<ColumnRef> MaterialInputs() {
 
 }
 
-std::span<const ColumnRef> Materials::Inputs() const {
+std::span<const ColumnRef> MaterialBuilder::Inputs() const {
     static const std::vector<ColumnRef> inputs = MaterialInputs();
     return inputs;
 }
 
-void Materials::Describe(RenderTables& tables) const {
+void MaterialBuilder::Describe(RenderTables& tables) const {
     tables.previews.address = m_previews.Address();
     tables.nonVisuals.address = m_nonVisuals.Address();
     tables.checkers.address = m_checkers.Address();
 }
 
-void Materials::Run(const ChangeSet&, TableLog&) {
+void MaterialBuilder::Run(const ChangeSet&, TableWrites&) {
     ERNIE_ZONE("Materials/Run");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     m_previews.Reserve(device, store.Schema(SchemaId::UsdPreviewSurface).Capacity());
     m_nonVisuals.Reserve(device, store.Schema(SchemaId::NonVisualMaterialAPI).Capacity());
     m_checkers.Reserve(device, store.Schema(SchemaId::CheckerboardAPI).Capacity());
-    const uint32_t prims = m_catalog.GetPrims().Size();
+    const uint32_t prims = m_structure.GetPrims().Size();
     if (prims == 0) {
         return;
     }
@@ -67,13 +67,13 @@ void Materials::Run(const ChangeSet&, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-void Materials::Prepare() {
+void MaterialBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Materials::Kernels() {
+device::Program& MaterialBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.materials"},
              .library = &kSceneKernels,
              .entries = {"WriteMaterials"},

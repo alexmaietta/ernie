@@ -41,7 +41,7 @@ float3 CustomRgb(Ptr<Float3> spectra, ArrayRef pairs) {
     return UnitLuminance(max(XyzToLinearSrgb(xyz / xyz.y) / spectra[kWhiteRow].Vector(), 0));
 }
 
-float3 Chromaticity(SceneData* scene, Ptr<Float3> spectra, uint prim, uint row) {
+float3 Chromaticity(AuthoredData* scene, Ptr<Float3> spectra, uint prim, uint row) {
     LightAPIData* light = &scene->schemas.lightAPI;
     const float3 color = light.color[row].Vector();
     const float kelvin = light.colorTemperature[row];
@@ -122,7 +122,7 @@ void Profile(inout LightRecord record, uint64_t handle, bool hemisphere, bool no
     }
 }
 
-DomeTextureFormat DomeFormat(SceneData* scene, TextureRecord texture, uint row) {
+DomeTextureFormat DomeFormat(AuthoredData* scene, TextureRecord texture, uint row) {
     DomeLightData* dome = &scene->schemas.domeLight;
     const DomeTextureFormat format = DomeTextureFormat(dome.textureFormat[row]);
     if (format != DomeTextureFormat::Automatic) {
@@ -143,7 +143,7 @@ void WriteDomeMaps(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     if (id.x >= kDomeMapCells || id.y >= layout->domeCount) {
         return;
     }
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     const uint domePrim = layout->domePrims[id.y];
     const uint row = PrimRow(scene, domePrim, kSlotDomeLight);
     const TextureRecord texture = p.textures[domePrim];
@@ -260,7 +260,7 @@ void WriteLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
     }
     const uint slot = first + id.x;
     const uint item = layout->prims[slot];
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     Ptr<Float3> spectra = p.spectra;
     uint prim = item;
     uint instancer = kNoPrim;
@@ -567,7 +567,7 @@ void WriteLightShapes(uniform LightParams p) {
     if (row >= p.shapeRows) {
         return;
     }
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     const uint prim = scene->schemas.lightAPI.prim[row];
     LightShapeRecord record;
     record.radius = 0;

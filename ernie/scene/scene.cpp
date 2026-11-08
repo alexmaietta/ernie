@@ -146,29 +146,30 @@ void SetInputs(RowWriter& writer, SchemaId schema, std::span<const MaterialInput
 }
 
 SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc)
-    : m_scene(scene), m_device(&device), m_store(device), m_catalog(m_store), m_timeline(m_catalog),
-      m_builder(bvh::Builder::Create(device, desc.traversal)), m_hierarchy(m_catalog),
-      m_geometry(m_catalog, *m_builder), m_bounds(m_catalog, m_instances),
-      m_tangents(m_catalog, m_geometry), m_textures(m_catalog, desc.textureThreads),
-      m_semantics(m_catalog), m_sensors(m_catalog), m_products(scene, m_catalog),
-      m_materials(m_catalog), m_instances(m_catalog, *m_builder, desc.maxRefits),
-      m_surfaces(m_catalog, m_instances), m_lights(m_catalog, m_instances), m_readback(device) {
-    m_timeline.Add(m_hierarchy);
-    m_timeline.Add(m_geometry);
-    m_timeline.Add(m_tangents);
-    m_timeline.Add(m_textures);
-    m_timeline.Add(m_semantics);
-    m_timeline.Add(m_sensors);
-    m_timeline.Add(m_products);
-    m_timeline.Add(m_materials);
-    m_timeline.Add(m_instances);
-    m_timeline.Add(m_surfaces);
-    m_timeline.Add(m_bounds);
-    m_timeline.Add(m_lights);
+    : m_scene(scene), m_device(&device), m_store(device), m_structure(m_store),
+      m_publisher(m_structure), m_builder(bvh::Builder::Create(device, desc.traversal)),
+      m_transforms(m_structure), m_meshes(m_structure, *m_builder),
+      m_bounds(m_structure, m_instances), m_tangents(m_structure, m_meshes),
+      m_textures(m_structure, desc.textureThreads), m_semantics(m_structure),
+      m_sensors(m_structure), m_products(scene, m_structure), m_materials(m_structure),
+      m_instances(m_structure, *m_builder, desc.maxRefits), m_surfaces(m_structure, m_instances),
+      m_lights(m_structure, m_instances), m_readback(device) {
+    m_publisher.Add(m_transforms);
+    m_publisher.Add(m_meshes);
+    m_publisher.Add(m_tangents);
+    m_publisher.Add(m_textures);
+    m_publisher.Add(m_semantics);
+    m_publisher.Add(m_sensors);
+    m_publisher.Add(m_products);
+    m_publisher.Add(m_materials);
+    m_publisher.Add(m_instances);
+    m_publisher.Add(m_surfaces);
+    m_publisher.Add(m_bounds);
+    m_publisher.Add(m_lights);
     m_store.Prepare();
     m_builder->Prepare();
-    for (System* system : std::initializer_list<System*>{
-             &m_hierarchy, &m_geometry, &m_bounds, &m_tangents, &m_textures, &m_semantics,
+    for (TableBuilder* system : std::initializer_list<TableBuilder*>{
+             &m_transforms, &m_meshes, &m_bounds, &m_tangents, &m_textures, &m_semantics,
              &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights}) {
         system->Prepare();
     }
@@ -178,7 +179,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
 }
 
 Prim SceneImpl::Handle(uint32_t prim) const {
-    return Prim(m_scene, prim, m_catalog.GetPrims().Generation(prim));
+    return Prim(m_scene, prim, m_structure.GetPrims().Generation(prim));
 }
 
 PrimRange SceneImpl::Range(const PrimBlock& block) const {
@@ -238,12 +239,12 @@ PrimRange Scene::Define(Span<const std::string> paths, SchemaId schema, const Ba
 
 Prim Scene::Move(Prim prim, std::string_view path) {
     m_impl->Check(prim);
-    Catalog& catalog = m_impl->GetCatalog();
-    catalog.Move(prim.Index(), path);
+    Structure& structure = m_impl->GetStructure();
+    structure.Move(prim.Index(), path);
     std::vector<std::string> xformable;
-    for (const uint32_t moved : catalog.GetPaths().Subtree(prim.Index())) {
-        if (IsA(catalog.GetPrims().At(moved).schema, SchemaId::Xformable)) {
-            xformable.push_back(catalog.GetPaths().Path(moved));
+    for (const uint32_t moved : structure.GetPaths().Subtree(prim.Index())) {
+        if (IsA(structure.GetPrims().At(moved).schema, SchemaId::Xformable)) {
+            xformable.push_back(structure.GetPaths().Path(moved));
         }
     }
     if (!xformable.empty()) {
@@ -260,7 +261,7 @@ Prim Scene::Rename(Prim prim, std::string_view name) {
 
 void Scene::Remove(Prim prim) {
     m_impl->Check(prim);
-    m_impl->GetCatalog().Remove(prim.Index());
+    m_impl->GetStructure().Remove(prim.Index());
 }
 
 namespace {
@@ -315,8 +316,8 @@ void Overrides::Set(Prim prim, ColumnRef column, Span<const std::byte> cell) {
     }
     SceneImpl& impl = SceneImpl::Get(*m_scene);
     impl.Check(prim);
-    const uint32_t row = impl.GetCatalog().GetPrims().Row(prim.Index(), column.schema);
-    Store& store = impl.GetStore();
+    const uint32_t row = impl.GetStructure().GetPrims().Row(prim.Index(), column.schema);
+    ColumnStore& store = impl.GetColumnStore();
     std::vector<std::byte> authored;
     if (!store.Overridden(column, row)) {
         authored = m_scene->Select(prim).Get(column).ReadHost();
@@ -340,10 +341,10 @@ void Overrides::Clear(Prim prim, ColumnRef column) {
     }
     if (prim.Valid()) {
         SceneImpl& impl = SceneImpl::Get(*m_scene);
-        const uint32_t row = impl.GetCatalog().GetPrims().FindRow(prim.Index(), column.schema);
+        const uint32_t row = impl.GetStructure().GetPrims().FindRow(prim.Index(), column.schema);
         if (row != kNoRow) {
-            impl.GetStore().ClearOverride(column, row, m_owner);
-            impl.GetStore().StampWorld(prim.World());
+            impl.GetColumnStore().ClearOverride(column, row, m_owner);
+            impl.GetColumnStore().StampWorld(prim.World());
         }
     }
     m_cells.erase(found);
@@ -363,14 +364,14 @@ Overrides Scene::CreateOverrides() {
 
 bool Scene::Overridden(Prim prim, ColumnRef column) const {
     m_impl->Check(prim);
-    const uint32_t row = m_impl->GetCatalog().GetPrims().FindRow(prim.Index(), column.schema);
-    return row != kNoRow && m_impl->GetStore().Overridden(column, row);
+    const uint32_t row = m_impl->GetStructure().GetPrims().FindRow(prim.Index(), column.schema);
+    return row != kNoRow && m_impl->GetColumnStore().Overridden(column, row);
 }
 
 std::vector<std::byte> Scene::ReadAuthored(Prim prim, ColumnRef column) const {
     if (Overridden(prim, column)) {
-        const uint32_t row = m_impl->GetCatalog().GetPrims().Row(prim.Index(), column.schema);
-        return m_impl->GetStore().Authored(column, row);
+        const uint32_t row = m_impl->GetStructure().GetPrims().Row(prim.Index(), column.schema);
+        return m_impl->GetColumnStore().Authored(column, row);
     }
     return Select(prim).Get(column).ReadHost();
 }
@@ -398,8 +399,8 @@ ComposedWorld& ComposedWorld::operator=(ComposedWorld&& other) noexcept {
 
 void ComposedWorld::Release() {
     if (m_scene && m_world != kGlobalWorld) {
-        SceneImpl::Get(*m_scene).GetCatalog().Decompose(m_world);
-        SceneImpl::Get(*m_scene).GetStore().StampWorld(m_world);
+        SceneImpl::Get(*m_scene).GetStructure().Decompose(m_world);
+        SceneImpl::Get(*m_scene).GetColumnStore().StampWorld(m_world);
     }
     m_world = kGlobalWorld;
 }
@@ -408,8 +409,8 @@ void ComposedWorld::Set(const ComposedWorldDesc& desc) {
     if (!m_scene) {
         throw Error("An empty world view shows nothing");
     }
-    Catalog& catalog = SceneImpl::Get(*m_scene).GetCatalog();
-    const uint32_t worlds = catalog.GetPrims().WorldCount();
+    Structure& structure = SceneImpl::Get(*m_scene).GetStructure();
+    const uint32_t worlds = structure.GetPrims().WorldCount();
     if (!desc.offsets.empty() && desc.offsets.size() != desc.worlds.size()) {
         throw Error("A world view has {} offsets for {} worlds", desc.offsets.size(),
                     desc.worlds.size());
@@ -419,8 +420,8 @@ void ComposedWorld::Set(const ComposedWorldDesc& desc) {
             throw Error("A world view can't show world {} of {}", world, worlds);
         }
     }
-    if (catalog.Compose(m_world, desc)) {
-        SceneImpl::Get(*m_scene).GetStore().StampWorld(m_world);
+    if (structure.Compose(m_world, desc)) {
+        SceneImpl::Get(*m_scene).GetColumnStore().StampWorld(m_world);
     }
 }
 
@@ -429,7 +430,7 @@ ComposedWorld Scene::ComposeWorld(Prim world, const ComposedWorldDesc& desc) {
     if (!world.IsA(SchemaId::World) || !world.IsSession()) {
         throw Error("{} isn't a session World, which only can show other worlds", world.Path());
     }
-    if (m_impl->GetCatalog().Compositions().contains(world.World())) {
+    if (m_impl->GetStructure().Compositions().contains(world.World())) {
         throw Error("{} already shows other worlds", world.Path());
     }
     ComposedWorld view(Ref<Scene>(this), world.World());
@@ -439,7 +440,7 @@ ComposedWorld Scene::ComposeWorld(Prim world, const ComposedWorldDesc& desc) {
 
 void Scene::MarkSession(Prim prim) {
     m_impl->Check(prim);
-    m_impl->GetCatalog().MarkSession(prim.Index());
+    m_impl->GetStructure().MarkSession(prim.Index());
 }
 
 void Scene::Apply(Span<const Prim> prims, SchemaId api) {
@@ -451,11 +452,11 @@ void Scene::Apply(Span<const Prim> prims, SchemaId api, std::string_view instanc
 }
 
 void Scene::Unapply(Span<const Prim> prims, SchemaId api) {
-    m_impl->GetCatalog().Unapply(m_impl->Indices(prims), api);
+    m_impl->GetStructure().Unapply(m_impl->Indices(prims), api);
 }
 
 void Scene::Unapply(Span<const Prim> prims, SchemaId api, std::string_view instance) {
-    m_impl->GetCatalog().Unapply(m_impl->Indices(prims), api, instance);
+    m_impl->GetStructure().Unapply(m_impl->Indices(prims), api, instance);
 }
 
 std::vector<Prim> Scene::Handles(const PrimRange& range) const {
@@ -469,12 +470,12 @@ std::vector<Prim> Scene::Handles(const PrimRange& range) const {
 
 PrimRange Scene::Clone(Prim source, Span<const std::string> targets, const CloneDesc& desc) {
     m_impl->Check(source);
-    return m_impl->Range(m_impl->GetCatalog().Clone(
+    return m_impl->Range(m_impl->GetStructure().Clone(
         source.Index(), std::span(targets.data(), targets.size()), desc));
 }
 
 std::optional<Prim> Scene::Find(std::string_view path) const {
-    const uint32_t prim = m_impl->GetCatalog().Find(path);
+    const uint32_t prim = m_impl->GetStructure().Find(path);
     if (prim == kNoPrim) {
         return std::nullopt;
     }
@@ -482,77 +483,77 @@ std::optional<Prim> Scene::Find(std::string_view path) const {
 }
 
 Prim Scene::At(uint32_t index) const {
-    if (!m_impl->GetCatalog().GetPrims().Alive(index)) {
+    if (!m_impl->GetStructure().GetPrims().Alive(index)) {
         throw Error("No prim {}", index);
     }
     return m_impl->Handle(index);
 }
 
 View Scene::Select(std::string_view pattern, SchemaId schema) const {
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
-    return View(catalog, schema, catalog.Select(pattern, schema));
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
+    return View(structure, schema, structure.Select(pattern, schema));
 }
 
 View Scene::Select(Span<const std::string> paths, SchemaId schema) const {
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
     std::vector<uint32_t> prims;
     for (const std::string& path : paths) {
-        const uint32_t prim = catalog.Find(path);
+        const uint32_t prim = structure.Find(path);
         if (prim == kNoPrim) {
             throw Error("No prim at \"{}\"", path);
         }
         prims.push_back(prim);
     }
-    return View(catalog, schema, std::move(prims));
+    return View(structure, schema, std::move(prims));
 }
 
 View Scene::Select(const PrimRange& range, SchemaId schema, uint32_t index) const {
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
     std::vector<uint32_t> prims;
     for (uint32_t copy = 0; copy < range.copies; ++copy) {
         prims.push_back(range.Index(copy, index));
     }
-    return View(catalog, schema, std::move(prims));
+    return View(structure, schema, std::move(prims));
 }
 
 View Scene::Select(Prim prim) const {
     m_impl->Check(prim);
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
-    return View(catalog, prim.Schema(), std::vector<uint32_t>{prim.Index()});
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
+    return View(structure, prim.Schema(), std::vector<uint32_t>{prim.Index()});
 }
 
 View Scene::Select(std::string_view pattern, SchemaId api, std::string_view instance) const {
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
     if (!IsMultipleApi(api)) {
         throw Error("{} isn't applied many times, so it has no instances", Info(api).name);
     }
-    const uint32_t token = catalog.GetTokens().Intern(instance).id;
-    std::vector<uint32_t> prims = catalog.Select(pattern, api);
+    const uint32_t token = structure.GetTokens().Intern(instance).id;
+    std::vector<uint32_t> prims = structure.Select(pattern, api);
     std::erase_if(prims, [&](uint32_t prim) {
-        return catalog.GetPrims().InstanceRow(prim, api, token) == kNoRow;
+        return structure.GetPrims().InstanceRow(prim, api, token) == kNoRow;
     });
-    return View(catalog, api, std::move(prims), instance);
+    return View(structure, api, std::move(prims), instance);
 }
 
 View Scene::Select(Prim prim, SchemaId api, std::string_view instance) const {
     m_impl->Check(prim);
-    Catalog& catalog = const_cast<SceneImpl&>(*m_impl).GetCatalog();
+    Structure& structure = const_cast<SceneImpl&>(*m_impl).GetStructure();
     if (!IsMultipleApi(api)) {
         throw Error("{} isn't applied many times, so it has no instances", Info(api).name);
     }
-    if (catalog.GetPrims().InstanceRow(prim.Index(), api,
-                                       catalog.GetTokens().Intern(instance).id) == kNoRow) {
+    if (structure.GetPrims().InstanceRow(prim.Index(), api,
+                                         structure.GetTokens().Intern(instance).id) == kNoRow) {
         throw Error("{} has no {} {}", prim.Path(), Info(api).name, instance);
     }
-    return View(catalog, api, std::vector<uint32_t>{prim.Index()}, instance);
+    return View(structure, api, std::vector<uint32_t>{prim.Index()}, instance);
 }
 
 uint32_t Scene::PrimCount() const {
-    return m_impl->GetCatalog().GetPrims().LiveCount();
+    return m_impl->GetStructure().GetPrims().LiveCount();
 }
 
 uint32_t Scene::WorldCount() const {
-    return m_impl->GetCatalog().GetPrims().WorldCount();
+    return m_impl->GetStructure().GetPrims().WorldCount();
 }
 
 device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
@@ -561,11 +562,11 @@ device::Operation Scene::Publish(const PublishDesc& desc, Stream producer) {
         m_impl->RunCommitSteps();
     }
     device::Operation done =
-        m_impl->GetTimeline().Publish(desc.ordinal.value_or(Published() + 1), producer);
+        m_impl->GetPublisher().Publish(desc.ordinal.value_or(Published() + 1), producer);
     while (desc.wait && Pending()) {
-        m_impl->GetTimeline().Finish();
+        m_impl->GetPublisher().Finish();
         m_impl->RunCommitSteps();
-        done = m_impl->GetTimeline().Publish(Published() + 1, producer);
+        done = m_impl->GetPublisher().Publish(Published() + 1, producer);
     }
     return done;
 }
@@ -592,15 +593,15 @@ std::vector<uint32_t> BoundableRows(const Prims& prims, std::vector<uint32_t> in
 
 device::Download Scene::ReadWorldTransformsAsync(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        TableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
-    return m_impl->GetReadback().ReadAsync(m_impl->GetHierarchy().Transforms(),
+        TableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetReadback().ReadAsync(m_impl->GetTransforms().Transforms(),
                                            sizeof(ernie::WorldTransform), rows);
 }
 
 std::vector<ernie::WorldTransform> Scene::WorldTransforms(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        TableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
-    return m_impl->GetReadback().Read<ernie::WorldTransform>(m_impl->GetHierarchy().Transforms(),
+        TableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetReadback().Read<ernie::WorldTransform>(m_impl->GetTransforms().Transforms(),
                                                              rows);
 }
 
@@ -608,14 +609,14 @@ static_assert(sizeof(Box) == sizeof(BoundableBox));
 
 device::Download Scene::ReadPrimBoundsAsync(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        BoundableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths));
+        BoundableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths));
     return m_impl->GetReadback().ReadAsync(m_impl->GetBounds().PrimBounds(), sizeof(BoundableBox),
                                            rows);
 }
 
 std::vector<Box> Scene::PrimBounds(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        BoundableRows(m_impl->GetCatalog().GetPrims(), PathPrims(*this, paths));
+        BoundableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths));
     return m_impl->GetReadback().Read<Box>(m_impl->GetBounds().PrimBounds(), rows);
 }
 
@@ -637,23 +638,23 @@ device::Download Scene::ReadAllBoundsAsync() const {
 }
 
 bool Scene::Pending() const {
-    return m_impl->CommitStepsPending() || m_impl->GetTimeline().Pending();
+    return m_impl->CommitStepsPending() || m_impl->GetPublisher().Pending();
 }
 
 uint64_t Scene::StructureVersion() const {
-    return m_impl->GetCatalog().Epoch();
+    return m_impl->GetStructure().Epoch();
 }
 
 Ordinal Scene::Published() const {
-    return const_cast<SceneImpl&>(*m_impl).GetTimeline().Published();
+    return const_cast<SceneImpl&>(*m_impl).GetPublisher().Published();
 }
 
 Snapshot Scene::Acquire(Stream consumer) {
-    return m_impl->GetTimeline().Acquire(consumer);
+    return m_impl->GetPublisher().Acquire(consumer);
 }
 
 void Scene::Release(const Snapshot& snapshot, Stream consumer) {
-    m_impl->GetTimeline().Release(snapshot, consumer);
+    m_impl->GetPublisher().Release(snapshot, consumer);
 }
 
 void Scene::Require(Span<const ernie::Token> taxonomies) {
@@ -666,19 +667,19 @@ void Scene::AddFile(std::string path, FileBytes bytes, std::optional<Prim> owner
         m_impl->Check(*owner);
         index = owner->Index();
     }
-    m_impl->GetCatalog().AddFile(std::move(path), std::move(bytes), index);
+    m_impl->GetStructure().AddFile(std::move(path), std::move(bytes), index);
 }
 
 void Scene::RemoveFile(std::string_view path) {
-    m_impl->GetCatalog().RemoveFile(path);
+    m_impl->GetStructure().RemoveFile(path);
 }
 
 ernie::Token Scene::Token(std::string_view text) {
-    return m_impl->GetCatalog().GetTokens().Intern(text);
+    return m_impl->GetStructure().GetTokens().Intern(text);
 }
 
 std::string_view Scene::Text(ernie::Token token) const {
-    return m_impl->GetCatalog().GetTokens().Text(token);
+    return m_impl->GetStructure().GetTokens().Text(token);
 }
 
 device::Device& Scene::GetDevice() const {
@@ -715,7 +716,7 @@ uint32_t PrimCopy::PrimCount() const {
 PrimCopy Scene::Copy(Prim prim) {
     ERNIE_ZONE("Scene/Copy");
     m_impl->Check(prim);
-    Catalog& catalog = m_impl->GetCatalog();
+    Structure& structure = m_impl->GetStructure();
     auto state = std::make_shared<PrimCopy::State>();
     state->root = prim.Path();
 
@@ -726,9 +727,9 @@ PrimCopy Scene::Copy(Prim prim) {
     };
 
     std::vector<Pending> reads;
-    for (const uint32_t index : catalog.GetPaths().Subtree(prim.Index())) {
-        const PrimRecord& record = catalog.GetPrims().At(index);
-        const std::string path = catalog.GetPaths().Path(index);
+    for (const uint32_t index : structure.GetPaths().Subtree(prim.Index())) {
+        const PrimRecord& record = structure.GetPrims().At(index);
+        const std::string path = structure.GetPaths().Path(index);
         CopiedPrim& copied = state->prims.emplace_back();
         copied.relative = path.substr(state->root.size());
         if (copied.relative.starts_with('/')) {
@@ -736,7 +737,7 @@ PrimCopy Scene::Copy(Prim prim) {
         }
         copied.schema = record.schema;
         copied.apis = record.apis;
-        copied.files = catalog.OwnedFiles(index);
+        copied.files = structure.OwnedFiles(index);
         for (const SchemaId table : PrimTables(record.schema, record.apis)) {
             std::vector<std::string> names = {""};
             if (IsMultipleApi(table)) {

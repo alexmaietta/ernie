@@ -142,7 +142,7 @@ struct LightShapeRecord {
 ERNIE_CHECK_SIZE(LightShapeRecord, 32);
 
 struct LightParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<LightLayout> layout;
     Ptr<InstanceLayout> instances;
     Ptr<RenderOrigin> origins;
@@ -177,7 +177,7 @@ bool Lists(ArrayRef targets, uint prim) {
     return false;
 }
 
-bool InCollection(SceneData* scene, uint row, uint prim) {
+bool InCollection(AuthoredData* scene, uint row, uint prim) {
     if (row == kNoRow) {
         return true;
     }
@@ -202,7 +202,7 @@ bool InCollection(SceneData* scene, uint row, uint prim) {
     return collection.collectionIncludeRoot[row] != 0;
 }
 
-uint LinkRow(SceneData* scene, uint prim, uint instance) {
+uint LinkRow(AuthoredData* scene, uint prim, uint instance) {
     CollectionAPIData* collection = &scene->schemas.collectionAPI;
     const uint row = ApiInstanceRow(scene, prim, kApiCollectionAPI, instance, collection.instance,
                                     collection.next);

@@ -32,19 +32,19 @@ void AddWorld(std::vector<uint32_t>& worlds, uint32_t world) {
 
 }
 
-std::span<const ColumnRef> Geometry::Inputs() const {
+std::span<const ColumnRef> MeshBuilder::Inputs() const {
     return kInputs;
 }
 
-std::span<const TableId> Geometry::TableOutputs() const {
+std::span<const TableId> MeshBuilder::TableOutputs() const {
     return kTableOutputs;
 }
 
-void Geometry::Describe(RenderTables& tables) const {
+void MeshBuilder::Describe(RenderTables& tables) const {
     tables.meshes.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
 }
 
-std::optional<MeshShape> Geometry::Find(uint32_t prim) const {
+std::optional<MeshShape> MeshBuilder::Find(uint32_t prim) const {
     const auto found = m_meshes.find(prim);
     if (found == m_meshes.end() || !found->second.key) {
         return std::nullopt;
@@ -54,7 +54,7 @@ std::optional<MeshShape> Geometry::Find(uint32_t prim) const {
     return MeshShape{shape.blas, shape.pointCount, topology.triangleCount, shape.users};
 }
 
-void Geometry::Triangulate() {
+void MeshBuilder::Triangulate() {
     std::vector<Topology*> pending;
     std::vector<TopologyJob> jobs;
     uint32_t faces = 0;
@@ -77,7 +77,7 @@ void Geometry::Triangulate() {
     }
     ERNIE_ZONE("Geometry/Triangulate");
     m_stats.triangulated += uint32_t(jobs.size());
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     device::Queue& queue = device.GetQueue();
     const auto scratch = [&](uint64_t words, const char* label) {
@@ -197,12 +197,12 @@ void Geometry::Triangulate() {
     queue.Submit(encoder.Finish());
 }
 
-void Geometry::Prune() {
+void MeshBuilder::Prune() {
     if (!m_stale) {
         return;
     }
     m_stale = false;
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     ArrayHeap& ints = store.Arrays(ColumnType::IntArray);
     std::erase_if(m_shapes, [&](const auto& entry) {
         if (entry.second.users > 0) {
@@ -225,13 +225,13 @@ void Geometry::Prune() {
     });
 }
 
-void Geometry::Settle() {
+void MeshBuilder::Settle() {
     m_stale = m_stale || !m_placing.empty();
     for (const auto& placing : m_placing) {
         m_topologies.try_emplace(placing.second.topology);
     }
     Triangulate();
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     for (const auto& [prim, key] : m_placing) {
         Mesh& mesh = m_meshes.at(prim);
         Topology& topology = m_topologies.at(key.topology);
@@ -266,8 +266,8 @@ void Geometry::Settle() {
     m_placing.clear();
 }
 
-void Geometry::Place(uint32_t prim) {
-    const Prims& prims = m_catalog.GetPrims();
+void MeshBuilder::Place(uint32_t prim) {
+    const Prims& prims = m_structure.GetPrims();
     Mesh mesh;
     mesh.prim = prim;
     mesh.generation = prims.Generation(prim);
@@ -286,8 +286,8 @@ void Geometry::Place(uint32_t prim) {
     m_placing.emplace_back(prim, key);
 }
 
-Geometry::ShapeKey Geometry::Key(const Mesh& mesh) const {
-    const Store& store = m_catalog.GetStore();
+MeshBuilder::ShapeKey MeshBuilder::Key(const Mesh& mesh) const {
+    const ColumnStore& store = m_structure.GetColumnStore();
     const ArrayRef points = store.Array(kPointBasedPoints, mesh.pointsRow);
     const ArrayRef indices = store.Array(kMeshFaceVertexIndices, mesh.meshRow);
     const ArrayRef counts = store.Array(kMeshFaceVertexCounts, mesh.meshRow);
@@ -296,7 +296,7 @@ Geometry::ShapeKey Geometry::Key(const Mesh& mesh) const {
             {indices.address, indices.count, counts.address, counts.count}};
 }
 
-void Geometry::Release(Mesh& mesh) {
+void MeshBuilder::Release(Mesh& mesh) {
     if (mesh.key) {
         --m_shapes.at(*mesh.key).users;
         --m_topologies.at(mesh.key->topology).users;
@@ -306,7 +306,7 @@ void Geometry::Release(Mesh& mesh) {
     }
 }
 
-void Geometry::Link(const Mesh& mesh) {
+void MeshBuilder::Link(const Mesh& mesh) {
     MeshRecord record{};
     if (mesh.key) {
         const Shape& shape = m_shapes.at(*mesh.key);
@@ -319,14 +319,14 @@ void Geometry::Link(const Mesh& mesh) {
         record.normals = shape.normals;
         record.bounds = shape.bounds;
     }
-    if (m_records.Set(mesh.meshRow, record) && m_catalog.GetPrims().Alive(mesh.prim)) {
-        AddWorld(m_relinked, m_catalog.GetPrims().At(mesh.prim).world);
+    if (m_records.Set(mesh.meshRow, record) && m_structure.GetPrims().Alive(mesh.prim)) {
+        AddWorld(m_relinked, m_structure.GetPrims().At(mesh.prim).world);
     }
 }
 
-void Geometry::Run(const ChangeSet& changes, TableLog& log) {
+void MeshBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     ERNIE_ZONE("Geometry/Run");
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     m_stats.built = 0;
     m_stats.refit = 0;
     m_stats.triangulated = 0;
@@ -386,7 +386,7 @@ void Geometry::Run(const ChangeSet& changes, TableLog& log) {
         collect(kPointBasedPoints, m_byPointsRow, moved);
         collect(kMeshFaceVertexIndices, m_byMeshRow, reshaped);
         collect(kMeshFaceVertexCounts, m_byMeshRow, reshaped);
-        const Store& store = m_catalog.GetStore();
+        const ColumnStore& store = m_structure.GetColumnStore();
         std::vector<uint32_t> rekeyed;
         for (const uint32_t prim : moved) {
             if (std::ranges::binary_search(reshaped, prim)) {
@@ -417,21 +417,21 @@ void Geometry::Run(const ChangeSet& changes, TableLog& log) {
     Prune();
     std::vector<uint32_t> updated;
     Update(updated);
-    m_records.Reserve(m_catalog.GetStore().Schema(SchemaId::Mesh).Capacity());
-    const bool replaced = m_records.Upload(m_catalog.GetStore().GetDevice());
+    m_records.Reserve(m_structure.GetColumnStore().Schema(SchemaId::Mesh).Capacity());
+    const bool replaced = m_records.Upload(m_structure.GetColumnStore().GetDevice());
     if (replaced) {
         m_relinked = {kGlobalWorld};
     }
     if (!m_relinked.empty()) {
-        log.Wrote(TableId::Meshes, m_relinked);
+        writes.Add(TableId::Meshes, m_relinked);
     }
     if (!updated.empty()) {
-        log.Wrote(TableId::MeshPoints, updated);
+        writes.Add(TableId::MeshPoints, updated);
     }
     m_relinked.clear();
 }
 
-void Geometry::Update(std::vector<uint32_t>& updated) {
+void MeshBuilder::Update(std::vector<uint32_t>& updated) {
     std::vector<Ref<bvh::Blas>> built;
     std::vector<Ref<bvh::Blas>> refit;
     std::vector<NormalsShape> normals;
@@ -466,7 +466,7 @@ void Geometry::Update(std::vector<uint32_t>& updated) {
     if (normals.empty()) {
         return;
     }
-    const Prims& prims = m_catalog.GetPrims();
+    const Prims& prims = m_structure.GetPrims();
     for (const auto& [prim, mesh] : m_meshes) {
         if (mesh.shape && mesh.shape->updated == Runs() && prims.Alive(prim)) {
             AddWorld(updated, prims.At(prim).world);
@@ -475,7 +475,7 @@ void Geometry::Update(std::vector<uint32_t>& updated) {
 
     static const profiler::ZoneId blasZone = profiler::ZoneId::Named("Geometry/Blas");
     static const profiler::ZoneId normalsZone = profiler::ZoneId::Named("Geometry/Normals");
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     store.Flush();
     const Ref<device::Buffer> table =
@@ -505,7 +505,7 @@ void Geometry::Update(std::vector<uint32_t>& updated) {
     queue.Submit(encoder.Finish());
 }
 
-void Geometry::Hold(std::vector<Ref<const RefCounted>>& held) const {
+void MeshBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_records.Buffer()});
     for (const auto& [key, shape] : m_shapes) {
         if (shape.blas) {
@@ -514,18 +514,18 @@ void Geometry::Hold(std::vector<Ref<const RefCounted>>& held) const {
     }
 }
 
-void Geometry::Prepare() {
+void MeshBuilder::Prepare() {
     Kernels();
     if (!m_scan) {
         m_scanCapacity = kPreparedScan;
-        m_scan =
-            std::make_unique<algorithms::Scan>(m_catalog.GetStore().GetDevice(), m_scanCapacity);
+        m_scan = std::make_unique<algorithms::Scan>(m_structure.GetColumnStore().GetDevice(),
+                                                    m_scanCapacity);
     }
 }
 
-device::Program& Geometry::Kernels() {
+device::Program& MeshBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.meshes"},
              .library = &kSceneKernels,
              .entries = {"FaceSizes", "FaceTriangles", "TopologySizes", "EmitTriangles",

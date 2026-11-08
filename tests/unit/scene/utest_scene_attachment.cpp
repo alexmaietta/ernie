@@ -77,12 +77,12 @@ DLManagedTensor* DeviceTensor(device::Device& device, uint32_t rows, int& deleti
     return Manage(owned, reinterpret_cast<void*>(address.address), address.device, rows, deletions);
 }
 
-uint64_t GlobalStamp(Store& store) {
+uint64_t GlobalStamp(ColumnStore& store) {
     return Items<uint64_t>(store.Worlds().Read(0, 0, 1)).front();
 }
 
-PrimBlock Attachable(Catalog& catalog, std::string_view prefix, uint32_t count) {
-    return catalog.Define(SchemaId::Sphere, Paths(prefix, count), [](RowWriter&) {}, true);
+PrimBlock Attachable(Structure& structure, std::string_view prefix, uint32_t count) {
+    return structure.Define(SchemaId::Sphere, Paths(prefix, count), [](RowWriter&) {}, true);
 }
 
 struct Moved {
@@ -92,7 +92,7 @@ struct Moved {
     int64_t allocated = 0;
 };
 
-template <class Work> Moved Measure(Store& store, Work work) {
+template <class Work> Moved Measure(ColumnStore& store, Work work) {
     device::Device& device = store.GetDevice();
     store.Flush();
     store.DeviceData();
@@ -117,16 +117,16 @@ void ExpectOnlyAWorldStampMoved(const Moved& moved) {
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        test(device, store, catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        test(device, store, structure);
     });
 }
 
 TEST(AttachmentTest, CopiedTensorsAreRefusedAndReadOnlyOnesTakeNoSceneValues) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 2));
-        UntypedAttribute radius = View(catalog, SchemaId::Sphere, block).Get(kSphereRadius);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 2));
+        UntypedAttribute radius = View(structure, SchemaId::Sphere, block).Get(kSphereRadius);
         std::vector<float> values = {1, 2};
         int64_t shape = 2;
         DLManagedTensorVersioned tensor{};
@@ -147,9 +147,9 @@ TEST(AttachmentTest, CopiedTensorsAreRefusedAndReadOnlyOnesTakeNoSceneValues) {
 }
 
 TEST(AttachmentTest, AHostTensorIsCopiedInWhenMarkChangeded) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 4));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 4));
+        const View view(structure, SchemaId::Sphere, block);
         Attribute<float> radius = view.Get<float>(kSphereRadius);
         int deletions = 0;
         DLManagedTensor* tensor = HostTensor({1, 2, 3, 4}, deletions);
@@ -166,7 +166,7 @@ TEST(AttachmentTest, AHostTensorIsCopiedInWhenMarkChangeded) {
 
         EXPECT_THROW(radius.Set(1.0f), Error);
         EXPECT_THROW(radius.Map(MapAccess::Write), Error);
-        EXPECT_THROW(catalog.Remove(block.Prim(0, 0)), Error);
+        EXPECT_THROW(structure.Remove(block.Prim(0, 0)), Error);
         EXPECT_THROW(radius.Attach(HostTensor({0, 0, 0, 0}, deletions)), Error);
         EXPECT_EQ(deletions, 0);
 
@@ -175,14 +175,14 @@ TEST(AttachmentTest, AHostTensorIsCopiedInWhenMarkChangeded) {
         EXPECT_FALSE(radius.Attached());
         EXPECT_EQ(radius.Get(), (std::vector<float>{5, 6, 7, 8}));
         radius.Set(2.0f);
-        catalog.Remove(block.Prim(0, 0));
+        structure.Remove(block.Prim(0, 0));
     });
 }
 
 TEST(AttachmentTest, AttachingFromTheSceneFillsTheTensor) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 3));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 3));
+        const View view(structure, SchemaId::Sphere, block);
         Attribute<float> radius = view.Get<float>(kSphereRadius);
         radius.Set(std::vector<float>{1, 2, 3});
         int deletions = 0;
@@ -195,9 +195,9 @@ TEST(AttachmentTest, AttachingFromTheSceneFillsTheTensor) {
 }
 
 TEST(AttachmentTest, ARefusedAttachmentLeavesTheTensorWithTheCaller) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 3));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 3));
+        const View view(structure, SchemaId::Sphere, block);
         int deletions = 0;
         DLManagedTensor* tensor = HostTensor({1, 2}, deletions);
         EXPECT_THROW(view.Get<float>(kSphereRadius).Attach(tensor), Error);
@@ -211,10 +211,10 @@ TEST(AttachmentTest, TheStoreFreesTensorsStillAttached) {
     test::ForEachDevice([](device::Device& device) {
         int deletions = 0;
         {
-            Store store(device);
-            Catalog catalog(store);
-            const View view(catalog, SchemaId::Sphere,
-                            catalog.Define(SchemaId::Sphere, Paths("/Ball", 2)));
+            ColumnStore store(device);
+            Structure structure(store);
+            const View view(structure, SchemaId::Sphere,
+                            structure.Define(SchemaId::Sphere, Paths("/Ball", 2)));
             view.Get<float>(kSphereRadius).Attach(HostTensor({1, 2}, deletions));
         }
         EXPECT_EQ(deletions, 1);
@@ -222,14 +222,14 @@ TEST(AttachmentTest, TheStoreFreesTensorsStillAttached) {
 }
 
 TEST(AttachmentTest, DeviceTensorsBecomeTheStorageOfAnAttachableBatch) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!InPlace(device)) {
             return;
         }
-        catalog.Define(SchemaId::Sphere, Paths("/Before", 3));
-        const PrimBlock block = Attachable(catalog, "/Ball", 300);
-        catalog.Define(SchemaId::Sphere, Paths("/After", 3));
-        const View view(catalog, SchemaId::Sphere, block);
+        structure.Define(SchemaId::Sphere, Paths("/Before", 3));
+        const PrimBlock block = Attachable(structure, "/Ball", 300);
+        structure.Define(SchemaId::Sphere, Paths("/After", 3));
+        const View view(structure, SchemaId::Sphere, block);
         Attribute<float> radius = view.Get<float>(kSphereRadius);
         std::vector<float> values(300);
         for (uint32_t i = 0; i < values.size(); ++i) {
@@ -268,12 +268,12 @@ TEST(AttachmentTest, DeviceTensorsBecomeTheStorageOfAnAttachableBatch) {
 }
 
 TEST(AttachmentTest, WriteMappingsOfAttachedValuesAliasTheTensorAndStampOnClose) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!InPlace(device)) {
             return;
         }
-        const PrimBlock block = Attachable(catalog, "/Ball", 64);
-        const View view(catalog, SchemaId::Sphere, block);
+        const PrimBlock block = Attachable(structure, "/Ball", 64);
+        const View view(structure, SchemaId::Sphere, block);
         Attribute<float> radius = view.Get<float>(kSphereRadius);
         int deletions = 0;
         DLManagedTensor* tensor = DeviceTensor(device, 64, deletions);
@@ -296,9 +296,9 @@ TEST(AttachmentTest, WriteMappingsOfAttachedValuesAliasTheTensorAndStampOnClose)
 }
 
 TEST(AttachmentTest, AttachmentsByCopyDontMapForWriting) {
-    ForEachScene([](device::Device&, Store&, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 4));
-        const View view(catalog, SchemaId::Sphere, block);
+    ForEachScene([](device::Device&, ColumnStore&, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 4));
+        const View view(structure, SchemaId::Sphere, block);
         Attribute<float> radius = view.Get<float>(kSphereRadius);
         int deletions = 0;
         radius.Attach(HostTensor({1, 2, 3, 4}, deletions)).Wait();
@@ -309,13 +309,13 @@ TEST(AttachmentTest, AttachmentsByCopyDontMapForWriting) {
 }
 
 TEST(AttachmentTest, InPlaceAttachmentNeedsAnAttachableBatch) {
-    ForEachScene([](device::Device& device, Store&, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore&, Structure& structure) {
         if (!InPlace(device)) {
             return;
         }
-        catalog.Define(SchemaId::Sphere, Paths("/Before", 3));
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 4));
-        const View view(catalog, SchemaId::Sphere, block);
+        structure.Define(SchemaId::Sphere, Paths("/Before", 3));
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 4));
+        const View view(structure, SchemaId::Sphere, block);
         int deletions = 0;
         DLManagedTensor* tensor = DeviceTensor(device, 4, deletions);
         EXPECT_THROW(view.Get<float>(kSphereRadius).Attach(tensor), Error);
@@ -325,22 +325,22 @@ TEST(AttachmentTest, InPlaceAttachmentNeedsAnAttachableBatch) {
 }
 
 TEST(ZeroCopyTest, ADenseMappingMovesNoBytesAndAScatteredOneStages) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 1000));
-        Attribute<float> dense = View(catalog, SchemaId::Sphere, block).Get<float>(kSphereRadius);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 1000));
+        Attribute<float> dense = View(structure, SchemaId::Sphere, block).Get<float>(kSphereRadius);
         dense.Set(1.0f);
         ExpectOnlyAWorldStampMoved(Measure(store, [&] {
             Mapping mapping = dense.Map(MapAccess::ReadWrite);
             mapping.Close();
         }));
 
-        const PrimBlock other = catalog.Define(SchemaId::Sphere, Paths("/Other", 1000));
+        const PrimBlock other = structure.Define(SchemaId::Sphere, Paths("/Other", 1000));
         std::vector<uint32_t> prims;
         for (uint32_t i = 0; i < 1000; ++i) {
             prims.push_back((i % 2 == 0 ? block : other).Prim(i, 0));
         }
         Attribute<float> scattered =
-            View(catalog, SchemaId::Sphere, prims).Get<float>(kSphereRadius);
+            View(structure, SchemaId::Sphere, prims).Get<float>(kSphereRadius);
         scattered.Map(MapAccess::ReadWrite).Close();
         Mapping mapping;
         const Moved moved = Measure(store, [&] { mapping = scattered.Map(MapAccess::ReadWrite); });
@@ -350,12 +350,13 @@ TEST(ZeroCopyTest, ADenseMappingMovesNoBytesAndAScatteredOneStages) {
 }
 
 TEST(ZeroCopyTest, DeviceTensorsAreReadInPlaceOrCopiedOnce) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!device.SharedDevice()) {
             return;
         }
-        const PrimBlock block = catalog.Define(SchemaId::Sphere, Paths("/Ball", 1000));
-        Attribute<float> radius = View(catalog, SchemaId::Sphere, block).Get<float>(kSphereRadius);
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 1000));
+        Attribute<float> radius =
+            View(structure, SchemaId::Sphere, block).Get<float>(kSphereRadius);
         radius.Read();
         int deletions = 0;
         Owned* owned = new Owned;
@@ -377,12 +378,13 @@ TEST(ZeroCopyTest, DeviceTensorsAreReadInPlaceOrCopiedOnce) {
 }
 
 TEST(ZeroCopyTest, AnInPlaceAttachmentMovesNoBytesPerFrame) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!InPlace(device)) {
             return;
         }
-        const PrimBlock block = Attachable(catalog, "/Ball", 1000);
-        Attribute<float> radius = View(catalog, SchemaId::Sphere, block).Get<float>(kSphereRadius);
+        const PrimBlock block = Attachable(structure, "/Ball", 1000);
+        Attribute<float> radius =
+            View(structure, SchemaId::Sphere, block).Get<float>(kSphereRadius);
         int deletions = 0;
         DLManagedTensor* tensor = DeviceTensor(device, 1000, deletions);
         const Ref<device::Buffer> user(static_cast<Owned*>(tensor->manager_ctx)->buffer);
@@ -437,9 +439,9 @@ DLManagedTensor* HostPoints(uint32_t prims, uint32_t count, float value, int& de
 const std::vector<Float3> kTriangle = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
 
 TEST(ArrayAttachmentTest, HostPointsAreCopiedInWhenMarkChangededAndClonesKeepTheirOwn) {
-    ForEachScene([](device::Device&, Store& store, Catalog& catalog) {
-        const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 3));
-        const View view(catalog, SchemaId::Mesh, block);
+    ForEachScene([](device::Device&, ColumnStore& store, Structure& structure) {
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 3));
+        const View view(structure, SchemaId::Mesh, block);
         ArrayAttribute<Float3> points = view.GetArray<Float3>(kPointBasedPoints);
         points.Set(0, kTriangle);
         int deletions = 0;
@@ -449,8 +451,8 @@ TEST(ArrayAttachmentTest, HostPointsAreCopiedInWhenMarkChangededAndClonesKeepThe
         EXPECT_THROW(points.Set(0, kTriangle), Error);
         EXPECT_THROW(view.Get(kPointBasedPoints).Map(MapAccess::Write), Error);
 
-        const PrimBlock copy = catalog.Clone(block.Prim(1, 0), Paths("/Copy", 1));
-        const View copied(catalog, SchemaId::Mesh, copy);
+        const PrimBlock copy = structure.Clone(block.Prim(1, 0), Paths("/Copy", 1));
+        const View copied(structure, SchemaId::Mesh, copy);
 
         static_cast<OwnedPoints*>(tensor->manager_ctx)->values.assign(36, 5.0f);
         EXPECT_EQ(points.Get(1)[0].x, 1.0f);
@@ -470,12 +472,12 @@ TEST(ArrayAttachmentTest, HostPointsAreCopiedInWhenMarkChangededAndClonesKeepThe
 }
 
 TEST(ArrayAttachmentTest, DevicePointsAreTheArraysInPlace) {
-    ForEachScene([](device::Device& device, Store& store, Catalog& catalog) {
+    ForEachScene([](device::Device& device, ColumnStore& store, Structure& structure) {
         if (!InPlace(device)) {
             return;
         }
-        const PrimBlock block = catalog.Define(SchemaId::Mesh, Paths("/Mesh", 2));
-        const View view(catalog, SchemaId::Mesh, block);
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 2));
+        const View view(structure, SchemaId::Mesh, block);
         ArrayAttribute<Float3> points = view.GetArray<Float3>(kPointBasedPoints);
         points.Set(0, kTriangle);
         points.Set(1, kTriangle);
@@ -519,7 +521,7 @@ TEST(ArrayAttachmentTest, DevicePointsAreTheArraysInPlace) {
         device.GetQueue().Write(*user, std::vector<Float3>(6).data());
         EXPECT_EQ(points.Get(1), std::vector<Float3>(3, Float3{3, 3, 3}));
         EXPECT_FALSE(heap.Borrowed(store.Array(
-            kPointBasedPoints, catalog.GetPrims().Row(block.Prim(1, 0), SchemaId::PointBased))));
+            kPointBasedPoints, structure.GetPrims().Row(block.Prim(1, 0), SchemaId::PointBased))));
     });
 }
 

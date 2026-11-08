@@ -9,7 +9,7 @@
 #include "ernie/device/operation.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/kernels/schema/schema.h"
-#include "ernie/scene/publish/table_versions.h"
+#include "ernie/scene/publish/table_writes.h"
 #include "ernie/scene/structure/structure.h"
 
 namespace ernie {

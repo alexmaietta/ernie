@@ -23,50 +23,50 @@ namespace {
 
 struct Scene {
     device::Device& device;
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Semantics& semantics;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    SemanticBuilder& semantics;
     Token taxonomy;
     Ordinal ordinal = 0;
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     uint32_t Define(SchemaId schema, const std::string& path) {
-        return catalog.Define(schema, std::vector<std::string>{path}).firstPrim;
+        return structure.Define(schema, std::vector<std::string>{path}).firstPrim;
     }
 
     uint32_t Labeled(const std::string& path, const std::string& label) {
-        return catalog
+        return structure
             .Define<Xform>(std::vector<std::string>{path},
                            {.semanticsLabels = {{"class", {label}}}})
             .firstPrim;
     }
 
     void Relabel(uint32_t prim, const std::string& label) {
-        const uint32_t id = catalog.GetTokens().Intern(label).id;
+        const uint32_t id = structure.GetTokens().Intern(label).id;
         ArrayHeap& arrays = store.Arrays(ColumnType::TokenArray);
         const ArrayRef array = arrays.Allocate(1);
         arrays.Write(array, std::as_bytes(std::span(&id, 1)));
         store.SetArray(kSemanticsLabelsAPISemanticsLabels,
-                       catalog.GetPrims().InstanceRow(prim, SchemaId::SemanticsLabelsAPI,
-                                                      catalog.GetTokens().Intern("class").id),
+                       structure.GetPrims().InstanceRow(prim, SchemaId::SemanticsLabelsAPI,
+                                                        structure.GetTokens().Intern("class").id),
                        array);
     }
 };
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
-        Semantics semantics(catalog);
-        timeline.Add(semantics);
-        const Token taxonomy = catalog.GetTokens().Intern("class");
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
+        SemanticBuilder semantics(structure);
+        publisher.Add(semantics);
+        const Token taxonomy = structure.GetTokens().Intern("class");
         semantics.Require(std::vector<Token>{taxonomy});
-        Scene scene{device, store, catalog, timeline, semantics, taxonomy};
+        Scene scene{device, store, structure, publisher, semantics, taxonomy};
         test(scene);
     });
 }
@@ -108,7 +108,7 @@ TEST(SemanticsTest, LabelsResolveDownTheTreeByTaxonomy) {
         EXPECT_EQ(s.semantics.LabeledPrim(s.taxonomy, hand), hand);
         EXPECT_EQ(s.semantics.SemanticId(s.taxonomy, free), 1u);
         EXPECT_EQ(s.semantics.LabeledPrim(s.taxonomy, free), kNoPrim);
-        EXPECT_GE(s.semantics.Data().stride, s.catalog.GetPrims().Size());
+        EXPECT_GE(s.semantics.Data().stride, s.structure.GetPrims().Size());
         EXPECT_EQ(s.semantics.Data().taxonomyCount, 1u);
     });
 }
@@ -117,9 +117,9 @@ TEST(SemanticsTest, ARequestedTaxonomyResolvesOnTheNextPublish) {
     ForEachScene([](Scene& s) {
         const uint32_t robot = s.Labeled("/Robot", "robot");
         s.Publish();
-        const Token material = s.catalog.GetTokens().Intern("material");
+        const Token material = s.structure.GetTokens().Intern("material");
         s.semantics.Require(std::vector<Token>{s.taxonomy, material});
-        EXPECT_TRUE(s.timeline.Pending());
+        EXPECT_TRUE(s.publisher.Pending());
         s.Publish();
         EXPECT_EQ(s.semantics.Data().taxonomyCount, 2u);
         EXPECT_EQ(s.semantics.SemanticId(material, robot), 1u);
@@ -161,7 +161,7 @@ TEST(SemanticsTest, RemovedPrimsLoseTheirEntries) {
     ForEachScene([](Scene& s) {
         const uint32_t ball = s.Labeled("/Ball", "ball");
         s.Publish();
-        s.catalog.Remove(ball);
+        s.structure.Remove(ball);
         s.Publish();
         EXPECT_EQ(s.semantics.SemanticId(s.taxonomy, ball), 0u);
         EXPECT_EQ(s.semantics.LabeledPrim(s.taxonomy, ball), kNoPrim);
@@ -189,7 +189,7 @@ TEST(SemanticsTest, TransformsAloneResolveNothing) {
         const uint32_t ball = s.Labeled("/Ball", "ball");
         s.Publish();
         const uint32_t runs = s.semantics.Runs();
-        View(s.catalog, SchemaId::Xformable, std::vector<uint32_t>{ball})
+        View(s.structure, SchemaId::Xformable, std::vector<uint32_t>{ball})
             .Get<Double3>(kXformableTranslate)
             .Set(Double3{1, 0, 0});
         s.Publish();

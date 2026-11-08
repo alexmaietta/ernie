@@ -7,7 +7,7 @@
 namespace ernie {
 
 struct MaterialParams {
-    Ptr<SceneData> scene;
+    Ptr<AuthoredData> scene;
     Ptr<PreviewRecord> previews;
     Ptr<NonVisualRecord> nonVisuals;
     Ptr<CheckerRecord> checkers;

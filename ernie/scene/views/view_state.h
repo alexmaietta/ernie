@@ -39,7 +39,7 @@ struct RowSource {
 
 class ViewState {
   public:
-    ViewState(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims,
+    ViewState(Structure& structure, SchemaId schema, std::vector<uint32_t> prims,
               uint32_t instance = kNoInstance);
 
     static constexpr uint32_t kNoInstance = 0xFFFFFFFF;
@@ -48,12 +48,12 @@ class ViewState {
         return m_instance;
     }
 
-    Catalog& GetCatalog() const {
-        return m_catalog;
+    Structure& GetStructure() const {
+        return m_structure;
     }
 
-    Store& GetStore() const {
-        return m_catalog.GetStore();
+    ColumnStore& GetColumnStore() const {
+        return m_structure.GetColumnStore();
     }
 
     SchemaId Schema() const {
@@ -74,7 +74,7 @@ class ViewState {
     RowSource Source(SchemaId table);
 
   private:
-    Catalog& m_catalog;
+    Structure& m_structure;
     SchemaId m_schema;
     uint32_t m_instance;
     std::vector<uint32_t> m_prims;

@@ -14,9 +14,9 @@
 
 namespace ernie {
 
-class Materials : public System {
+class MaterialBuilder : public TableBuilder {
   public:
-    explicit Materials(Catalog& catalog) : m_catalog(catalog) {}
+    explicit MaterialBuilder(Structure& structure) : m_structure(structure) {}
 
     std::string_view Name() const override {
         return "materials";
@@ -24,7 +24,7 @@ class Materials : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
@@ -34,7 +34,7 @@ class Materials : public System {
   private:
     device::Program& Kernels();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     Ref<device::Program> m_program;
     DeviceTable<PreviewRecord> m_previews{"preview surface records"};
     DeviceTable<NonVisualRecord> m_nonVisuals{"nonvisual material records"};

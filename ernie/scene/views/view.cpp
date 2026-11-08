@@ -12,10 +12,10 @@
 
 namespace ernie {
 
-ViewState::ViewState(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims,
+ViewState::ViewState(Structure& structure, SchemaId schema, std::vector<uint32_t> prims,
                      uint32_t instance)
-    : m_catalog(catalog), m_schema(schema), m_instance(instance), m_prims(std::move(prims)) {
-    const ernie::Prims& records = catalog.GetPrims();
+    : m_structure(structure), m_schema(schema), m_instance(instance), m_prims(std::move(prims)) {
+    const ernie::Prims& records = structure.GetPrims();
     m_generations.reserve(m_prims.size());
     for (const uint32_t prim : m_prims) {
         const PrimRecord& record = records.At(prim);
@@ -29,19 +29,19 @@ ViewState::ViewState(Catalog& catalog, SchemaId schema, std::vector<uint32_t> pr
 }
 
 bool ViewState::Live(uint32_t index) const {
-    const ernie::Prims& records = m_catalog.GetPrims();
+    const ernie::Prims& records = m_structure.GetPrims();
     return records.Alive(m_prims[index]) &&
            records.Generation(m_prims[index]) == m_generations[index];
 }
 
 const ViewRows& ViewState::Rows(SchemaId table) {
     ViewRows& rows = m_rows[table];
-    if (rows.epoch == m_catalog.Epoch()) {
+    if (rows.epoch == m_structure.Epoch()) {
         return rows;
     }
-    const ernie::Prims& records = m_catalog.GetPrims();
+    const ernie::Prims& records = m_structure.GetPrims();
     rows = {};
-    rows.epoch = m_catalog.Epoch();
+    rows.epoch = m_structure.Epoch();
     rows.rows.reserve(m_prims.size());
     std::set<uint32_t> worlds;
     for (uint32_t index = 0; index < m_prims.size(); ++index) {
@@ -58,8 +58,8 @@ const ViewRows& ViewState::Rows(SchemaId table) {
         } else {
             row = records.InstanceRow(m_prims[index], table, m_instance);
             if (row == kNoRow) {
-                throw Error("{} has no {} {}", m_catalog.GetPaths().Path(m_prims[index]),
-                            Info(table).name, m_catalog.GetTokens().Text(Token{m_instance}));
+                throw Error("{} has no {} {}", m_structure.GetPaths().Path(m_prims[index]),
+                            Info(table).name, m_structure.GetTokens().Text(Token{m_instance}));
             }
         }
         const uint32_t world = records.At(m_prims[index]).world;
@@ -81,8 +81,8 @@ const Ref<device::Buffer>& ViewState::DeviceRows(SchemaId table) {
     Rows(table);
     ViewRows& rows = m_rows.at(table);
     if (!rows.device && !rows.rows.empty()) {
-        rows.device = GetStore().GetDevice().CreateBuffer({.label = "view rows"},
-                                                          std::span<const uint32_t>(rows.rows));
+        rows.device = GetColumnStore().GetDevice().CreateBuffer(
+            {.label = "view rows"}, std::span<const uint32_t>(rows.rows));
     }
     return rows.device;
 }
@@ -96,21 +96,21 @@ RowSource ViewState::Source(SchemaId table) {
     return {device ? device->Address() : 0, 0};
 }
 
-View::View(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims)
-    : m_state(std::make_shared<ViewState>(catalog, schema, std::move(prims))) {}
+View::View(Structure& structure, SchemaId schema, std::vector<uint32_t> prims)
+    : m_state(std::make_shared<ViewState>(structure, schema, std::move(prims))) {}
 
-View::View(Catalog& catalog, SchemaId schema, std::vector<uint32_t> prims,
+View::View(Structure& structure, SchemaId schema, std::vector<uint32_t> prims,
            std::string_view instance)
-    : m_state(std::make_shared<ViewState>(catalog, schema, std::move(prims),
-                                          catalog.GetTokens().Intern(instance).id)) {}
+    : m_state(std::make_shared<ViewState>(structure, schema, std::move(prims),
+                                          structure.GetTokens().Intern(instance).id)) {}
 
-View::View(Catalog& catalog, SchemaId schema, const PrimBlock& block, uint32_t index) {
+View::View(Structure& structure, SchemaId schema, const PrimBlock& block, uint32_t index) {
     std::vector<uint32_t> prims;
     prims.reserve(block.copies);
     for (uint32_t copy = 0; copy < block.copies; ++copy) {
         prims.push_back(block.Prim(copy, index));
     }
-    m_state = std::make_shared<ViewState>(catalog, schema, std::move(prims));
+    m_state = std::make_shared<ViewState>(structure, schema, std::move(prims));
 }
 
 uint32_t View::PrimCount() const {
@@ -132,7 +132,7 @@ Span<const uint32_t> View::Prims() const {
 View View::World(uint32_t world) const {
     std::vector<uint32_t> prims;
     if (m_state) {
-        const ernie::Prims& records = m_state->GetCatalog().GetPrims();
+        const ernie::Prims& records = m_state->GetStructure().GetPrims();
         for (uint32_t index = 0; index < m_state->Size(); ++index) {
             if (m_state->Live(index) && records.At(m_state->Prims()[index]).world == world) {
                 prims.push_back(m_state->Prims()[index]);
@@ -143,7 +143,7 @@ View View::World(uint32_t world) const {
         return View();
     }
     View narrowed;
-    narrowed.m_state = std::make_shared<ViewState>(m_state->GetCatalog(), m_state->Schema(),
+    narrowed.m_state = std::make_shared<ViewState>(m_state->GetStructure(), m_state->Schema(),
                                                    std::move(prims), m_state->Instance());
     return narrowed;
 }
@@ -195,7 +195,7 @@ ColumnRef View::Column(std::string_view field) const {
     if (!m_state) {
         throw Error("An empty view has no attributes");
     }
-    const ernie::Prims& prims = m_state->GetCatalog().GetPrims();
+    const ernie::Prims& prims = m_state->GetStructure().GetPrims();
     if (m_state->Schema() != SchemaId::None) {
         uint64_t shared = ~uint64_t(0);
         for (const uint32_t prim : m_state->Prims()) {

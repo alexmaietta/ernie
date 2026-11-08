@@ -52,7 +52,7 @@ class SceneImpl {
     template <class Write>
     Prim Define(std::string_view path, SchemaId schema, uint64_t apis, const Write& write) {
         const std::string paths[] = {std::string(path)};
-        return Handle(m_catalog.Define(schema, paths, apis, write).firstPrim);
+        return Handle(m_structure.Define(schema, paths, apis, write).firstPrim);
     }
 
     template <class Write>
@@ -64,18 +64,18 @@ class SceneImpl {
     template <class Write>
     PrimRange Define(Span<const std::string> paths, SchemaId schema, uint64_t apis,
                      const Write& write, const BatchDesc& batch = {}) {
-        return Range(m_catalog.Define(schema, std::span(paths.data(), paths.size()), apis, write,
-                                      batch.attachable));
+        return Range(m_structure.Define(schema, std::span(paths.data(), paths.size()), apis, write,
+                                        batch.attachable));
     }
 
     template <class Write> void Apply(Span<const Prim> prims, SchemaId api, const Write& write) {
-        m_catalog.Apply(Indices(prims), api, write);
+        m_structure.Apply(Indices(prims), api, write);
     }
 
     template <class Write>
     void Apply(Span<const Prim> prims, SchemaId api, std::string_view instance,
                const Write& write) {
-        m_catalog.Apply(Indices(prims), api, instance, write);
+        m_structure.Apply(Indices(prims), api, instance, write);
     }
 
     std::vector<uint32_t> Indices(Span<const Prim> prims) const;
@@ -88,63 +88,63 @@ class SceneImpl {
         return *m_device;
     }
 
-    Store& GetStore() {
+    ColumnStore& GetColumnStore() {
         return m_store;
     }
 
-    Catalog& GetCatalog() {
-        return m_catalog;
+    Structure& GetStructure() {
+        return m_structure;
     }
 
-    const Catalog& GetCatalog() const {
-        return m_catalog;
+    const Structure& GetStructure() const {
+        return m_structure;
     }
 
-    Timeline& GetTimeline() {
-        return m_timeline;
+    Publisher& GetPublisher() {
+        return m_publisher;
     }
 
     bvh::Builder& GetBuilder() {
         return *m_builder;
     }
 
-    Hierarchy& GetHierarchy() {
-        return m_hierarchy;
+    TransformBuilder& GetTransforms() {
+        return m_transforms;
     }
 
-    Geometry& GetGeometry() {
-        return m_geometry;
+    MeshBuilder& GetMeshes() {
+        return m_meshes;
     }
 
-    ernie::Bounds& GetBounds() {
+    ernie::BoundsBuilder& GetBounds() {
         return m_bounds;
     }
 
-    Tangents& GetTangents() {
+    TangentBuilder& GetTangents() {
         return m_tangents;
     }
 
-    Textures& GetTextures() {
+    TextureBuilder& GetTextures() {
         return m_textures;
     }
 
-    Semantics& GetSemantics() {
+    SemanticBuilder& GetSemantics() {
         return m_semantics;
     }
 
-    Instances& GetInstances() {
+    InstanceBuilder& GetInstances() {
         return m_instances;
     }
 
-    Lights& GetLights() {
+    LightBuilder& GetLights() {
         return m_lights;
     }
 
-    Surfaces& GetSurfaces() {
+    SurfaceBuilder& GetSurfaces() {
         return m_surfaces;
     }
 
-    Products& GetProducts() {
+    ProductBuilder& GetProducts() {
         return m_products;
     }
 
@@ -167,22 +167,22 @@ class SceneImpl {
   private:
     Scene& m_scene;
     Ref<device::Device> m_device;
-    Store m_store;
-    Catalog m_catalog;
-    Timeline m_timeline;
+    ColumnStore m_store;
+    Structure m_structure;
+    Publisher m_publisher;
     std::unique_ptr<bvh::Builder> m_builder;
-    Hierarchy m_hierarchy;
-    Geometry m_geometry;
-    ernie::Bounds m_bounds;
-    Tangents m_tangents;
-    Textures m_textures;
-    Semantics m_semantics;
-    Sensors m_sensors;
-    Products m_products;
-    Materials m_materials;
-    Instances m_instances;
-    Surfaces m_surfaces;
-    Lights m_lights;
+    TransformBuilder m_transforms;
+    MeshBuilder m_meshes;
+    ernie::BoundsBuilder m_bounds;
+    TangentBuilder m_tangents;
+    TextureBuilder m_textures;
+    SemanticBuilder m_semantics;
+    SensorBuilder m_sensors;
+    ProductBuilder m_products;
+    MaterialBuilder m_materials;
+    InstanceBuilder m_instances;
+    SurfaceBuilder m_surfaces;
+    LightBuilder m_lights;
     Readback m_readback;
     std::vector<std::function<bool()>> m_commitSteps;
 };

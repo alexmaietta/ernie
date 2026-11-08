@@ -27,9 +27,9 @@ struct PinnedTables {
     }
 };
 
-class Timeline {
+class Publisher {
   public:
-    explicit Timeline(Catalog& catalog) : m_catalog(catalog) {}
+    explicit Publisher(Structure& structure) : m_structure(structure) {}
 
     Ordinal Published() const {
         return m_sealed.empty() ? 0 : m_sealed.back().ordinal;
@@ -42,7 +42,7 @@ class Timeline {
         return m_outstanding;
     }
 
-    void Add(System& system);
+    void Add(TableBuilder& system);
     device::Operation Publish(Ordinal ordinal, Stream producer = Stream::None());
     ChangeSet Changes(Ordinal since, std::span<const ColumnRef> columns = {});
 
@@ -56,7 +56,7 @@ class Timeline {
     };
 
     struct Scheduled {
-        System* system = nullptr;
+        TableBuilder* system = nullptr;
         Ordinal stamp = 0;
         uint64_t writes = 0;
         uint64_t epoch = 0;
@@ -70,17 +70,17 @@ class Timeline {
     ChangeSet Build(Ordinal since, Ordinal until, Ordinal sealing,
                     std::span<const ColumnRef> columns,
                     std::vector<Ref<device::Buffer>>* reused = nullptr);
-    void RunSystems(Ordinal stamp, Ordinal ordinal);
+    void RunBuilders(Ordinal stamp, Ordinal ordinal);
     void Seal();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     std::vector<Sealed> m_sealed;
     std::vector<Scheduled> m_systems;
     uint64_t m_writes = 0;
     uint64_t m_epoch = 0;
     uint32_t m_outstanding = 0;
     RenderTables m_tables{};
-    TableLog m_log;
+    TableWrites m_tableWrites;
     std::shared_ptr<const PinnedTables> m_pinned;
 };
 

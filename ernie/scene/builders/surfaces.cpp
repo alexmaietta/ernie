@@ -24,18 +24,18 @@ constexpr ColumnRef kInputs[] = {kGprimPrimvars,         kGprimDisplayColor,
 
 }
 
-std::span<const ColumnRef> Surfaces::Inputs() const {
+std::span<const ColumnRef> SurfaceBuilder::Inputs() const {
     return kInputs;
 }
 
-void Surfaces::Describe(RenderTables& tables) const {
+void SurfaceBuilder::Describe(RenderTables& tables) const {
     tables.surfaces.address = m_surfaces.Address();
 }
 
-void Surfaces::Run(const ChangeSet& changes, TableLog&) {
+void SurfaceBuilder::Run(const ChangeSet& changes, TableWrites&) {
     ERNIE_ZONE("Surfaces/Run");
     m_written = 0;
-    Store& store = m_catalog.GetStore();
+    ColumnStore& store = m_structure.GetColumnStore();
     const std::span<const uint32_t> starts = m_instances.FirstInstances();
     const std::span<const uint32_t> counts = m_instances.InstanceCounts();
     if (changes.tables->instances.address == 0 || counts.empty()) {
@@ -76,13 +76,13 @@ void Surfaces::Run(const ChangeSet& changes, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-void Surfaces::Prepare() {
+void SurfaceBuilder::Prepare() {
     Kernels();
 }
 
-device::Program& Surfaces::Kernels() {
+device::Program& SurfaceBuilder::Kernels() {
     if (!m_program) {
-        m_program = m_catalog.GetStore().GetDevice().CreateProgram(
+        m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.surfaces"},
              .library = &kSceneKernels,
              .entries = {"WriteSurfaces"},

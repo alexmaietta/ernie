@@ -38,9 +38,9 @@ struct SemanticStats {
     bool reallocated = false;
 };
 
-class Semantics : public System {
+class SemanticBuilder : public TableBuilder {
   public:
-    explicit Semantics(Catalog& catalog) : m_catalog(catalog) {}
+    explicit SemanticBuilder(Structure& structure) : m_structure(structure) {}
 
     std::string_view Name() const override {
         return "semantics";
@@ -48,7 +48,7 @@ class Semantics : public System {
 
     std::span<const ColumnRef> Inputs() const override;
     bool Pending() const override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     void Require(std::span<const Token> taxonomies);
 
@@ -92,7 +92,7 @@ class Semantics : public System {
     void Grow(uint32_t prims);
     void Upload(std::span<const uint32_t> prims);
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     std::vector<Token> m_wanted;
     std::vector<Token> m_taxonomies;
     uint32_t m_stride = 0;

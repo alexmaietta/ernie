@@ -6,7 +6,7 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-MappingRecord LoadMapping(SceneData* scene, uint row) {
+MappingRecord LoadMapping(AuthoredData* scene, uint row) {
     TextureMappingAPIData* m = &scene->schemas.textureMappingAPI;
     MappingRecord record;
     record.projection = m.projection[row];
@@ -26,7 +26,7 @@ MappingRecord LoadMapping(SceneData* scene, uint row) {
     return record;
 }
 
-DetailRecord LoadDetail(SceneData* scene, uint row) {
+DetailRecord LoadDetail(AuthoredData* scene, uint row) {
     SurfaceDetailAPIData* s = &scene->schemas.surfaceDetailAPI;
     DetailRecord record;
     record.normal = s.normal[row];
@@ -49,7 +49,7 @@ DetailRecord LoadDetail(SceneData* scene, uint row) {
     return record;
 }
 
-PreviewRecord LoadPreview(SceneData* scene, uint prim) {
+PreviewRecord LoadPreview(AuthoredData* scene, uint prim) {
     UsdPreviewSurfaceData* d = &scene->schemas.usdPreviewSurface;
     const uint row = PrimRow(scene, prim, kSlotUsdPreviewSurface);
     PreviewRecord record;
@@ -89,7 +89,7 @@ PreviewRecord LoadPreview(SceneData* scene, uint prim) {
 [numthreads(kMaterialGroup, 1, 1)]
 void WriteMaterials(uniform MaterialParams p) {
     const uint prim = LinearThreadIndex();
-    SceneData* scene = p.scene;
+    AuthoredData* scene = p.scene;
     if (prim >= scene->primCount || (scene->prims.flags[prim] & kPrimAlive) == 0) {
         return;
     }

@@ -32,33 +32,33 @@ std::string WriteImage(const std::string& name, Rgba color) {
 }
 
 struct Scene {
-    Store& store;
-    Catalog& catalog;
-    Timeline& timeline;
-    Textures& textures;
+    ColumnStore& store;
+    Structure& structure;
+    Publisher& publisher;
+    TextureBuilder& textures;
     Ordinal ordinal = 0;
 
     void Publish() {
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
     }
 
     void Settle() {
         textures.Finish();
-        EXPECT_TRUE(timeline.Pending());
+        EXPECT_TRUE(publisher.Pending());
         Publish();
     }
 
     uint32_t Material(const std::string& path, const std::string& texture) {
         const uint32_t prim =
-            catalog.Define(SchemaId::UsdPreviewSurface, std::vector<std::string>{path}).firstPrim;
+            structure.Define(SchemaId::UsdPreviewSurface, std::vector<std::string>{path}).firstPrim;
         Texture(prim, texture);
         return prim;
     }
 
     void Texture(uint32_t material, const std::string& texture) {
-        View(catalog, SchemaId::UsdPreviewSurface, std::vector<uint32_t>{material})
+        View(structure, SchemaId::UsdPreviewSurface, std::vector<uint32_t>{material})
             .Get<Token>(kUsdPreviewSurfaceDiffuseColorTexture)
-            .Set(catalog.GetTokens().Intern(texture));
+            .Set(structure.GetTokens().Intern(texture));
     }
 
     uint32_t Bindings(uint32_t material) {
@@ -66,7 +66,7 @@ struct Scene {
     }
 };
 
-class TextureProbe : public System {
+class TextureProbe : public TableBuilder {
   public:
     std::string_view Name() const override {
         return "texture probe";
@@ -85,7 +85,7 @@ class TextureProbe : public System {
         return false;
     }
 
-    void Run(const ChangeSet& changes, TableLog&) override {
+    void Run(const ChangeSet& changes, TableWrites&) override {
         wrote = changes.Wrote(TableId::Textures);
         worlds = changes.worlds;
     }
@@ -96,12 +96,12 @@ class TextureProbe : public System {
 
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
-        Textures textures(catalog);
-        timeline.Add(textures);
-        Scene scene{store, catalog, timeline, textures};
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
+        TextureBuilder textures(structure);
+        publisher.Add(textures);
+        Scene scene{store, structure, publisher, textures};
         test(scene);
     });
 }
@@ -118,7 +118,7 @@ TEST(TexturesTest, ImagesLoadInTheBackgroundAndBindOnceReady) {
         EXPECT_NE(s.Bindings(look), kNoTextures);
         EXPECT_EQ(s.textures.Stats().loaded, 1u);
         EXPECT_EQ(s.textures.Stats().loading, 0u);
-        EXPECT_FALSE(s.timeline.Pending());
+        EXPECT_FALSE(s.publisher.Pending());
     });
 }
 
@@ -167,7 +167,7 @@ TEST(TexturesTest, ANewPathRebindsAndReleasesTheOldImage) {
 
 TEST(TexturesTest, CheckerboardPlanesBindTheChecker) {
     ForEachScene([&](Scene& s) {
-        s.catalog.Define<Plane>(std::vector<std::string>{"/Ground"}, {.checkerboard = true});
+        s.structure.Define<Plane>(std::vector<std::string>{"/Ground"}, {.checkerboard = true});
         s.Publish();
         s.Settle();
         EXPECT_NE(s.textures.Checker(), 0u);
@@ -182,7 +182,7 @@ TEST(TexturesTest, PublishingWithNothingToLoadDoesNothing) {
         s.Settle();
         const uint32_t runs = s.textures.Runs();
         s.Publish();
-        s.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"});
+        s.structure.Define(SchemaId::Sphere, std::vector<std::string>{"/Ball"});
         s.Publish();
         EXPECT_EQ(s.textures.Runs(), runs + 1);
         EXPECT_EQ(s.textures.Stats().loaded, 0u);
@@ -193,26 +193,26 @@ TEST(TexturesTest, PublishingWithNothingToLoadDoesNothing) {
 TEST(TexturesTest, DomeRecordsCarryTheirImageSizeAndRebindsAreLoggedPerWorld) {
     const std::string red = WriteImage("red.png", {1, 0, 0, 1});
     test::ForEachDevice([&](device::Device& device) {
-        Store store(device);
-        Catalog catalog(store);
-        Timeline timeline(catalog);
-        Textures textures(catalog);
+        ColumnStore store(device);
+        Structure structure(store);
+        Publisher publisher(structure);
+        TextureBuilder textures(structure);
         TextureProbe probe;
-        timeline.Add(textures);
-        timeline.Add(probe);
+        publisher.Add(textures);
+        publisher.Add(probe);
         Ordinal ordinal = 0;
-        catalog.Define(SchemaId::World, std::vector<std::string>{"/Env"});
+        structure.Define(SchemaId::World, std::vector<std::string>{"/Env"});
         const uint32_t dome =
-            catalog.Define(SchemaId::DomeLight, std::vector<std::string>{"/Env/Sky"}).firstPrim;
-        View(catalog, SchemaId::DomeLight, std::vector<uint32_t>{dome})
+            structure.Define(SchemaId::DomeLight, std::vector<std::string>{"/Env/Sky"}).firstPrim;
+        View(structure, SchemaId::DomeLight, std::vector<uint32_t>{dome})
             .Get<Token>(kDomeLightTextureFile)
-            .Set(catalog.GetTokens().Intern(red));
-        timeline.Publish(++ordinal).Wait();
+            .Set(structure.GetTokens().Intern(red));
+        publisher.Publish(++ordinal).Wait();
         EXPECT_EQ(textures.Record(dome).textures, kNoTextures);
 
         textures.Finish();
         probe.wrote = false;
-        timeline.Publish(++ordinal).Wait();
+        publisher.Publish(++ordinal).Wait();
         EXPECT_TRUE(probe.wrote);
         EXPECT_EQ(probe.worlds, (std::vector<uint32_t>{0}));
         const TextureRecord record = textures.Record(dome);
@@ -220,8 +220,8 @@ TEST(TexturesTest, DomeRecordsCarryTheirImageSizeAndRebindsAreLoggedPerWorld) {
         EXPECT_EQ(record.width, 4u);
         EXPECT_EQ(record.height, 4u);
 
-        catalog.Remove(dome);
-        timeline.Publish(++ordinal).Wait();
+        structure.Remove(dome);
+        publisher.Publish(++ordinal).Wait();
         EXPECT_EQ(textures.Record(dome).textures, kNoTextures);
         EXPECT_EQ(textures.Record(dome).width, 0u);
     });

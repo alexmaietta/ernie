@@ -17,10 +17,10 @@
 
 namespace ernie {
 
-class Lights : public System {
+class LightBuilder : public TableBuilder {
   public:
-    Lights(Catalog& catalog, const Instances& instances)
-        : m_catalog(catalog), m_instances(instances) {}
+    LightBuilder(Structure& structure, const InstanceBuilder& instances)
+        : m_structure(structure), m_instances(instances) {}
 
     std::string_view Name() const override {
         return "lights";
@@ -35,7 +35,7 @@ class Lights : public System {
     }
 
     void Prepare() override;
-    void Run(const ChangeSet& changes, TableLog& log) override;
+    void Run(const ChangeSet& changes, TableWrites& writes) override;
 
     const Ref<device::Buffer>& Layout() const {
         return m_layout;
@@ -64,7 +64,7 @@ class Lights : public System {
     void WriteCollectionsAndShapes();
     device::Program& Kernels();
 
-    Catalog& m_catalog;
+    Structure& m_structure;
     Ref<device::Program> m_program;
     Ref<device::Buffer> m_layout;
     Ref<device::Buffer> m_records;
@@ -81,7 +81,7 @@ class Lights : public System {
     uint32_t m_worlds = 0;
     uint32_t m_domes = 0;
     uint64_t m_seen = 0;
-    const Instances& m_instances;
+    const InstanceBuilder& m_instances;
     uint32_t m_written = 0;
 };
 
