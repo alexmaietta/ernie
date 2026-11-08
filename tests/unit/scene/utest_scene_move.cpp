@@ -30,7 +30,7 @@ Double3 WorldPosition(Scene& scene, std::string_view path) {
 TEST(MoveTest, RenamedPrimsKeepTheirIndexAndWhatPointsAtThem) {
     ForEachScene([](Scene& scene) {
         scene.Define<Scope>("/Looks");
-        const Prim red = scene.Define<Material>("/Looks/Red", {.id = "UsdPreviewSurface"});
+        const Prim red = scene.DefineMaterial("/Looks/Red");
         scene.Define<Sphere>("/Ball", {.materialBinding = {"/Looks/Red"}});
         const uint64_t before = scene.StructureVersion();
 
@@ -114,8 +114,8 @@ TEST(MoveTest, BadMovesChangeNothing) {
 TEST(RemoveTest, RelationshipsToRemovedPrimsWaitForTheirPath) {
     ForEachScene([](Scene& scene) {
         scene.Define<Scope>("/Looks");
-        const Prim red = scene.Define<Material>("/Looks/Red", {.id = "UsdPreviewSurface"});
-        scene.Define<Material>("/Looks/Blue", {.id = "UsdPreviewSurface"});
+        const Prim red = scene.DefineMaterial("/Looks/Red");
+        scene.DefineMaterial("/Looks/Blue");
         scene.Define<Sphere>("/Ball", {.materialBinding = {"/Looks/Red"}});
         scene.Define<Sphere>("/Pair", {.materialBinding = {"/Looks/Red", "/Looks/Blue"}});
         const uint32_t index = red.Index();
@@ -124,11 +124,11 @@ TEST(RemoveTest, RelationshipsToRemovedPrimsWaitForTheirPath) {
         EXPECT_EQ(scene.Select("/Pair").Get("materialBinding").GetTargets(0),
                   std::vector<std::string>{"/Looks/Blue"});
 
-        const Prim reused = scene.Define<Material>("/Looks/Green", {.id = "UsdPreviewSurface"});
+        const Prim reused = scene.DefineMaterial("/Looks/Green");
         EXPECT_EQ(reused.Index(), index);
         EXPECT_TRUE(scene.Select("/Ball").Get("materialBinding").GetTargets(0).empty());
 
-        scene.Define<Material>("/Looks/Red", {.id = "UsdPreviewSurface"});
+        scene.DefineMaterial("/Looks/Red");
         EXPECT_EQ(scene.Select("/Ball").Get("materialBinding").GetTargets(0),
                   std::vector<std::string>{"/Looks/Red"});
         EXPECT_EQ(scene.Select("/Pair").Get("materialBinding").GetTargets(0),
@@ -139,9 +139,9 @@ TEST(RemoveTest, RelationshipsToRemovedPrimsWaitForTheirPath) {
 TEST(CopyTest, CopiesPasteWithTheirValuesAndRelationships) {
     ForEachScene([](Scene& scene) {
         scene.Define<Scope>("/Looks");
-        scene.Define<Material>("/Looks/Shared", {.id = "UsdPreviewSurface"});
+        scene.DefineMaterial("/Looks/Shared");
         scene.Define<Xform>("/Robot", {.translate = {1, 2, 3}});
-        scene.Define<Material>("/Robot/Paint", {.id = "UsdPreviewSurface"});
+        scene.DefineMaterial("/Robot/Paint");
         scene.Define<Sphere>("/Robot/Head", {.materialBinding = {"/Robot/Paint"}, .radius = 0.25f});
         scene.Define<Cube>("/Robot/Body", {.materialBinding = {"/Looks/Shared"}, .size = 2});
 
@@ -167,7 +167,7 @@ TEST(CopyTest, CopiesPasteWithTheirValuesAndRelationships) {
 TEST(CopyTest, PastingARemovedSubtreeBackReconnectsWhatPointedAtIt) {
     ForEachScene([](Scene& scene) {
         scene.Define<Scope>("/Looks");
-        scene.Define<Material>("/Looks/Red", {.id = "UsdPreviewSurface"});
+        scene.DefineMaterial("/Looks/Red");
         scene.Define<Sphere>("/Ball", {.materialBinding = {"/Looks/Red"}});
         const PrimCopy removed = scene.Copy(*scene.Find("/Looks"));
         scene.Remove(*scene.Find("/Looks"));
@@ -182,7 +182,7 @@ TEST(CopyTest, CopiesPasteIntoOtherScenes) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> from = Scene::Create(device);
         const Ref<Scene> to = Scene::Create(device);
-        from->Define<Material>("/Paint", {.id = "UsdPreviewSurface"});
+        from->DefineMaterial("/Paint");
         from->Define<Sphere>("/Ball", {.materialBinding = {"/Paint"}, .radius = 3});
         to->Paste(from->Copy(*from->Find("/Paint")), "/Paint");
         to->Paste(from->Copy(*from->Find("/Ball")), "/Ball");

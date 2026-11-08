@@ -5,6 +5,55 @@
 
 namespace ernie {
 
+static const uint kDefinitionDiffuse = 0;
+static const uint kDefinitionPreviewConstant = 1;
+static const uint kDefinitionPreviewTextured = 2;
+
+ERNIE_ENUM(TextureChannel){
+    Rgb,
+    R,
+    G,
+    B,
+    A,
+};
+
+ERNIE_ENUM(PreviewInput){
+    DiffuseColor,
+    EmissiveColor,
+    SpecularColor,
+    Metallic,
+    Roughness,
+    Clearcoat,
+    ClearcoatRoughness,
+    Opacity,
+    Occlusion,
+    Normal,
+    DetailNormal,
+    DetailAlbedo,
+    Displacement,
+};
+
+static const uint kPreviewInputs = 13;
+
+struct MaterialRecord {
+    uint definition;
+    uint words;
+    uint padding0;
+    uint padding1;
+};
+
+ERNIE_CHECK_SIZE(MaterialRecord, 16);
+
+struct TextureInput {
+    uint64_t handle;
+    uint channel;
+    uint padding0;
+    Float4 scale;
+    Float4 bias;
+};
+
+ERNIE_CHECK_SIZE(TextureInput, 48);
+
 struct MappingRecord {
     uint projection;
     uint projectionSpace;
@@ -26,57 +75,48 @@ ERNIE_CHECK_SIZE(MappingRecord, 64);
 
 struct DetailRecord {
     Float3 normal;
-    float normalTextureInfluence;
     float normalStrength;
-    uint normalConvention;
-    uint enableDetail;
     Float3 detailNormal;
-    float detailNormalTextureInfluence;
     float detailNormalStrength;
     Float3 detailAlbedo;
-    uint detailAlbedoTextureChannel;
-    float detailAlbedoTextureInfluence;
     float detailAlbedoStrength;
     Float2 detailScale;
     Float2 detailOffset;
     float detailRotation;
     uint detailHexTiling;
+    uint enableDetail;
+    uint padding0;
 };
 
-ERNIE_CHECK_SIZE(DetailRecord, 96);
+ERNIE_CHECK_SIZE(DetailRecord, 80);
 
-struct PreviewRecord {
+struct PreviewParams {
     Float3 diffuseColor;
-    uint diffuseColorTextureChannel;
-    float diffuseColorTextureInfluence;
-    Float3 emissiveColor;
-    uint emissiveColorTextureChannel;
-    float emissiveColorTextureInfluence;
     uint useSpecularWorkflow;
-    Float3 specularColor;
-    uint specularColorTextureChannel;
-    float specularColorTextureInfluence;
+    Float3 emissiveColor;
     float metallic;
-    uint metallicTextureChannel;
-    float metallicTextureInfluence;
+    Float3 specularColor;
     float roughness;
-    uint roughnessTextureChannel;
-    float roughnessTextureInfluence;
     float ior;
     float clearcoat;
-    uint clearcoatTextureChannel;
-    float clearcoatTextureInfluence;
     float clearcoatRoughness;
-    uint clearcoatRoughnessTextureChannel;
-    float clearcoatRoughnessTextureInfluence;
     float opacity;
-    uint opacityTextureChannel;
-    float opacityTextureInfluence;
     MappingRecord mapping;
     DetailRecord detail;
+    TextureInput inputs[kPreviewInputs];
 };
 
-ERNIE_CHECK_SIZE(PreviewRecord, 288);
+ERNIE_CHECK_SIZE(PreviewParams, 832);
+
+struct PackEntry {
+    uint64_t pages;
+    uint row;
+    uint words;
+    uint destination;
+    uint value;
+};
+
+ERNIE_CHECK_SIZE(PackEntry, 24);
 
 struct NonVisualRecord {
     float lidarReflectance;

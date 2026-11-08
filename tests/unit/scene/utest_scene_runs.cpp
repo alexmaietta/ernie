@@ -24,8 +24,7 @@ using Tables = std::set<std::string_view>;
 Ref<Scene> Stage(device::Device& device) {
     const Ref<Scene> scene = Scene::Create(device);
     scene->Define<Scope>("/Looks");
-    scene->Define<Material>(
-        "/Looks/Red", {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{1, 0, 0}}}});
+    scene->DefineMaterial("/Looks/Red", {.inputs = {{"diffuseColor", Float3{1, 0, 0}}}});
     scene->Define<World>("/Env0");
     const Prim ball = scene->Define<Sphere>("/Env0/Ball", {.materialBinding = {"/Looks/Red"}});
     scene->Apply<SemanticsLabelsAPI>(ball, "class", {.semanticsLabels = {"rock"}});
@@ -81,7 +80,7 @@ TEST(RunsTest, EachEditRunsOnlyTheTablesThatReadIt) {
          },
          {"geometry", "bounds", "tangents", "instances", "surfaces"}},
         {"editing a material",
-         [](Scene& s) { s.Find("/Looks/Red")->Set(UsdPreviewSurface::kRoughness, 0.2f); },
+         [](Scene& s) { s.Find("/Looks/Red/Surface")->Set(UsdPreviewSurface::kRoughness, 0.2f); },
          {"materials"}},
         {"dimming a lamp",
          [](Scene& s) { s.Find("/Env0/Lamp")->Set(LightAPI::kIntensity, 3.0f); },

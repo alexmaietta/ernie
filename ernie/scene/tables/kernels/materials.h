@@ -8,12 +8,20 @@ namespace ernie {
 
 struct MaterialParams {
     Ptr<AuthoredData> scene;
-    Ptr<PreviewRecord> previews;
     Ptr<NonVisualRecord> nonVisuals;
     Ptr<CheckerRecord> checkers;
 };
 
-ERNIE_CHECK_SIZE(MaterialParams, 32);
+ERNIE_CHECK_SIZE(MaterialParams, 24);
+
+struct PackParams {
+    Ptr<PackEntry> entries;
+    Ptr<uint> words;
+    uint count;
+    uint padding0;
+};
+
+ERNIE_CHECK_SIZE(PackParams, 24);
 
 static const uint kMaterialGroup = 64;
 

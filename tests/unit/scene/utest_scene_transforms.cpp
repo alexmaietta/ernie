@@ -160,8 +160,8 @@ TEST(TransformsTest, OnlyDirtyWorldsAreDispatched) {
 
 TEST(TransformsTest, VisibilityPurposeAndMaterialAreInherited) {
     ForEachWorld([](World& w) {
-        const uint32_t look = w.Define(SchemaId::UsdPreviewSurface, "/Look");
-        const uint32_t other = w.Define(SchemaId::UsdPreviewSurface, "/Other");
+        const uint32_t look = w.Define(SchemaId::Material, "/Look");
+        const uint32_t other = w.Define(SchemaId::Material, "/Other");
         const uint32_t parent = w.Define<Xform>("/Parent", {.materialBinding = {"/Look"},
                                                             .visibility = Visibility::Invisible,
                                                             .purpose = Purpose::Guide});

@@ -27,20 +27,11 @@ struct MaterialQuery {
         return PrimImageable(hit.tables, prim).material;
     }
 
-    SchemaId Schema(uint material) {
-        return material == kNoPrim ? SchemaId::None : PrimSchema(hit.tables, material);
+    uint Definition(uint material) {
+        return material == kNoPrim ? kDefinitionDiffuse : hit.tables->materials[material].definition;
     }
 
-    uint Textures(uint material) {
-        return material == kNoPrim ? kNoTextures : hit.tables->textures[material].textures;
-    }
-
-    Ptr<uint64_t> Bindings(uint textures, uint first) {
-        return textures == kNoTextures ? Ptr<uint64_t>(0)
-                                       : hit.tables->textureBindings + (textures + first);
-    }
-
-    uint64_t Texture(uint textures, uint input) {
-        return textures == kNoTextures ? 0 : hit.tables->textureBindings[textures + input];
+    T* Params<T>(uint material) {
+        return (T*)(hit.tables->materialWords + hit.tables->materials[material].words);
     }
 }

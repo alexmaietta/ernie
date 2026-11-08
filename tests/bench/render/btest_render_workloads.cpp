@@ -385,14 +385,13 @@ void Materials(benchmark::State& state) {
         scene->Define<Scope>("/Looks");
         for (uint32_t m = 0; m < materials; ++m) {
             const float hue = float(m % 97) / 97;
-            std::vector<MaterialInput> inputs = {{"roughness", 0.3f + 0.4f * hue}};
+            MaterialDesc look = {.inputs = {{"roughness", 0.3f + 0.4f * hue}}};
             if (textured) {
-                inputs.push_back({"diffuseColorTexture", TextureFile(m)});
+                look.textures.push_back({.input = "diffuseColor", .file = TextureFile(m)});
             } else {
-                inputs.push_back({"diffuseColor", Float3{hue, 0.4f, 1 - hue}});
+                look.inputs.push_back({"diffuseColor", Float3{hue, 0.4f, 1 - hue}});
             }
-            scene->Define<Material>(fmt::format("/Looks/Look_{}", m),
-                                    {.id = "UsdPreviewSurface", .inputs = inputs});
+            scene->DefineMaterial(fmt::format("/Looks/Look_{}", m), look);
         }
         scene->Define<World>("/env_0");
         scene->Define<Mesh>("/env_0/Ground", Tile(32, 40, 0, true));

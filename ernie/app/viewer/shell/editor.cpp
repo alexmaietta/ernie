@@ -44,7 +44,7 @@ PrimGroup Classify(SchemaId schema) {
         if (base == "Camera") {
             return PrimGroup::Cameras;
         }
-        if (base == "Material") {
+        if (base == "Connectable") {
             return PrimGroup::Shading;
         }
         if (base == "Background" || base.starts_with("Render")) {
@@ -105,7 +105,8 @@ std::string Editor::Create(SchemaId type, const Double3& at, const Quatd& orient
     }
     const std::vector<std::string> before = m_selection.paths;
     const auto define = [this, type, path, at, orient] {
-        const Prim prim = m_scene->Define(path, type);
+        const Prim prim = type == SchemaId::Material ? m_scene->DefineMaterial(path)
+                                                     : m_scene->Define(path, type);
         if (prim.IsA(SchemaId::Xformable)) {
             prim.Set(Xformable::kTranslate, at);
             prim.Set(Xformable::kOrient, orient);

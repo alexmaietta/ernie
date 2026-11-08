@@ -124,11 +124,12 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             materials.minimal = true;
             materials.maxAnisotropy = min(materials.maxAnisotropy, kMinimalAnisotropy);
             const uint material = materials.BoundMaterial(point.prim);
-            const bool preview = materials.Schema(material) == SchemaId::UsdPreviewSurface;
+            const uint definition = materials.Definition(material);
             if (Mode == MinimalMode::TextureDiffuse) {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
                 RgbSpectrum albedo;
-                if (preview) {
+                if (definition == kDefinitionPreviewTextured ||
+                        definition == kDefinitionPreviewConstant) {
                     albedo = StandardDefinition<PreviewMaterial, RgbSpectrum>.Albedo(context);
                 } else {
                     albedo = StandardDefinition<DiffuseMaterial, RgbSpectrum>.Albedo(context);
@@ -138,7 +139,8 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             } else {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
                 OpticalClosure<RgbSpectrum> closure = OpticalClosure<RgbSpectrum>();
-                if (preview) {
+                if (definition == kDefinitionPreviewTextured ||
+                        definition == kDefinitionPreviewConstant) {
                     StandardDefinition<PreviewMaterial, RgbSpectrum>.Shade(context, closure);
                 } else {
                     StandardDefinition<DiffuseMaterial, RgbSpectrum>.Shade(context, closure);

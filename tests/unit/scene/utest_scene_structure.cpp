@@ -294,7 +294,7 @@ TEST(StructureTest, TargetsToPrimsDefinedLaterResolveWhenTheyAppear) {
         const ArrayRef before = store.Array(kMaterialBindingAPIMaterialBinding, row);
         EXPECT_EQ(Items<uint32_t>(heap.Read(before)), std::vector<uint32_t>{kNoPrim});
         const std::vector<std::string> look = {"/Look"};
-        const uint32_t material = structure.Define(SchemaId::UsdPreviewSurface, look).firstPrim;
+        const uint32_t material = structure.Define(SchemaId::Material, look).firstPrim;
         const ArrayRef after = store.Array(kMaterialBindingAPIMaterialBinding, row);
         EXPECT_EQ(Items<uint32_t>(heap.Read(after)), std::vector<uint32_t>{material});
     });

@@ -129,6 +129,10 @@ class SceneImpl {
         return m_textures;
     }
 
+    const MaterialTable& GetMaterials() const {
+        return m_materials;
+    }
+
     SemanticTable& GetSemantics() {
         return m_semantics;
     }

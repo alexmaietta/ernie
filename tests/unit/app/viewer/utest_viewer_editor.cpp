@@ -180,8 +180,8 @@ TEST_F(EditorTest, SetsCellsAcrossPrimsAndRestoresEachOnUndo) {
 TEST_F(EditorTest, SetsRelationshipTargetsWithUndo) {
     {
         Session session(*s_device);
-        session.scene->Define<UsdPreviewSurface>("/Red");
-        session.scene->Define<UsdPreviewSurface>("/Blue");
+        session.scene->DefineMaterial("/Red");
+        session.scene->DefineMaterial("/Blue");
         session.scene->Define<Sphere>("/Ball", {.materialBinding = {"/Red"}});
         const auto target = [scene = session.scene] { return scene->Select("/Ball"); };
         const ColumnRef binding = Sphere::kMaterialBinding.Column();

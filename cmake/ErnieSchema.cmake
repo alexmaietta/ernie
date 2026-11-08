@@ -19,7 +19,7 @@ set(_ernie_schema_units
     hertz
 )
 set(_ernie_schema_metadata_keys
-    "tracked|texturable|doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
+    "tracked|doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
 )
 set(_ernie_schema_number "-?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
 
@@ -127,7 +127,7 @@ function(
     set(auto "")
     string(STRIP "${text}" text)
     while(NOT text STREQUAL "")
-        if(attribute AND text MATCHES "^(tracked|texturable)[ \t]*(,(.*))?$")
+        if(attribute AND text MATCHES "^(tracked)[ \t]*(,(.*))?$")
             list(APPEND flags ${CMAKE_MATCH_1})
             set(text "${CMAKE_MATCH_3}")
         elseif(text MATCHES "^doc[ \t]*=[ \t]*\"([^\"\\\\]*)\"[ \t]*(,(.*))?$")
@@ -230,7 +230,7 @@ function(
         else()
             message(
                 FATAL_ERROR
-                "${where}: expected tracked, texturable, doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
+                "${where}: expected tracked, doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
             )
         endif()
         string(STRIP "${text}" text)
@@ -247,47 +247,6 @@ function(
     set(${out_max} "${max}" PARENT_SCOPE)
     set(${out_applies} "${applies}" PARENT_SCOPE)
     set(${out_auto} "${auto}" PARENT_SCOPE)
-endfunction()
-
-function(_ernie_schema_texturable line where out)
-    if(NOT line MATCHES "^texturable[ \t]+([a-z0-9_]+)[ \t]+([A-Za-z_][A-Za-z0-9_:]*)(.*)$")
-        message(FATAL_ERROR "${where}: expected an attribute after texturable")
-    endif()
-    set(type "${CMAKE_MATCH_1}")
-    set(attribute "${CMAKE_MATCH_2}")
-    set(rest "${CMAKE_MATCH_3}")
-    if(NOT type MATCHES "^(float|float3|color3f|normal3f)$")
-        message(FATAL_ERROR "${where}: only float, float3, color3f and normal3f are texturable")
-    endif()
-    set(metadata "")
-    if(rest MATCHES "^(.*)\\(([ \t]*(${_ernie_schema_metadata_keys}).*)\\)[ \t]*$")
-        set(rest "${CMAKE_MATCH_1}")
-        set(metadata "${CMAKE_MATCH_2}")
-    endif()
-    set(group "")
-    if(metadata MATCHES "(group[ \t]*=[ \t]*\"[^\"]*\")")
-        set(group "${CMAKE_MATCH_1}, ")
-    endif()
-    if(metadata MATCHES "(enabledBy[ \t]*=[ \t]*\"[^\"]*\")")
-        string(APPEND group "${CMAKE_MATCH_1}, ")
-    endif()
-    _ernie_schema_field("${attribute}" field)
-    set(channel rgb)
-    if(type STREQUAL "float")
-        set(channel r)
-    endif()
-    if(metadata STREQUAL "")
-        set(value "${type} ${attribute}${rest} (texturable)")
-    else()
-        set(value "${type} ${attribute}${rest} (texturable, ${metadata})")
-    endif()
-    set(${out}
-        "${value}"
-        "asset ${attribute}:texture (tracked, ${group}doc = \"A texture whose channels replace ${field}.\")"
-        "token ${attribute}:textureChannel = ${channel} (allowed = <rgb, r, g, b, a>, enum = TextureChannel, ${group}doc = \"Which channels of the texture replace ${field}.\")"
-        "float ${attribute}:textureInfluence = 1 (min = 0, max = 1, ${group}doc = \"How much the texture replaces ${field}, from not at all at 0 to fully at 1.\")"
-        PARENT_SCOPE
-    )
 endfunction()
 
 function(_ernie_schema_scalar element text where out)
@@ -970,22 +929,6 @@ function(ernie_generate_schemas directory)
         if(NOT open STREQUAL "")
             message(FATAL_ERROR "${file}:${open_number}: metadata opened with ( is never closed")
         endif()
-        set(expanded "")
-        set(expanded_numbers "")
-        foreach(line number IN ZIP_LISTS lines numbers)
-            if(line MATCHES "^texturable[ \t]")
-                _ernie_schema_texturable("${line}" "${file}:${number}" generated)
-                list(APPEND expanded ${generated})
-                foreach(unused IN LISTS generated)
-                    list(APPEND expanded_numbers ${number})
-                endforeach()
-            else()
-                list(APPEND expanded "${line}")
-                list(APPEND expanded_numbers ${number})
-            endif()
-        endforeach()
-        set(lines ${expanded})
-        set(numbers ${expanded_numbers})
         set(current "")
         foreach(line number IN ZIP_LISTS lines numbers)
             set(where "${file}:${number}")

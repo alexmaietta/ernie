@@ -125,20 +125,17 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
     static const Textures textures;
     const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
     scene->Define<Scope>("/Looks");
-    scene->Define<Material>("/Looks/Ground",
-                            {.id = "UsdPreviewSurface",
-                             .inputs = {{"diffuseColorTexture", textures.albedo},
-                                        {"normalTexture", textures.normal},
-                                        {"roughnessTexture", textures.roughness}}});
-    scene->Define<Material>(
-        "/Looks/Hex", {.id = "UsdPreviewSurface",
-                       .inputs = {{"diffuseColorTexture", textures.albedo}, {"hexTiling", true}}});
-    scene->Define<Material>("/Looks/Triplanar",
-                            {.id = "UsdPreviewSurface",
-                             .inputs = {{"diffuseColorTexture", textures.albedo},
-                                        {"normalTexture", textures.normal},
-                                        {"projection", "triplanar"},
-                                        {"tileSize", 2.0f}}});
+    scene->DefineMaterial("/Looks/Ground",
+                          {.textures = {{.input = "diffuseColor", .file = textures.albedo},
+                                        {.input = "normal", .file = textures.normal},
+                                        {.input = "roughness", .file = textures.roughness}}});
+    scene->DefineMaterial("/Looks/Hex",
+                          {.textures = {{.input = "diffuseColor", .file = textures.albedo}},
+                           .placement = {{"hexTiling", true}}});
+    scene->DefineMaterial("/Looks/Triplanar",
+                          {.textures = {{.input = "diffuseColor", .file = textures.albedo},
+                                        {.input = "normal", .file = textures.normal}},
+                           .placement = {{"projection", "triplanar"}, {"tileSize", 2.0f}}});
     scene->Define<World>("/env_0");
     scene->Define<Mesh>("/env_0/Ground", Ground());
     for (uint32_t i = 0; i < kBalls; ++i) {

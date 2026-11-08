@@ -48,16 +48,16 @@ struct Scene {
         Publish();
     }
 
-    uint32_t Material(const std::string& path, const std::string& texture) {
+    uint32_t UvTexture(const std::string& path, const std::string& texture) {
         const uint32_t prim =
-            structure.Define(SchemaId::UsdPreviewSurface, std::vector<std::string>{path}).firstPrim;
+            structure.Define(SchemaId::UsdUVTexture, std::vector<std::string>{path}).firstPrim;
         Texture(prim, texture);
         return prim;
     }
 
-    void Texture(uint32_t material, const std::string& texture) {
-        View(structure, SchemaId::UsdPreviewSurface, std::vector<uint32_t>{material})
-            .Get<Token>(kUsdPreviewSurfaceDiffuseColorTexture)
+    void Texture(uint32_t reader, const std::string& texture) {
+        View(structure, SchemaId::UsdUVTexture, std::vector<uint32_t>{reader})
+            .Get<Token>(kUsdUVTextureFile)
             .Set(structure.GetTokens().Intern(texture));
     }
 
@@ -109,12 +109,12 @@ template <class Test> void ForEachScene(Test test) {
 TEST(TexturesTest, ImagesLoadInTheBackgroundAndBindOnceReady) {
     const std::string red = WriteImage("red.png", {1, 0, 0, 1});
     ForEachScene([&](Scene& s) {
-        const uint32_t look = s.Material("/Look", red);
+        const uint32_t look = s.UvTexture("/Look", red);
         s.Publish();
-        EXPECT_EQ(s.textures.Handle(look, "diffuseColor"), 0u);
+        EXPECT_EQ(s.textures.Handle(look, "file"), 0u);
         EXPECT_EQ(s.Bindings(look), kNoTextures);
         s.Settle();
-        EXPECT_NE(s.textures.Handle(look, "diffuseColor"), 0u);
+        EXPECT_NE(s.textures.Handle(look, "file"), 0u);
         EXPECT_NE(s.Bindings(look), kNoTextures);
         EXPECT_EQ(s.textures.Stats().loaded, 1u);
         EXPECT_EQ(s.textures.Stats().loading, 0u);
@@ -125,24 +125,24 @@ TEST(TexturesTest, ImagesLoadInTheBackgroundAndBindOnceReady) {
 TEST(TexturesTest, AnImageSharedByMaterialsLoadsOnce) {
     const std::string red = WriteImage("red.png", {1, 0, 0, 1});
     ForEachScene([&](Scene& s) {
-        const uint32_t a = s.Material("/A", red);
-        const uint32_t b = s.Material("/B", red);
+        const uint32_t a = s.UvTexture("/A", red);
+        const uint32_t b = s.UvTexture("/B", red);
         s.Publish();
         s.Settle();
         EXPECT_EQ(s.textures.Stats().images, 1u);
         EXPECT_EQ(s.textures.Stats().loaded, 1u);
-        EXPECT_NE(s.textures.Handle(a, "diffuseColor"), 0u);
-        EXPECT_NE(s.textures.Handle(b, "diffuseColor"), 0u);
+        EXPECT_NE(s.textures.Handle(a, "file"), 0u);
+        EXPECT_NE(s.textures.Handle(b, "file"), 0u);
     });
 }
 
 TEST(TexturesTest, MissingFilesFailWithoutABinding) {
     ForEachScene([&](Scene& s) {
-        const uint32_t look = s.Material("/Look", "/no/such/image.png");
+        const uint32_t look = s.UvTexture("/Look", "/no/such/image.png");
         s.Publish();
         s.Settle();
         EXPECT_EQ(s.textures.Stats().failed, 1u);
-        EXPECT_EQ(s.textures.Handle(look, "diffuseColor"), 0u);
+        EXPECT_EQ(s.textures.Handle(look, "file"), 0u);
         EXPECT_EQ(s.Bindings(look), kNoTextures);
     });
 }
@@ -151,7 +151,7 @@ TEST(TexturesTest, ANewPathRebindsAndReleasesTheOldImage) {
     const std::string red = WriteImage("red.png", {1, 0, 0, 1});
     const std::string blue = WriteImage("blue.png", {0, 0, 1, 1});
     ForEachScene([&](Scene& s) {
-        const uint32_t look = s.Material("/Look", red);
+        const uint32_t look = s.UvTexture("/Look", red);
         s.Publish();
         s.Settle();
         s.Texture(look, blue);
@@ -160,7 +160,7 @@ TEST(TexturesTest, ANewPathRebindsAndReleasesTheOldImage) {
         EXPECT_EQ(s.textures.Stats().loading, 1u);
         s.Settle();
         EXPECT_EQ(s.textures.Stats().loaded, 1u);
-        EXPECT_NE(s.textures.Handle(look, "diffuseColor"), 0u);
+        EXPECT_NE(s.textures.Handle(look, "file"), 0u);
         EXPECT_EQ(s.textures.Stats().images, 1u);
     });
 }
@@ -177,7 +177,7 @@ TEST(TexturesTest, CheckerboardPlanesBindTheChecker) {
 TEST(TexturesTest, PublishingWithNothingToLoadDoesNothing) {
     const std::string red = WriteImage("red.png", {1, 0, 0, 1});
     ForEachScene([&](Scene& s) {
-        s.Material("/Look", red);
+        s.UvTexture("/Look", red);
         s.Publish();
         s.Settle();
         const uint32_t runs = s.textures.Runs();

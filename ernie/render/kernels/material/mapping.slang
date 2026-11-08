@@ -182,32 +182,36 @@ float Channel(float4 value, TextureChannel channel) {
     }
 }
 
-float3 MixedColor(Float3 value, float4 texel, uint64_t handle, uint channel, float influence) {
+float4 TexelValue(float4 texel, Ptr<TextureInput> input) {
+    return texel * input.scale.Vector() + input.bias.Vector();
+}
+
+float3 TexturedColor(Float3 value, float4 texel, uint64_t handle, Ptr<TextureInput> input) {
     if (handle == 0) {
         return value.Vector();
     }
-    const TextureChannel read = TextureChannel(channel);
-    const float3 texture = read == TextureChannel::Rgb ? texel.xyz : float3(Channel(texel, read));
-    return lerp(value.Vector(), texture, influence);
+    const float4 read = TexelValue(texel, input);
+    const TextureChannel channel = TextureChannel(input.channel);
+    return channel == TextureChannel::Rgb ? read.xyz : float3(Channel(read, channel));
 }
 
-float MixedFloat(float value, float4 texel, uint64_t handle, uint channel, float influence) {
+float TexturedFloat(float value, float4 texel, uint64_t handle, Ptr<TextureInput> input) {
     if (handle == 0) {
         return value;
     }
-    return lerp(value, Channel(texel, TextureChannel(channel)), influence);
+    return Channel(TexelValue(texel, input), TextureChannel(input.channel));
 }
 
 static const uint kTextureInputs = 8;
 
 struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
-    Ptr<uint64_t> bindings;
+    Ptr<TextureInput> inputs;
     float4 texels[Inputs];
     uint64_t normalHandle;
     float3 normalValue;
-    float normalInfluence;
+    float3 normalScale;
+    float3 normalBias;
     float normalStrength;
-    bool directX;
     float3 normal;
     float3 normalSum;
     float bias;
@@ -218,20 +222,35 @@ struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
         for (uint input = 0; input < Inputs; ++input) {
             texels[input] = float4(0);
         }
-        bindings = Ptr<uint64_t>(0);
+        inputs = Ptr<TextureInput>(0);
         normalHandle = 0;
         normalValue = float3(0, 0, 1);
-        normalInfluence = 1;
+        normalScale = float3(2);
+        normalBias = float3(-1);
         normalStrength = 1;
-        directX = false;
         this.normal = normal;
         normalSum = float3(0);
         bias = query.lodBias;
         maxAnisotropy = query.maxAnisotropy;
     }
 
+    uint64_t HandleAt(Ptr<TextureInput> input) {
+        return uint64_t(input) == 0 ? 0 : input.handle;
+    }
+
     uint64_t Handle(uint input) {
-        return uint64_t(bindings) == 0 ? 0 : bindings[input];
+        return uint64_t(inputs) == 0 ? 0 : HandleAt(inputs + input);
+    }
+
+    [mutating]
+    void SetNormal(Ptr<TextureInput> input, float3 value, float strength) {
+        normalHandle = HandleAt(input);
+        normalValue = value;
+        normalStrength = strength;
+        if (normalHandle != 0) {
+            normalScale = input.scale.Vector().xyz;
+            normalBias = input.bias.Vector().xyz;
+        }
     }
 
     [mutating]
@@ -269,7 +288,7 @@ struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
         const float3 n =
             normalHandle == 0
                 ? float3(normalValue.xy * normalStrength, normalValue.z)
-                : TangentNormal(normalTexel, normalValue, normalInfluence, normalStrength, directX,
+                : TangentNormal(normalTexel, normalScale, normalBias, normalStrength,
                                 placement.angle);
         normalSum += placement.weight *
                      (placement.tangent * n.x + placement.bitangent * n.y + normal * n.z);

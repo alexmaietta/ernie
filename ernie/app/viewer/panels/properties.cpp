@@ -311,7 +311,7 @@ class Properties {
             const Span<const ColumnInfo> columns = Columns(owner);
             for (uint32_t index = 0; index < columns.size(); ++index) {
                 const ColumnInfo& info = columns[index];
-                if (Has(info.flags, ColumnFlags::Internal)) {
+                if (Has(info.flags, ColumnFlags::Internal) || owner == SchemaId::Connectable) {
                     continue;
                 }
                 const std::string_view label =
@@ -326,6 +326,10 @@ class Properties {
                                   {}});
             }
         };
+        m_connections.clear();
+        if (m_prims.size() == 1 && m_prims.front().IsA(SchemaId::Connectable)) {
+            m_connections = m_prims.front().Connections();
+        }
         for (SchemaId level = m_schema; level != SchemaId::None; level = Info(level).base) {
             add(level, shared, Info(level).name, {});
         }
@@ -497,7 +501,15 @@ class Properties {
         ImGui::PushID(&info);
         ImGui::PushID(row.instance.c_str());
         const uint32_t cell = ElementBytes(info.type);
-        if (row.cells.size() < cell) {
+        const auto connected = std::ranges::find(m_connections, info.field, &Connection::input);
+        if (connected != m_connections.end()) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s.%s", connected->source.c_str(), connected->output.c_str());
+            if (ImGui::BeginItemTooltip()) {
+                ImGui::TextUnformatted("Connected, so its value comes from this output");
+                ImGui::EndTooltip();
+            }
+        } else if (row.cells.size() < cell) {
             ImGui::TextDisabled("...");
         } else {
             const bool mixed = !SameAcrossPrims(row, cell);
@@ -509,7 +521,7 @@ class Properties {
             ImGui::EndDisabled();
         }
         ImGui::TableNextColumn();
-        if (row.cells.size() >= cell) {
+        if (row.cells.size() >= cell && connected == m_connections.end()) {
             DrawReset(index);
         }
         ImGui::PopID();
@@ -1088,6 +1100,7 @@ class Properties {
     std::vector<Prim> m_prims;
     SchemaId m_schema = SchemaId::None;
     std::vector<Row> m_rows;
+    std::vector<Connection> m_connections;
     std::vector<device::Download> m_reads;
     Clock::time_point m_requested;
     std::map<std::string, std::vector<std::string>> m_items;

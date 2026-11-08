@@ -29,35 +29,12 @@ TextureWrap Wrap(TextureWrapMode mode) {
 
 }
 
-std::vector<TextureSlot> TextureSlots(SchemaId material) {
-    std::vector<TextureSlot> slots;
-    for (const SchemaId table : PrimTables(material, Info(material).apis)) {
-        const std::span<const ColumnInfo> columns = Columns(table);
-        for (const ColumnInfo& column : columns) {
-            if (!Has(column.flags, ColumnFlags::Texturable)) {
-                continue;
-            }
-            const std::string field(column.field);
-            slots.push_back({table, FindOwnColumn(table, field + "Texture").index,
-                             column.role == ColumnRole::Color});
-        }
-    }
-    return slots;
-}
-
 namespace {
 
 std::map<SchemaId, std::vector<TextureSlot>> MaterialSlots() {
     std::map<SchemaId, std::vector<TextureSlot>> materials;
-    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
-        const SchemaId schema = SchemaId(index);
-        if (Info(schema).kind != SchemaKind::Concrete || !IsA(schema, SchemaId::Material)) {
-            continue;
-        }
-        if (std::vector<TextureSlot> slots = TextureSlots(schema); !slots.empty()) {
-            materials.emplace(schema, std::move(slots));
-        }
-    }
+    materials[SchemaId::UsdUVTexture] = {
+        {.table = SchemaId::UsdUVTexture, .texture = kUsdUVTextureFile.index, .color = true}};
     materials[SchemaId::DomeLight] = {
         {.table = SchemaId::DomeLight, .texture = kDomeLightTextureFile.index, .color = true}};
     for (const SchemaId light : {SchemaId::SphereLight, SchemaId::RectLight, SchemaId::DiskLight,
@@ -72,7 +49,8 @@ std::map<SchemaId, std::vector<TextureSlot>> MaterialSlots() {
 }
 
 std::vector<ColumnRef> InputColumns(const std::map<SchemaId, std::vector<TextureSlot>>& materials) {
-    std::vector<ColumnRef> inputs = {kTextureMappingAPIWrap, kCheckerboardAPICheckerboard};
+    std::vector<ColumnRef> inputs = {kUsdUVTextureWrapS, kUsdUVTextureSourceColorSpace,
+                                     kCheckerboardAPICheckerboard};
     for (const auto& [schema, slots] : materials) {
         for (const TextureSlot& slot : slots) {
             const ColumnRef column = {slot.table, &Columns(slot.table)[slot.texture], slot.texture};
@@ -121,7 +99,7 @@ uint64_t TextureTable::Handle(uint32_t prim, std::string_view input) const {
         return 0;
     }
     for (const Bound& bound : found->second.slots) {
-        if (Columns(bound.slot.table)[bound.slot.texture].field == std::string(input) + "Texture") {
+        if (Columns(bound.slot.table)[bound.slot.texture].field == input) {
             return bound.binding.handle;
         }
     }
@@ -176,7 +154,7 @@ void TextureTable::Publish(uint32_t prim, const Material& material) {
     const Prims& prims = m_structure.GetPrims();
     const SchemaId schema = prims.Record(prim).schema;
     TextureRecord record{};
-    if (IsA(schema, SchemaId::Material) || schema == SchemaId::DomeLight) {
+    if (schema == SchemaId::UsdUVTexture || schema == SchemaId::DomeLight) {
         record.textures = material.bindings;
     }
     for (uint32_t index = 0; index < material.slots.size(); ++index) {
@@ -249,11 +227,13 @@ void TextureTable::Rebind(uint32_t prim, Cells& cells) {
     const SchemaId schema = prims.Record(prim).schema;
     Material material;
     TextureWrap wrap = TextureWrap::Repeat;
-    if (prims.HasApi(prim, SchemaId::TextureMappingAPI)) {
-        const uint32_t row = prims.Row(prim, SchemaId::TextureMappingAPI);
-        wrap = Wrap(TextureWrapMode(
-            Read(cells, SchemaId::TextureMappingAPI, kTextureMappingAPIWrap.index)[row]));
-        material.rows.push_back({SchemaId::TextureMappingAPI, row});
+    TextureColorSpace space = TextureColorSpace::Auto;
+    if (schema == SchemaId::UsdUVTexture) {
+        const uint32_t row = prims.Row(prim, SchemaId::UsdUVTexture);
+        wrap = Wrap(
+            TextureWrapMode(Read(cells, SchemaId::UsdUVTexture, kUsdUVTextureWrapS.index)[row]));
+        space = TextureColorSpace(
+            Read(cells, SchemaId::UsdUVTexture, kUsdUVTextureSourceColorSpace.index)[row]);
     }
     TextureBinding checker;
     if (IsA(schema, SchemaId::Plane)) {
@@ -275,10 +255,12 @@ void TextureTable::Rebind(uint32_t prim, Cells& cells) {
             const uint32_t row = prims.Row(prim, slot.table);
             std::string path(
                 m_structure.GetTokens().Text(Token{Read(cells, slot.table, slot.texture)[row]}));
-            const bool srgb = slot.color && !path.empty() && IsPngOrJpeg(path);
-            const TextureWrap slotWrap = IsA(schema, SchemaId::Material) ? wrap
-                                         : schema == SchemaId::DomeLight ? TextureWrap::Repeat
-                                                                         : TextureWrap::Clamp;
+            const bool srgb = space == TextureColorSpace::SRGB ||
+                              (space == TextureColorSpace::Auto && slot.color && !path.empty() &&
+                               IsPngOrJpeg(path));
+            const TextureWrap slotWrap = schema == SchemaId::UsdUVTexture ? wrap
+                                         : schema == SchemaId::DomeLight  ? TextureWrap::Repeat
+                                                                          : TextureWrap::Clamp;
             material.slots.push_back({slot, m_cache.Bind({std::move(path), srgb}, slotWrap)});
             if (std::ranges::find(material.rows, RowKey{slot.table, row}) == material.rows.end()) {
                 material.rows.push_back({slot.table, row});

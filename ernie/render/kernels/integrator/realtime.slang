@@ -224,7 +224,9 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         const float weighted = bounce < bounces ? 1.0f : 0.0f;
         ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
         OpticalClosure<Spectrum> closure = OpticalClosure<Spectrum>();
-        if (materials.Schema(material) == SchemaId::UsdPreviewSurface) {
+        const uint definition = materials.Definition(material);
+        if (definition == kDefinitionPreviewTextured ||
+                definition == kDefinitionPreviewConstant) {
             StandardDefinition<PreviewMaterial, Spectrum>.Shade(context, closure);
         } else {
             StandardDefinition<DiffuseMaterial, Spectrum>.Shade(context, closure);

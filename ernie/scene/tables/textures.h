@@ -32,8 +32,6 @@ struct TextureSlot {
     bool color = false;
 };
 
-std::vector<TextureSlot> TextureSlots(SchemaId material);
-
 class TextureTable : public Table {
   public:
     explicit TextureTable(Structure& structure, unsigned threads = 4);

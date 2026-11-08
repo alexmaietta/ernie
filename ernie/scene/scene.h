@@ -47,7 +47,7 @@ struct ImportReader;
 struct ImportDesc;
 struct ImportSource;
 
-ERNIE_API Prim Define(Scene& scene, std::string_view path, const Material::Desc& desc);
+ERNIE_API Prim DefineMaterial(Scene& scene, std::string_view path, const MaterialDesc& desc);
 
 class ERNIE_API PrimCopy {
   public:
@@ -144,6 +144,7 @@ class ERNIE_API Scene : public RefCounted {
     }
 
     Prim Define(std::string_view path, SchemaId schema);
+    Prim DefineMaterial(std::string_view path, const MaterialDesc& desc = {});
     PrimRange Define(Span<const std::string> paths, SchemaId schema, const BatchDesc& batch = {});
     void Remove(Prim prim);
     Overrides CreateOverrides();

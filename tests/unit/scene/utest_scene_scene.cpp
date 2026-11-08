@@ -91,23 +91,47 @@ TEST(SceneTest, ABatchIsOneDenseView) {
     });
 }
 
-TEST(SceneTest, MaterialsAreDefinedByIdWithTheirInputs) {
+bool Connected(const Prim& prim, std::string_view input, std::string_view source,
+               std::string_view output) {
+    for (const Connection& connection : prim.Connections()) {
+        if (connection.input == input) {
+            return connection.source == source && connection.output == output;
+        }
+    }
+    return false;
+}
+
+TEST(SceneTest, MaterialsAreDefinedWithASurfaceTexturesAndAPlacement) {
     ForEachScene([](Scene& scene) {
-        const Prim look = Define(
-            scene, "/Look",
-            Material::Desc{.id = "UsdPreviewSurface",
-                           .inputs = {{"roughness", 0.25f}, {"diffuseColor", Float3{1, 0, 0}}}});
-        EXPECT_EQ(look.Schema(), SchemaId::UsdPreviewSurface);
-        const std::vector<std::string> path = {"/Look"};
-        EXPECT_EQ(scene.Select(path).Get<float>(kUsdPreviewSurfaceRoughness).Get(),
-                  std::vector<float>{0.25f});
-        EXPECT_THROW(Define(scene, "/Bad", Material::Desc{.id = "NoSuchMaterial"}), Error);
-        EXPECT_THROW(Define(scene, "/Twice",
-                            Material::Desc{.id = "UsdPreviewSurface",
-                                           .inputs = {{"roughness", 0.1f}, {"roughness", 0.2f}}}),
+        const Prim look = scene.DefineMaterial(
+            "/Look", {.inputs = {{"roughness", 0.25f}, {"diffuseColor", Float3{1, 0, 0}}},
+                      .textures = {{.input = "normal", .file = "normal.png"},
+                                   {.input = "metallic", .file = "masks.png", .output = "b"}},
+                      .placement = {{"tileSize", 2.0f}}});
+        EXPECT_EQ(look.Schema(), SchemaId::Material);
+        EXPECT_TRUE(Connected(look, "surface", "/Look/Surface", "surface"));
+        const Prim surface = *scene.Find("/Look/Surface");
+        EXPECT_EQ(surface.Schema(), SchemaId::UsdPreviewSurface);
+        EXPECT_EQ(surface.Get(UsdPreviewSurface::kRoughness), 0.25f);
+        EXPECT_TRUE(Connected(surface, "normal", "/Look/NormalTexture", "rgb"));
+        EXPECT_TRUE(Connected(surface, "metallic", "/Look/MetallicTexture", "b"));
+        const Prim normal = *scene.Find("/Look/NormalTexture");
+        EXPECT_EQ(normal.Get(UsdUVTexture::kFile), "normal.png");
+        EXPECT_EQ(normal.Get(UsdUVTexture::kSourceColorSpace), TextureColorSpace::Raw);
+        EXPECT_EQ(normal.Get(UsdUVTexture::kScale), (Float4{2, 2, 2, 1}));
+        EXPECT_EQ(normal.Get(UsdUVTexture::kBias), (Float4{-1, -1, -1, 0}));
+        EXPECT_TRUE(Connected(normal, "st", "/Look/Placement", "st"));
+        EXPECT_EQ(scene.Find("/Look/Placement")->Get(TexturePlacement::kTileSize), 2.0f);
+
+        EXPECT_THROW(scene.DefineMaterial("/Bad", {.id = "NoSuchMaterial"}), Error);
+        EXPECT_THROW(
+            scene.DefineMaterial("/Twice", {.inputs = {{"roughness", 0.1f}, {"roughness", 0.2f}}}),
+            Error);
+        EXPECT_THROW(scene.DefineMaterial("/Untextured", {.placement = {{"tileSize", 2.0f}}}),
                      Error);
         EXPECT_FALSE(scene.Find("/Bad"));
         EXPECT_FALSE(scene.Find("/Twice"));
+        EXPECT_FALSE(scene.Find("/Untextured"));
     });
 }
 
@@ -249,10 +273,9 @@ TEST(SceneTest, TypedPrimsReadAndWriteEveryKindOfField) {
 
         const UsdPreviewSurfacePrim look = scene.Define<UsdPreviewSurface>("/Look");
         EXPECT_EQ(look.Id(), "UsdPreviewSurface");
-        look.SetUvPrimvar("uv");
-        EXPECT_EQ(look.UvPrimvar(), "uv");
-        look.SetDiffuseColorTexture("albedo.png");
-        EXPECT_EQ(look.DiffuseColorTexture(), "albedo.png");
+        const UsdUVTexturePrim albedo = scene.Define<UsdUVTexture>("/Albedo");
+        albedo.SetFile("albedo.png");
+        EXPECT_EQ(albedo.File(), "albedo.png");
 
         const MeshPrim mesh = scene.Define<Mesh>("/Mesh");
         const std::vector<Float3> points = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
@@ -345,7 +368,7 @@ TEST(SceneTest, TargetsTokensAndPrimvarsAreSetByValue) {
         UntypedAttribute binding = view.Get("materialBinding");
         binding.SetTargets(0, {"/Later"});
         EXPECT_TRUE(binding.GetTargets(0).empty());
-        scene.Define<Material>("/Later", {.id = "UsdPreviewSurface"});
+        scene.DefineMaterial("/Later");
         EXPECT_EQ(binding.GetTargets(0), std::vector<std::string>{"/Later"});
 
         const std::vector<Prim> meshes = scene.Handles({view.Prims()[0], 1, 1, kGlobalWorld, 0});

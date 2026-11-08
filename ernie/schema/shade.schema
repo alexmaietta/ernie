@@ -1,90 +1,7 @@
-api class TextureMappingAPI (
-    doc = "Places a surface's textures: from a primvar or projected from the shaded position, then transformed and optionally hex tiled."
-) {
-    token inputs:projection = uv (
-        allowed = [uv, planar, box, triplanar]
-        enum = TextureProjection
-        group = "Mapping"
-        displayName = "Projection"
-        doc = "Where texture coordinates come from: a primvar, or the position projected onto the xy plane, onto the box face the normal points at, or onto all three axes blended."
-    )
-    token inputs:projectionSpace = object (
-        allowed = [object, world]
-        enum = TextureSpace
-        group = "Mapping"
-        displayName = "Projection Space"
-        doc = "Whether projected textures move with the object or stay fixed in the world."
-    )
-    token inputs:wrap = repeat (
-        tracked
-        allowed = [repeat, mirror, clamp, black]
-        enum = TextureWrapMode
-        group = "Mapping"
-        displayName = "Wrap"
-        doc = "How texture coordinates outside 0 to 1 wrap. Black reads transparent black."
-    )
-    token inputs:uvPrimvar = st (
-        group = "Mapping"
-        displayName = "UV Primvar"
-        doc = "The float2 primvar read when projection is uv."
-    )
-    float inputs:tileSize = 1 (
-        unit = meters
-        group = "Mapping"
-        displayName = "Tile Size"
-        doc = "Length of one texture repeat for planar, box and triplanar projections."
-    )
-    float inputs:triplanarBlend = 0.25 (
-        group = "Mapping"
-        displayName = "Triplanar Blend"
-        min = 0
-        max = 1
-        doc = "How widely triplanar projections blend across edges. 0 gives hard box seams."
-    )
-    float2 inputs:uvScale = (1, 1) (
-        group = "Mapping"
-        displayName = "Tiling"
-        doc = "Repeats per unit of texture coordinate, applied after rotation."
-    )
-    float2 inputs:uvOffset = (0, 0) (
-        group = "Mapping"
-        displayName = "Offset"
-        doc = "Shift applied after rotation and tiling."
-    )
-    float inputs:uvRotation = 0 (
-        unit = degrees
-        group = "Mapping"
-        displayName = "Rotation"
-        doc = "Rotation about the texture origin, applied first."
-    )
-    bool inputs:hexTiling = false (
-        group = "Hex Tiling"
-        displayName = "Hex Tiling"
-        doc = "Blend randomly rotated and offset copies on a hex grid to hide repetition."
-    )
-    float inputs:hexTilingContrast = 0.5 (
-        group = "Hex Tiling"
-        displayName = "Contrast"
-        min = 0
-        max = 1
-        enabledBy = "hexTiling"
-        doc = "How sharply neighbouring hex tiles blend."
-    )
-    float inputs:hexTilingRotation = 180 (
-        unit = degrees
-        group = "Hex Tiling"
-        displayName = "Rotation"
-        min = 0
-        max = 180
-        enabledBy = "hexTiling"
-        doc = "Largest random rotation of each hex tile."
-    )
-}
-
 api class SurfaceDetailAPI (
     doc = "Perturbs a surface's shading: a normal map, detail normal and albedo maps at a finer tiling, and displacement."
 ) {
-    texturable normal3f inputs:normal = (0, 0, 1) (
+    normal3f inputs:normal = (0, 0, 1) (
         group = "Normal"
         displayName = "Normal"
         doc = "Tangent-space shading normal, usually from a normal map."
@@ -96,19 +13,12 @@ api class SurfaceDetailAPI (
         max = 2
         doc = "Scales how far the normal map tilts the shading normal."
     )
-    token inputs:normalConvention = openGL (
-        allowed = [openGL, directX]
-        enum = NormalConvention
-        group = "Normal"
-        displayName = "Normal Convention"
-        doc = "Whether the normal map's green channel points up the texture, as in OpenGL, or down, as in DirectX."
-    )
     bool inputs:enableDetail = false (
         group = "Detail"
         displayName = "Enable Detail"
         doc = "Layer detail normal and albedo maps over the surface at a finer tiling."
     )
-    texturable normal3f inputs:detailNormal = (0, 0, 1) (
+    normal3f inputs:detailNormal = (0, 0, 1) (
         group = "Detail"
         displayName = "Detail Normal"
         enabledBy = "enableDetail"
@@ -122,7 +32,7 @@ api class SurfaceDetailAPI (
         enabledBy = "enableDetail"
         doc = "Scales how far the detail normal map tilts the shading normal."
     )
-    texturable color3f inputs:detailAlbedo = (0.5, 0.5, 0.5) (
+    color3f inputs:detailAlbedo = (0.5, 0.5, 0.5) (
         group = "Detail"
         displayName = "Detail Albedo"
         enabledBy = "enableDetail"
@@ -166,7 +76,7 @@ api class SurfaceDetailAPI (
         displayName = "Enable Displacement"
         doc = "Displace the surface by a height. It bumps the shading normal for now, without moving geometry."
     )
-    texturable float inputs:displacement = 0 (
+    float inputs:displacement = 0 (
         group = "Displacement"
         displayName = "Height"
         enabledBy = "enableDisplacement"
@@ -404,31 +314,21 @@ class TexturePlacement : Shader (
     )
 }
 
-abstract class Material : Connectable (
-    doc = "A material bound to geometry. Each concrete material is one shading model with all its inputs."
+class Material : NodeGraph (
+    doc = "A material bound to geometry. Its outputs:surface connection names the shader that shades it."
 ) {
-    token info:id (
-        group = "Material"
-        displayName = "Material Type"
-        doc = "The material's type, which Define<Material> defines."
-    )
-    inputs inputs (
-        group = "Material"
-        displayName = "Inputs"
-        doc = "Named input values. Define<Material> picks the material by id and sets these on its columns."
-    )
 }
 
-class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (
+class UsdPreviewSurface : Shader, SurfaceDetailAPI (
     doc = "USD's preview surface: a diffuse and specular surface with clearcoat, emission and opacity."
 ) {
     token info:id = UsdPreviewSurface
-    texturable color3f inputs:diffuseColor = (0.18, 0.18, 0.18) (
+    color3f inputs:diffuseColor = (0.18, 0.18, 0.18) (
         group = "Diffuse"
         displayName = "Diffuse Color"
         doc = "Diffuse reflectance, or base color in the metallic workflow."
     )
-    texturable color3f inputs:emissiveColor = (0, 0, 0) (
+    color3f inputs:emissiveColor = (0, 0, 0) (
         group = "Emission"
         displayName = "Emissive Color"
         doc = "Light emitted by the surface."
@@ -438,20 +338,20 @@ class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (
         displayName = "Use Specular Workflow"
         doc = "Use specularColor rather than metallic."
     )
-    texturable color3f inputs:specularColor = (0, 0, 0) (
+    color3f inputs:specularColor = (0, 0, 0) (
         group = "Specular"
         displayName = "Specular Color"
         enabledBy = "useSpecularWorkflow"
         doc = "Specular reflectance at normal incidence, in the specular workflow."
     )
-    texturable float inputs:metallic = 0 (
+    float inputs:metallic = 0 (
         group = "Specular"
         displayName = "Metallic"
         min = 0
         max = 1
         doc = "How metallic the surface is, in the metallic workflow."
     )
-    texturable float inputs:roughness = 0.5 (
+    float inputs:roughness = 0.5 (
         group = "Specular"
         displayName = "Roughness"
         min = 0
@@ -465,21 +365,21 @@ class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (
         max = 3
         doc = "Index of refraction, which sets the Fresnel reflectance."
     )
-    texturable float inputs:clearcoat = 0 (
+    float inputs:clearcoat = 0 (
         group = "Clearcoat"
         displayName = "Clearcoat"
         min = 0
         max = 1
         doc = "Strength of a second, white specular layer."
     )
-    texturable float inputs:clearcoatRoughness = 0.01 (
+    float inputs:clearcoatRoughness = 0.01 (
         group = "Clearcoat"
         displayName = "Clearcoat Roughness"
         min = 0
         max = 1
         doc = "Roughness of the clearcoat layer."
     )
-    texturable float inputs:opacity = 1 (
+    float inputs:opacity = 1 (
         group = "Opacity"
         displayName = "Opacity"
         min = 0
@@ -499,7 +399,7 @@ class UsdPreviewSurface : Material, TextureMappingAPI, SurfaceDetailAPI (
         max = 1
         doc = "Above zero, opacity cuts the surface out where it falls below this, rather than blending."
     )
-    texturable float inputs:occlusion = 1 (
+    float inputs:occlusion = 1 (
         group = "Occlusion"
         displayName = "Occlusion"
         min = 0

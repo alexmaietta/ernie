@@ -73,9 +73,7 @@ struct Setup {
 Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::Traversal::Auto) {
     const Ref<Scene> scene = Scene::Create(bench::BenchDevice(traversal));
     scene->Define<Scope>("/Looks");
-    scene->Define<Material>(
-        "/Looks/Paint",
-        {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", Float3{0.8f, 0.2f, 0.1f}}}});
+    scene->DefineMaterial("/Looks/Paint", {.inputs = {{"diffuseColor", Float3{0.8f, 0.2f, 0.1f}}}});
     scene->Define<World>("/env_0");
     std::vector<std::string> props;
     for (uint32_t i = 0; i < kProps; ++i) {

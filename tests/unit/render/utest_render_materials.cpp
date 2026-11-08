@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "ernie/io/image.h"
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/rotation.h"
@@ -75,8 +79,8 @@ TEST(MaterialsTest, PreviewSurfaceEditsReachTheImage) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = LookingDown(device, MinimalMode::Full);
         scene->Define<Scope>("/Looks");
-        const Prim look =
-            scene->Define<UsdPreviewSurface>("/Looks/Paint", {.diffuseColor = {1, 0, 0}});
+        scene->DefineMaterial("/Looks/Paint", {.inputs = {{"diffuseColor", Float3{1, 0, 0}}}});
+        const Prim look = *scene->Find("/Looks/Paint/Surface");
         scene->Define<Mesh>("/Quad", {.materialBinding = {"/Looks/Paint"},
                                       .points = {{-9, -9, 0}, {9, -9, 0}, {9, 9, 0}, {-9, 9, 0}},
                                       .faceVertexIndices = {0, 1, 2, 3},
@@ -92,11 +96,43 @@ TEST(MaterialsTest, PreviewSurfaceEditsReachTheImage) {
     });
 }
 
+TEST(MaterialsTest, TexturesConnectedThroughUsdUVTextureReachTheImage) {
+    const std::filesystem::path red =
+        std::filesystem::temp_directory_path() / "ernie_render_materials_red.png";
+    WritePng(red, Image(4, 4, Rgba{1, 0, 0, 1}));
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, MinimalMode::TextureDiffuse);
+        scene->Define<Scope>("/Looks");
+        scene->DefineMaterial("/Looks/Paint",
+                              {.inputs = {{"diffuseColor", Float3{0, 0, 1}}},
+                               .textures = {{.input = "diffuseColor", .file = red.string()}}});
+        const std::vector<Float2> st = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+        scene->Define<Mesh>("/Quad",
+                            {.materialBinding = {"/Looks/Paint"},
+                             .primvars = {Primvar::Create("st", Interpolation::Vertex, st)},
+                             .points = {{-9, -9, 0}, {9, -9, 0}, {9, 9, 0}, {-9, 9, 0}},
+                             .faceVertexIndices = {0, 1, 2, 3},
+                             .faceVertexCounts = {4},
+                             .subdivisionScheme = SubdivisionScheme::None});
+        Renderer renderer(scene);
+        const uint32_t center = (kSide / 2) * kSide + kSide / 2;
+        Float3 pixel = Colors(renderer)[center];
+        for (int attempt = 0; attempt < 500 && pixel.x <= pixel.z; ++attempt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            pixel = Colors(renderer)[center];
+        }
+        EXPECT_GT(pixel.x, pixel.z);
+        scene->Find("/Looks/Paint/Surface")->Disconnect("diffuseColor");
+        pixel = Colors(renderer)[center];
+        EXPECT_GT(pixel.z, pixel.x);
+    });
+}
+
 TEST(MaterialsTest, NonvisualReflectanceScalesLidarIntensity) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);
         scene->Define<Scope>("/Looks");
-        const Prim look = scene->Define<UsdPreviewSurface>("/Looks/Wall");
+        const Prim look = scene->DefineMaterial("/Looks/Wall");
         scene->Apply<NonVisualMaterialAPI>(look, {.nonvisualLidarReflectance = 1});
         scene->Define<Plane>("/Wall", {.translate = {0, 0, -5}, .width = 0, .length = 0})
             .Set(MaterialBindingAPI::kMaterialBinding, std::vector<std::string>{"/Looks/Wall"});

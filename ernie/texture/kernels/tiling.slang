@@ -118,12 +118,9 @@ Placement Probe(Placement placement, PlacementSettings settings, uint i) {
     return probe;
 }
 
-float3 TangentNormal(float4 texel, float3 constant, float influence, float strength,
-                     bool directX, float angle) {
-    float3 n = texel.xyz * 2 - 1;
-    n.y = directX ? -n.y : n.y;
+float3 TangentNormal(float4 texel, float3 scale, float3 bias, float strength, float angle) {
+    float3 n = texel.xyz * scale + bias;
     n.xy = Rotate(n.xy, -angle);
-    n = lerp(constant, n, influence);
     n.xy *= strength;
     return n;
 }

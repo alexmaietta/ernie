@@ -73,8 +73,8 @@ Ref<Scene> DefaultScene(device::Device& device, uint32_t worlds, bool waitForKer
                                                     {"Yellow", {0.9f, 0.7f, 0.2f}},
                                                     {"Purple", {0.6f, 0.4f, 0.8f}}};
     for (const auto& [name, color] : looks) {
-        scene->Define<Material>(fmt::format("/World/Looks/{}", name),
-                                {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", color}}});
+        scene->DefineMaterial(fmt::format("/World/Looks/{}", name),
+                              {.inputs = {{"diffuseColor", color}}});
     }
     scene->Define<Plane>("/World/Ground", {.checkerboard = true,
                                            .checkerColorA = {0.6f, 0.6f, 0.6f},

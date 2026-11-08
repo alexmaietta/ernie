@@ -181,6 +181,20 @@ struct MaterialInput {
     MaterialValue value;
 };
 
+struct MaterialTexture {
+    std::string input;
+    std::string file;
+    std::string output = "rgb";
+    std::vector<MaterialInput> inputs;
+};
+
+struct MaterialDesc {
+    std::string id = "UsdPreviewSurface";
+    std::vector<MaterialInput> inputs;
+    std::vector<MaterialTexture> textures;
+    std::vector<MaterialInput> placement;
+};
+
 using InstancedTokens = std::map<std::string, std::vector<std::string>, std::less<>>;
 
 #endif
