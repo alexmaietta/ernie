@@ -68,10 +68,9 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
 
     for (uint32_t index = 0; index < plan.segments.size(); ++index) {
         const Segment& segment = plan.segments[index];
-        if (segment.kind != NodeKind::Point) {
-            throw Error("Pipeline passes of {} nodes can't be generated yet",
-                        segment.kind == NodeKind::Stencil ? "stencil"
-                                                          : "reduce, global, compact or host");
+        if (segment.kind != NodeKind::Point && segment.kind != NodeKind::Stencil) {
+            throw Error("Pipeline passes of reduce, global, compact or host nodes can't be "
+                        "generated yet");
         }
         const std::string entry = std::format("Segment{}", index);
         generated.entries.push_back(entry);
@@ -91,6 +90,18 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                     throw Error(
                         "{}'s optional {} isn't connected, which generated passes don't take yet",
                         resolved.path, def.inputs[port].name);
+                }
+                if (def.kind == NodeKind::Stencil && port == 0) {
+                    if (storedSlot[value] == kNoValue) {
+                        throw Error("{} is a stencil, but its {} isn't stored", resolved.path,
+                                    def.inputs[port].name);
+                    }
+                    source += std::format(
+                        "    const Neighborhood<{0}> n{1} = Neighborhood<{0}>(p, element, {2});\n",
+                        kSignalNames[uint32_t(pipeline.values[value].type)], value,
+                        storedSlot[value]);
+                    arguments += std::format(", n{}", value);
+                    continue;
                 }
                 if (!available.contains(value)) {
                     if (storedSlot[value] == kNoValue) {

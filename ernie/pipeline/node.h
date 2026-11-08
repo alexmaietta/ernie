@@ -25,9 +25,12 @@ enum class NodeKind : uint8_t {
 enum class LayoutRule : uint8_t {
     FirstInput,
     Detector,
+    FullChannels,
     Color,
     Scalar,
 };
+
+inline constexpr uint32_t kMostStencilRadius = 8;
 
 struct PortDef {
     std::string name;

@@ -27,6 +27,8 @@ struct Frame {
     uint32_t identity = 7;
     uint32_t captures = 1;
     Fusion fusion = Fusion::Fused;
+    uint32_t pattern = 0;
+    bool mosaic = false;
 };
 
 inline std::map<std::string, std::vector<float>>
@@ -42,8 +44,9 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
                               .sources = {{generated.path, generated.source}},
                               .entries = generated.entries,
                               .label = "test pipeline"});
-    const std::vector<SignalLayout> layouts =
-        PropagateLayouts(pipeline, registry, {.channels = frame.channels});
+    const std::vector<SignalLayout> layouts = PropagateLayouts(
+        pipeline, registry,
+        {.channels = frame.channels, .pattern = frame.pattern, .mosaics = frame.mosaic});
     const uint32_t perCapture = frame.width * frame.height;
     const uint32_t elements = perCapture * frame.captures;
     std::vector<float> rates;
@@ -67,7 +70,7 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
         if (slot >= storedCount) {
             outputs[pipeline.outputs[slot - storedCount].name] = buffer.Get();
         }
-        values.push_back({buffer->Address(), channels, 0});
+        values.push_back({buffer->Address(), channels, layouts[value].mosaic ? kSignalMosaic : 0u});
         held.push_back(buffer);
     }
     std::vector<PipelineValue> slots;

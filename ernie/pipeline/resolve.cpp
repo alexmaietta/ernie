@@ -211,6 +211,17 @@ std::vector<SignalLayout> PropagateLayouts(const ResolvedPipeline& pipeline,
             }
             layout.element = uniform("precision") == "half" ? ElementType::F16 : ElementType::F32;
             break;
+        case LayoutRule::FullChannels: {
+            const auto first =
+                std::ranges::find_if(node.inputs, [](uint32_t value) { return value != kNoValue; });
+            if (first != node.inputs.end()) {
+                layout = layouts[*first];
+            }
+            layout.channels = detector.channels;
+            layout.pattern = detector.pattern;
+            layout.mosaic = false;
+            break;
+        }
         case LayoutRule::Color:
             layout.channels = 3;
             break;

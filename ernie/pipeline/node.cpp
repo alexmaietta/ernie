@@ -6,13 +6,18 @@
 namespace ernie::pipeline {
 
 uint32_t NodeRegistry::Add(NodeDef def) {
+    if (def.kind == NodeKind::Source && !def.inputs.empty()) {
+        throw Error("Pipeline node {} is a source, so it takes no signal inputs", def.id);
+    }
+    if (def.kind == NodeKind::Stencil && (def.inputs.empty() || def.radius > kMostStencilRadius)) {
+        throw Error(
+            "Pipeline node {} is a stencil, so it needs a signal input and a radius up to {}",
+            def.id, kMostStencilRadius);
+    }
     const auto found = m_ids.find(def.id);
     if (found != m_ids.end()) {
         m_defs[found->second] = std::move(def);
         return found->second;
-    }
-    if (def.kind == NodeKind::Source && !def.inputs.empty()) {
-        throw Error("Pipeline node {} is a source, so it takes no signal inputs", def.id);
     }
     const auto index = uint32_t(m_defs.size());
     m_ids.emplace(def.id, index);

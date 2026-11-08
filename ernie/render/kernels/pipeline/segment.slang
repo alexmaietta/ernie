@@ -52,16 +52,16 @@ uint HalfStride(uint channels) {
     return (channels + 1) & ~1u;
 }
 
-PipelineValue ValueSlot(PipelineParams p, PipelineElement element, uint slot) {
-    return p.values[element.capture->firstValue + slot];
+PipelineValue ValueSlot(PipelineParams p, PipelineCapture* capture, uint slot) {
+    return p.values[capture->firstValue + slot];
 }
 
-S ReadSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot) {
-    const PipelineValue value = ValueSlot(p, element, slot);
+S ReadSignalAt<S : ISignal>(PipelineParams p, PipelineCapture* capture, uint slot, uint index) {
+    const PipelineValue value = ValueSlot(p, capture, slot);
     Channels channels = Channels(value.channels);
     if ((value.flags & kSignalHalf) != 0) {
         Ptr<uint> words = Ptr<uint>(value.address);
-        const uint64_t first = uint64_t(element.index) * HalfStride(value.channels) / 2;
+        const uint64_t first = uint64_t(index) * HalfStride(value.channels) / 2;
         [ForceUnroll]
         for (uint i = 0; i < kMostSignalChannels; ++i) {
             if (i < value.channels) {
@@ -70,7 +70,7 @@ S ReadSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot) 
         }
     } else {
         Ptr<float> floats = Ptr<float>(value.address);
-        const uint64_t first = uint64_t(element.index) * value.channels;
+        const uint64_t first = uint64_t(index) * value.channels;
         [ForceUnroll]
         for (uint i = 0; i < kMostSignalChannels; ++i) {
             if (i < value.channels) {
@@ -81,8 +81,12 @@ S ReadSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot) 
     return S.Make(channels);
 }
 
+S ReadSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot) {
+    return ReadSignalAt<S>(p, element.capture, slot, element.index);
+}
+
 void WriteSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot, S signal) {
-    const PipelineValue value = ValueSlot(p, element, slot);
+    const PipelineValue value = ValueSlot(p, element.capture, slot);
     const Channels channels = signal.Get();
     if ((value.flags & kSignalHalf) != 0) {
         Ptr<uint> words = Ptr<uint>(value.address);

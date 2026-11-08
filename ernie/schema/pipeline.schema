@@ -104,3 +104,118 @@ class Encode : SensorNode (
         doc = "srgb applies the sRGB curve, and rec709 the Rec. 709 camera curve."
     )
 }
+
+class Demosaic : SensorNode (
+    doc = "Fills in every channel at every pixel of a mosaic, averaging the nearest samples of each channel around the pixel. Signals that aren't mosaics pass through."
+) {
+    token info:id = Demosaic
+    token inputs:method = bilinear (
+        tracked
+        allowed = [bilinear]
+        group = "Demosaic"
+        displayName = "Method"
+        doc = "bilinear averages the nearest samples of each channel within one pixel, which is bilinear interpolation on a Bayer mosaic."
+    )
+}
+
+class GaussianPsf : SensorNode (
+    doc = "Blurs the photoelectron rate by a Gaussian point spread function out to 3 pixels, as defocus or a lens's spread does. On a mosaic it averages only samples of the same channel."
+) {
+    token info:id = GaussianPsf
+    float inputs:sigma = 0.7 (
+        tracked
+        group = "Optics"
+        displayName = "Sigma"
+        min = 0
+        doc = "The spread's standard deviation in pixels."
+    )
+}
+
+class Denoise : SensorNode (
+    doc = "Smooths color with a bilateral filter out to 2 pixels, which keeps edges whose difference is much larger than sigmaRange."
+) {
+    token info:id = Denoise
+    float inputs:sigmaSpace = 1 (
+        tracked
+        group = "Denoise"
+        displayName = "Sigma Space"
+        min = 0
+        doc = "The filter's spatial standard deviation in pixels."
+    )
+    float inputs:sigmaRange = 0.05 (
+        tracked
+        group = "Denoise"
+        displayName = "Sigma Range"
+        min = 0
+        doc = "How different in color two pixels may be and still average, as a standard deviation."
+    )
+}
+
+class Vignette : SensorNode (
+    doc = "Darkens the photoelectron rate toward the corners by 1 - strength r^2, where r is the distance from the image's center over half its diagonal, as a lens barrel's mechanical vignetting does. The natural cos^4 falloff is already in the rate."
+) {
+    token info:id = Vignette
+    float inputs:strength = 0.3 (
+        tracked
+        group = "Optics"
+        displayName = "Strength"
+        min = 0
+        max = 1
+        doc = "How much darker the corners are, from 0 for none to 1 for black."
+    )
+}
+
+class BlackLevel : SensorNode (
+    doc = "Subtracts the detector's black level from digital numbers."
+) {
+    token info:id = BlackLevel
+}
+
+class WhiteBalance : SensorNode (
+    doc = "Scales red, green and blue by fixed gains."
+) {
+    token info:id = WhiteBalance
+    float3 inputs:gains = (1, 1, 1) (
+        tracked
+        group = "White Balance"
+        displayName = "Gains"
+        doc = "The red, green and blue gains."
+    )
+}
+
+class Ccm : SensorNode (
+    doc = "Applies a color correction matrix, taking the camera's red, green and blue to the working space's."
+) {
+    token info:id = Ccm
+    float3 inputs:red = (1, 0, 0) (
+        tracked
+        group = "Matrix"
+        displayName = "Red"
+        doc = "The weights of the camera's red, green and blue in the output's red."
+    )
+    float3 inputs:green = (0, 1, 0) (
+        tracked
+        group = "Matrix"
+        displayName = "Green"
+        doc = "The weights of the camera's red, green and blue in the output's green."
+    )
+    float3 inputs:blue = (0, 0, 1) (
+        tracked
+        group = "Matrix"
+        displayName = "Blue"
+        doc = "The weights of the camera's red, green and blue in the output's blue."
+    )
+}
+
+class Tone : SensorNode (
+    doc = "Compresses scene-linear color into the displayable range."
+) {
+    token info:id = Tone
+    token inputs:curve = none (
+        tracked
+        allowed = [none, reinhard, aces]
+        group = "Tone"
+        displayName = "Curve"
+        doc = "none leaves color as it is, reinhard maps x to x / (1 + x), and aces applies Narkowicz's fit of the ACES filmic curve."
+    )
+}

@@ -47,6 +47,7 @@ ernie_test(
     SOURCES
         unit/pipeline/utest_pipeline_codegen.cpp
         unit/pipeline/utest_pipeline_fusion.cpp
+        unit/pipeline/utest_pipeline_isp.cpp
         unit/pipeline/utest_pipeline_nodes.cpp
         unit/pipeline/utest_pipeline_noise.cpp
         unit/pipeline/utest_pipeline_resolve.cpp
