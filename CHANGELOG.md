@@ -21,9 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every TLAS is placed relative to a render origin that follows the first sensor a render product points at, so geometry near a camera stays precise up to solar system distances.
 - Render products are resolved by the scene when it publishes. Editing prims that a product doesn't read, or adding and removing them, no longer prepares every product again or reallocates their outputs. Only products whose settings, vars or sensors changed are prepared again.
 - Editing display colors, primvars or authored normals no longer rewrites instance records, and only rewrites the surfaces of the worlds that show the edited prims.
+- `Renderer::Step` publishes the scene's pending edits before it plans, so a product edited since the last step is prepared from its new settings even when nothing is due.
+- `Scene::At` is now `Scene::ByIndex`, and `Image::At` is now `Image::Pixel`.
+- Public scene headers moved to match the module's layout. `ernie/scene/access/` is now `ernie/scene/views/`, `ernie/scene/catalog/tokens.h` is now `ernie/scene/structure/tokens.h`, `ernie/scene/kernels/schema/` is now `ernie/scene/schema/`, and `semantics.h` and `primvars.h` moved from `ernie/scene/kernels/` to `ernie/scene/records/`.
+- The overlay is its own module. `ernie/render/overlay/overlay.h` is now `ernie/overlay/overlay.h` and `ernie/render/kernels/overlay/style.h` is now `ernie/overlay/kernels/style.h`, and `ernie/ernie.h` still includes the overlay.
 
 ### Removed
 
+- The public headers `ernie/scene/kernels/scene.h` and `ernie/scene/kernels/textures.h`. The authored scene data they described is internal to the scene module, and render kernels read the scene's records instead.
 - `Snapshot::sceneData` and Python's `snapshot.scene_data`. Render kernels read only the render tables a snapshot's `tables` points at, so the authored columns no longer travel with a snapshot.
 - The derived attributes `ernie:worldTransform`, `ernie:computedVisibility`, `ernie:computedPurpose` and `ernie:computedMaterial`. The hierarchy system keeps them in its own tables, and world transforms are read through `WorldTransforms` instead.
 - The derived mesh attributes `ernie:blas`, `ernie:triangleCorners`, `ernie:triangleFaces`, `ernie:pointTriangleStarts`, `ernie:pointTriangles`, `ernie:pointBounds`, `ernie:smoothNormals`, `ernie:tangents` and `ernie:tangentPrimvar`. The geometry and tangents systems keep them in mesh and tangent records.
