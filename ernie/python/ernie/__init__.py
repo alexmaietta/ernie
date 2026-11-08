@@ -9,6 +9,7 @@ from ernie._ernie import (
     CancelledError,
     Colormap,
     Device,
+    DetectorDesc,
     DType,
     FrameOutput,
     IdLabel,
@@ -31,6 +32,8 @@ from ernie._ernie import (
     OverlayStyle,
     OverlayUnits,
     Overlays,
+    Pipeline,
+    PipelineSession,
     Prim,
     PrimCopy,
     Primvar,
@@ -67,12 +70,14 @@ from ernie._ernie import (
     list_adapters,
     look_along,
     look_at,
+    pipeline_node,
     register_importer,
     unregister_importer,
     write_frame,
     write_image,
     write_render_var,
 )
+from ernie import _pipelines
 from ernie._typed import SchemaPrim, SchemaSelection, Targets
 from ernie.schemas import *
 
@@ -85,6 +90,7 @@ __all__ = [
     "CancelledError",
     "Colormap",
     "DType",
+    "DetectorDesc",
     "Device",
     "FrameOutput",
     "IdLabel",
@@ -107,6 +113,8 @@ __all__ = [
     "OverlayStyle",
     "OverlayUnits",
     "Overlays",
+    "Pipeline",
+    "PipelineSession",
     "Prim",
     "PrimCopy",
     "Primvar",
@@ -146,6 +154,7 @@ __all__ = [
     "list_adapters",
     "look_along",
     "look_at",
+    "pipeline_node",
     "register_importer",
     "unregister_importer",
     "write_frame",

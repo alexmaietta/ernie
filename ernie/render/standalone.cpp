@@ -6,7 +6,9 @@
 
 #include "ernie/device/queue.h"
 #include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/resolve.h"
 #include "ernie/render/pipelines.h"
+#include "ernie/scene/scene_impl.h"
 #include "ernie/util/error.h"
 
 namespace ernie {
@@ -62,16 +64,94 @@ std::atomic<uint32_t> g_standaloneDefinitions{1u << 24};
 
 }
 
-Pipeline::Pipeline(device::Device& device, pipeline::PipelineDesc desc)
-    : Pipeline(device, std::move(desc), pipeline::BuiltinNodes()) {}
+struct Pipeline::State {
+    device::Device* device = nullptr;
+    const pipeline::NodeRegistry* registry = nullptr;
+    std::string path;
+    pipeline::ResolvedPipeline instance;
+    std::shared_ptr<const CompiledPipeline> compiled;
 
-Pipeline::Pipeline(device::Device& device, pipeline::PipelineDesc desc,
+    State(device::Device& on, const pipeline::NodeRegistry& nodes, std::string name,
+          pipeline::ResolvedPipeline resolved)
+        : device(&on), registry(&nodes), path(std::move(name)), instance(std::move(resolved)) {
+        auto definition = std::make_shared<pipeline::PipelineDefinition>(
+            pipeline::BuildDefinition(g_standaloneDefinitions++, instance, nodes));
+        compiled = CompilePipeline(on, std::move(definition), nodes);
+    }
+};
+
+std::optional<PipelineNodeInfo> FindPipelineNode(std::string_view id) {
+    const pipeline::NodeRegistry& registry = pipeline::BuiltinNodes();
+    const uint32_t found = registry.Find(id);
+    if (found == pipeline::kNoDef) {
+        return std::nullopt;
+    }
+    const pipeline::NodeDef& def = registry[found];
+    PipelineNodeInfo info{.id = def.id,
+                          .kind = std::string(pipeline::kNodeKindNames[uint32_t(def.kind)])};
+    for (const pipeline::PortDef& port : def.inputs) {
+        info.inputs.push_back(
+            {port.name, std::string(pipeline::kSignalNames[uint32_t(port.type)]), port.optional});
+    }
+    for (const pipeline::PortDef& port : def.outputs) {
+        info.outputs.push_back(
+            {port.name, std::string(pipeline::kSignalNames[uint32_t(port.type)]), port.optional});
+    }
+    return info;
+}
+
+Pipeline::Pipeline(const Ref<Scene>& scene, std::string_view path) {
+    if (scene->Pending()) {
+        scene->Publish().Wait();
+    }
+    const std::optional<Prim> prim = scene->Find(path);
+    if (!prim || !prim->IsA<SensorPipeline>()) {
+        throw Error("{} isn't a SensorPipeline", path);
+    }
+    const PipelineTable& table = SceneImpl::Get(*scene).GetPipelines();
+    const std::shared_ptr<const PipelineInstance> instance = table.Find(prim->Index());
+    if (!instance) {
+        throw Error("{} isn't resolved yet", path);
+    }
+    if (!instance->error.empty()) {
+        throw Error("{}", instance->error);
+    }
+    m_state = std::make_unique<State>(scene->GetDevice(), table.Registry(), std::string(path),
+                                      instance->resolved);
+}
+
+Pipeline::Pipeline(device::Device& device, const pipeline::PipelineDesc& desc)
+    : Pipeline(device, desc, pipeline::BuiltinNodes()) {}
+
+Pipeline::Pipeline(device::Device& device, const pipeline::PipelineDesc& desc,
                    const pipeline::NodeRegistry& registry)
-    : m_device(&device), m_registry(&registry),
-      m_instance(pipeline::ResolvePipeline(desc, registry)) {
-    auto definition = std::make_shared<pipeline::PipelineDefinition>(
-        pipeline::BuildDefinition(g_standaloneDefinitions++, m_instance, registry));
-    m_compiled = CompilePipeline(device, std::move(definition), registry);
+    : m_state(std::make_unique<State>(device, registry, desc.path,
+                                      pipeline::ResolvePipeline(desc, registry))) {}
+
+Pipeline::~Pipeline() = default;
+Pipeline::Pipeline(Pipeline&&) noexcept = default;
+Pipeline& Pipeline::operator=(Pipeline&&) noexcept = default;
+
+device::Device& Pipeline::GetDevice() const {
+    return *m_state->device;
+}
+
+std::vector<std::string> Pipeline::Sources() const {
+    std::vector<std::string> sources;
+    for (const pipeline::ResolvedNode& node : m_state->instance.nodes) {
+        if ((*m_state->registry)[node.def].kind == pipeline::NodeKind::Source) {
+            sources.push_back(node.path);
+        }
+    }
+    return sources;
+}
+
+std::vector<std::string> Pipeline::Outputs() const {
+    std::vector<std::string> outputs;
+    for (const pipeline::ResolvedOutput& output : m_state->instance.outputs) {
+        outputs.push_back(output.name);
+    }
+    return outputs;
 }
 
 PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc) const {
@@ -80,11 +160,13 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc) const {
 }
 
 PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& state) const {
-    const pipeline::PipelineDefinition& definition = *m_compiled->definition;
-    const pipeline::GeneratedPipeline& generated = m_compiled->generated;
+    const pipeline::NodeRegistry& registry = *m_state->registry;
+    const pipeline::ResolvedPipeline& instance = m_state->instance;
+    const pipeline::PipelineDefinition& definition = *m_state->compiled->definition;
+    const pipeline::GeneratedPipeline& generated = m_state->compiled->generated;
     const DetectorRecord detector = Record(desc.detector);
     const std::vector<pipeline::SignalLayout> layouts =
-        pipeline::PropagateLayouts(m_instance, *m_registry,
+        pipeline::PropagateLayouts(instance, registry,
                                    {.channels = detector.channels,
                                     .pattern = detector.pattern,
                                     .mosaics = PatternMosaics(desc.detector.pattern)});
@@ -94,12 +176,15 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
     int64_t width = 0;
     std::vector<const device::Tensor*> sources(generated.slots.size(), nullptr);
     for (uint32_t slot = 0; slot < generated.slots.size(); ++slot) {
-        const pipeline::Value& value = m_instance.values[generated.slots[slot]];
-        const pipeline::ResolvedNode& node = m_instance.nodes[value.node];
-        if ((*m_registry)[node.def].kind != pipeline::NodeKind::Source) {
+        const pipeline::Value& value = instance.values[generated.slots[slot]];
+        const pipeline::ResolvedNode& node = instance.nodes[value.node];
+        if (registry[node.def].kind != pipeline::NodeKind::Source) {
             continue;
         }
-        const auto found = desc.inputs.find(node.path);
+        auto found = desc.inputs.find(node.path);
+        if (found == desc.inputs.end() && node.path.starts_with(m_state->path + "/")) {
+            found = desc.inputs.find(std::string_view(node.path).substr(m_state->path.size() + 1));
+        }
         if (found == desc.inputs.end()) {
             throw Error("The run has no input for {}", node.path);
         }
@@ -124,7 +209,7 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
         throw Error("A standalone run needs at least one nonempty input");
     }
 
-    device::Device& device = *m_device;
+    device::Device& device = *m_state->device;
     const uint64_t perCapture = uint64_t(height) * width;
     const uint64_t elements = perCapture * captures;
     std::vector<device::Tensor> tensors(generated.slots.size());
@@ -152,7 +237,7 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
             {tensors[slot].Address(), layout.channels, layout.mosaic ? kSignalMosaic : 0u});
     }
 
-    const std::vector<uint32_t> packed = pipeline::PackWords(definition, m_instance);
+    const std::vector<uint32_t> packed = pipeline::PackWords(definition, instance);
     std::vector<uint32_t> words = packed;
     words.push_back(0);
     CameraRecord camera{};
@@ -164,7 +249,7 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
     const uint64_t stateBytes = std::max<uint64_t>(
         uint64_t(definition.stateWords) * captures * sizeof(float), sizeof(float));
     if (!state || state->Bytes() != stateBytes) {
-        const std::vector<float> initial = pipeline::InitialState(definition, *m_registry);
+        const std::vector<float> initial = pipeline::InitialState(definition, registry);
         std::vector<float> states;
         for (int64_t capture = 0; capture < captures; ++capture) {
             states.insert(states.end(), initial.begin(), initial.end());
@@ -209,12 +294,12 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, Ref<device::Buffer>& 
                                 .elementCount = elements,
                                 .captureCount = uint32_t(captures)};
     device::CommandEncoder encoder = device.GetQueue().CreateEncoder();
-    RecordPipeline(encoder, *m_compiled, params, uint32_t(captures), elements);
+    RecordPipeline(encoder, *m_state->compiled, params, uint32_t(captures), elements);
     device.GetQueue().Submit(encoder.Finish()).Wait();
 
     PipelineOutputs outputs;
-    for (uint32_t output = 0; output < m_instance.outputs.size(); ++output) {
-        outputs.emplace(m_instance.outputs[output].name, tensors[storedCount + output]);
+    for (uint32_t output = 0; output < instance.outputs.size(); ++output) {
+        outputs.emplace(instance.outputs[output].name, tensors[storedCount + output]);
     }
     return outputs;
 }

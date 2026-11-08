@@ -59,11 +59,16 @@ Rig MakeRig(device::Device& device) {
     scene.Define<Scope>("/Render");
     scene.Define<RenderVar>("/Render/Raw", {.sourceName = "raw"});
     scene.Define<RenderVar>("/Render/Color", {.sourceName = "color"});
-    scene.Define<RenderProduct>(
-        "/Render/A", {.camera = {"/Cam"}, .resolution = {8, 4}, .orderedVars = {"/Render/Raw"}});
-    scene.Define<RenderProduct>(
-        "/Render/B", {.camera = {"/Cam"}, .resolution = {8, 4}, .orderedVars = {"/Render/Raw"}});
-    scene.Define<RenderProduct>("/Render/C", {.camera = {"/Cam"},
+    scene.Define<RenderProduct>("/Render/A", {.renderMode = RenderMode::RealTime,
+                                              .camera = {"/Cam"},
+                                              .resolution = {8, 4},
+                                              .orderedVars = {"/Render/Raw"}});
+    scene.Define<RenderProduct>("/Render/B", {.renderMode = RenderMode::RealTime,
+                                              .camera = {"/Cam"},
+                                              .resolution = {8, 4},
+                                              .orderedVars = {"/Render/Raw"}});
+    scene.Define<RenderProduct>("/Render/C", {.renderMode = RenderMode::RealTime,
+                                              .camera = {"/Cam"},
                                               .resolution = {8, 4},
                                               .pipelineBinding = {"/Pipes/Color"},
                                               .orderedVars = {"/Render/Color"}});
@@ -135,6 +140,17 @@ TEST(PipelinesTest, ProductsReadOutputsOfTheirOwnOrTheirSensorsPipeline) {
             ->Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Raw"});
         rig.scene->Publish().Wait();
         EXPECT_NE(impl.GetProducts().Find(rig.scene->Find("/Render/C")->Index())->error, "");
+    });
+}
+
+TEST(PipelinesTest, MinimalProductsCantMeasureElectronRates) {
+    test::ForEachDevice([](device::Device& device) {
+        Rig rig = MakeRig(device);
+        const Prim a = *rig.scene->Find("/Render/A");
+        a.Set(RenderProduct::kRenderMode, RenderMode::Minimal);
+        rig.scene->Publish().Wait();
+        const auto product = SceneImpl::Get(*rig.scene).GetProducts().Find(a.Index());
+        EXPECT_NE(product->error.find("RealTime"), std::string::npos) << product->error;
     });
 }
 

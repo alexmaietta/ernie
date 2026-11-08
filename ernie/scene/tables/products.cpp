@@ -454,6 +454,22 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 ResolveVar(m_scene.ByIndex(var), product, kind, channels, bound));
             product.semantic |= added.semantic;
         }
+        const bool rated =
+            std::ranges::any_of(product.vars,
+                                [](const ResolvedVar& var) {
+                                    return var.output.empty() &&
+                                           var.source == RenderVarSource::ElectronRate;
+                                }) ||
+            (bound.instance &&
+             std::ranges::any_of(
+                 bound.instance->resolved.nodes, [&](const pipeline::ResolvedNode& node) {
+                     return m_pipelines.Registry()[node.def].kind == pipeline::NodeKind::Source;
+                 }));
+        if (rated && RenderMode(record.renderMode) != RenderMode::RealTime) {
+            throw Error("{} measures electron rates, which only a RealTime render traces, so set "
+                        "its renderMode to RealTime",
+                        path);
+        }
         product.entry = SelectEntry(product, kind);
         product.overlays = prim.Get(RenderProduct::kOverlays);
         if (!product.overlays.empty() && kind.schema != SchemaId::Camera) {

@@ -42,4 +42,5 @@ ernie_public_files(
     render_output.h
     renderer.h
     shaders.h
+    standalone.h
 )

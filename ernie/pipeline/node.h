@@ -22,6 +22,9 @@ enum class NodeKind : uint8_t {
     Host,
 };
 
+inline constexpr std::string_view kNodeKindNames[] = {"source", "point",   "stencil", "reduce",
+                                                      "global", "compact", "host"};
+
 enum class LayoutRule : uint8_t {
     FirstInput,
     Detector,

@@ -10,6 +10,7 @@
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
 #include "ernie/render/shaders.h"
+#include "ernie/render/standalone.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"

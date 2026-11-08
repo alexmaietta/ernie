@@ -14,6 +14,7 @@ NB_MODULE(_ernie, module) {
     ernie::python::BindDevice(module);
     ernie::python::BindScene(module);
     ernie::python::BindRender(module);
+    ernie::python::BindPipeline(module);
     ernie::python::BindImport(module);
     ernie::python::BindIo(module);
     ernie::python::BindRotation(module);

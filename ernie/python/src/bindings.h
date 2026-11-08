@@ -93,6 +93,7 @@ void BindScene(nanobind::module_& module);
 void BindRender(nanobind::module_& module);
 void BindImport(nanobind::module_& module);
 void BindIo(nanobind::module_& module);
+void BindPipeline(nanobind::module_& module);
 void BindRotation(nanobind::module_& module);
 
 }

@@ -4,16 +4,38 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "ernie/device/buffer.h"
 #include "ernie/device/device.h"
 #include "ernie/device/tensor.h"
-#include "ernie/pipeline/resolve.h"
+#include "ernie/export.h"
 #include "ernie/scene/scene.h"
 
 namespace ernie {
 
-struct CompiledPipeline;
+namespace pipeline {
+struct PipelineDesc;
+class NodeRegistry;
+}
+
+struct PipelineNodePort {
+    std::string name;
+    std::string type;
+    bool optional = false;
+};
+
+struct PipelineNodeInfo {
+    std::string id;
+    std::string kind;
+    std::vector<PipelineNodePort> inputs;
+    std::vector<PipelineNodePort> outputs;
+};
+
+ERNIE_API std::optional<PipelineNodeInfo> FindPipelineNode(std::string_view id);
 
 struct DetectorDesc {
     DetectorPattern pattern = DetectorPattern::Rgb;
@@ -41,26 +63,32 @@ struct PipelineRunDesc {
 
 using PipelineOutputs = std::map<std::string, device::Tensor, std::less<>>;
 
-class Pipeline {
+class ERNIE_API Pipeline {
   public:
-    Pipeline(device::Device& device, pipeline::PipelineDesc desc);
-    Pipeline(device::Device& device, pipeline::PipelineDesc desc,
+    Pipeline(const Ref<Scene>& scene, std::string_view path);
+    Pipeline(device::Device& device, const pipeline::PipelineDesc& desc);
+    Pipeline(device::Device& device, const pipeline::PipelineDesc& desc,
              const pipeline::NodeRegistry& registry);
+    ~Pipeline();
+    Pipeline(Pipeline&&) noexcept;
+    Pipeline& operator=(Pipeline&&) noexcept;
 
     PipelineOutputs Run(const PipelineRunDesc& desc) const;
 
+    device::Device& GetDevice() const;
+    std::vector<std::string> Sources() const;
+    std::vector<std::string> Outputs() const;
+
   private:
     friend class PipelineSession;
+    struct State;
 
     PipelineOutputs Run(const PipelineRunDesc& desc, Ref<device::Buffer>& state) const;
 
-    device::Device* m_device;
-    const pipeline::NodeRegistry* m_registry;
-    pipeline::ResolvedPipeline m_instance;
-    std::shared_ptr<const CompiledPipeline> m_compiled;
+    std::unique_ptr<State> m_state;
 };
 
-class PipelineSession {
+class ERNIE_API PipelineSession {
   public:
     explicit PipelineSession(const Pipeline& pipeline) : m_pipeline(pipeline) {}
 
@@ -68,6 +96,10 @@ class PipelineSession {
 
     uint32_t Captures() const {
         return m_captures;
+    }
+
+    const Pipeline& GetPipeline() const {
+        return m_pipeline;
     }
 
   private:

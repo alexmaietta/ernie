@@ -88,6 +88,9 @@ TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
                                       .orderedVars = {"/Render/Rate", "/Render/Raw"}});
         Renderer renderer(scene);
         const Pipeline standalone(device, RawDesc());
+        const Pipeline loaded(scene, "/Pipes/Raw");
+        EXPECT_EQ(loaded.Sources(), std::vector<std::string>{"/Pipes/Raw/Signal"});
+        EXPECT_EQ(loaded.Outputs(), std::vector<std::string>{"raw"});
         PipelineRunDesc run{.exposureTime = kExposureTime, .identity = HashPath("/Cam").words[0]};
         std::vector<float> previous;
         for (uint32_t capture = 0; capture < 2; ++capture) {
@@ -101,6 +104,9 @@ TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
             run.capture = capture;
             const std::vector<float> traced = raw.tensor.ToHost<float>();
             EXPECT_EQ(traced, standalone.Run(run).at("raw").ToHost<float>()) << capture;
+            PipelineRunDesc named = run;
+            named.inputs = {{"Signal", run.inputs.begin()->second}};
+            EXPECT_EQ(traced, loaded.Run(named).at("raw").ToHost<float>()) << capture;
             EXPECT_NE(traced, previous);
             previous = traced;
         }
