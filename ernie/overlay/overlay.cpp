@@ -27,6 +27,26 @@ using Batch = OverlayData::Batch;
 
 constexpr uint64_t kLeastPairs = 1 << 16;
 
+constexpr device::DType kFloats[] = {device::DType::Float32};
+constexpr device::DType kWords[] = {device::DType::UInt32, device::DType::Int32};
+constexpr device::DType kColors[] = {device::DType::Float32, device::DType::UInt8};
+
+enum HostBuffer : size_t {
+    kHostPoints,
+    kHostEnds,
+    kHostColors,
+    kHostSizes,
+    kHostWorlds,
+    kHostRotations,
+    kHostScalars,
+    kHostExtras,
+    kHostCodes,
+    kHostPrims,
+    kHostGroups,
+    kHostIds,
+    kHostBuffers,
+};
+
 struct Layout {
     int64_t worlds = 0;
     int64_t rows = 0;
@@ -163,6 +183,10 @@ void AppendRow(Batch& batch, const HostRow& row, uint32_t color, float size, uin
     batch.hostExtras.push_back(row.extra);
 }
 
+void AppendRow(Batch& batch, const HostRow& row, const OverlayStyle& style) {
+    AppendRow(batch, row, PackColor(style.color), style.width, style.world, style.id);
+}
+
 void AppendText(Batch& batch, std::string_view text, const HostRow& row,
                 const OverlayStyle& style) {
     std::vector<uint8_t> codes = OverlayCodes(text);
@@ -220,7 +244,7 @@ Layout CheckPoints(const device::Tensor& points, std::string_view batch, bool tr
 
 void CheckField(const device::Tensor& field, const device::Tensor& points, Layout layout,
                 std::string_view batch, std::string_view name, int64_t width,
-                std::initializer_list<device::DType> types) {
+                std::span<const device::DType> types) {
     if (field.Empty()) {
         return;
     }
@@ -262,6 +286,16 @@ void CheckField(const device::Tensor& field, const device::Tensor& points, Layou
     }
 }
 
+void CheckItemCount(const Batch& batch, std::string_view name, int64_t counts) {
+    if (batch.itemCount.Empty()) {
+        return;
+    }
+    if (std::ranges::find(kWords, batch.itemCount.Type()) == std::end(kWords) ||
+        batch.itemCount.Shape().size() != 1 || batch.itemCount.Shape()[0] != counts) {
+        throw Error("Overlay {}' item counts are a [{}] uint32 tensor", name, counts);
+    }
+}
+
 void Require(const device::Tensor& field, std::string_view batch, std::string_view name) {
     if (field.Empty()) {
         throw Error("Overlay {} need {}", batch, name);
@@ -294,10 +328,8 @@ ImageLayout CheckImage(const device::Tensor& pixels, int64_t rows) {
 }
 
 void CheckPrims(const Batch& batch) {
-    const std::initializer_list<device::DType> kWords = {device::DType::UInt32,
-                                                         device::DType::Int32};
     const device::Tensor& prims = batch.prims;
-    if (prims.Empty() || std::ranges::find(kWords, prims.Type()) == kWords.end() ||
+    if (prims.Empty() || std::ranges::find(kWords, prims.Type()) == std::end(kWords) ||
         prims.Shape().size() != 1) {
         throw Error("Overlay prims are an [N] uint32 tensor of prim indices");
     }
@@ -313,9 +345,9 @@ void CheckPrims(const Batch& batch) {
     }
     const Layout rows{0, batch.groups.Empty() ? layout.rows : int64_t(batch.groupCount), 0};
     CheckField(batch.colors, batch.groups.Empty() ? prims : batch.groups, rows, "prims", "colors",
-               4, {device::DType::Float32, device::DType::UInt8});
+               4, kColors);
     CheckField(batch.sizes, batch.groups.Empty() ? prims : batch.groups, rows, "prims", "widths", 0,
-               {device::DType::Float32});
+               kFloats);
     if (!batch.pixels.Empty()) {
         if (batch.primShape != OverlayPrimShape::CameraImages) {
             throw Error("Only overlay camera images take pixels");
@@ -326,9 +358,6 @@ void CheckPrims(const Batch& batch) {
 
 void CheckFill(const Batch& batch) {
     const std::string_view name = KindName(batch.kind);
-    const std::initializer_list<device::DType> kFloats = {device::DType::Float32};
-    const std::initializer_list<device::DType> kWords = {device::DType::UInt32,
-                                                         device::DType::Int32};
     Layout layout;
     if (batch.kind == OverlayKind::Triangles) {
         const Span<const int64_t> shape = batch.points.Shape();
@@ -352,14 +381,9 @@ void CheckFill(const Batch& batch) {
         Require(batch.pixels, name, "pixels");
         CheckImage(batch.pixels, layout.rows);
     }
-    CheckField(batch.colors, batch.points, layout, name, "colors", 4,
-               {device::DType::Float32, device::DType::UInt8});
+    CheckField(batch.colors, batch.points, layout, name, "colors", 4, kColors);
     CheckField(batch.worlds, batch.points, layout, name, "worlds", 0, kWords);
-    if (!batch.itemCount.Empty() &&
-        (std::ranges::find(kWords, batch.itemCount.Type()) == kWords.end() ||
-         batch.itemCount.Shape().size() != 1 || batch.itemCount.Shape()[0] != 1)) {
-        throw Error("Overlay {}' item counts are a [1] uint32 tensor", name);
-    }
+    CheckItemCount(batch, name, 1);
 }
 
 void CheckText(const Batch& batch) {
@@ -386,18 +410,10 @@ void CheckText(const Batch& batch) {
             throw Error("Overlay {}' points are an [N, 3] tensor, a row per text", name);
         }
     }
-    const std::initializer_list<device::DType> kFloats = {device::DType::Float32};
-    const std::initializer_list<device::DType> kWords = {device::DType::UInt32,
-                                                         device::DType::Int32};
-    CheckField(batch.colors, source, layout, name, "colors", 4,
-               {device::DType::Float32, device::DType::UInt8});
+    CheckField(batch.colors, source, layout, name, "colors", 4, kColors);
     CheckField(batch.sizes, source, layout, name, "sizes", 0, kFloats);
     CheckField(batch.worlds, source, layout, name, "worlds", 0, kWords);
-    if (!batch.itemCount.Empty() &&
-        (std::ranges::find(kWords, batch.itemCount.Type()) == kWords.end() ||
-         batch.itemCount.Shape().size() != 1 || batch.itemCount.Shape()[0] != 1)) {
-        throw Error("Overlay {}' item counts are a [1] uint32 tensor", name);
-    }
+    CheckItemCount(batch, name, 1);
     if (batch.format.decimals > kOverlayMostDecimals) {
         throw Error("Overlay numbers with {} decimals; at most {} fit", batch.format.decimals,
                     kOverlayMostDecimals);
@@ -420,9 +436,6 @@ void CheckBatch(const Batch& batch) {
     const std::string_view name = KindName(batch.kind);
     const OverlayKind kind = batch.kind;
     const Layout layout = CheckPoints(batch.points, name, kind == OverlayKind::Trails);
-    const std::initializer_list<device::DType> kFloats = {device::DType::Float32};
-    const std::initializer_list<device::DType> kWords = {device::DType::UInt32,
-                                                         device::DType::Int32};
     const std::string_view ends = kind == OverlayKind::Boxes     ? "half extents"
                                   : kind == OverlayKind::Circles ? "normals"
                                                                  : "ends";
@@ -446,24 +459,24 @@ void CheckBatch(const Batch& batch) {
     } else {
         CheckField(batch.extras, batch.points, layout, name, "heads", 0, kWords);
     }
-    CheckField(batch.colors, batch.points, layout, name, "colors", 4,
-               {device::DType::Float32, device::DType::UInt8});
+    CheckField(batch.colors, batch.points, layout, name, "colors", 4, kColors);
     CheckField(batch.sizes, batch.points, layout, name,
                kind == OverlayKind::Markers ? "sizes" : "widths", 0, kFloats);
     if (!batch.worlds.Empty() && layout.worlds > 0) {
         throw Error("Overlay {} with a world per row can't also have worlds", name);
     }
     CheckField(batch.worlds, batch.points, layout, name, "worlds", 0, kWords);
+    CheckItemCount(batch, name, std::max<int64_t>(layout.worlds, 1));
     if (!batch.itemCount.Empty()) {
-        const int64_t counts = std::max<int64_t>(layout.worlds, 1);
-        if (std::ranges::find(kWords, batch.itemCount.Type()) == kWords.end() ||
-            batch.itemCount.Shape().size() != 1 || batch.itemCount.Shape()[0] != counts) {
-            throw Error("Overlay {}' item counts are a [{}] uint32 tensor", name, counts);
-        }
         if (&batch.itemCount.GetDevice() != &batch.points.GetDevice()) {
             throw Error("Overlay {}' item counts are on another device than their points", name);
         }
     }
+}
+
+void Push(OverlayData& data, Batch batch) {
+    CheckBatch(batch);
+    data.batches.push_back(std::move(batch));
 }
 
 uint32_t Words(int64_t value, std::string_view what) {
@@ -502,8 +515,7 @@ OverlayData& Overlay::Edit() {
 }
 
 Overlay& Overlay::Line(Float3 a, Float3 b, const OverlayStyle& style) {
-    AppendRow(HostBatch(Edit(), OverlayKind::Lines, style), {a, b}, PackColor(style.color),
-              style.width, style.world, style.id);
+    AppendRow(HostBatch(Edit(), OverlayKind::Lines, style), {a, b}, style);
     return *this;
 }
 
@@ -532,13 +544,11 @@ Overlay& Overlay::Polyline(Span<const Float3> points, bool closed, const Overlay
         return *this;
     }
     Batch& batch = HostBatch(Edit(), OverlayKind::Lines, style);
-    const uint32_t color = PackColor(style.color);
     for (size_t at = 0; at + 1 < points.size(); ++at) {
-        AppendRow(batch, {points[at], points[at + 1]}, color, style.width, style.world, style.id);
+        AppendRow(batch, {points[at], points[at + 1]}, style);
     }
     if (closed && points.size() > 2) {
-        AppendRow(batch, {points[points.size() - 1], points[0]}, color, style.width, style.world,
-                  style.id);
+        AppendRow(batch, {points[points.size() - 1], points[0]}, style);
     }
     return *this;
 }
@@ -566,35 +576,31 @@ Overlay& Overlay::Markers(Span<const Float3> points, const OverlayStyle& style,
 Overlay& Overlay::Box(Float3 center, Float3 halfExtents, const OverlayStyle& style,
                       Quatd orientation) {
     AppendRow(HostBatch(Edit(), OverlayKind::Boxes, style),
-              {.point = center, .end = halfExtents, .rotation = Rotation(orientation)},
-              PackColor(style.color), style.width, style.world, style.id);
+              {.point = center, .end = halfExtents, .rotation = Rotation(orientation)}, style);
     return *this;
 }
 
 Overlay& Overlay::Sphere(Float3 center, float radius, const OverlayStyle& style) {
     AppendRow(HostBatch(Edit(), OverlayKind::Spheres, style), {.point = center, .scalar = radius},
-              PackColor(style.color), style.width, style.world, style.id);
+              style);
     return *this;
 }
 
 Overlay& Overlay::Circle(Float3 center, Float3 normal, float radius, const OverlayStyle& style) {
     AppendRow(HostBatch(Edit(), OverlayKind::Circles, style),
-              {.point = center, .end = normal, .scalar = radius}, PackColor(style.color),
-              style.width, style.world, style.id);
+              {.point = center, .end = normal, .scalar = radius}, style);
     return *this;
 }
 
 Overlay& Overlay::Frame(Float3 origin, Quatd orientation, float length, const OverlayStyle& style) {
     AppendRow(HostBatch(Edit(), OverlayKind::Frames, style),
-              {.point = origin, .rotation = Rotation(orientation), .scalar = length},
-              PackColor(style.color), style.width, style.world, style.id);
+              {.point = origin, .rotation = Rotation(orientation), .scalar = length}, style);
     return *this;
 }
 
 Overlay& Overlay::Arrow(Float3 from, Float3 to, const OverlayStyle& style, float headLength) {
     AppendRow(HostBatch(Edit(), OverlayKind::Arrows, style),
-              {.point = from, .end = to, .scalar = headLength}, PackColor(style.color), style.width,
-              style.world, style.id);
+              {.point = from, .end = to, .scalar = headLength}, style);
     return *this;
 }
 
@@ -605,7 +611,7 @@ Overlay& Overlay::Capsule(Float3 center, Quatd orientation, float radius, float 
                .rotation = Rotation(orientation),
                .scalar = radius,
                .extra = std::bit_cast<uint32_t>(halfHeight)},
-              PackColor(style.color), style.width, style.world, style.id);
+              style);
     return *this;
 }
 
@@ -632,8 +638,7 @@ Overlay& Overlay::Text(const ScreenPlacement& placement, std::string_view text,
 
 Overlay& Overlay::Triangle(Float3 a, Float3 b, Float3 c, const OverlayStyle& style) {
     AppendRow(HostBatch(Edit(), OverlayKind::Triangles, style),
-              {.point = a, .end = b, .rotation = {c.x, c.y, c.z, 1}, .extra = 7},
-              PackColor(style.color), style.width, style.world, style.id);
+              {.point = a, .end = b, .rotation = {c.x, c.y, c.z, 1}, .extra = 7}, style);
     return *this;
 }
 
@@ -642,7 +647,6 @@ Overlay& Overlay::Polygon(Span<const Float3> points, const OverlayStyle& style) 
         return *this;
     }
     Batch& batch = HostBatch(Edit(), OverlayKind::Triangles, style);
-    const uint32_t color = PackColor(style.color);
     const size_t last = points.size() - 2;
     for (size_t at = 1; at <= last; ++at) {
         const Float3 c = points[at + 1];
@@ -650,7 +654,7 @@ Overlay& Overlay::Polygon(Span<const Float3> points, const OverlayStyle& style) 
         AppendRow(
             batch,
             {.point = points[0], .end = points[at], .rotation = {c.x, c.y, c.z, 1}, .extra = edges},
-            color, style.width, style.world, style.id);
+            style);
     }
     return *this;
 }
@@ -772,7 +776,7 @@ Overlay& Overlay::Image(Float3 topLeft, Float3 right, Float3 down, device::Tenso
     }
     Batch batch{.kind = OverlayKind::Images, .style = style, .pixels = std::move(pixels)};
     AppendRow(batch, {.point = topLeft, .end = right, .rotation = {down.x, down.y, down.z, 1}},
-              PackColor(style.color), style.width, style.world, style.id);
+              style);
     Edit().batches.push_back(std::move(batch));
     return *this;
 }
@@ -819,8 +823,7 @@ Overlay& Overlay::Add(OverlayTriangles triangles) {
                 .worlds = std::move(triangles.worlds),
                 .itemCount = std::move(triangles.itemCount),
                 .owner = std::move(triangles.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -835,8 +838,7 @@ Overlay& Overlay::Add(OverlayImages images) {
                 .rotations = std::move(images.downs),
                 .pixels = std::move(images.pixels),
                 .owner = std::move(images.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -852,8 +854,7 @@ Overlay& Overlay::Add(OverlayPrims prims) {
                 .primShape = prims.shape,
                 .length = prims.length,
                 .owner = std::move(prims.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -868,8 +869,7 @@ Overlay& Overlay::Add(OverlayTexts texts) {
                 .chars = std::move(texts.chars),
                 .placement = texts.placement,
                 .owner = std::move(texts.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -885,13 +885,11 @@ Overlay& Overlay::Add(OverlayNumbers numbers) {
                 .placement = numbers.placement,
                 .format = std::move(numbers.format),
                 .owner = std::move(numbers.owner)};
-    CheckBatch(batch);
-    uint32_t prefix[4] = {};
-    uint32_t suffix[4] = {};
+    uint32_t words[4] = {};
     uint32_t length = 0;
-    PackAffix(batch.format.prefix, prefix, length, "prefix");
-    PackAffix(batch.format.suffix, suffix, length, "suffix");
-    Edit().batches.push_back(std::move(batch));
+    PackAffix(batch.format.prefix, words, length, "prefix");
+    PackAffix(batch.format.suffix, words, length, "suffix");
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -905,8 +903,7 @@ Overlay& Overlay::Add(OverlayLines lines) {
                 .worlds = std::move(lines.worlds),
                 .itemCount = std::move(lines.itemCount),
                 .owner = std::move(lines.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -919,8 +916,7 @@ Overlay& Overlay::Add(OverlayMarkers markers) {
                 .worlds = std::move(markers.worlds),
                 .itemCount = std::move(markers.itemCount),
                 .owner = std::move(markers.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -935,8 +931,7 @@ Overlay& Overlay::Add(OverlayBoxes boxes) {
                 .itemCount = std::move(boxes.itemCount),
                 .rotations = std::move(boxes.orientations),
                 .owner = std::move(boxes.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -950,8 +945,7 @@ Overlay& Overlay::Add(OverlaySpheres spheres) {
                 .itemCount = std::move(spheres.itemCount),
                 .scalars = std::move(spheres.radii),
                 .owner = std::move(spheres.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -966,8 +960,7 @@ Overlay& Overlay::Add(OverlayCircles circles) {
                 .itemCount = std::move(circles.itemCount),
                 .scalars = std::move(circles.radii),
                 .owner = std::move(circles.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -982,8 +975,7 @@ Overlay& Overlay::Add(OverlayFrames frames) {
                 .scalars = std::move(frames.lengths),
                 .length = frames.length,
                 .owner = std::move(frames.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -999,8 +991,7 @@ Overlay& Overlay::Add(OverlayArrows arrows) {
                 .scalars = std::move(arrows.headLengths),
                 .length = arrows.headLength,
                 .owner = std::move(arrows.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -1016,8 +1007,7 @@ Overlay& Overlay::Add(OverlayCapsules capsules) {
                 .scalars = std::move(capsules.radii),
                 .extras = std::move(capsules.halfHeights),
                 .owner = std::move(capsules.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -1032,8 +1022,7 @@ Overlay& Overlay::Add(OverlayTrails trails) {
                 .extras = std::move(trails.heads),
                 .fade = trails.fade,
                 .owner = std::move(trails.owner)};
-    CheckBatch(batch);
-    Edit().batches.push_back(std::move(batch));
+    Push(Edit(), std::move(batch));
     return *this;
 }
 
@@ -1204,7 +1193,6 @@ void OverlayPass::Unite(OverlayBatch& gpu, uint32_t rows, uint32_t groups, uint6
 
 void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uint32_t worldCount,
                              std::vector<OverlayBatch>& batches, uint32_t& firstItem) {
-    constexpr size_t kHostBuffers = 12;
     Uploaded& uploaded = m_uploads[overlay.get()];
     if (uploaded.contents.lock() != overlay) {
         uploaded = {overlay, {}};
@@ -1247,8 +1235,8 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
         const Ref<device::Buffer>* buffers =
             Hosted(batch) ? uploaded.buffers.data() + kHostBuffers * hostBatch++ : nullptr;
         if (batch.kind == OverlayKind::Outlines) {
-            m_outlines.push_back({.bits = {buffers[9]->Address()},
-                                  .bitWords = uint32_t(buffers[9]->Bytes() / 4),
+            m_outlines.push_back({.bits = {buffers[kHostPrims]->Address()},
+                                  .bitWords = uint32_t(buffers[kHostPrims]->Bytes() / 4),
                                   .color = PackColor(style.color),
                                   .width = std::max(style.width, 0.5f),
                                   .overlay = index});
@@ -1308,22 +1296,22 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
             gpu.flags |= image.layered ? kOverlayImageLayers : 0;
         }
         if (Hosted(batch)) {
-            gpu.points = {buffers[0]->Address()};
+            gpu.points = {buffers[kHostPoints]->Address()};
             gpu.pointStride = 3;
-            gpu.ends = {buffers[1]->Address()};
+            gpu.ends = {buffers[kHostEnds]->Address()};
             gpu.endStride = 3;
-            gpu.colors = {buffers[2]->Address()};
+            gpu.colors = {buffers[kHostColors]->Address()};
             gpu.colorStride = 1;
-            gpu.sizes = {buffers[3]->Address()};
+            gpu.sizes = {buffers[kHostSizes]->Address()};
             gpu.sizeStride = 1;
-            gpu.rotations = {buffers[5]->Address()};
+            gpu.rotations = {buffers[kHostRotations]->Address()};
             gpu.rotationStride = 4;
-            gpu.scalars = {buffers[6]->Address()};
+            gpu.scalars = {buffers[kHostScalars]->Address()};
             gpu.scalarStride = 1;
-            gpu.extras = {buffers[7]->Address()};
+            gpu.extras = {buffers[kHostExtras]->Address()};
             gpu.extraStride = 1;
             if (!batch.hostIds.empty()) {
-                gpu.ids = {buffers[11]->Address()};
+                gpu.ids = {buffers[kHostIds]->Address()};
                 gpu.idStride = 1;
                 gpu.flags |= kOverlayHasIds;
             }
@@ -1331,29 +1319,30 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
                          kOverlayHasRotations | kOverlayHasScalars | kOverlayHasExtras;
             gpu.pieces = PiecesPerRow(batch.kind, 0);
             if (Textual(batch.kind)) {
-                gpu.chars = buffers[8]->Address();
+                gpu.chars = buffers[kHostCodes]->Address();
                 gpu.flags |= kOverlayPackedText;
                 gpu.maxChars = batch.maxChars;
                 gpu.pieces = textPieces(batch.maxChars);
             }
             auto rows = uint32_t(batch.hostPoints.size());
             if (batch.kind == OverlayKind::Prims) {
-                gpu.prims = {buffers[9]->Address()};
+                gpu.prims = {buffers[kHostPrims]->Address()};
                 gpu.pointStride = 1;
                 gpu.pieces = PrimPieces(batch.primShape);
                 gpu.primCount = uint32_t(batch.hostPrims.size());
                 rows = gpu.primCount;
                 if (!batch.hostGroups.empty()) {
                     rows = batch.groupCount;
-                    Unite(gpu, gpu.primCount, rows, buffers[9]->Address(), 1,
-                          buffers[10]->Address(), 1);
+                    Unite(gpu, gpu.primCount, rows, buffers[kHostPrims]->Address(), 1,
+                          buffers[kHostGroups]->Address(), 1);
                 }
             }
             gpu.capacity = rows * gpu.pieces;
             if (rows > 0 && std::ranges::any_of(batch.hostWorlds, [](uint32_t world) {
                     return world != kGlobalWorld;
                 })) {
-                Group(gpu, {index, batchIndex}, rows, worldCount, buffers[4]->Address(), 1, unused);
+                Group(gpu, {index, batchIndex}, rows, worldCount, buffers[kHostWorlds]->Address(),
+                      1, unused);
             }
         } else {
             const std::string kind(KindName(batch.kind));
@@ -1374,6 +1363,18 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
             const auto worldStride = [&](const device::Tensor& tensor, int64_t words,
                                          std::string_view name) {
                 return perWorld ? Words(Stride(tensor, 0) / words, name) : 0u;
+            };
+            const auto bind = [&](const device::Tensor& tensor, std::string_view name,
+                                  int64_t words, auto& pointer, uint32_t& stride,
+                                  uint32_t& perWorldStride, uint32_t flag) {
+                if (tensor.Empty()) {
+                    return;
+                }
+                field(tensor, name);
+                pointer.address = tensor.Address();
+                stride = rowStride(tensor, words, name);
+                perWorldStride = worldStride(tensor, words, name);
+                gpu.flags |= flag;
             };
             const device::Tensor& source = primal                               ? batch.prims
                                            : !textual                           ? batch.points
@@ -1436,53 +1437,25 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
                 gpu.trailLength = uint32_t(batch.points.Shape()[1]);
                 gpu.endStride = Words(Stride(batch.points, 1), "points");
             }
-            if (!batch.ends.Empty()) {
-                field(batch.ends, "ends");
-                gpu.ends = {batch.ends.Address()};
-                gpu.endStride = rowStride(batch.ends, 1, "ends");
-                gpu.endWorldStride = worldStride(batch.ends, 1, "ends");
-            }
+            bind(batch.ends, "ends", 1, gpu.ends, gpu.endStride, gpu.endWorldStride, 0);
             if (!batch.colors.Empty()) {
-                field(batch.colors, "colors");
                 const bool bytes = batch.colors.Type() == device::DType::UInt8;
                 const int64_t words = bytes ? 4 : 1;
                 if (bytes && batch.colors.Address() % 4 != 0) {
                     throw UnsupportedError("Overlay {}' uint8 colors start on a 4-byte boundary",
                                            kind);
                 }
-                gpu.colors = {batch.colors.Address()};
-                gpu.colorStride = rowStride(batch.colors, words, "colors");
-                gpu.colorWorldStride = worldStride(batch.colors, words, "colors");
-                gpu.flags |= kOverlayHasColors | (bytes ? kOverlayByteColors : 0);
+                bind(batch.colors, "colors", words, gpu.colors, gpu.colorStride,
+                     gpu.colorWorldStride, kOverlayHasColors | (bytes ? kOverlayByteColors : 0));
             }
-            if (!batch.sizes.Empty()) {
-                field(batch.sizes, "widths");
-                gpu.sizes = {batch.sizes.Address()};
-                gpu.sizeStride = rowStride(batch.sizes, 1, "widths");
-                gpu.sizeWorldStride = worldStride(batch.sizes, 1, "widths");
-                gpu.flags |= kOverlayHasSizes;
-            }
-            if (!batch.rotations.Empty()) {
-                field(batch.rotations, "orientations");
-                gpu.rotations = {batch.rotations.Address()};
-                gpu.rotationStride = rowStride(batch.rotations, 1, "orientations");
-                gpu.rotationWorldStride = worldStride(batch.rotations, 1, "orientations");
-                gpu.flags |= kOverlayHasRotations;
-            }
-            if (!batch.scalars.Empty()) {
-                field(batch.scalars, "radii");
-                gpu.scalars = {batch.scalars.Address()};
-                gpu.scalarStride = rowStride(batch.scalars, 1, "radii");
-                gpu.scalarWorldStride = worldStride(batch.scalars, 1, "radii");
-                gpu.flags |= kOverlayHasScalars;
-            }
-            if (!batch.extras.Empty()) {
-                field(batch.extras, trail ? "heads" : "half heights");
-                gpu.extras = {batch.extras.Address()};
-                gpu.extraStride = rowStride(batch.extras, 1, "extras");
-                gpu.extraWorldStride = worldStride(batch.extras, 1, "extras");
-                gpu.flags |= kOverlayHasExtras;
-            }
+            bind(batch.sizes, "widths", 1, gpu.sizes, gpu.sizeStride, gpu.sizeWorldStride,
+                 kOverlayHasSizes);
+            bind(batch.rotations, "orientations", 1, gpu.rotations, gpu.rotationStride,
+                 gpu.rotationWorldStride, kOverlayHasRotations);
+            bind(batch.scalars, "radii", 1, gpu.scalars, gpu.scalarStride, gpu.scalarWorldStride,
+                 kOverlayHasScalars);
+            bind(batch.extras, trail ? "heads" : "half heights", 1, gpu.extras, gpu.extraStride,
+                 gpu.extraWorldStride, kOverlayHasExtras);
             if (!batch.worlds.Empty()) {
                 field(batch.worlds, "worlds");
                 gpu.worlds = {batch.worlds.Address()};

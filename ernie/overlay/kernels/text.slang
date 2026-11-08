@@ -90,16 +90,6 @@ uint GatherCodes(ShapeRow shape, out uint codes[kOverlayTextChars]) {
     return count;
 }
 
-float PenAdvance(OverlayParams p, uint code, uint next) {
-    float units = p.glyphs[code].advance;
-    if (code >= kOverlayKernFirstCode && next >= kOverlayKernFirstCode) {
-        const uint entry = (code - kOverlayKernFirstCode) * kOverlayKernCodeCount +
-                           (next - kOverlayKernFirstCode);
-        units += float(int(ReadByte(p.kerning, entry) << 24) >> 24) / 16;
-    }
-    return units;
-}
-
 float2 PenPosition(OverlayParams p, uint codes[kOverlayTextChars], uint count, uint index,
                    out float2 size, out float lineWidth) {
     float2 pen = float2(0);
@@ -120,7 +110,13 @@ float2 PenPosition(OverlayParams p, uint codes[kOverlayTextChars], uint count, u
             }
             pen = float2(0, pen.y + kOverlayLineUnits);
         } else {
-            pen.x += PenAdvance(p, codes[i], i + 1 < count ? codes[i + 1] : 0);
+            const uint next = i + 1 < count ? codes[i + 1] : 0;
+            pen.x += p.glyphs[codes[i]].advance;
+            if (codes[i] >= kOverlayKernFirstCode && next >= kOverlayKernFirstCode) {
+                const uint entry = (codes[i] - kOverlayKernFirstCode) * kOverlayKernCodeCount +
+                                   (next - kOverlayKernFirstCode);
+                pen.x += float(int(ReadByte(p.kerning, entry) << 24) >> 24) / 16;
+            }
         }
     }
     if (inLine) {
