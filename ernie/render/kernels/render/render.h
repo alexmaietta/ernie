@@ -76,7 +76,6 @@ struct CapturePixel {
 #endif
 
 struct RenderParams {
-    Ptr<SceneData> scene;
     Ptr<RenderTables> tables;
     Ptr<Capture> captures;
     uint64_t firstPixel;
@@ -84,7 +83,7 @@ struct RenderParams {
     uint pixelCount;
 };
 
-ERNIE_CHECK_SIZE(RenderParams, 40);
+ERNIE_CHECK_SIZE(RenderParams, 32);
 
 struct ScatterParams {
     Ptr<PointCloud> cloud;

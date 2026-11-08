@@ -19,7 +19,6 @@ struct LidarReturn {
 
 struct LidarResponse : IResponse<LidarPattern> {
     HitQuery query;
-    SceneData* scene;
     RenderTables* tables;
     ReturnMode mode;
     uint stride;
@@ -35,11 +34,9 @@ struct LidarResponse : IResponse<LidarPattern> {
     uint firstPrim;
 
     static LidarResponse Load(SensorContext context, LidarPattern pattern) {
-        SceneData* scene = context.params.scene;
         Capture* capture = context.capture;
         LidarResponse response;
         response.query = context.query;
-        response.scene = scene;
         response.tables = context.params.tables;
         response.mode = ReturnMode(
             context.params.tables->lidars[PrimRow(context.params.tables, capture->sensor, kSlotLidar)]

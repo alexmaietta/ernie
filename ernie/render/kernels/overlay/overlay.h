@@ -280,7 +280,6 @@ struct OverlayGroupParams {
 ERNIE_CHECK_SIZE(OverlayGroupParams, 64);
 
 struct OverlayUniteParams {
-    Ptr<SceneData> scene;
     Ptr<RenderTables> tables;
     Ptr<uint> prims;
     Ptr<uint> groups;
@@ -291,7 +290,7 @@ struct OverlayUniteParams {
     uint boxCount;
 };
 
-ERNIE_CHECK_SIZE(OverlayUniteParams, 56);
+ERNIE_CHECK_SIZE(OverlayUniteParams, 48);
 
 struct OverlayFill {
     uint64_t pixels;
@@ -331,7 +330,6 @@ struct OverlayRecord {
 ERNIE_CHECK_SIZE(OverlayRecord, 32);
 
 struct OverlayParams {
-    Ptr<SceneData> scene;
     Ptr<RenderTables> tables;
     Ptr<OverlayView> views;
     Ptr<OverlayBatch> batches;
@@ -365,7 +363,7 @@ struct OverlayParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(OverlayParams, 208);
+ERNIE_CHECK_SIZE(OverlayParams, 200);
 
 struct BlendParams {
     Ptr<uint> color;

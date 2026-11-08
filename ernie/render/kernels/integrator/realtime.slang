@@ -170,7 +170,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
             const LightType type = LightType(record.type);
             if ((type != LightType::Distant && type != LightType::Dome) ||
                 (camera && (record.flags & kLightVisible) == 0) ||
-                (!camera && !InCollection(query.scene, record.lightLink, originPrim))) {
+                (!camera && !InCollection(query.tables, record.lightLink, originPrim))) {
                 continue;
             }
             Spectrum emitted;
@@ -206,7 +206,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                 (drawn.instancer != kNoPrim && candidate.copyOffset != drawn.offset)) {
                 continue;
             }
-            if (!camera && !InCollection(query.scene, lights->records[i].lightLink, originPrim)) {
+            if (!camera && !InCollection(query.tables, lights->records[i].lightLink, originPrim)) {
                 return Spectrum.Constant(0);
             }
             const AreaLight<Spectrum> light =
@@ -299,7 +299,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                     continue;
                 }
                 lit = true;
-                if (!InCollection(query.scene, record.lightLink, point.prim)) {
+                if (!InCollection(query.tables, record.lightLink, point.prim)) {
                     continue;
                 }
                 sample = SampleLight(record, point.position, v);

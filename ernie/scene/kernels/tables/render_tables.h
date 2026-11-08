@@ -32,6 +32,7 @@ struct RenderTables {
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<CollectionRecord> collections;
+    Ptr<LightShapeRecord> lightShapes;
     Ptr<RenderOrigin> origins;
     Ptr<WorldTransform> slotWorlds;
     Ptr<CameraRecord> cameras;
@@ -46,7 +47,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 272);
+ERNIE_CHECK_SIZE(RenderTables, 280);
 
 #ifdef __SLANG__
 

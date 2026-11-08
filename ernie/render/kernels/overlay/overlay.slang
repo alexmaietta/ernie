@@ -50,12 +50,12 @@ uint FindView(OverlayParams p, uint tile) {
 }
 
 float3 RenderSpace(OverlayParams p, OverlayBatch batch, uint world, float3 point) {
-    SceneData* scene = p.scene;
+    RenderTables* tables = p.tables;
     InstanceLayout* layout = p.tables->instances;
     if (batch.anchor != kNoPrim) {
         const WorldTransform transform = PrimWorld(p.tables, batch.anchor);
         return transform.Apply(point) + RenderTranslation(p.tables, transform, world) +
-               ShownOffset(layout, world, scene->prims.world[batch.anchor]);
+               ShownOffset(layout, world, tables->prims.world[batch.anchor]);
     }
     return RenderPoint(p.tables, point, world);
 }
@@ -180,16 +180,13 @@ struct Lens {
     float near;
     bool orthographic;
 
-    __init(SceneData* scene, uint prim) {
-        const uint row = PrimRow(scene, prim, kSlotCamera);
-        aperture = float2(scene->schemas.camera.horizontalAperture[row],
-                          scene->schemas.camera.verticalAperture[row]);
-        offset = float2(scene->schemas.camera.horizontalApertureOffset[row],
-                        scene->schemas.camera.verticalApertureOffset[row]);
-        focal = max(scene->schemas.camera.focalLength[row], 1e-6f);
-        near = scene->schemas.camera.clippingRange[row].x;
-        orthographic =
-            Projection(scene->schemas.camera.projection[row]) == Projection::Orthographic;
+    __init(RenderTables* tables, uint prim) {
+        const CameraRecord record = tables->cameras[PrimRow(tables, prim, kSlotCamera)];
+        aperture = record.aperture.Vector();
+        offset = record.offset.Vector();
+        focal = max(record.focalLength, 1e-6f);
+        near = record.clipping.x;
+        orthographic = Projection(record.projection) == Projection::Orthographic;
     }
 
     float3 Corner(float2 film, float depth) {
@@ -204,9 +201,9 @@ float2 FilmCorner(uint corner) {
     return float2(corner == 1 || corner == 2 ? 1 : -1, corner >= 2 ? 1 : -1);
 }
 
-bool FrustumPiece(SceneData* scene, uint prim, uint piece, float far, out float3 a,
+bool FrustumPiece(RenderTables* tables, uint prim, uint piece, float far, out float3 a,
                   out float3 b) {
-    const Lens lens = Lens(scene, prim);
+    const Lens lens = Lens(tables, prim);
     const uint corner = piece % 4;
     if (piece < 4) {
         a = lens.orthographic ? lens.Corner(FilmCorner(corner), lens.near) : float3(0);
@@ -223,16 +220,17 @@ bool FrustumPiece(SceneData* scene, uint prim, uint piece, float far, out float3
     return true;
 }
 
-bool LightPiece(SceneData* scene, uint prim, uint piece, float length, out float3 a,
+bool LightPiece(RenderTables* tables, uint prim, uint piece, float length, out float3 a,
                 out float3 b) {
     a = float3(0);
     b = float3(0);
-    switch (SchemaId(scene->prims.schema[prim])) {
+    const LightShapeRecord shape = HasApi(tables, prim, kApiLightAPI)
+                                       ? tables->lightShapes[ApiRow(tables, prim, kApiLightAPI)]
+                                       : LightShapeRecord();
+    switch (PrimSchema(tables, prim)) {
     case SchemaId::SphereLight: {
-        const uint row = PrimRow(scene, prim, kSlotSphereLight);
-        const float radius = scene->schemas.sphereLight.treatAsPoint[row] != 0
-                                 ? 0.05f * length
-                                 : max(scene->schemas.sphereLight.radius[row], 0.02f * length);
+        const float radius =
+            shape.treatAsPoint != 0 ? 0.05f * length : max(shape.radius, 0.02f * length);
         const uint circle = piece / kOverlaySphereSegments;
         const float3 u = circle == 0 ? float3(0, 1, 0) : circle == 1 ? float3(0, 0, 1) : float3(1, 0, 0);
         const float3 v = circle == 0 ? float3(0, 0, 1) : circle == 1 ? float3(1, 0, 0) : float3(0, 1, 0);
@@ -241,9 +239,7 @@ bool LightPiece(SceneData* scene, uint prim, uint piece, float length, out float
         return true;
     }
     case SchemaId::RectLight: {
-        const uint row = PrimRow(scene, prim, kSlotRectLight);
-        const float2 half = 0.5f * float2(scene->schemas.rectLight.width[row],
-                                          scene->schemas.rectLight.height[row]);
+        const float2 half = 0.5f * float2(shape.width, shape.height);
         if (piece < 4) {
             a = float3(FilmCorner(piece) * half, 0);
             b = float3(FilmCorner((piece + 1) % 4) * half, 0);
@@ -253,7 +249,7 @@ bool LightPiece(SceneData* scene, uint prim, uint piece, float length, out float
                ArrowPiece(float3(0), float3(0, 0, -0.5f * length), 0, piece - 4, 4, a, b);
     }
     case SchemaId::DiskLight: {
-        const float radius = scene->schemas.diskLight.radius[PrimRow(scene, prim, kSlotDiskLight)];
+        const float radius = shape.radius;
         if (piece < kOverlayCircleSegments) {
             RingPiece(float3(0), float3(1, 0, 0), float3(0, 1, 0), radius, piece,
                       kOverlayCircleSegments, a, b);
@@ -264,9 +260,8 @@ bool LightPiece(SceneData* scene, uint prim, uint piece, float length, out float
                           piece - kOverlayCircleSegments, 4, a, b);
     }
     case SchemaId::CylinderLight: {
-        const uint row = PrimRow(scene, prim, kSlotCylinderLight);
-        const float half = 0.5f * scene->schemas.cylinderLight.length[row];
-        const float radius = scene->schemas.cylinderLight.radius[row];
+        const float half = 0.5f * shape.length;
+        const float radius = shape.radius;
         if (piece < 2 * kOverlayCapsuleSegments) {
             const float x = piece < kOverlayCapsuleSegments ? -half : half;
             RingPiece(float3(x, 0, 0), float3(0, 1, 0), float3(0, 0, 1), radius,
@@ -295,14 +290,10 @@ bool LightPiece(SceneData* scene, uint prim, uint piece, float length, out float
     }
 }
 
-bool PrimBounded(SceneData* scene, uint prim) {
-    return prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0 &&
-           SchemaIsA(scene->prims.schema[prim], SchemaId::Gprim);
+bool PrimBounded(RenderTables* tables, uint prim) {
+    return PrimAlive(tables, prim) && SchemaIsA(tables->prims.schema[prim], SchemaId::Gprim);
 }
 
-bool PrimAlive(SceneData* scene, uint prim) {
-    return prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0;
-}
 
 float3 AxisTint(uint axis) {
     return axis == 0 ? float3(0.8f, 0.05f, 0.03f)
@@ -412,7 +403,7 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
                   out float3 a, out float3 b, inout float4 color) {
     a = float3(0);
     b = float3(0);
-    SceneData* scene = p.scene;
+    RenderTables* tables = p.tables;
     const OverlayBatch batch = shape.batch;
     if (batch.primShape == uint(OverlayPrimShape::Bounds)) {
         float3 low;
@@ -428,12 +419,12 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
             world = batch.boxes[at + 6];
         } else {
             const uint prim = shape.Prim();
-            if (!PrimBounded(scene, prim)) {
+            if (!PrimBounded(tables, prim)) {
                 return false;
             }
             low = p.tables->primBounds[prim].lower.Vector();
             high = p.tables->primBounds[prim].upper.Vector();
-            world = scene->prims.world[prim];
+            world = tables->prims.world[prim];
             if (low.x == high.x && low.y == high.y && low.z == high.z) {
                 return false;
             }
@@ -462,10 +453,10 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         return true;
     }
     const uint prim = shape.Prim();
-    if (!PrimAlive(scene, prim)) {
+    if (!PrimAlive(tables, prim)) {
         return false;
     }
-    const uint world = scene->prims.world[prim];
+    const uint world = tables->prims.world[prim];
     if (!WorldShown(p.tables->instances, viewWorld, world)) {
         return false;
     }
@@ -489,13 +480,13 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         return true;
     }
     case uint(OverlayPrimShape::Frustums):
-        if (prim == view.camera || !SchemaIsA(scene->prims.schema[prim], SchemaId::Camera) ||
-            !FrustumPiece(scene, prim, piece, batch.length, from, to)) {
+        if (prim == view.camera || !SchemaIsA(tables->prims.schema[prim], SchemaId::Camera) ||
+            !FrustumPiece(tables, prim, piece, batch.length, from, to)) {
             return false;
         }
         break;
     case uint(OverlayPrimShape::Lights):
-        if (!LightPiece(scene, prim, piece, batch.length, from, to)) {
+        if (!LightPiece(tables, prim, piece, batch.length, from, to)) {
             return false;
         }
         break;
@@ -679,10 +670,10 @@ bool ProjectText(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
         corner = anchor - align * (blockPixels + 2 * pad) + pad;
         mode = uint(OverlayDepth::Always);
     } else {
-        SceneData* scene = p.scene;
+        RenderTables* tables = p.tables;
         const CameraModel camera = CameraModel.Load(p.tables, view.camera);
-        const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
-        const float near = scene->schemas.camera.clippingRange[cameraRow].x;
+        const uint cameraRow = PrimRow(tables, view.camera, kSlotCamera);
+        const float near = tables->cameras[cameraRow].clipping.x;
         const float3 point = RenderSpace(p, batch, viewWorld, shape.Point());
         if (any(isnan(point)) || any(isinf(point))) {
             return false;
@@ -752,7 +743,7 @@ struct Sizing {
         if (!active) {
             return;
         }
-        SceneData* scene = p.scene;
+        RenderTables* tables = p.tables;
         const WorldTransform frame = PrimWorld(p.tables, view.camera);
         right = normalize(frame.x.Vector());
         up = normalize(frame.y.Vector());
@@ -761,8 +752,8 @@ struct Sizing {
             return;
         }
         const CameraModel camera = CameraModel.Load(p.tables, view.camera);
-        const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
-        const float near = max(scene->schemas.camera.clippingRange[cameraRow].x, 1e-4f);
+        const uint cameraRow = PrimRow(tables, view.camera, kSlotCamera);
+        const float near = max(tables->cameras[cameraRow].clipping.x, 1e-4f);
         const float depth = camera.ImagePlaneDistance(centre);
         const float probe = 1e-2f * max(depth, near);
         const float2 from = Pixel(camera.Project(centre).film, view);
@@ -795,7 +786,7 @@ float Cross2(float2 a, float2 b) {
 bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWorld, uint piece,
                  float4 color, out OverlayRecord record) {
     record = {};
-    SceneData* scene = p.scene;
+    RenderTables* tables = p.tables;
     const OverlayBatch batch = shape.batch;
     float3 corners[3];
     uint edges = 7;
@@ -818,15 +809,15 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
             down = sizing.Place(p, batch, viewWorld, local + shape.Third());
         } else {
             const uint prim = shape.Prim();
-            if (!PrimAlive(scene, prim) || prim == view.camera ||
-                !SchemaIsA(scene->prims.schema[prim], SchemaId::Camera)) {
+            if (!PrimAlive(tables, prim) || prim == view.camera ||
+                !SchemaIsA(tables->prims.schema[prim], SchemaId::Camera)) {
                 return false;
             }
-            const uint world = scene->prims.world[prim];
+            const uint world = tables->prims.world[prim];
             if (!WorldShown(p.tables->instances, viewWorld, world)) {
                 return false;
             }
-            const Lens lens = Lens(scene, prim);
+            const Lens lens = Lens(tables, prim);
             const float distance = batch.length > 0 ? batch.length : 1;
             const WorldTransform w = PrimWorld(p.tables, prim);
             const float3 offset = RenderTranslation(p.tables, w, viewWorld) +
@@ -868,10 +859,10 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
     }
 
     const CameraModel camera = CameraModel.Load(p.tables, view.camera);
-    const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
-    const float near = scene->schemas.camera.clippingRange[cameraRow].x;
+    const uint cameraRow = PrimRow(tables, view.camera, kSlotCamera);
+    const float near = tables->cameras[cameraRow].clipping.x;
     const bool perspective =
-        Projection(scene->schemas.camera.projection[cameraRow]) != Projection::Orthographic;
+        Projection(tables->cameras[cameraRow].projection) != Projection::Orthographic;
     float2 pixels[3];
     for (uint corner = 0; corner < 3; ++corner) {
         if (any(isnan(corners[corner])) || any(isinf(corners[corner]))) {
@@ -950,11 +941,11 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     const uint item = (local - batch.firstItem) / batch.pieces;
     const uint piece = (local - batch.firstItem) % batch.pieces;
     const OverlayView view = p.views[viewIndex];
-    SceneData* scene = p.scene;
+    RenderTables* tables = p.tables;
     if (((view.overlays >> batch.overlay) & 1) == 0) {
         return false;
     }
-    const uint viewWorld = scene->prims.world[view.camera];
+    const uint viewWorld = tables->prims.world[view.camera];
     uint slice;
     uint row;
     if (!ResolveRow(batch, viewWorld, item, slice, row)) {
@@ -983,10 +974,10 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     }
 
     const CameraModel camera = CameraModel.Load(p.tables, view.camera);
-    const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
-    const float near = scene->schemas.camera.clippingRange[cameraRow].x;
+    const uint cameraRow = PrimRow(tables, view.camera, kSlotCamera);
+    const float near = tables->cameras[cameraRow].clipping.x;
     const bool perspective =
-        Projection(scene->schemas.camera.projection[cameraRow]) != Projection::Orthographic;
+        Projection(tables->cameras[cameraRow].projection) != Projection::Orthographic;
 
     float3 a;
     float3 b;
@@ -1526,10 +1517,10 @@ void UniteOverlayBoxes(uniform OverlayUniteParams u) {
     if (entry >= u.primCount) {
         return;
     }
-    SceneData* scene = u.scene;
+    RenderTables* tables = u.tables;
     const uint prim = u.prims[entry * u.primStride];
     const uint group = u.groups[entry * u.groupStride];
-    if (group >= u.boxCount || !PrimBounded(scene, prim)) {
+    if (group >= u.boxCount || !PrimBounded(tables, prim)) {
         return;
     }
     const float3 low = u.tables->primBounds[prim].lower.Vector();
@@ -1542,7 +1533,7 @@ void UniteOverlayBoxes(uniform OverlayUniteParams u) {
         InterlockedMin(u.boxes[at + axis], OrderedFloat(low[axis]));
         InterlockedMax(u.boxes[at + 3 + axis], OrderedFloat(high[axis]));
     }
-    InterlockedMin(u.boxes[at + 6], scene->prims.world[prim]);
+    InterlockedMin(u.boxes[at + 6], tables->prims.world[prim]);
 }
 
 bool Outlined(OverlayOutline outline, uint id) {
@@ -1748,7 +1739,7 @@ void ChooseOverlayPicks(uniform OverlayParams p) {
 
 void PickRay(OverlayParams p, OverlayView view, float2 pixel, out float3 origin,
              out float3 direction) {
-    SceneData* scene = p.scene;
+    RenderTables* tables = p.tables;
     const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const float2 film = float2(pixel.x / float(view.width) * 2 - 1, 1 - pixel.y / float(view.height) * 2);
     const CameraRay ray = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));
@@ -1766,8 +1757,8 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     OverlayPickResult result = p.pickResults[pick];
     const OverlayPickQuery query = p.picks[pick];
     const OverlayView view = p.views[query.view];
-    SceneData* scene = p.scene;
-    result.world = scene->prims.world[view.camera];
+    RenderTables* tables = p.tables;
+    result.world = tables->prims.world[view.camera];
     float3 origin;
     float3 direction;
     PickRay(p, view, float2(query.x, query.y), origin, direction);
@@ -1805,7 +1796,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
                       : kNoPrim;
     result.distance = measure.distance;
     result.depth = measure.depth;
-    const uint world = scene->prims.world[view.camera];
+    const uint world = tables->prims.world[view.camera];
     const float3 found = position - RenderShift(p.tables, world, world);
     result.position = {found.x, found.y, found.z};
     p.pickResults[pick] = result;

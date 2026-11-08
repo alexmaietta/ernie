@@ -24,7 +24,6 @@ float3 MeshShadingNormal(SurfaceRecord surface, ObjectSpace space, SurfaceElemen
 }
 
 SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float spread) {
-    SceneData* data = query.scene;
     const uint prim = primHit.prim;
     const ObjectSpace space = query.LoadObjectSpace(primHit);
     SurfacePoint point;

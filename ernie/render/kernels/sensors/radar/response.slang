@@ -11,7 +11,6 @@ using namespace ernie;
 
 struct RadarResponse : IResponse<RadarPattern> {
     HitQuery query;
-    SceneData* scene;
     RenderTables* tables;
     float3 sensorVelocity;
     bool hit;
@@ -26,7 +25,6 @@ struct RadarResponse : IResponse<RadarPattern> {
         RenderParams params = context.params;
         RadarResponse response;
         response.query = context.query;
-        response.scene = params.scene;
         response.tables = params.tables;
         response.sensorVelocity = PointVelocity(params.tables,
                                                 context.capture->sensor, pattern.frame.position);

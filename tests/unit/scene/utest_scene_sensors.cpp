@@ -63,5 +63,30 @@ TEST(SensorsTest, RecordsHoldResolvedParametersAndFollowEdits) {
     });
 }
 
+TEST(SensorsTest, LightShapesKeepAuthoredSizesForGuides) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim rect =
+            scene->Define<RectLight>("/Panel", {.scale = {2, 2, 2}, .width = 3, .height = 4});
+        const Prim bulb = scene->Define<SphereLight>("/Bulb", {.radius = 0.5f});
+        scene->Publish().Wait();
+        const Prims& prims = SceneImpl::Get(*scene).GetCatalog().GetPrims();
+        const auto shape = [&](const Prim& light) {
+            const Snapshot snapshot = scene->Acquire(Stream::Host());
+            const LightShapeRecord record = ReadRecord<LightShapeRecord>(
+                device, snapshot, PinnedTables::From(snapshot).tables.lightShapes.address,
+                prims.Row(light.Index(), SchemaId::LightAPI));
+            scene->Release(snapshot);
+            return record;
+        };
+        EXPECT_FLOAT_EQ(shape(rect).width, 3);
+        EXPECT_FLOAT_EQ(shape(rect).height, 4);
+        EXPECT_FLOAT_EQ(shape(bulb).radius, 0.5f);
+        bulb.Set(SphereLight::kRadius, 2.0f);
+        scene->Publish().Wait();
+        EXPECT_FLOAT_EQ(shape(bulb).radius, 2);
+    });
+}
+
 }
 }

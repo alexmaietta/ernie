@@ -1672,7 +1672,6 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
     params.glyphs = {m_fontGlyphs ? m_fontGlyphs->Address() : m_unused->Address()};
     params.kerning = m_fontKerning ? m_fontKerning->Address() : m_unused->Address();
     params.textHeight = m_fontField ? OverlayTextFont().textHeight : 0;
-    params.scene = {snapshot.sceneData};
     params.tables = {snapshot.tables};
     params.views = {m_views->Address()};
     params.batches = {m_batches->Address()};
@@ -1829,7 +1828,6 @@ void OverlayPass::RecordUnions(device::CommandEncoder& encoder, const Snapshot& 
     }
     encoder.Barrier();
     for (OverlayUniteParams& params : m_uniteParams) {
-        params.scene = {snapshot.sceneData};
         params.tables = {snapshot.tables};
         encoder.Dispatch(
             m_program->Entry("ClearOverlayBoxes"), params,

@@ -128,6 +128,19 @@ struct CollectionRecord {
 
 ERNIE_CHECK_SIZE(CollectionRecord, 48);
 
+struct LightShapeRecord {
+    float radius;
+    float width;
+    float height;
+    float length;
+    uint treatAsPoint;
+    uint padding0;
+    uint padding1;
+    uint padding2;
+};
+
+ERNIE_CHECK_SIZE(LightShapeRecord, 32);
+
 struct LightParams {
     Ptr<SceneData> scene;
     Ptr<LightLayout> layout;
@@ -139,13 +152,16 @@ struct LightParams {
     Ptr<uint> tlases;
     Ptr<Float3> spectra;
     Ptr<CollectionRecord> collections;
+    Ptr<LightShapeRecord> shapes;
     uint tlasCount;
     uint lightLink;
     uint shadowLink;
     uint collectionRows;
+    uint shapeRows;
+    uint padding;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 96);
+ERNIE_CHECK_SIZE(LightParams, 112);
 
 static const uint kLoopedLights = 8;
 

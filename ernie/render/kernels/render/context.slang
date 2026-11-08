@@ -12,9 +12,8 @@ struct SensorContext {
     HitQuery query;
 
     __init(RenderParams params, Capture* capture) {
-        SceneData* scene = params.scene;
         this.params = params;
         this.capture = capture;
-        query = HitQuery(scene, params.tables, params.tables->prims.world[capture->sensor]);
+        query = HitQuery(params.tables, params.tables->prims.world[capture->sensor]);
     }
 }

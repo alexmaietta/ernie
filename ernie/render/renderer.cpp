@@ -728,7 +728,6 @@ device::Operation RendererImpl::Trace(const OutputSet& set, const std::set<uint3
                                       const Snapshot& snapshot) {
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
-    params.scene.address = snapshot.sceneData;
     params.tables.address = snapshot.tables;
 
     device::Queue& queue = m_scene->GetDevice().GetQueue();

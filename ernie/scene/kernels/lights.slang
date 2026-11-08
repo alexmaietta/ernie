@@ -559,3 +559,51 @@ void WriteCollections(uniform LightParams p) {
     record.padding1 = 0;
     p.collections[row] = record;
 }
+
+[shader("compute")]
+[numthreads(kLightGroup, 1, 1)]
+void WriteLightShapes(uniform LightParams p) {
+    const uint row = LinearThreadIndex();
+    if (row >= p.shapeRows) {
+        return;
+    }
+    SceneData* scene = p.scene;
+    const uint prim = scene->schemas.lightAPI.prim[row];
+    LightShapeRecord record;
+    record.radius = 0;
+    record.width = 0;
+    record.height = 0;
+    record.length = 0;
+    record.treatAsPoint = 0;
+    record.padding0 = 0;
+    record.padding1 = 0;
+    record.padding2 = 0;
+    if (prim < scene->primCount && (scene->prims.flags[prim] & kPrimAlive) != 0) {
+        switch (SchemaId(scene->prims.schema[prim])) {
+        case SchemaId::SphereLight: {
+            const uint at = PrimRow(scene, prim, kSlotSphereLight);
+            record.radius = scene->schemas.sphereLight.radius[at];
+            record.treatAsPoint = scene->schemas.sphereLight.treatAsPoint[at];
+            break;
+        }
+        case SchemaId::RectLight: {
+            const uint at = PrimRow(scene, prim, kSlotRectLight);
+            record.width = scene->schemas.rectLight.width[at];
+            record.height = scene->schemas.rectLight.height[at];
+            break;
+        }
+        case SchemaId::DiskLight:
+            record.radius = scene->schemas.diskLight.radius[PrimRow(scene, prim, kSlotDiskLight)];
+            break;
+        case SchemaId::CylinderLight: {
+            const uint at = PrimRow(scene, prim, kSlotCylinderLight);
+            record.radius = scene->schemas.cylinderLight.radius[at];
+            record.length = scene->schemas.cylinderLight.length[at];
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    p.shapes[row] = record;
+}

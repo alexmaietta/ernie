@@ -27,10 +27,9 @@ struct WorldOffset {
 
 bool LoadRay(RayCastParams params, uint index, out HitQuery query, out Ray ray,
              out WorldOffset offset) {
-    SceneData* data = params.scene;
     InstanceLayout* layout = params.tables->instances;
     const uint world = params.worlds != nullptr ? params.worlds[index] : params.world;
-    query = HitQuery(data, params.tables, world == kGlobalWorld || world < layout->worldCount
+    query = HitQuery(params.tables, world == kGlobalWorld || world < layout->worldCount
                                        ? world
                                        : kGlobalWorld);
     const RenderOrigin origin = TlasOrigin(params.tables, query.world);

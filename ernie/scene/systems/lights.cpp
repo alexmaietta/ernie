@@ -196,10 +196,12 @@ std::span<const ColumnRef> Lights::Inputs() const {
 void Lights::Describe(RenderTables& tables) const {
     tables.lights.address = m_layout ? m_layout->Address() : 0;
     tables.collections.address = m_collections.Address();
+    tables.lightShapes.address = m_shapes.Address();
 }
 
 void Lights::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held, {m_layout, m_records, m_cdf, m_maps, m_spectra, m_collections.Buffer()});
+    HoldBuffers(held, {m_layout, m_records, m_cdf, m_maps, m_spectra, m_collections.Buffer(),
+                       m_shapes.Buffer()});
 }
 
 void Lights::Prepare() {
@@ -370,7 +372,7 @@ void Lights::Run(const ChangeSet& changes, TableLog&) {
         Relayout();
     }
     Store& store = m_catalog.GetStore();
-    WriteCollections();
+    WriteCollectionsAndShapes();
     const bool viewed = store.LastWrite(kRenderProductCamera) > m_seen;
     m_seen = store.WriteSequence();
     std::vector<uint32_t> dirty;
@@ -434,22 +436,27 @@ void Lights::Run(const ChangeSet& changes, TableLog&) {
     queue.Submit(encoder.Finish());
 }
 
-void Lights::WriteCollections() {
+void Lights::WriteCollectionsAndShapes() {
     Store& store = m_catalog.GetStore();
     device::Device& device = store.GetDevice();
-    const uint32_t rows = store.Schema(SchemaId::CollectionAPI).Rows();
-    m_collections.Reserve(device, store.Schema(SchemaId::CollectionAPI).Capacity());
-    if (rows == 0) {
-        return;
-    }
     LightParams params{};
+    params.collectionRows = store.Schema(SchemaId::CollectionAPI).Rows();
+    params.shapeRows = store.Schema(SchemaId::LightAPI).Rows();
+    m_collections.Reserve(device, store.Schema(SchemaId::CollectionAPI).Capacity());
+    m_shapes.Reserve(device, store.Schema(SchemaId::LightAPI).Capacity());
     params.scene.address = store.DeviceData();
     params.collections.address = m_collections.Address();
-    params.collectionRows = rows;
+    params.shapes.address = m_shapes.Address();
     device::Queue& queue = device.GetQueue();
     device::CommandEncoder encoder = queue.CreateEncoder();
-    encoder.Dispatch(Kernels().Entry("WriteCollections"), params,
-                     {.x = device::GroupCount(rows, kLightGroup)});
+    if (params.collectionRows > 0) {
+        encoder.Dispatch(Kernels().Entry("WriteCollections"), params,
+                         {.x = device::GroupCount(params.collectionRows, kLightGroup)});
+    }
+    if (params.shapeRows > 0) {
+        encoder.Dispatch(Kernels().Entry("WriteLightShapes"), params,
+                         {.x = device::GroupCount(params.shapeRows, kLightGroup)});
+    }
     queue.Submit(encoder.Finish());
 }
 
@@ -459,7 +466,7 @@ device::Program& Lights::Kernels() {
             {.modules = {"ernie.scene.kernels.lights"},
              .library = &kSceneKernels,
              .entries = {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights",
-                         "WriteLightCdf", "WriteCollections"},
+                         "WriteLightCdf", "WriteCollections", "WriteLightShapes"},
              .label = "lights"});
     }
     return *m_program;

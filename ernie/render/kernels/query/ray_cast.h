@@ -12,7 +12,6 @@
 namespace ernie {
 
 struct RayCastParams {
-    Ptr<SceneData> scene;
     Ptr<RenderTables> tables;
     Ptr<float> origins;
     Ptr<float> directions;
@@ -30,7 +29,7 @@ struct RayCastParams {
     uint count;
 };
 
-ERNIE_CHECK_SIZE(RayCastParams, 112);
+ERNIE_CHECK_SIZE(RayCastParams, 104);
 
 static const uint kRayCastGroup = 64;
 

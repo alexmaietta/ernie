@@ -61,7 +61,7 @@ class Lights : public System {
   private:
     bool Restructured(const ChangeSet& changes) const;
     void Relayout();
-    void WriteCollections();
+    void WriteCollectionsAndShapes();
     device::Program& Kernels();
 
     Catalog& m_catalog;
@@ -72,6 +72,7 @@ class Lights : public System {
     Ref<device::Buffer> m_maps;
     Ref<device::Buffer> m_spectra;
     DeviceTable<CollectionRecord> m_collections{"collection records"};
+    DeviceTable<LightShapeRecord> m_shapes{"light shape records"};
     std::set<uint32_t> m_lights;
     std::set<uint32_t> m_worldPrims;
     std::map<uint32_t, std::set<uint32_t>> m_shownIn;
