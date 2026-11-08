@@ -7,7 +7,7 @@ using namespace ernie;
 static const float kOrthographicApertureUnits = 0.1f;
 
 struct OrthographicProjection : IProjection {
-    static OrthographicProjection Load(SceneData* scene, uint row) {
+    static OrthographicProjection Load(RenderTables* tables, uint row) {
         return OrthographicProjection();
     }
 

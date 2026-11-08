@@ -20,6 +20,16 @@ struct Float2 {
     float x;
     float y;
 
+    __init() {
+        x = 0;
+        y = 0;
+    }
+
+    __init(float2 v) {
+        x = v.x;
+        y = v.y;
+    }
+
     float2 Vector() {
         return float2(x, y);
     }

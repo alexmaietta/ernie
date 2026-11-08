@@ -27,6 +27,7 @@ ernie_object_library(
     systems/readback.cpp
     systems/regions.cpp
     systems/semantics.cpp
+    systems/sensors.cpp
     systems/surfaces.cpp
     systems/tangents.cpp
     systems/textures.cpp

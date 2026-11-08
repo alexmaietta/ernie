@@ -8,7 +8,6 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-static const float kMillimeters = 0.001f;
 
 struct CameraSample : IDifferentiable {
     float2 film;
@@ -49,18 +48,18 @@ struct CameraSensor : IDifferentiable {
 }
 
 struct CameraLens : IDifferentiable {
-    SceneData* scene;
+    RenderTables* tables;
     no_diff uint row;
     no_diff Projection projection;
 
     [Differentiable]
     LensRay Trace(float2 film) {
-        const float2 ideal = NoDistortion.Load(scene, row).Undistort(film);
+        const float2 ideal = NoDistortion.Load(tables, row).Undistort(film);
         switch (projection) {
         case Projection::Orthographic:
-            return OrthographicProjection.Load(scene, row).Trace(ideal);
+            return OrthographicProjection.Load(tables, row).Trace(ideal);
         default:
-            return PerspectiveProjection.Load(scene, row).Trace(ideal);
+            return PerspectiveProjection.Load(tables, row).Trace(ideal);
         }
     }
 
@@ -69,30 +68,30 @@ struct CameraLens : IDifferentiable {
         float2 ideal;
         switch (projection) {
         case Projection::Orthographic:
-            ideal = OrthographicProjection.Load(scene, row).Image(local);
+            ideal = OrthographicProjection.Load(tables, row).Image(local);
             break;
         default:
-            ideal = PerspectiveProjection.Load(scene, row).Image(local);
+            ideal = PerspectiveProjection.Load(tables, row).Image(local);
             break;
         }
-        return NoDistortion.Load(scene, row).Distort(ideal);
+        return NoDistortion.Load(tables, row).Distort(ideal);
     }
 
     float Distance(float3 local) {
         switch (projection) {
         case Projection::Orthographic:
-            return OrthographicProjection.Load(scene, row).Distance(local);
+            return OrthographicProjection.Load(tables, row).Distance(local);
         default:
-            return PerspectiveProjection.Load(scene, row).Distance(local);
+            return PerspectiveProjection.Load(tables, row).Distance(local);
         }
     }
 
     float Spread(float2 filmStep) {
         switch (projection) {
         case Projection::Orthographic:
-            return OrthographicProjection.Load(scene, row).Spread(filmStep);
+            return OrthographicProjection.Load(tables, row).Spread(filmStep);
         default:
-            return PerspectiveProjection.Load(scene, row).Spread(filmStep);
+            return PerspectiveProjection.Load(tables, row).Spread(filmStep);
         }
     }
 }
@@ -190,41 +189,24 @@ struct CameraModel : IDifferentiable {
     no_diff SensorFrame pose;
     no_diff float exposure;
 
-    static CameraModel Load(SceneData* scene, RenderTables* tables, uint prim) {
-        CameraData* data = &scene->schemas.camera;
-        const uint row = PrimRow(scene, prim, kSlotCamera);
+    static CameraModel Load(RenderTables* tables, uint prim) {
+        const uint row = PrimRow(tables, prim, kSlotCamera);
+        const CameraRecord record = tables->cameras[row];
         CameraModel camera;
-
-        camera.sensor.aperture = float2(data.horizontalAperture[row], data.verticalAperture[row]);
-        camera.sensor.offset =
-            float2(data.horizontalApertureOffset[row], data.verticalApertureOffset[row]);
-
-        camera.lens.scene = scene;
+        camera.sensor.aperture = record.aperture.Vector();
+        camera.sensor.offset = record.offset.Vector();
+        camera.lens.tables = tables;
         camera.lens.row = row;
-        camera.lens.projection = Projection(data.projection[row]);
-
-        const float fStop = data.fStop[row];
-        if (camera.lens.projection == Projection::Orthographic || fStop <= 0) {
-            camera.aperture.radius = 0;
-        } else {
-            camera.aperture.radius = data.focalLength[row] * kMillimeters / (2 * fStop);
-        }
-        camera.aperture.focusDistance = data.focusDistance[row];
-
-        camera.clipping.near = data.clippingRange[row].x;
-        camera.clipping.far = data.clippingRange[row].y;
-        camera.clipping.planes = data.clippingPlanes[row];
-
-        camera.shutter.open = data.shutterOpen[row];
-        camera.shutter.close = data.shutterClose[row];
-
+        camera.lens.projection = Projection(record.projection);
+        camera.aperture.radius = record.apertureRadius;
+        camera.aperture.focusDistance = record.focusDistance;
+        camera.clipping.near = record.clipping.x;
+        camera.clipping.far = record.clipping.y;
+        camera.clipping.planes = record.clippingPlanes;
+        camera.shutter.open = record.shutter.x;
+        camera.shutter.close = record.shutter.y;
         camera.pose = LoadSensorFrame(tables, prim);
-
-        const float exposureFStop = data.exposureFStop[row];
-        const float sensitivity = data.exposureResponsivity[row] * (data.exposureIso[row] / 100);
-        const float light = data.exposureTime[row] / (exposureFStop * exposureFStop);
-        camera.exposure = sensitivity * light * exp2(data.exposure[row]);
-
+        camera.exposure = record.exposure;
         return camera;
     }
 

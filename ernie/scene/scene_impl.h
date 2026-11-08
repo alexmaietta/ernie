@@ -21,6 +21,7 @@
 #include "ernie/scene/systems/lights.h"
 #include "ernie/scene/systems/readback.h"
 #include "ernie/scene/systems/semantics.h"
+#include "ernie/scene/systems/sensors.h"
 #include "ernie/scene/systems/surfaces.h"
 #include "ernie/scene/systems/tangents.h"
 #include "ernie/scene/systems/textures.h"
@@ -170,6 +171,7 @@ class SceneImpl {
     Tangents m_tangents;
     Textures m_textures;
     Semantics m_semantics;
+    Sensors m_sensors;
     Instances m_instances;
     Surfaces m_surfaces;
     Lights m_lights;

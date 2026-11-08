@@ -7,7 +7,7 @@ using namespace ernie;
 
 extension CameraModel : IPattern {
     static CameraModel Load(SensorContext context) {
-        return CameraModel.Load(context.params.scene, context.params.tables,
+        return CameraModel.Load(context.params.tables,
                                 context.capture->sensor);
     }
 

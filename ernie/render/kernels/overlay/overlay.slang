@@ -680,7 +680,7 @@ bool ProjectText(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
         mode = uint(OverlayDepth::Always);
     } else {
         SceneData* scene = p.scene;
-        const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+        const CameraModel camera = CameraModel.Load(p.tables, view.camera);
         const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
         const float near = scene->schemas.camera.clippingRange[cameraRow].x;
         const float3 point = RenderSpace(p, batch, viewWorld, shape.Point());
@@ -760,7 +760,7 @@ struct Sizing {
         if ((batch.flags & kOverlayScreenSized) == 0) {
             return;
         }
-        const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+        const CameraModel camera = CameraModel.Load(p.tables, view.camera);
         const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
         const float near = max(scene->schemas.camera.clippingRange[cameraRow].x, 1e-4f);
         const float depth = camera.ImagePlaneDistance(centre);
@@ -867,7 +867,7 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, uint viewWor
         uvs = piece == 0 ? 0x34u : 0x2Cu;
     }
 
-    const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
     const float near = scene->schemas.camera.clippingRange[cameraRow].x;
     const bool perspective =
@@ -982,7 +982,7 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
         return ProjectFill(p, shape, view, viewWorld, piece, color, record);
     }
 
-    const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const uint cameraRow = PrimRow(scene, view.camera, kSlotCamera);
     const float near = scene->schemas.camera.clippingRange[cameraRow].x;
     const bool perspective =
@@ -1749,7 +1749,7 @@ void ChooseOverlayPicks(uniform OverlayParams p) {
 void PickRay(OverlayParams p, OverlayView view, float2 pixel, out float3 origin,
              out float3 direction) {
     SceneData* scene = p.scene;
-    const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const float2 film = float2(pixel.x / float(view.width) * 2 - 1, 1 - pixel.y / float(view.height) * 2);
     const CameraRay ray = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));
     origin = ray.ray.origin;
@@ -1790,7 +1790,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     float3 through;
     float3 along;
     PickRay(p, view, measure.nearest, through, along);
-    const CameraModel camera = CameraModel.Load(scene, p.tables, view.camera);
+    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const float start = camera.ImagePlaneDistance(through);
     const float rate = camera.ImagePlaneDistance(through + along) - start;
     const float3 position = through + along * (rate != 0 ? (measure.depth - start) / rate : 0);

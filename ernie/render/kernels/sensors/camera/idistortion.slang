@@ -5,7 +5,7 @@ __exported import ernie.render.kernels.sensors.camera.iprojection;
 using namespace ernie;
 
 interface IDistortion : IDifferentiable {
-    static This Load(SceneData* scene, uint row);
+    static This Load(RenderTables* tables, uint row);
 
     [Differentiable]
     float2 Distort(float2 ideal) {
@@ -19,7 +19,7 @@ interface IDistortion : IDifferentiable {
 }
 
 struct NoDistortion : IDistortion {
-    static NoDistortion Load(SceneData* scene, uint row) {
+    static NoDistortion Load(RenderTables* tables, uint row) {
         return NoDistortion();
     }
 }

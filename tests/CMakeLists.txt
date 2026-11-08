@@ -118,6 +118,7 @@ ernie_test(
         unit/scene/utest_scene_rotation.cpp
         unit/scene/utest_scene_scene.cpp
         unit/scene/utest_scene_semantics.cpp
+        unit/scene/utest_scene_sensors.cpp
         unit/scene/utest_scene_snapshots.cpp
         unit/scene/utest_scene_store.cpp
         unit/scene/utest_scene_tables.cpp

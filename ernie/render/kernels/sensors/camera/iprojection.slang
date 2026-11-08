@@ -10,7 +10,7 @@ struct LensRay : IDifferentiable {
 }
 
 interface IProjection : IDifferentiable {
-    static This Load(SceneData* scene, uint row);
+    static This Load(RenderTables* tables, uint row);
 
     [Differentiable]
     LensRay Trace(float2 film);

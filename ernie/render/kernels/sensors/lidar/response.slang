@@ -37,12 +37,13 @@ struct LidarResponse : IResponse<LidarPattern> {
     static LidarResponse Load(SensorContext context, LidarPattern pattern) {
         SceneData* scene = context.params.scene;
         Capture* capture = context.capture;
-        const uint row = PrimRow(scene, capture->sensor, kSlotLidar);
         LidarResponse response;
         response.query = context.query;
         response.scene = scene;
         response.tables = context.params.tables;
-        response.mode = ReturnMode(scene->schemas.lidar.returnMode[row]);
+        response.mode = ReturnMode(
+            context.params.tables->lidars[PrimRow(context.params.tables, capture->sensor, kSlotLidar)]
+                .returnMode);
         response.stride = max(capture->returns, 1u);
         response.returns = min(response.stride, kMostLidarReturns);
         response.found = 0;

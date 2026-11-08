@@ -18,36 +18,20 @@ struct LidarPattern : IPattern {
     uint latticeStep;
 
     static LidarPattern Load(SensorContext context) {
-        SceneData* scene = context.params.scene;
+        RenderTables* tables = context.params.tables;
         Capture* capture = context.capture;
-        LidarData* data = &scene->schemas.lidar;
-        const uint row = PrimRow(scene, capture->sensor, kSlotLidar);
-        const float2 sweep = radians(float2(data.azimuthRange[row].x, data.azimuthRange[row].y));
+        const LidarRecord record = tables->lidars[PrimRow(tables, capture->sensor, kSlotLidar)];
         LidarPattern pattern;
-        pattern.frame = LoadSensorFrame(context.params.tables, capture->sensor);
-        pattern.rotary = ScanType(data.scanType[row]) == ScanType::Rotary;
-        pattern.azimuthStart = sweep.x;
-        pattern.azimuthStep = (sweep.y - sweep.x) / float(max(capture->width, 1u));
-        pattern.elevations = data.emitterElevations[row];
-        pattern.azimuths = data.emitterAzimuths[row];
-        pattern.range = float2(data.range[row].x, data.range[row].y);
-        pattern.divergence =
-            radians(float2(data.beamDivergence[row].x, data.beamDivergence[row].y));
-        pattern.samples = max(data.beamSamples[row], 1u);
-        pattern.latticeStep = max(uint(float(pattern.samples) * 0.618034f), 1u);
-        for (;;) {
-            uint a = pattern.latticeStep;
-            uint b = pattern.samples;
-            while (b != 0) {
-                const uint r = a % b;
-                a = b;
-                b = r;
-            }
-            if (a == 1) {
-                break;
-            }
-            ++pattern.latticeStep;
-        }
+        pattern.frame = LoadSensorFrame(tables, capture->sensor);
+        pattern.rotary = record.rotary != 0;
+        pattern.azimuthStart = record.sweep.x;
+        pattern.azimuthStep = (record.sweep.y - record.sweep.x) / float(max(capture->width, 1u));
+        pattern.elevations = record.elevations;
+        pattern.azimuths = record.azimuths;
+        pattern.range = record.range.Vector();
+        pattern.divergence = record.divergence.Vector();
+        pattern.samples = record.samples;
+        pattern.latticeStep = record.latticeStep;
         return pattern;
     }
 

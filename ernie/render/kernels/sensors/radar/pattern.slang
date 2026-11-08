@@ -11,16 +11,14 @@ struct RadarPattern : IPattern {
     float2 range;
 
     static RadarPattern Load(SensorContext context) {
-        SceneData* scene = context.params.scene;
+        RenderTables* tables = context.params.tables;
         Capture* capture = context.capture;
-        RadarData* data = &scene->schemas.radar;
-        const uint row = PrimRow(scene, capture->sensor, kSlotRadar);
+        const RadarRecord record = tables->radars[PrimRow(tables, capture->sensor, kSlotRadar)];
         RadarPattern pattern;
-        pattern.frame = LoadSensorFrame(context.params.tables, capture->sensor);
-        pattern.fieldOfView =
-            radians(float2(data.fieldOfView[row].x, data.fieldOfView[row].y));
+        pattern.frame = LoadSensorFrame(tables, capture->sensor);
+        pattern.fieldOfView = record.fieldOfView.Vector();
         pattern.resolution = float2(capture->width, capture->height);
-        pattern.range = float2(data.range[row].x, data.range[row].y);
+        pattern.range = record.range.Vector();
         return pattern;
     }
 

@@ -7,9 +7,9 @@ using namespace ernie;
 struct PerspectiveProjection : IProjection {
     float focalLength;
 
-    static PerspectiveProjection Load(SceneData* scene, uint row) {
+    static PerspectiveProjection Load(RenderTables* tables, uint row) {
         PerspectiveProjection projection;
-        projection.focalLength = scene->schemas.camera.focalLength[row];
+        projection.focalLength = tables->cameras[row].focalLength;
         return projection;
     }
 

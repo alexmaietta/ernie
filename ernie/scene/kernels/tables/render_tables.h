@@ -10,6 +10,7 @@
 #include "ernie/scene/kernels/tables/hierarchy.h"
 #include "ernie/scene/kernels/tables/instances.h"
 #include "ernie/scene/kernels/tables/prims.h"
+#include "ernie/scene/kernels/tables/sensors.h"
 #include "ernie/scene/kernels/tables/tangents.h"
 #include "ernie/scene/kernels/tables/textures.h"
 
@@ -27,12 +28,15 @@ struct RenderTables {
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
+    Ptr<CameraRecord> cameras;
+    Ptr<LidarRecord> lidars;
+    Ptr<RadarRecord> radars;
     SemanticsData semantics;
     uint worldCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 176);
+ERNIE_CHECK_SIZE(RenderTables, 200);
 
 #ifdef __SLANG__
 
