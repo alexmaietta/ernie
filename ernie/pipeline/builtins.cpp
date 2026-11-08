@@ -3,6 +3,15 @@
 
 namespace ernie::pipeline {
 
+const NodeRegistry& BuiltinNodes() {
+    static const NodeRegistry registry = [] {
+        NodeRegistry builtins;
+        RegisterBuiltinNodes(builtins);
+        return builtins;
+    }();
+    return registry;
+}
+
 void RegisterBuiltinNodes(NodeRegistry& registry) {
     registry.Add({.id = "CameraSignal",
                   .kind = NodeKind::Source,
@@ -13,13 +22,13 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
     registry.Add({.id = "Integrate",
                   .inputs = {{"electronRate", SignalType::ElectronRate}},
                   .outputs = {{"electrons", SignalType::Electrons}},
-                  .parameters = {{"time"}},
+                  .parameters = {{"time", 1, {0}}},
                   .module = kCameraNodes,
                   .type = "IntegrateNode"});
     registry.Add({.id = "Emva1288",
                   .inputs = {{"electrons", SignalType::Electrons}},
                   .outputs = {{"electrons", SignalType::Electrons}},
-                  .parameters = {{"time"}},
+                  .parameters = {{"time", 1, {0}}},
                   .uniforms = {{"shot", {"poisson", "gaussian", "off"}, "poisson"},
                                {"fixedPatterns", {"false", "true"}, "true"}},
                   .module = kCameraNodes,
@@ -32,7 +41,7 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
     registry.Add({.id = "Gain",
                   .inputs = {{"digital", SignalType::Digital}},
                   .outputs = {{"digital", SignalType::Digital}},
-                  .parameters = {{"gain"}},
+                  .parameters = {{"gain", 1, {1}}},
                   .module = kCameraNodes,
                   .type = "GainNode"});
     registry.Add({.id = "ToColor",
@@ -60,7 +69,7 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .kind = NodeKind::Stencil,
                   .inputs = {{"electronRate", SignalType::ElectronRate}},
                   .outputs = {{"electronRate", SignalType::ElectronRate}},
-                  .parameters = {{"sigma"}},
+                  .parameters = {{"sigma", 1, {0.7f}}},
                   .radius = 3,
                   .module = kIspNodes,
                   .type = "GaussianPsfNode"});
@@ -68,14 +77,14 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .kind = NodeKind::Stencil,
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"color", SignalType::LinearColor}},
-                  .parameters = {{"sigmaSpace"}, {"sigmaRange"}},
+                  .parameters = {{"sigmaSpace", 1, {1}}, {"sigmaRange", 1, {0.05f}}},
                   .radius = 2,
                   .module = kIspNodes,
                   .type = "DenoiseNode"});
     registry.Add({.id = "Vignette",
                   .inputs = {{"electronRate", SignalType::ElectronRate}},
                   .outputs = {{"electronRate", SignalType::ElectronRate}},
-                  .parameters = {{"strength"}},
+                  .parameters = {{"strength", 1, {0.3f}}},
                   .module = kIspNodes,
                   .type = "VignetteNode"});
     registry.Add({.id = "BlackLevel",
@@ -87,24 +96,35 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
         {.id = "WhiteBalance",
          .inputs = {{"color", SignalType::LinearColor}, {"stat", SignalType::CaptureStat, true}},
          .outputs = {{"color", SignalType::LinearColor}},
-         .parameters = {{"gains", 3}},
+         .parameters = {{"gains", 3, {1, 1, 1}}},
          .module = kIspNodes,
          .type = "WhiteBalanceNode"});
     registry.Add({.id = "Meter",
                   .kind = NodeKind::Reduce,
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"stat", SignalType::CaptureStat}},
-                  .parameters = {{"radius"}},
+                  .parameters = {{"radius", 1, {0.3f}}},
                   .uniforms = {{"mode", {"average", "centerWeighted", "spot"}, "average"}},
                   .layout = LayoutRule::Stat,
                   .module = kIspNodes,
                   .type = "MeterNode"});
-    registry.Add({.id = "Ccm",
-                  .inputs = {{"color", SignalType::LinearColor}},
+    registry.Add({.id = "AutoExposure",
+                  .inputs = {{"color", SignalType::LinearColor}, {"stat", SignalType::CaptureStat}},
                   .outputs = {{"color", SignalType::LinearColor}},
-                  .parameters = {{"red", 3}, {"green", 3}, {"blue", 3}},
+                  .parameters = {{"target", 1, {0.18f}},
+                                 {"speed", 1, {0.5f}},
+                                 {"minGain", 1, {1.0f / 64}},
+                                 {"maxGain", 1, {64}}},
+                  .state = {1},
                   .module = kIspNodes,
-                  .type = "CcmNode"});
+                  .type = "AutoExposureNode"});
+    registry.Add(
+        {.id = "Ccm",
+         .inputs = {{"color", SignalType::LinearColor}},
+         .outputs = {{"color", SignalType::LinearColor}},
+         .parameters = {{"red", 3, {1, 0, 0}}, {"green", 3, {0, 1, 0}}, {"blue", 3, {0, 0, 1}}},
+         .module = kIspNodes,
+         .type = "CcmNode"});
     registry.Add({.id = "Tone",
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"color", SignalType::LinearColor}},

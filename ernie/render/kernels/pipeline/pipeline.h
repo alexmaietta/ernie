@@ -31,9 +31,10 @@ struct PipelineCapture {
     uint identity;
     uint firstValue;
     uint camera;
+    Ptr<float> state;
 };
 
-ERNIE_CHECK_SIZE(PipelineCapture, 48);
+ERNIE_CHECK_SIZE(PipelineCapture, 56);
 
 struct PipelineParams {
     Ptr<RenderTables> tables;

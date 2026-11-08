@@ -203,6 +203,41 @@ class Meter : SensorNode (
     )
 }
 
+class AutoExposure : SensorNode (
+    doc = "Scales color by a gain that follows a Meter's mean luminance toward a target from one capture to the next, as a camera's auto exposure does. A capture uses the gain the captures before it settled on, so it reacts one capture late, as real cameras do. Each sensor keeps its own gain, which starts at 1."
+) {
+    token info:id = AutoExposure
+    float inputs:target = 0.18 (
+        tracked
+        group = "Exposure"
+        displayName = "Target"
+        min = 0
+        doc = "The mean luminance the gain aims for."
+    )
+    float inputs:speed = 0.5 (
+        tracked
+        group = "Exposure"
+        displayName = "Speed"
+        min = 0
+        max = 1
+        doc = "How far the gain moves toward its ideal each capture, in stops, from 0 for never to 1 for at once."
+    )
+    float inputs:minGain = 0.015625 (
+        tracked
+        group = "Exposure"
+        displayName = "Min Gain"
+        min = 0
+        doc = "The smallest gain allowed."
+    )
+    float inputs:maxGain = 64 (
+        tracked
+        group = "Exposure"
+        displayName = "Max Gain"
+        min = 0
+        doc = "The largest gain allowed."
+    )
+}
+
 class Ccm : SensorNode (
     doc = "Applies a color correction matrix, taking the camera's red, green and blue to the working space's."
 ) {

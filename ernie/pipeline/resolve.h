@@ -26,6 +26,7 @@ struct NodeDesc {
     std::string path;
     std::string id;
     std::vector<std::pair<std::string, std::string>> uniforms;
+    std::vector<std::pair<std::string, std::vector<float>>> values;
     std::vector<ConnectionDesc> inputs;
 };
 
@@ -41,6 +42,7 @@ struct ResolvedNode {
     uint32_t prim = 0;
     std::string path;
     std::vector<std::string> uniforms;
+    std::vector<float> parameters;
     std::vector<uint32_t> inputs;
     std::vector<uint32_t> outputs;
 };

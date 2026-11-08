@@ -38,12 +38,30 @@ struct PointContext {
     PipelineElement element;
     uint node;
     uint parameters;
+    uint state;
 
     __init(PipelineParams params, PipelineElement element, uint node, uint parameters) {
         this.params = params;
         this.element = element;
         this.node = node;
         this.parameters = parameters;
+        this.state = 0;
+    }
+
+    __init(PipelineParams params, PipelineElement element, uint node, uint parameters, uint state) {
+        this.params = params;
+        this.element = element;
+        this.node = node;
+        this.parameters = parameters;
+        this.state = state;
+    }
+
+    float State(uint index) {
+        return element.capture->state[state + index];
+    }
+
+    void SetState(uint index, float value) {
+        element.capture->state[state + index] = value;
     }
 
     float Parameter(uint index) {

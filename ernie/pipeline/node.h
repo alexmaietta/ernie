@@ -42,6 +42,7 @@ struct PortDef {
 struct ParameterDef {
     std::string name;
     uint32_t words = 1;
+    std::vector<float> fallback;
 };
 
 struct UniformDef {
@@ -57,6 +58,7 @@ struct NodeDef {
     std::vector<PortDef> outputs;
     std::vector<ParameterDef> parameters;
     std::vector<UniformDef> uniforms;
+    std::vector<float> state;
     uint32_t radius = 0;
     LayoutRule layout = LayoutRule::FirstInput;
     std::string module;

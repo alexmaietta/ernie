@@ -53,6 +53,7 @@ ernie_test(
         unit/pipeline/utest_pipeline_reduce.cpp
         unit/pipeline/utest_pipeline_resolve.cpp
         unit/pipeline/utest_pipeline_segments.cpp
+        unit/pipeline/utest_pipeline_standalone.cpp
 )
 
 ernie_test(

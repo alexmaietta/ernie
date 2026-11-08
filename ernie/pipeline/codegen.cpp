@@ -211,9 +211,9 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                 arguments += std::format(", v{}", value);
                 available.insert(value);
             }
-            source += std::format("    {}.Evaluate(PointContext(p, element, {}, {}){});\n",
+            source += std::format("    {}.Evaluate(PointContext(p, element, {}, {}, {}){});\n",
                                   NodeType(def, resolved), node, definition.parameterOffsets[node],
-                                  arguments);
+                                  definition.stateOffsets[node], arguments);
             for (const uint32_t value : resolved.outputs) {
                 for (const uint32_t slot : outputSlots(value)) {
                     source += std::format("    WriteSignal(p, element, {}, v{});\n", slot, value);
@@ -221,6 +221,36 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
             }
         }
         source += "}\n";
+        for (const uint32_t node : segment.nodes) {
+            const ResolvedNode& resolved = pipeline.nodes[node];
+            const NodeDef& def = registry[resolved.def];
+            if (def.state.empty()) {
+                continue;
+            }
+            std::string stats;
+            for (uint32_t port = 0; port < def.inputs.size(); ++port) {
+                if (def.inputs[port].type != SignalType::CaptureStat) {
+                    continue;
+                }
+                const uint32_t value = resolved.inputs[port];
+                stats += value == kNoValue
+                             ? std::string(", CaptureStat.Zero()")
+                             : std::format(", ReadStat(p, capture, {})", storedSlot[value]);
+            }
+            const std::string update = std::format("Segment{}Update{}", index, node);
+            generated.entries.push_back(update);
+            generated.shapes.push_back(DispatchShape::Captures);
+            source += std::format(
+                "\n[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\n"
+                "void {}(uniform PipelineParams p) {{\n"
+                "    const uint captureIndex = LinearThreadIndex();\n"
+                "    if (captureIndex >= p.captureCount) {{\n        return;\n    }}\n"
+                "    PipelineCapture* capture = p.captures + captureIndex;\n"
+                "    const PipelineElement element = ElementAt(capture, 0);\n"
+                "    {}.Update(PointContext(p, element, {}, {}, {}){});\n}}\n",
+                update, NodeType(def, resolved), node, definition.parameterOffsets[node],
+                definition.stateOffsets[node], stats);
+        }
     }
     generated.source = std::move(source);
     return generated;

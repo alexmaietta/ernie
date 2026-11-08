@@ -236,3 +236,29 @@ struct ToneNode<let curve : uint> {
         output = LinearColor.Make(channels);
     }
 }
+
+struct AutoExposureNode {
+    static void Evaluate(PointContext context, LinearColor input, CaptureStat stat,
+                         out LinearColor output) {
+        const float gain = context.State(0);
+        Channels channels = input.Get();
+        [ForceUnroll]
+        for (uint c = 0; c < kMostSignalChannels; ++c) {
+            channels[c] *= gain;
+        }
+        output = LinearColor.Make(channels);
+    }
+
+    static void Update(PointContext context, CaptureStat stat) {
+        if (stat.Weight() <= 0) {
+            return;
+        }
+        const float lowest = context.Parameter(2);
+        const float highest = max(context.Parameter(3), lowest);
+        const float luminance = max(stat.values[kMostSignalChannels], 1e-6f);
+        const float ideal = clamp(context.Parameter(0) / luminance, lowest, highest);
+        const float gain = max(context.State(0), 1e-12f);
+        const float next = gain * pow(ideal / gain, saturate(context.Parameter(1)));
+        context.SetState(0, clamp(next, lowest, highest));
+    }
+}

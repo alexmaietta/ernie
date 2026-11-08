@@ -21,6 +21,9 @@ uint32_t NodeRegistry::Add(NodeDef def) {
                     "CaptureStat laid out per capture",
                     def.id);
     }
+    if (!def.state.empty() && def.kind != NodeKind::Point) {
+        throw Error("Pipeline node {} keeps state, which only point nodes do for now", def.id);
+    }
     const auto found = m_ids.find(def.id);
     if (found != m_ids.end()) {
         m_defs[found->second] = std::move(def);

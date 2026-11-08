@@ -145,6 +145,19 @@ ResolvedPipeline ResolvePipeline(const PipelineDesc& desc, const NodeRegistry& r
         for (const UniformDef& uniform : def.uniforms) {
             resolved.uniforms.push_back(Uniform(each, uniform));
         }
+        for (const ParameterDef& parameter : def.parameters) {
+            const auto found = std::ranges::find(
+                each.values, parameter.name, &std::pair<std::string, std::vector<float>>::first);
+            std::vector<float> value = found != each.values.end() ? found->second
+                                       : parameter.fallback.empty()
+                                           ? std::vector<float>(parameter.words, 0)
+                                           : parameter.fallback;
+            if (value.size() != parameter.words) {
+                throw Error("{}'s {} has {} values, and it takes {}", each.path, parameter.name,
+                            value.size(), parameter.words);
+            }
+            resolved.parameters.insert(resolved.parameters.end(), value.begin(), value.end());
+        }
         for (uint32_t port = 0; port < def.outputs.size(); ++port) {
             resolved.outputs.push_back(uint32_t(pipeline.values.size()));
             pipeline.values.push_back({position[node], port, def.outputs[port].type});

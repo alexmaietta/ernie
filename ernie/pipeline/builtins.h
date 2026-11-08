@@ -10,4 +10,6 @@ inline constexpr const char* kIspNodes = "ernie.render.kernels.pipeline.nodes.is
 
 void RegisterBuiltinNodes(NodeRegistry& registry);
 
+const NodeRegistry& BuiltinNodes();
+
 }
