@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "ernie/device/tensor.h"
 #include "ernie/scene/records/products.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"
@@ -24,12 +25,51 @@ struct SimulationClock {
     uint64_t resets = 0;
 };
 
+enum class RenderEntry : uint32_t {
+    MinimalData,
+    MinimalDisplayColor,
+    MinimalTextureDiffuse,
+    MinimalFull,
+    RealTime,
+    RealTimeBands,
+    Lidar,
+    Radar,
+};
+
+inline constexpr uint32_t kRenderEntryCount = 8;
+
+enum class PointChannel : uint32_t {
+    Coordinates,
+    Distance,
+    Intensity,
+    StableId,
+    Emitter,
+    Firing,
+    Echo,
+    RadialVelocity,
+};
+
+struct PointChannelInfo {
+    std::string_view name;
+    device::DType type;
+    int64_t lanes;
+};
+
+inline constexpr PointChannelInfo kPointChannels[] = {
+    {"Coordinates", device::DType::Float32, 3}, {"Distance", device::DType::Float32, 1},
+    {"Intensity", device::DType::Float32, 1},   {"StableId", device::DType::UInt32, 4},
+    {"Emitter", device::DType::UInt32, 1},      {"Firing", device::DType::UInt32, 1},
+    {"Echo", device::DType::UInt32, 1},         {"RadialVelocity", device::DType::Float32, 1}};
+
 struct ResolvedVar {
     uint32_t prim = kNoPrim;
     std::string path;
     RenderVarSource source = RenderVarSource::LdrColor;
-    std::vector<std::string> channels;
     FrameOfReference frame = FrameOfReference::Sensor;
+    device::DType type = device::DType::UInt8;
+    std::vector<int64_t> shape;
+    std::vector<PointChannel> channels;
+    bool semantic = false;
 
     bool operator==(const ResolvedVar&) const = default;
 };
@@ -40,6 +80,8 @@ struct ResolvedProduct {
     std::vector<uint32_t> sensors;
     std::vector<ResolvedVar> vars;
     Token taxonomy;
+    RenderEntry entry = RenderEntry::MinimalData;
+    bool semantic = false;
     std::string error;
     uint64_t version = 0;
     bool due = true;

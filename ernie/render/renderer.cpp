@@ -28,122 +28,10 @@ namespace ernie {
 
 namespace {
 
-struct RenderVarFormat {
-    device::DType type;
-    uint32_t channels;
-};
-
-RenderVarFormat SourceFormat(RenderVarSource source) {
-    switch (source) {
-    case RenderVarSource::LdrColor:
-        return {device::DType::UInt8, 4};
-    case RenderVarSource::HdrColor:
-        return {device::DType::Float32, 4};
-    case RenderVarSource::DistanceToCamera:
-    case RenderVarSource::DistanceToImagePlane:
-    case RenderVarSource::Intensity:
-    case RenderVarSource::RadialVelocity:
-        return {device::DType::Float32, 1};
-    case RenderVarSource::NonStableInstanceSegmentation:
-        return {device::DType::UInt32, 1};
-    case RenderVarSource::Normal:
-        return {device::DType::Float32, 3};
-    case RenderVarSource::DiffuseAlbedo:
-        return {device::DType::UInt8, 4};
-    case RenderVarSource::SemanticSegmentation:
-        return {device::DType::UInt32, 1};
-    case RenderVarSource::SemanticInstanceSegmentation:
-    case RenderVarSource::StableIdSegmentation:
-    case RenderVarSource::InstancerStableId:
-        return {device::DType::UInt32, 4};
-    case RenderVarSource::InstanceId:
-        return {device::DType::Int64, 1};
-    case RenderVarSource::SemanticIdMap:
-    case RenderVarSource::StableIdMap:
-        return {device::DType::UInt8, 1};
-    case RenderVarSource::PointCloud:
-        break;
-    }
-    throw Error("No format for render var source {}", uint32_t(source));
-}
-
-bool PerPixel(RenderVarSource source) {
-    return source != RenderVarSource::SemanticIdMap && source != RenderVarSource::StableIdMap &&
-           source != RenderVarSource::PointCloud;
-}
-
-struct PointChannel {
-    std::string_view name;
-    device::DType type;
-    int64_t lanes;
-    uint64_t PointCloud::* address;
-};
-
-constexpr PointChannel kPointChannels[] = {
-    {"Coordinates", device::DType::Float32, 3, &PointCloud::coordinates},
-    {"Distance", device::DType::Float32, 1, &PointCloud::distance},
-    {"Intensity", device::DType::Float32, 1, &PointCloud::intensity},
-    {"StableId", device::DType::UInt32, 4, &PointCloud::stableId},
-    {"Emitter", device::DType::UInt32, 1, &PointCloud::emitter},
-    {"Firing", device::DType::UInt32, 1, &PointCloud::firing},
-    {"Echo", device::DType::UInt32, 1, &PointCloud::echo},
-    {"RadialVelocity", device::DType::Float32, 1, &PointCloud::radialVelocity}};
-
-const PointChannel& FindPointChannel(std::string_view name) {
-    for (const PointChannel& channel : kPointChannels) {
-        if (channel.name == name) {
-            return channel;
-        }
-    }
-    throw Error("A PointCloud has no channel {}", name);
-}
-
-bool Semantic(RenderVarSource source) {
-    return source == RenderVarSource::NonStableInstanceSegmentation ||
-           source == RenderVarSource::SemanticSegmentation ||
-           source == RenderVarSource::SemanticIdMap ||
-           source == RenderVarSource::SemanticInstanceSegmentation ||
-           source == RenderVarSource::StableIdSegmentation ||
-           source == RenderVarSource::StableIdMap;
-}
-
-struct SensorKind {
-    SchemaId schema;
-    std::optional<RenderEntry> entry;
-    bool shades;
-    bool returns;
-    bool measuresVelocity;
-};
-
-const SensorKind kSensorKinds[] = {
-    {SchemaId::Camera, std::nullopt, true, false, false},
-    {SchemaId::Lidar, RenderEntry::Lidar, false, true, false},
-    {SchemaId::Radar, RenderEntry::Radar, false, true, true},
-};
-
-const SensorKind& FindSensorKind(SchemaId schema) {
-    for (const SensorKind& kind : kSensorKinds) {
-        if (IsA(schema, kind.schema)) {
-            return kind;
-        }
-    }
-    throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
-}
-
-bool Outputs(const SensorKind& kind, RenderVarSource source) {
-    switch (source) {
-    case RenderVarSource::DistanceToCamera:
-    case RenderVarSource::Normal:
-        return true;
-    case RenderVarSource::Intensity:
-    case RenderVarSource::PointCloud:
-        return kind.returns;
-    case RenderVarSource::RadialVelocity:
-        return kind.measuresVelocity;
-    default:
-        return kind.shades || Semantic(source);
-    }
-}
+constexpr uint64_t PointCloud::* kPointFields[] = {
+    &PointCloud::coordinates, &PointCloud::distance,      &PointCloud::intensity,
+    &PointCloud::stableId,    &PointCloud::emitter,       &PointCloud::firing,
+    &PointCloud::echo,        &PointCloud::radialVelocity};
 
 IdEntries MapEntries(const SemanticTable& semantics, RenderVarSource source, Token taxonomy) {
     switch (source) {
@@ -156,34 +44,6 @@ IdEntries MapEntries(const SemanticTable& semantics, RenderVarSource source, Tok
         return semantics.SemanticInstanceIdEntries(taxonomy);
     default:
         return semantics.StableIdEntries();
-    }
-}
-
-bool Shaded(std::span<const RendererImpl::ProductVar> vars) {
-    return std::ranges::any_of(vars, [](const RendererImpl::ProductVar& var) {
-        return var.source == RenderVarSource::LdrColor || var.source == RenderVarSource::HdrColor ||
-               var.source == RenderVarSource::DiffuseAlbedo;
-    });
-}
-
-RenderEntry SelectEntry(std::span<const RendererImpl::ProductVar> vars, RenderMode renderMode,
-                        MinimalMode minimalMode, SpectralMode spectralMode) {
-    if (!Shaded(vars)) {
-        return RenderEntry::MinimalData;
-    }
-    if (renderMode == RenderMode::RealTime) {
-        return spectralMode == SpectralMode::Bands ? RenderEntry::RealTimeBands
-                                                   : RenderEntry::RealTime;
-    }
-    switch (minimalMode) {
-    case MinimalMode::DisplayColor:
-        return RenderEntry::MinimalDisplayColor;
-    case MinimalMode::TextureDiffuse:
-        return RenderEntry::MinimalTextureDiffuse;
-    case MinimalMode::Full:
-        return RenderEntry::MinimalFull;
-    default:
-        return RenderEntry::MinimalData;
     }
 }
 
@@ -236,7 +96,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     }
     StepPlan& plan = PlanProducts(products);
     for (const auto& [path, names] : shown) {
-        if (m_products.at(path).sensor != SchemaId::Camera) {
+        if (!IsA(SchemaId(m_products.at(path).record.sensorSchema), SchemaId::Camera)) {
             throw Error("{} renders no camera, and only cameras show overlays", path);
         }
     }
@@ -347,10 +207,10 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
         const Product& product = PrepareProduct(path);
         Capture capture{};
         capture.product = product.prim;
-        capture.width = product.resolution.x;
-        capture.height = product.resolution.y;
-        capture.missDistance = product.missDistance;
-        capture.returns = std::max(product.returns, 1u);
+        capture.width = product.record.width;
+        capture.height = product.record.height;
+        capture.missDistance = product.record.missDistance;
+        capture.returns = std::max(product.record.returns, 1u);
         if (product.semantic) {
             const auto found = std::ranges::find(plan.taxonomies, product.taxonomy);
             capture.taxonomy = uint32_t(found - plan.taxonomies.begin());
@@ -360,8 +220,8 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
         }
 
         FrameOutput frame;
-        for (const ProductVar& var : product.vars) {
-            frame.renderVars[var.output.renderVarPath] = var.output;
+        for (const RenderVarOutput& output : product.outputs) {
+            frame.renderVars[output.renderVarPath] = output;
         }
         plan.products[path] = ProductOutput{path, {std::move(frame)}};
 
@@ -417,77 +277,19 @@ RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
     if (!resolved->error.empty()) {
         throw Error("{}", resolved->error);
     }
-    const ProductRecord& record = resolved->record;
-    const SensorKind& kind = FindSensorKind(SchemaId(record.sensorSchema));
-
-    Product product;
-    product.prim = resolved->prim;
-    product.version = resolved->version;
-    product.sensors = resolved->sensors;
-    product.sensor = kind.schema;
-    product.resolution = {record.width, record.height};
-    product.returns = record.returns;
-    product.frameRate = record.frameRate;
-    product.startTime = record.startTime;
-    product.taxonomy = resolved->taxonomy;
-    product.missDistance = record.missDistance;
-
+    Product product{*resolved};
     std::string sources;
-    for (const ResolvedVar& var : resolved->vars) {
-        const ProductVar& added = product.vars.emplace_back(PrepareVar(var, product));
-        sources += (sources.empty() ? "" : ", ") + added.output.sourceName;
-        product.semantic |= Semantic(added.source);
-        product.semantic |= std::ranges::find(added.channels, "StableId") != added.channels.end();
-        if (!Outputs(kind, added.source)) {
-            throw Error("{} writes {}, which a {} doesn't output", path, added.output.sourceName,
-                        Info(kind.schema).name);
-        }
-        if (!kind.measuresVelocity &&
-            std::ranges::find(added.channels, "RadialVelocity") != added.channels.end()) {
-            throw Error("{} asks {} for RadialVelocity, which a {} doesn't measure", path,
-                        added.output.renderVarPath, Info(kind.schema).name);
-        }
+    for (const ResolvedVar& var : product.vars) {
+        const std::string_view source = kRenderVarSourceTokens[uint32_t(var.source)];
+        product.outputs.push_back({var.path, std::string(source), {}});
+        sources += std::format("{}{}", sources.empty() ? "" : ", ", source);
     }
-    product.entry = kind.entry ? *kind.entry
-                               : SelectEntry(product.vars, RenderMode(record.renderMode),
-                                             MinimalMode(record.minimalMode),
-                                             SpectralMode(record.spectralMode));
-
+    const ProductRecord& record = product.record;
     Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
-        Counted(product.sensors.size(), "sensor"), product.resolution.x, product.resolution.y,
+        Counted(product.sensors.size(), "sensor"), record.width, record.height,
         sources.empty() ? "nothing" : sources, kRenderEntries[uint32_t(product.entry)],
-        product.frameRate > 0 ? fmt::format(", capturing at {} Hz", product.frameRate) : "");
+        record.frameRate > 0 ? fmt::format(", capturing at {} Hz", record.frameRate) : "");
     return m_products.emplace(path, std::move(product)).first->second;
-}
-
-RendererImpl::ProductVar RendererImpl::PrepareVar(const ResolvedVar& var, const Product& product) {
-    const RenderVarSource source = var.source;
-    RenderVarOutput output{var.path, std::string(kRenderVarSourceTokens[uint32_t(source)]), {}};
-    if (source == RenderVarSource::PointCloud) {
-        std::vector<std::string> channels = var.channels;
-        if (channels.empty()) {
-            channels = {"Coordinates", "Intensity"};
-        }
-        for (const std::string& channel : channels) {
-            FindPointChannel(channel);
-        }
-        return {source, std::move(output),   device::DType::UInt8,
-                {},     std::move(channels), var.frame == FrameOfReference::World};
-    }
-    if (!PerPixel(source)) {
-        return {source, std::move(output)};
-    }
-
-    const RenderVarFormat format = SourceFormat(source);
-    std::vector<int64_t> shape = {int64_t(product.sensors.size()), product.resolution.y,
-                                  product.resolution.x};
-    if (product.returns > 0) {
-        shape.push_back(product.returns);
-    }
-    if (format.channels > 1) {
-        shape.push_back(format.channels);
-    }
-    return {source, std::move(output), format.type, std::move(shape)};
 }
 
 void RendererImpl::UpdateMaps() {
@@ -498,8 +300,10 @@ void RendererImpl::UpdateMaps() {
             continue;
         }
         const bool stale = product.mapVersion != semantics.Runs();
-        for (ProductVar& var : product.vars) {
-            if (!Semantic(var.source)) {
+        for (size_t index = 0; index < product.vars.size(); ++index) {
+            const ResolvedVar& var = product.vars[index];
+            RenderVarOutput& owned = product.outputs[index];
+            if (!var.semantic || var.source == RenderVarSource::PointCloud) {
                 continue;
             }
             if (stale) {
@@ -513,20 +317,20 @@ void RendererImpl::UpdateMaps() {
                     label.labels.insert(entry.labels.begin(), entry.labels.end());
                     texts.emplace_back(id, entry.text);
                 }
-                var.output.idMap = std::make_shared<const IdMap>(std::move(map));
-                if (!PerPixel(var.source)) {
+                owned.idMap = std::make_shared<const IdMap>(std::move(map));
+                if (var.shape.empty()) {
                     const std::vector<std::byte> bytes = PackIdMap(texts);
                     const Ref<device::Buffer> buffer = m_scene->GetDevice().CreateBuffer(
-                        {.label = var.output.renderVarPath}, std::span<const std::byte>(bytes));
-                    var.output.tensor =
+                        {.label = var.path}, std::span<const std::byte>(bytes));
+                    owned.tensor =
                         device::Tensor(buffer, 0, device::DType::UInt8, {int64_t(bytes.size())});
                 }
             }
             for (FrameOutput& frame : planned.frames) {
-                RenderVarOutput& output = frame.renderVars.at(var.output.renderVarPath);
-                output.idMap = var.output.idMap;
-                if (!PerPixel(var.source)) {
-                    output.tensor = var.output.tensor;
+                RenderVarOutput& output = frame.renderVars.at(var.path);
+                output.idMap = owned.idMap;
+                if (var.shape.empty()) {
+                    output.tensor = owned.tensor;
                 }
             }
         }
@@ -564,29 +368,29 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     for (const auto& [path, output] : plan.products) {
         const Product& product = m_products.at(path);
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
-        for (const ProductVar& var : product.vars) {
+        for (const ResolvedVar& var : product.vars) {
             if (var.source == RenderVarSource::PointCloud) {
                 uint64_t& clouds = slots[uint32_t(var.source)];
                 clouds = AcquireCloud(set, path, product, var, clouds);
                 continue;
             }
-            if (!PerPixel(var.source)) {
+            if (var.shape.empty()) {
                 continue;
             }
             const uint64_t bytes =
                 std::accumulate(var.shape.begin(), var.shape.end(),
                                 uint64_t(ElementBytes(var.type)), std::multiplies<>());
-            const Ref<device::Buffer> buffer = device.CreateBuffer(
-                {.bytes = bytes, .usage = usage, .label = var.output.renderVarPath});
+            const Ref<device::Buffer> buffer =
+                device.CreateBuffer({.bytes = bytes, .usage = usage, .label = var.path});
             device::Tensor tensor(buffer, 0, var.type, var.shape);
             slots[uint32_t(var.source)] = tensor.Address();
-            set.vars.push_back({path, var.output.renderVarPath, std::move(tensor), {}});
+            set.vars.push_back({path, var.path, std::move(tensor), {}});
         }
         if (!plan.shownOverlays.contains(path)) {
             continue;
         }
-        const std::vector<int64_t> shape = {int64_t(product.sensors.size()), product.resolution.y,
-                                            product.resolution.x, 4};
+        const std::vector<int64_t> shape = {int64_t(product.sensors.size()), product.record.height,
+                                            product.record.width, 4};
         const uint64_t pixels = uint64_t(shape[0]) * shape[1] * shape[2];
         OwnedOverlay overlay{path, device::Tensor(device.CreateBuffer({.bytes = pixels * 4,
                                                                        .usage = usage,
@@ -632,23 +436,22 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
 }
 
 uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
-                                    const ProductVar& var, uint64_t next) {
+                                    const ResolvedVar& var, uint64_t next) {
     device::Device& device = m_scene->GetDevice();
     const device::BufferUsage usage =
         device.SharedDevice() ? device::BufferUsage::Interop : device::BufferUsage::None;
     const auto sensors = int64_t(product.sensors.size());
-    const uint32_t returns = std::max(product.returns, 1u);
-    const uint32_t perSensor = product.resolution.x * product.resolution.y * returns;
+    const uint32_t returns = std::max(product.record.returns, 1u);
+    const uint32_t perSensor = product.record.width * product.record.height * returns;
     const auto add = [&](std::string channel, device::DType type, std::vector<int64_t> shape) {
         const uint64_t bytes = std::accumulate(shape.begin(), shape.end(),
                                                uint64_t(ElementBytes(type)), std::multiplies<>());
         device::Tensor tensor(
-            device.CreateBuffer({.bytes = bytes,
-                                 .usage = usage,
-                                 .label = var.output.renderVarPath + " " + channel}),
+            device.CreateBuffer(
+                {.bytes = bytes, .usage = usage, .label = var.path + " " + channel}),
             0, type, std::move(shape));
         const uint64_t address = tensor.Address();
-        set.vars.push_back({path, var.output.renderVarPath, std::move(tensor), std::move(channel)});
+        set.vars.push_back({path, var.path, std::move(tensor), std::move(channel)});
         return address;
     };
 
@@ -664,19 +467,20 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path, con
     cloud.flags = owned.flags->Address();
     cloud.offsets = owned.offsets->Address();
     cloud.counts = add("Counts", device::DType::UInt32, {sensors});
-    for (const std::string& name : var.channels) {
-        const PointChannel& channel = FindPointChannel(name);
+    for (const PointChannel channel : var.channels) {
+        const PointChannelInfo& info = kPointChannels[uint32_t(channel)];
         std::vector<int64_t> shape = {sensors, perSensor};
-        if (channel.lanes > 1) {
-            shape.push_back(channel.lanes);
+        if (info.lanes > 1) {
+            shape.push_back(info.lanes);
         }
-        cloud.*channel.address = add(name, channel.type, std::move(shape));
+        cloud.*kPointFields[uint32_t(channel)] =
+            add(std::string(info.name), info.type, std::move(shape));
     }
     cloud.slotsPerSensor = perSensor;
-    cloud.width = product.resolution.x;
+    cloud.width = product.record.width;
     cloud.returns = returns;
     cloud.sensors = uint32_t(sensors);
-    cloud.world = var.world ? 1 : 0;
+    cloud.world = var.frame == FrameOfReference::World ? 1 : 0;
     cloud.next = next;
     owned.cloud = device.CreateBuffer({.label = path + " point cloud"}, std::vector{cloud});
     const uint64_t address = owned.cloud->Address();
@@ -812,9 +616,9 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
         for (uint32_t layer = 0; layer < product.sensors.size(); ++layer) {
             targets.push_back({.camera = product.sensors[layer],
                                .layer = layer,
-                               .width = product.resolution.x,
-                               .height = product.resolution.y,
-                               .missDistance = product.missDistance,
+                               .width = product.record.width,
+                               .height = product.record.height,
+                               .missDistance = product.record.missDistance,
                                .overlay = overlay.tensor.Address(),
                                .depth = overlay.depth,
                                .overlays = mask,
@@ -828,12 +632,12 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     std::vector<OverlayCameraSource> cameraImages;
     for (const OwnedVar& var : set.vars) {
         const Product& product = m_products.at(var.product);
-        if (!due.contains(product.prim) || product.sensor != SchemaId::Camera) {
+        if (!due.contains(product.prim) ||
+            !IsA(SchemaId(product.record.sensorSchema), SchemaId::Camera)) {
             continue;
         }
-        const auto source = std::ranges::find_if(product.vars, [&](const ProductVar& candidate) {
-            return candidate.output.renderVarPath == var.renderVar &&
-                   candidate.source == RenderVarSource::LdrColor;
+        const auto source = std::ranges::find_if(product.vars, [&](const ResolvedVar& candidate) {
+            return candidate.path == var.renderVar && candidate.source == RenderVarSource::LdrColor;
         });
         if (source == product.vars.end()) {
             continue;

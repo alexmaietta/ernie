@@ -62,6 +62,163 @@ Shape SensorShape(const Prim& sensor, Uint2 resolution) {
     return {resolution};
 }
 
+struct VarFormat {
+    device::DType type;
+    int64_t channels;
+};
+
+VarFormat SourceFormat(RenderVarSource source) {
+    switch (source) {
+    case RenderVarSource::LdrColor:
+    case RenderVarSource::DiffuseAlbedo:
+        return {device::DType::UInt8, 4};
+    case RenderVarSource::HdrColor:
+        return {device::DType::Float32, 4};
+    case RenderVarSource::DistanceToCamera:
+    case RenderVarSource::DistanceToImagePlane:
+    case RenderVarSource::Intensity:
+    case RenderVarSource::RadialVelocity:
+        return {device::DType::Float32, 1};
+    case RenderVarSource::NonStableInstanceSegmentation:
+    case RenderVarSource::SemanticSegmentation:
+        return {device::DType::UInt32, 1};
+    case RenderVarSource::Normal:
+        return {device::DType::Float32, 3};
+    case RenderVarSource::SemanticInstanceSegmentation:
+    case RenderVarSource::StableIdSegmentation:
+    case RenderVarSource::InstancerStableId:
+        return {device::DType::UInt32, 4};
+    case RenderVarSource::InstanceId:
+        return {device::DType::Int64, 1};
+    default:
+        return {device::DType::UInt8, 0};
+    }
+}
+
+bool Semantic(RenderVarSource source) {
+    return source == RenderVarSource::NonStableInstanceSegmentation ||
+           source == RenderVarSource::SemanticSegmentation ||
+           source == RenderVarSource::SemanticIdMap ||
+           source == RenderVarSource::SemanticInstanceSegmentation ||
+           source == RenderVarSource::StableIdSegmentation ||
+           source == RenderVarSource::StableIdMap;
+}
+
+struct SensorKind {
+    SchemaId schema;
+    std::optional<RenderEntry> entry;
+    bool shades;
+    bool returns;
+    bool measuresVelocity;
+};
+
+const SensorKind kSensorKinds[] = {
+    {SchemaId::Camera, std::nullopt, true, false, false},
+    {SchemaId::Lidar, RenderEntry::Lidar, false, true, false},
+    {SchemaId::Radar, RenderEntry::Radar, false, true, true},
+};
+
+const SensorKind& FindSensorKind(SchemaId schema) {
+    for (const SensorKind& kind : kSensorKinds) {
+        if (IsA(schema, kind.schema)) {
+            return kind;
+        }
+    }
+    throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
+}
+
+bool Outputs(const SensorKind& kind, RenderVarSource source) {
+    switch (source) {
+    case RenderVarSource::DistanceToCamera:
+    case RenderVarSource::Normal:
+        return true;
+    case RenderVarSource::Intensity:
+    case RenderVarSource::PointCloud:
+        return kind.returns;
+    case RenderVarSource::RadialVelocity:
+        return kind.measuresVelocity;
+    default:
+        return kind.shades || Semantic(source);
+    }
+}
+
+ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind) {
+    const RenderVarSource source = prim.Get(RenderVar::kSourceName);
+    const std::string_view name = kRenderVarSourceTokens[uint32_t(source)];
+    ResolvedVar var{.prim = prim.Index(),
+                    .path = prim.Path(),
+                    .source = source,
+                    .frame = prim.Get(RenderVar::kFrameOfReference),
+                    .semantic = Semantic(source)};
+    if (!Outputs(kind, source)) {
+        throw Error("{} writes {}, which a {} doesn't output", prim.Path(), name,
+                    Info(kind.schema).name);
+    }
+    if (source == RenderVarSource::PointCloud) {
+        std::vector<std::string> names = prim.Get(RenderVar::kChannels);
+        if (names.empty()) {
+            names = {"Coordinates", "Intensity"};
+        }
+        for (const std::string& channel : names) {
+            const auto found = std::ranges::find(kPointChannels, channel, &PointChannelInfo::name);
+            if (found == std::end(kPointChannels)) {
+                throw Error("{} asks for {}, which a PointCloud has no channel for", var.path,
+                            channel);
+            }
+            const auto point = PointChannel(found - std::begin(kPointChannels));
+            if (point == PointChannel::RadialVelocity && !kind.measuresVelocity) {
+                throw Error("{} asks for RadialVelocity, which a {} doesn't measure", var.path,
+                            Info(kind.schema).name);
+            }
+            var.semantic |= point == PointChannel::StableId;
+            var.channels.push_back(point);
+        }
+        return var;
+    }
+    const VarFormat format = SourceFormat(source);
+    if (format.channels == 0) {
+        return var;
+    }
+    const ProductRecord& record = product.record;
+    var.type = format.type;
+    var.shape = {int64_t(product.sensors.size()), record.height, record.width};
+    if (record.returns > 0) {
+        var.shape.push_back(record.returns);
+    }
+    if (format.channels > 1) {
+        var.shape.push_back(format.channels);
+    }
+    return var;
+}
+
+RenderEntry SelectEntry(const ResolvedProduct& product, const SensorKind& kind) {
+    if (kind.entry) {
+        return *kind.entry;
+    }
+    const bool shaded = std::ranges::any_of(product.vars, [](const ResolvedVar& var) {
+        return var.source == RenderVarSource::LdrColor || var.source == RenderVarSource::HdrColor ||
+               var.source == RenderVarSource::DiffuseAlbedo;
+    });
+    if (!shaded) {
+        return RenderEntry::MinimalData;
+    }
+    const ProductRecord& record = product.record;
+    if (RenderMode(record.renderMode) == RenderMode::RealTime) {
+        return SpectralMode(record.spectralMode) == SpectralMode::Bands ? RenderEntry::RealTimeBands
+                                                                        : RenderEntry::RealTime;
+    }
+    switch (MinimalMode(record.minimalMode)) {
+    case MinimalMode::DisplayColor:
+        return RenderEntry::MinimalDisplayColor;
+    case MinimalMode::TextureDiffuse:
+        return RenderEntry::MinimalTextureDiffuse;
+    case MinimalMode::Full:
+        return RenderEntry::MinimalFull;
+    default:
+        return RenderEntry::MinimalData;
+    }
+}
+
 bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
     const ProductRecord& x = a.record;
     const ProductRecord& y = b.record;
@@ -70,7 +227,7 @@ bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
            x.missDistance == y.missDistance && x.renderMode == y.renderMode &&
            x.minimalMode == y.minimalMode && x.spectralMode == y.spectralMode &&
            a.sensors == b.sensors && a.vars == b.vars && a.taxonomy == b.taxonomy &&
-           a.error == b.error;
+           a.entry == b.entry && a.semantic == b.semantic && a.error == b.error;
 }
 
 }
@@ -176,14 +333,13 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
         if (record.width == 0 || record.height == 0) {
             throw Error("{} has a resolution of {} x {}", path, record.width, record.height);
         }
+        const SensorKind& kind = FindSensorKind(schema);
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
-            const Prim each = m_scene.ByIndex(var);
-            product.vars.push_back({.prim = var,
-                                    .path = each.Path(),
-                                    .source = each.Get(RenderVar::kSourceName),
-                                    .channels = each.Get(RenderVar::kChannels),
-                                    .frame = each.Get(RenderVar::kFrameOfReference)});
+            const ResolvedVar& added =
+                product.vars.emplace_back(ResolveVar(m_scene.ByIndex(var), product, kind));
+            product.semantic |= added.semantic;
         }
+        product.entry = SelectEntry(product, kind);
     } catch (const Error& error) {
         product.error = error.what();
     }

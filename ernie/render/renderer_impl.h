@@ -25,18 +25,6 @@
 
 namespace ernie {
 
-enum class RenderEntry : uint32_t {
-    MinimalData,
-    MinimalDisplayColor,
-    MinimalTextureDiffuse,
-    MinimalFull,
-    RealTime,
-    RealTimeBands,
-    Lidar,
-    Radar,
-};
-
-inline constexpr uint32_t kRenderEntryCount = 8;
 inline constexpr size_t kCachedPlans = 4;
 
 class RendererImpl {
@@ -46,30 +34,9 @@ class RendererImpl {
     RenderOutput Step(std::span<const std::string> products, double dt,
                       Stream stream = Stream::None());
 
-    struct ProductVar {
-        RenderVarSource source;
-        RenderVarOutput output;
-        device::DType type = device::DType::UInt8;
-        std::vector<int64_t> shape;
-        std::vector<std::string> channels;
-        bool world = false;
-    };
-
-    struct Product {
-        uint32_t prim = kNoPrim;
-        SchemaId sensor = SchemaId::Camera;
-        std::vector<uint32_t> sensors;
-        Uint2 resolution;
-        Token taxonomy;
-        float missDistance = 0;
-        uint32_t returns = 0;
-        float frameRate = 0;
-        float startTime = 0;
-        bool semantic = false;
+    struct Product : ResolvedProduct {
         uint32_t mapVersion = ~0u;
-        uint64_t version = 0;
-        RenderEntry entry = RenderEntry::MinimalData;
-        std::vector<ProductVar> vars;
+        std::vector<RenderVarOutput> outputs;
     };
 
     struct Launch {
@@ -123,12 +90,11 @@ class RendererImpl {
     void DropStaleProducts();
     StepPlan& PlanProducts(std::span<const std::string> products);
     Product& PrepareProduct(const std::string& path);
-    ProductVar PrepareVar(const ResolvedVar& var, const Product& product);
     void UpdateMaps();
 
     OutputSet& AcquireSet(StepPlan& plan);
     uint64_t AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
-                          const ProductVar& var, uint64_t next);
+                          const ResolvedVar& var, uint64_t next);
     device::Operation Trace(const OutputSet& set, const std::set<uint32_t>& due,
                             const Snapshot& snapshot);
     std::vector<OverlayContents> RecordOverlays(device::CommandEncoder& encoder,
