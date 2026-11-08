@@ -38,6 +38,11 @@ class MaterialTable : public Table {
     }
 
     void Prepare() override;
+
+    bool Pending() const override {
+        return m_nodeVersion != NodeVersion();
+    }
+
     void Run(const ChangeSet& changes, TableVersions& versions) override;
     void Describe(RenderTables& tables) const override;
 
@@ -121,6 +126,7 @@ class MaterialTable : public Table {
     std::vector<uint32_t> m_generations;
     mutable std::vector<ColumnRef> m_inputs;
     mutable uint32_t m_inputSchemas = 0;
+    uint64_t m_nodeVersion = NodeVersion();
     uint32_t m_wordCount = 0;
     uint32_t m_resolves = 0;
     DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();

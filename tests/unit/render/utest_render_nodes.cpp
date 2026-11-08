@@ -313,6 +313,56 @@ struct TestOrange {
     });
 }
 
+std::string HotNode(std::string_view color, std::string_view inputs) {
+    return std::format(R"(
+import ernie.material;
+
+struct TestHot {{
+    [Color] float3 tint = float3(0, 1, 0);
+{}
+    void Material(inout SurfaceInputs m, ShadeContext c) {{
+        m.baseColor = SpectralValue.Rgb({});
+        m.specularWeight = 0;
+    }}
+}}
+)",
+                       inputs, color);
+}
+
+TEST(MaterialNodeTest, ReloadedFilesChangeTheImageAndKeepInputValues) {
+    const std::filesystem::path file =
+        WriteFile("ernie_render_nodes_hot.slang", HotNode("tint", ""));
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, true);
+        LoadShaders(*scene, file);
+        EXPECT_EQ(LoadShaders(*scene, file), std::vector<std::string>{"TestHot"});
+        const Prim surface = Paint(*scene, "TestHot");
+        surface.Set("tint", Float3{1, 0, 0});
+        Renderer renderer(scene);
+        Float3 pixel = Center(renderer);
+        EXPECT_GT(pixel.x, 0.5f);
+        EXPECT_TRUE(ReloadShaders(*scene).empty());
+
+        WriteFile("ernie_render_nodes_hot.slang", HotNode("tint.zyx", ""));
+        EXPECT_EQ(ReloadShaders(*scene), std::vector<std::string>{"TestHot"});
+        pixel = Center(renderer);
+        EXPECT_GT(pixel.z, 0.5f);
+        EXPECT_LT(pixel.x, 0.1f);
+
+        WriteFile("ernie_render_nodes_hot.slang",
+                  HotNode("tint.zyx * gain", "    float gain = 0.5;\n"));
+        EXPECT_EQ(ReloadShaders(*scene), std::vector<std::string>{"TestHot"});
+        EXPECT_EQ(surface.Get<Float3>("tint"), (Float3{1, 0, 0}));
+        EXPECT_EQ(surface.Get<float>("gain"), 0.5f);
+        const Float3 half = Center(renderer);
+        EXPECT_NEAR(half.z, pixel.z * 0.5f, 0.05f);
+
+        WriteFile("ernie_render_nodes_hot.slang", "struct TestHot { void Material( }");
+        EXPECT_TRUE(ReloadShaders(*scene).empty());
+        EXPECT_NEAR(Center(renderer).z, half.z, 1e-3f);
+    });
+}
+
 TEST(MaterialNodeTest, FilesWithoutNodesOrWithBadInputsAreReported) {
     const std::filesystem::path empty = WriteFile("ernie_render_nodes_empty.slang", R"(
 import ernie.material;

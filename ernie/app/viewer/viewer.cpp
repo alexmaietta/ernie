@@ -16,6 +16,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <numbers>
 #include <optional>
 #include <set>
@@ -732,9 +733,12 @@ class ViewerImpl {
     void DrawCreateMenu();
     void DrawPanels();
     void TakeShortcuts();
+    void WatchShaders();
 
     Ref<device::Device> m_device;
     Ref<Scene> m_scene;
+    std::chrono::steady_clock::time_point m_nextShaderCheck;
+    std::map<std::filesystem::path, std::filesystem::file_time_type> m_shaderTimes;
     ViewerDesc m_desc;
     GLFWwindow* m_window = nullptr;
     bool m_glfw = false;
@@ -885,6 +889,31 @@ void ViewerImpl::Lead() {
     }
 }
 
+void ViewerImpl::WatchShaders() {
+    const auto now = std::chrono::steady_clock::now();
+    if (!m_scene || now < m_nextShaderCheck) {
+        return;
+    }
+    m_nextShaderCheck = now + std::chrono::milliseconds(500);
+    bool changed = false;
+    for (const std::filesystem::path& file : LoadedShaderFiles()) {
+        std::error_code error;
+        const std::filesystem::file_time_type written =
+            std::filesystem::last_write_time(file, error);
+        if (error) {
+            continue;
+        }
+        const auto [found, added] = m_shaderTimes.try_emplace(file, written);
+        if (!added && found->second != written) {
+            found->second = written;
+            changed = true;
+        }
+    }
+    if (changed) {
+        ReloadShaders(*m_scene);
+    }
+}
+
 void ViewerImpl::Frame() {
     ImGui::SetCurrentContext(imgui);
     profiler::BeginFrame();
@@ -897,6 +926,7 @@ void ViewerImpl::Frame() {
     for (const std::function<void()>& deferred : std::exchange(m_deferred, {})) {
         deferred();
     }
+    WatchShaders();
     Lead();
     for (const auto& viewport : m_viewports) {
         if (viewport->visible) {

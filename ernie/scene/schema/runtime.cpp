@@ -212,8 +212,7 @@ Span<const RuntimeInheritance> RuntimeInherited(SchemaId schema) {
 }
 
 SchemaId FindSchemaByName(std::string_view name) {
-    const uint32_t count = SchemaCount();
-    for (uint32_t index = 0; index < count; ++index) {
+    for (uint32_t index = SchemaCount(); index-- > 0;) {
         if (Info(SchemaId(index)).name == name) {
             return SchemaId(index);
         }
@@ -221,7 +220,7 @@ SchemaId FindSchemaByName(std::string_view name) {
     return SchemaId::None;
 }
 
-SchemaId RegisterSchema(const RuntimeSchemaDesc& desc) {
+SchemaId RegisterSchema(const RuntimeSchemaDesc& desc, bool replace) {
     Check(desc);
     Registry& registry = RuntimeRegistry();
     const std::lock_guard lock(registry.mutex);
@@ -229,7 +228,9 @@ SchemaId RegisterSchema(const RuntimeSchemaDesc& desc) {
         if (IsRuntime(existing) && Same(Lookup(existing).desc, desc)) {
             return existing;
         }
-        throw Error("A schema called {} already exists", desc.name);
+        if (!replace || !IsRuntime(existing)) {
+            throw Error("A schema called {} already exists", desc.name);
+        }
     }
     const uint32_t index = registry.count.load(std::memory_order_relaxed);
     if (index >= kMaxRuntimeSchemas) {

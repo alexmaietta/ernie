@@ -12,4 +12,8 @@ namespace ernie {
 
 ERNIE_API std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& file);
 
+ERNIE_API std::vector<std::string> ReloadShaders(Scene& scene);
+
+ERNIE_API std::vector<std::filesystem::path> LoadedShaderFiles();
+
 }

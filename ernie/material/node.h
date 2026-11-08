@@ -42,6 +42,8 @@ void RegisterNode(NodeDefinition node);
 
 std::shared_ptr<const NodeDefinition> FindNode(std::string_view name);
 
+uint64_t NodeVersion();
+
 uint32_t NodeInputBytes(NodeInputType type);
 
 }

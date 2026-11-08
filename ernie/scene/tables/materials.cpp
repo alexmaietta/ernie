@@ -716,7 +716,8 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     ERNIE_ZONE("Materials/Run");
     ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
-    if (Restructured(changes) || !m_records.Buffer()) {
+    if (Restructured(changes) || !m_records.Buffer() || m_nodeVersion != NodeVersion()) {
+        m_nodeVersion = NodeVersion();
         Resolve();
     }
     m_records.Upload(device);

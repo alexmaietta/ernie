@@ -54,6 +54,7 @@ using ShaderLoader =
     std::function<std::vector<std::string>(Scene& scene, const std::filesystem::path& file)>;
 
 ERNIE_API void SetShaderLoader(ShaderLoader loader);
+ERNIE_API uint32_t RetypePrims(Scene& scene, SchemaId from, SchemaId to);
 ERNIE_API ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc);
 ERNIE_API PrimRange Define(Scene& scene, Span<const std::string> paths, const Shader::Desc& desc,
                            const BatchDesc& batch = {});

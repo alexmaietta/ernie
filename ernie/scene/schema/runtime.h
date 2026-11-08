@@ -30,7 +30,7 @@ struct RuntimeSchemaDesc {
     std::vector<std::pair<std::string, RuntimeValue>> inherited;
 };
 
-ERNIE_API SchemaId RegisterSchema(const RuntimeSchemaDesc& desc);
+ERNIE_API SchemaId RegisterSchema(const RuntimeSchemaDesc& desc, bool replace = false);
 
 ERNIE_API SchemaId FindSchemaByName(std::string_view name);
 

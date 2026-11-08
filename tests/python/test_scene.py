@@ -199,3 +199,21 @@ def test_material_nodes_load_from_their_source_asset(scene, tmp_path):
     )
     assert asset["id"] == "PyAsset"
     assert asset["strength"] == 3.0
+
+
+def test_reloading_an_edited_shader_file_replaces_its_nodes(scene, tmp_path):
+    source = tmp_path / "hot.slang"
+    body = (
+        "import ernie.material;\n"
+        "struct PyHot {{\n"
+        "    float strength = {};\n"
+        "    void Material(inout SurfaceInputs m, ShadeContext c) {{}}\n"
+        "}}\n"
+    )
+    source.write_text(body.format(1))
+    assert scene.load_shaders(str(source)) == ["PyHot"]
+    assert scene.reload_shaders() == []
+    source.write_text(body.format(2))
+    assert scene.reload_shaders() == ["PyHot"]
+    hot = scene.define("/Hot", "Shader", {"id": "PyHot"})
+    assert hot["strength"] == 2.0

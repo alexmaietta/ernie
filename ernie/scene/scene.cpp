@@ -182,6 +182,42 @@ void SetShaderLoader(ShaderLoader loader) {
     Loader() = std::move(loader);
 }
 
+uint32_t RetypePrims(Scene& scene, SchemaId from, SchemaId to) {
+    SceneImpl& impl = SceneImpl::Get(scene);
+    Structure& structure = impl.GetStructure();
+    ColumnStore& store = structure.GetColumnStore();
+    const Prims& prims = structure.GetPrims();
+    const Span<const ColumnInfo> before = Columns(from);
+    const Span<const ColumnInfo> after = Columns(to);
+    uint32_t moved = 0;
+    for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
+        if (!prims.Alive(prim) || prims.Record(prim).schema != from) {
+            continue;
+        }
+        std::vector<std::pair<uint32_t, std::vector<std::byte>>> kept;
+        const uint32_t row = prims.Row(prim, from);
+        for (uint32_t column = 0; column < after.size(); ++column) {
+            for (uint32_t old = 0; old < before.size(); ++old) {
+                if (before[old].field == after[column].field &&
+                    before[old].type == after[column].type && !IsArray(before[old].type)) {
+                    kept.emplace_back(column, store.Schema(from).Read(old, row, 1));
+                }
+            }
+        }
+        structure.Retype(prim, to);
+        const uint32_t retyped = prims.Row(prim, to);
+        for (const auto& [column, cell] : kept) {
+            store.Stage({to, &after[column], column}, retyped, cell);
+        }
+        ++moved;
+    }
+    if (moved > 0) {
+        Log(LogLevel::Debug, "moved {} from the old {} to its new inputs", Counted(moved, "prim"),
+            Info(to).name);
+    }
+    return moved;
+}
+
 ShaderPrim Define(Scene& scene, std::string_view path, const Shader::Desc& desc) {
     const SchemaId schema = DefinedShader(scene, desc);
     Log(LogLevel::Debug, "{} is a {} shader", path, Info(schema).name);

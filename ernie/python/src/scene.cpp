@@ -554,6 +554,7 @@ void RegisterScene(nb::module_& module) {
             "load_shaders",
             [](Ref<Scene> scene, const std::string& path) { return LoadShaders(*scene, path); },
             nb::arg("path"))
+        .def("reload_shaders", [](Ref<Scene> scene) { return ReloadShaders(*scene); })
         .def("define", &Define, nb::arg("path"), nb::arg("schema"), nb::arg("values") = nb::none(),
              nb::kw_only(), nb::arg("apis") = nb::none())
         .def("define", &DefineBatch, nb::arg("paths"), nb::arg("schema"),

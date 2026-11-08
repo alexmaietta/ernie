@@ -330,7 +330,7 @@ constexpr uint32_t PrimSlot(SchemaId schema, uint64_t apis, SchemaId table) {
 }
 
 inline SchemaId ShaderSchema(std::string_view id) {
-    for (uint32_t index = 0; index < SchemaCount(); ++index) {
+    for (uint32_t index = SchemaCount(); index-- > 0;) {
         const SchemaId schema = SchemaId(index);
         if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
             IsA(schema, SchemaId::Shader)) {
