@@ -41,8 +41,8 @@ std::vector<uint32_t> Rows(Structure& structure, std::span<const uint32_t> prims
 
 class Counter : public Table {
   public:
-    explicit Counter(std::vector<ColumnRef> inputs, bool structural = true)
-        : m_inputs(std::move(inputs)), m_structural(structural) {}
+    explicit Counter(std::vector<ColumnRef> inputs, bool structural = true, bool rows = true)
+        : m_inputs(std::move(inputs)), m_structural(structural), m_rows(rows) {}
 
     std::string_view Name() const override {
         return "counter";
@@ -50,6 +50,10 @@ class Counter : public Table {
 
     std::span<const ColumnRef> Inputs() const override {
         return m_inputs;
+    }
+
+    std::span<const ColumnRef> RowInputs() const override {
+        return m_rows ? std::span<const ColumnRef>(m_inputs) : std::span<const ColumnRef>();
     }
 
     bool Structural() const override {
@@ -67,6 +71,7 @@ class Counter : public Table {
   private:
     std::vector<ColumnRef> m_inputs;
     bool m_structural;
+    bool m_rows;
 };
 
 template <class Test> void ForEachTimeline(Test test) {
@@ -209,6 +214,25 @@ TEST(PublisherTest, SystemsRunOnlyWhenTheirInputsChange) {
         EXPECT_EQ(transforms.runs, 3u);
         EXPECT_EQ(radii.runs, 2u);
         EXPECT_EQ(transforms.last.added.size(), 1u);
+    });
+}
+
+TEST(PublisherTest, TablesGetChangedRowsOnlyForTheColumnsTheyAskFor) {
+    ForEachTimeline([](device::Device& device, Structure& structure, Publisher& publisher) {
+        Counter rows({kXformableTranslate});
+        Counter runs({kXformableTranslate}, true, false);
+        publisher.Add(rows);
+        publisher.Add(runs);
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 4));
+        publisher.Publish(1);
+        View(structure, SchemaId::Sphere, block).Get<Double3>(kXformableTranslate).Set(Double3{});
+        const uint64_t submitted = device.GetQueue().Submitted();
+        publisher.Publish(2);
+        EXPECT_EQ(runs.runs, 2u);
+        EXPECT_EQ(runs.last.Rows(kXformableTranslate), nullptr);
+        ASSERT_NE(rows.last.Rows(kXformableTranslate), nullptr);
+        EXPECT_EQ(rows.last.Rows(kXformableTranslate)->ToHost().size(), 4u);
+        EXPECT_LE(device.GetQueue().Submitted() - submitted, 3u);
     });
 }
 

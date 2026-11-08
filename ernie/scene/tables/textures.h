@@ -49,6 +49,10 @@ class TextureTable : public Table {
         return m_inputs;
     }
 
+    std::span<const ColumnRef> RowInputs() const override {
+        return m_inputs;
+    }
+
     std::span<const TableId> TableOutputs() const override {
         static constexpr TableId kTables[] = {TableId::Textures};
         return kTables;

@@ -58,6 +58,7 @@ struct Setup {
     Ref<Scene> scene;
     uint32_t worlds = 1;
     Attribute<Double3> translate;
+    Attribute<Double3> tenth;
     Attribute<Float3> colors;
     ArrayAttribute<Float3> points;
     Ref<device::Buffer> poseFrames;
@@ -110,7 +111,16 @@ Setup Prepare(uint32_t worlds, bool dome) {
             moved.push_back(std::format("/env_{}/Prop_{}", w, i));
         }
     }
-    Setup setup{scene, worlds, scene->Select(moved).Get<Double3>("translate"),
+    std::vector<std::string> some;
+    for (uint32_t w = 0; w < worlds; w += 10) {
+        for (uint32_t i = 0; i < kProps; ++i) {
+            some.push_back(std::format("/env_{}/Prop_{}", w, i));
+        }
+    }
+    Setup setup{scene,
+                worlds,
+                scene->Select(moved).Get<Double3>("translate"),
+                scene->Select(some).Get<Double3>("translate"),
                 scene->Select(moved).Get<Float3>("displayColor"),
                 scene->Select(sheets).GetArray<Float3>("points")};
     for (uint32_t w = 0; w < worlds; ++w) {
@@ -172,6 +182,19 @@ const Edit kEdits[] = {
          s.translate.Set(poses);
      }},
     {"poses-device", [](Setup& s) { Upload(s, s.translate, s.poseFrames, s.poseBytes); }},
+    {"pose-one",
+     [](Setup& s) {
+         s.scene->Find("/env_0/Prop_0")
+             ->Set(Xformable::kTranslate, Double3{0.01 * double(s.step % 7), 0, 0});
+     }},
+    {"poses-tenth",
+     [](Setup& s) {
+         std::vector<Double3> poses(size_t(s.tenth.Size()));
+         for (size_t p = 0; p < poses.size(); ++p) {
+             poses[p] = {double(p % 4) + 0.01 * double(s.step % 7), double(p / 4 % 4), 0};
+         }
+         s.tenth.Set(poses);
+     }},
     {"points-device", [](Setup& s) { Upload(s, s.points, s.pointFrames, s.pointBytes); }},
     {"colors",
      [](Setup& s) {

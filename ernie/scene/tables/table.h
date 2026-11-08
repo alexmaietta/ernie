@@ -24,6 +24,10 @@ class Table {
     virtual std::string_view Name() const = 0;
     virtual std::span<const ColumnRef> Inputs() const = 0;
 
+    virtual std::span<const ColumnRef> RowInputs() const {
+        return {};
+    }
+
     virtual std::span<const TableId> TableInputs() const {
         return {};
     }

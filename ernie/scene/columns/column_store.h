@@ -167,6 +167,18 @@ class ColumnStore {
     }
 
     template <class Params>
+    void Record(device::CommandEncoder& encoder, const char* entry, const Params& params,
+                uint64_t threads) {
+        if (threads == 0) {
+            return;
+        }
+        const device::ZoneScope zone(encoder,
+                                     profiler::ZoneId::Named(std::string("ColumnStore/") + entry));
+        encoder.Dispatch(Kernels().Entry(entry), params,
+                         {.x = device::GroupCount(threads, kCellsGroup)});
+    }
+
+    template <class Params>
     device::Operation Dispatch(const char* entry, const Params& params, uint64_t threads) {
         device::Queue& queue = m_device.GetQueue();
         if (threads == 0) {

@@ -72,7 +72,7 @@ class Publisher {
     Ordinal SealedStamp(Ordinal ordinal) const;
     Ordinal SealedOrdinal(Ordinal stamp, Ordinal sealing) const;
     ChangeSet Build(Ordinal since, Ordinal until, Ordinal sealing,
-                    std::span<const ColumnRef> columns,
+                    std::span<const ColumnRef> columns, std::span<const ColumnRef> rows,
                     std::vector<Ref<device::Buffer>>* reused = nullptr);
     void RunTables(Ordinal stamp, Ordinal ordinal);
     void Seal();

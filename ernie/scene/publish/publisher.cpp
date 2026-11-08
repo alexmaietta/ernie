@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
@@ -56,7 +57,7 @@ Ordinal Publisher::SealedOrdinal(Ordinal stamp, Ordinal sealing) const {
 }
 
 ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
-                           std::span<const ColumnRef> columns,
+                           std::span<const ColumnRef> columns, std::span<const ColumnRef> rows,
                            std::vector<Ref<device::Buffer>>* reused) {
     ColumnStore& store = m_structure.GetColumnStore();
     ChangeSet changes;
@@ -86,22 +87,25 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
         }
     }
 
-    device::Queue& queue = store.GetDevice().GetQueue();
-    if (reused != nullptr) {
-        reused->resize(columns.size());
-    }
-    for (size_t i = 0; i < columns.size(); ++i) {
-        const ColumnRef column = columns[i];
+    for (const ColumnRef column : columns) {
         if (IsArray(column.column->type)) {
             changes.arrays.emplace_back(column, store.ArrayRows(column, since, until));
         }
+    }
+    if (reused != nullptr) {
+        reused->resize(rows.size());
+    }
+    device::Queue& queue = store.GetDevice().GetQueue();
+    std::optional<device::CommandEncoder> encoder;
+    for (size_t i = 0; i < rows.size(); ++i) {
+        const ColumnRef column = rows[i];
         if (!store.Tracked(column)) {
             continue;
         }
         const ColumnTable& table = store.Schema(column.schema);
-        const uint32_t rows = table.Rows();
+        const uint32_t count = table.Rows();
         const uint64_t bytes =
-            (uint64_t(kChangedRowsOffset) + std::max(rows, 1u)) * sizeof(uint32_t);
+            (uint64_t(kChangedRowsOffset) + std::max(count, 1u)) * sizeof(uint32_t);
         Ref<device::Buffer> buffer = reused != nullptr ? (*reused)[i] : nullptr;
         if (!buffer || buffer->Bytes() < bytes) {
             buffer = store.GetDevice().CreateBuffer({.bytes = bytes, .label = "changed rows"});
@@ -109,20 +113,23 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
                 (*reused)[i] = buffer;
             }
         }
-        device::CommandEncoder encoder = queue.CreateEncoder();
-        encoder.Fill(buffer->Slice(0, kChangedRowsOffset * sizeof(uint32_t)));
-        queue.Submit(encoder.Finish());
-        if (rows > 0) {
-            CompactParams params{};
-            params.stamps.address = table.Pages(store.StampColumn(column));
-            params.tablePrims.address = table.Pages(store.PrimsColumn(column.schema));
-            params.out.address = buffer->Address();
-            params.since = since;
-            params.until = until;
-            params.rows = rows;
-            store.Dispatch("CompactChanged", params, rows);
+        if (!encoder) {
+            encoder.emplace(queue.CreateEncoder());
         }
-        changes.columns.emplace_back(column, buffer, rows);
+        encoder->Fill(buffer->Slice(0, kChangedRowsOffset * sizeof(uint32_t)));
+        encoder->Barrier();
+        CompactParams params{};
+        params.stamps.address = table.Pages(store.StampColumn(column));
+        params.tablePrims.address = table.Pages(store.PrimsColumn(column.schema));
+        params.out.address = buffer->Address();
+        params.since = since;
+        params.until = until;
+        params.rows = count;
+        store.Record(*encoder, "CompactChanged", params, count);
+        changes.columns.emplace_back(column, buffer, count);
+    }
+    if (encoder) {
+        queue.Submit(encoder->Finish());
     }
     return changes;
 }
@@ -143,7 +150,7 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         }
         ERNIE_ZONE("Publisher/Table");
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
-                                  table.Inputs(), &scheduled.changed);
+                                  table.Inputs(), table.RowInputs(), &scheduled.changed);
         for (const TableId id : table.TableInputs()) {
             if (m_versions.Version(id) > scheduled.logged) {
                 changes.wrote.push_back(id);
@@ -215,7 +222,7 @@ ChangeSet Publisher::Changes(Ordinal since, std::span<const ColumnRef> columns) 
         throw Error("Changes since {}, but only {} is published", since, Published());
     }
     const Ordinal until = m_sealed.empty() ? 0 : m_sealed.back().stamp;
-    return Build(SealedStamp(since), until, Published(), columns);
+    return Build(SealedStamp(since), until, Published(), columns, columns);
 }
 
 void Publisher::Seal() {
