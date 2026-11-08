@@ -17,9 +17,13 @@ namespace ernie {
 
 namespace {
 
-constexpr ColumnRef kInputs[] = {kGprimPrimvars,         kGprimDisplayColor,
-                                 kPointBasedNormals,     kPointBasedNormalsInterpolation,
-                                 kMeshSubdivisionScheme, kPointInstancerPrimvars,
+constexpr ColumnRef kInputs[] = {kGprimPrimvars,
+                                 kGprimDisplayColor,
+                                 kGprimDisplayOpacity,
+                                 kPointBasedNormals,
+                                 kPointBasedNormalsInterpolation,
+                                 kMeshSubdivisionScheme,
+                                 kPointInstancerPrimvars,
                                  kPointInstancerIds};
 
 }

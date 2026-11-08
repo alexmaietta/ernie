@@ -20,7 +20,7 @@ struct SurfaceRecord {
     ArrayRef primvars;
     ArrayRef instancerPrimvars;
     Float3 displayColor;
-    uint padding1;
+    float displayOpacity;
     int64_t instanceId;
 };
 
@@ -149,9 +149,11 @@ struct InstanceLayout {
     Ptr<Float3> offsets;
     uint worldCount;
     uint displayColorName;
+    uint displayOpacityName;
+    uint padding;
 };
 
-ERNIE_CHECK_SIZE(InstanceLayout, 128);
+ERNIE_CHECK_SIZE(InstanceLayout, 136);
 
 #ifdef __SLANG__
 

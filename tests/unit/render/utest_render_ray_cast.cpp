@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/queue.h"
+#include "ernie/scene/primvar.h"
 #include "ernie/scene/records/points.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"
@@ -393,6 +394,55 @@ TEST(RayCastTest, PointsWithNormalsAreDisksFacingThem) {
         distance = cast().distance.ToHost<float>();
         EXPECT_NEAR(distance[0], 2.5, 1e-4);
         EXPECT_NEAR(distance[5], 4.5, 1e-4);
+    });
+}
+
+TEST(RayCastTest, TranslucentPointsBlockRaysInProportionToTheirOpacity) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kRays = 4096;
+        for (const device::Traversal traversal :
+             {device::Traversal::Auto, device::Traversal::Software}) {
+            SCOPED_TRACE(int(traversal));
+            const Ref<Scene> scene = Scene::Create(device, {.traversal = traversal});
+            const Prim veil = scene->Define<Points>(
+                "/Veil", {.displayOpacity = 0, .points = {{3, 0, 0}, {3, 10, 0}}, .widths = {2}});
+            scene->Define<Points>("/Wall", {.points = {{6, 0, 0}, {6, 10, 0}}, .widths = {2}});
+            std::vector<float> origins;
+            std::vector<float> directions;
+            for (uint32_t i = 0; i < kRays; ++i) {
+                const float y = 0.4f * (float(i % 64) / 63 - 0.5f);
+                const float z = 0.4f * (float(i / 64) / 63 - 0.5f);
+                origins.insert(origins.end(), {0, y + (i % 2 == 0 ? 0.0f : 10.0f), z});
+                directions.insert(directions.end(), {1, 0, 0});
+            }
+            RayCaster caster(scene);
+            Rays rays;
+            rays.origins = Floats(device, origins, 3);
+            rays.directions = Floats(device, directions, 3);
+            const auto blocked = [&] {
+                const std::vector<float> distance = caster.Cast(rays).distance.ToHost<float>();
+                std::pair<uint32_t, uint32_t> counts{0, 0};
+                for (uint32_t i = 0; i < kRays; ++i) {
+                    EXPECT_LT(distance[i], 6) << i;
+                    (i % 2 == 0 ? counts.first : counts.second) += distance[i] < 4;
+                }
+                return counts;
+            };
+            EXPECT_EQ(blocked(), (std::pair<uint32_t, uint32_t>{0, 0}));
+
+            veil.Set(Points::kDisplayOpacity, 1.0f);
+            EXPECT_EQ(blocked(), (std::pair<uint32_t, uint32_t>{kRays / 2, kRays / 2}));
+
+            veil.Set(Points::kDisplayOpacity, 0.5f);
+            const auto [near, far] = blocked();
+            EXPECT_NEAR(double(near) / (kRays / 2), 0.5, 0.06);
+            EXPECT_NEAR(double(far) / (kRays / 2), 0.5, 0.06);
+
+            veil.Set(Points::kPrimvars,
+                     std::vector<Primvar>{Primvar::Create("displayOpacity", Interpolation::Vertex,
+                                                          std::vector<float>{0, 1})});
+            EXPECT_EQ(blocked(), (std::pair<uint32_t, uint32_t>{0, kRays / 2}));
+        }
     });
 }
 

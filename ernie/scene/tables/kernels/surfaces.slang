@@ -18,6 +18,7 @@ SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
         const uint gprimRow = PrimRow(scene, prim, kSlotGprim);
         surface.primvars = scene->schemas.gprim.primvars[gprimRow];
         surface.displayColor = scene->schemas.gprim.displayColor[gprimRow];
+        surface.displayOpacity = scene->schemas.gprim.displayOpacity[gprimRow];
     }
     if (schema == SchemaId::Mesh) {
         const uint meshRow = PrimRow(scene, prim, kSlotMesh);

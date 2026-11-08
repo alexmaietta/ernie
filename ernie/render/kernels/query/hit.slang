@@ -98,6 +98,8 @@ struct HitQuery {
         ShapeIntersector intersector;
         intersector.shapes = layout->shapes;
         intersector.points = tables->points;
+        intersector.surfaces = tables->surfaces;
+        intersector.opacityName = layout->displayOpacityName;
         intersector.first = layout->firstInstances[tlas];
         return intersector;
     }

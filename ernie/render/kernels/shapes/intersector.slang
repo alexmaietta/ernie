@@ -9,6 +9,8 @@ __exported import ernie.render.kernels.shapes.plane;
 __exported import ernie.render.kernels.shapes.sphere;
 __exported import ernie.render.kernels.trace.ray;
 import ernie.device.kernels.device;
+import ernie.render.kernels.random;
+import ernie.render.kernels.surface.primvars;
 
 using namespace ernie;
 
@@ -100,16 +102,42 @@ float ShapeDistance(ShapeRecord record, Ptr<PointsRecord> points, uint primitive
     return hit.inside ? hit.t : kInfinity;
 }
 
+bool PointBlocks(SurfaceRecord surface, uint opacityName, uint point, Ray ray) {
+    float opacity = surface.displayOpacity;
+    float4 authored;
+    if (ReadPrimvar(FindPrimvarIn(surface.primvars, opacityName), SurfaceElement.Point(point),
+                    authored)) {
+        opacity = authored.x;
+    }
+    if (opacity >= 1) {
+        return true;
+    }
+    uint seed = Hash(point);
+    for (uint axis = 0; axis < 3; ++axis) {
+        seed = Hash(seed ^ asuint(ray.origin[axis]));
+        seed = Hash(seed ^ asuint(ray.direction[axis]));
+    }
+    return float(seed >> 8) * (1.0f / 16777216.0f) < opacity;
+}
+
 struct ShapeIntersector : IIntersector {
     Ptr<ShapeRecord> shapes;
     Ptr<PointsRecord> points;
+    Ptr<SurfaceRecord> surfaces;
     uint first;
+    uint opacityName;
 
     bool Intersect(Ray ray, uint instance, uint geometry, uint primitive, inout float t,
                    out float2 attributes) {
         attributes = float2(0);
-        const float distance = ShapeDistance(shapes[first + instance], points, primitive, ray);
+        const uint slot = first + instance;
+        const ShapeRecord shape = shapes[slot];
+        const float distance = ShapeDistance(shape, points, primitive, ray);
         if (distance >= t) {
+            return false;
+        }
+        if (ShapeKind(shape.kind) == ShapeKind::Points &&
+            !PointBlocks(surfaces[slot], opacityName, primitive, ray)) {
             return false;
         }
         t = distance;
