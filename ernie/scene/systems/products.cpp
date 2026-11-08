@@ -2,7 +2,6 @@
 #include "ernie/scene/systems/products.h"
 
 #include <algorithm>
-#include <cstring>
 #include <optional>
 
 #include "ernie/scene/access/view.h"
@@ -22,7 +21,8 @@ std::vector<ColumnRef> ProductInputs() {
                                      kLidarMaxReturns, kRadarRays};
     for (const SchemaId schema :
          {SchemaId::RenderProduct, SchemaId::RenderVar, SchemaId::MinimalAPI,
-          SchemaId::BackgroundAPI, SchemaId::RealTimeAPI, SchemaId::SensorAPI}) {
+          SchemaId::BackgroundAPI, SchemaId::RealTimeAPI, SchemaId::SensorAPI,
+          SchemaId::ColorBackground, SchemaId::GradientBackground}) {
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t index = 0; index < columns.size(); ++index) {
             inputs.push_back({schema, &columns[index], index});
@@ -58,8 +58,13 @@ Shape SensorShape(const Prim& sensor, Uint2 resolution) {
     return {resolution};
 }
 
-bool SameProduct(const ResolvedProduct& a, const ResolvedProduct& b) {
-    return std::memcmp(&a.record, &b.record, sizeof(ProductRecord)) == 0 &&
+bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
+    const ProductRecord& x = a.record;
+    const ProductRecord& y = b.record;
+    return x.sensorSchema == y.sensorSchema && x.width == y.width && x.height == y.height &&
+           x.returns == y.returns && x.frameRate == y.frameRate && x.startTime == y.startTime &&
+           x.missDistance == y.missDistance && x.renderMode == y.renderMode &&
+           x.minimalMode == y.minimalMode && x.spectralMode == y.spectralMode &&
            a.sensors == b.sensors && a.vars == b.vars && a.taxonomy == b.taxonomy &&
            a.error == b.error;
 }
@@ -113,6 +118,17 @@ ResolvedProduct Products::Resolve(uint32_t index) const {
     const std::vector<uint32_t> backgrounds =
         view.GetArray<uint32_t>(kBackgroundAPIBackground).Get(0);
     record.background = backgrounds.empty() ? kNoPrim : backgrounds.front();
+    record.backgroundKind = uint32_t(SchemaId::None);
+    if (record.background != kNoPrim && prims.Alive(record.background)) {
+        const Prim background = m_scene.At(record.background);
+        record.backgroundKind = uint32_t(prims.At(record.background).schema);
+        if (background.IsA<ColorBackground>()) {
+            record.backgroundLow = background.Get(ColorBackground::kColor);
+        } else if (background.IsA<GradientBackground>()) {
+            record.backgroundLow = background.Get(GradientBackground::kHorizonColor);
+            record.backgroundHigh = background.Get(GradientBackground::kZenithColor);
+        }
+    }
     record.renderMode = uint32_t(prim.Get(RenderProduct::kRenderMode));
     record.minimalMode = uint32_t(prim.Get(MinimalAPI::kMode));
     record.spectralMode = uint32_t(prim.Get(RenderProduct::kSpectralMode));
@@ -180,7 +196,7 @@ void Products::Run(const ChangeSet&, TableLog&) {
         }
         ResolvedProduct product = Resolve(prim);
         const auto previous = m_products.find(prim);
-        product.version = previous != m_products.end() && SameProduct(previous->second, product)
+        product.version = previous != m_products.end() && SamePlan(previous->second, product)
                               ? previous->second.version
                               : ++m_versions;
         m_records.Set(prims.Row(prim, SchemaId::RenderProduct), product.record);

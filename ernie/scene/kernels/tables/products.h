@@ -27,11 +27,15 @@ struct ProductRecord {
     Float3 ambient;
     uint background;
     Float3 ground;
-    uint padding0;
+    uint backgroundKind;
     Float3 backgroundColor;
+    uint padding0;
+    Float3 backgroundLow;
     uint padding1;
+    Float3 backgroundHigh;
+    uint padding2;
 };
 
-ERNIE_CHECK_SIZE(ProductRecord, 144);
+ERNIE_CHECK_SIZE(ProductRecord, 176);
 
 }

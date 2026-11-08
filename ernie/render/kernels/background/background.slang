@@ -6,31 +6,24 @@ __exported import ernie.render.kernels.background.gradient;
 using namespace ernie;
 
 struct Background {
-    SceneData* scene;
-    uint prim;
+    ProductRecord* product;
     SchemaId kind;
     float3 fallback;
 
-    static Background Load(SceneData* scene, RenderTables* tables, uint product) {
-        ProductRecord* record = &tables->products[PrimRow(tables, product, kSlotRenderProduct)];
+    static Background Load(RenderTables* tables, uint product) {
         Background background;
-        background.scene = scene;
-        background.prim = kNoPrim;
-        background.kind = SchemaId::None;
-        background.fallback = record.backgroundColor.Vector();
-        if (PrimAlive(tables, record.background)) {
-            background.prim = record.background;
-            background.kind = PrimSchema(tables, record.background);
-        }
+        background.product = &tables->products[PrimRow(tables, product, kSlotRenderProduct)];
+        background.kind = SchemaId(background.product.backgroundKind);
+        background.fallback = background.product.backgroundColor.Vector();
         return background;
     }
 
     float3 Radiance(float3 direction) {
         switch (kind) {
         case SchemaId::GradientBackground:
-            return GradientBackground.Load(scene, prim).Radiance(direction);
+            return GradientBackground.Load(product).Radiance(direction);
         case SchemaId::ColorBackground:
-            return ColorBackground.Load(scene, prim).Radiance(direction);
+            return ColorBackground.Load(product).Radiance(direction);
         default:
             return fallback;
         }

@@ -5,7 +5,7 @@ __exported import ernie.scene.kernels.scene;
 using namespace ernie;
 
 interface IBackground {
-    static This Load(SceneData* scene, uint prim);
+    static This Load(ProductRecord* product);
 
     float3 Radiance(float3 direction);
 }

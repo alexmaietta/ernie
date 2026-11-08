@@ -146,5 +146,22 @@ TEST(MaterialsTest, ShadowLinksLetExcludedBlockersPassLight) {
     });
 }
 
+TEST(MaterialsTest, BackgroundsFollowTheirPrimAndItsEdits) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = LookingDown(device, MinimalMode::DisplayColor);
+        const Prim fill = scene->Define<ColorBackground>("/Fill", {.color = {0, 1, 0}});
+        scene->Find("/Render/View")
+            ->Set(BackgroundAPI::kBackground, std::vector<std::string>{"/Fill"});
+        Renderer renderer(scene);
+        Float3 pixel = Colors(renderer)[0];
+        EXPECT_GT(pixel.y, 0.5f);
+        EXPECT_LT(pixel.x, 0.1f);
+        fill.Set(ColorBackground::kColor, Float3{1, 0, 0});
+        pixel = Colors(renderer)[0];
+        EXPECT_GT(pixel.x, 0.5f);
+        EXPECT_LT(pixel.y, 0.1f);
+    });
+}
+
 }
 }

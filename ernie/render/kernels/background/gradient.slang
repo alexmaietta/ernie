@@ -13,10 +13,8 @@ struct GradientBackground : IBackground {
         this.zenith = zenith;
     }
 
-    static GradientBackground Load(SceneData* scene, uint prim) {
-        GradientBackgroundData* data = &scene->schemas.gradientBackground;
-        const uint row = PrimRow(scene, prim, kSlotGradientBackground);
-        return GradientBackground(data.horizonColor[row].Vector(), data.zenithColor[row].Vector());
+    static GradientBackground Load(ProductRecord* product) {
+        return GradientBackground(product.backgroundLow.Vector(), product.backgroundHigh.Vector());
     }
 
     float3 Radiance(float3 direction) {

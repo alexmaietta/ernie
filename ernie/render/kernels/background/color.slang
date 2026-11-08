@@ -11,9 +11,8 @@ struct ColorBackground : IBackground {
         this.color = color;
     }
 
-    static ColorBackground Load(SceneData* scene, uint prim) {
-        const uint row = PrimRow(scene, prim, kSlotColorBackground);
-        return ColorBackground(scene->schemas.colorBackground.color[row].Vector());
+    static ColorBackground Load(ProductRecord* product) {
+        return ColorBackground(product.backgroundLow.Vector());
     }
 
     float3 Radiance(float3 direction) {

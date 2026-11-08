@@ -21,7 +21,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
     static CameraResponse<I> Load(SensorContext context, CameraModel camera) {
         CameraResponse<I> response;
         response.integrator = I.Load(context);
-        response.background = Background.Load(context.query.scene, context.query.tables, context.capture->product);
+        response.background = Background.Load(context.query.tables, context.capture->product);
         response.exposure = camera.exposure;
         response.first = SurfacePoint.Miss();
         response.albedo = float3(0);

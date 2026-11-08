@@ -56,6 +56,17 @@ TEST(ProductsTest, EditsOutsideAProductKeepItsOutputs) {
     });
 }
 
+TEST(ProductsTest, KernelSettingsChangeWithoutPreparingTheProductAgain) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = OneCamera(device);
+        Renderer renderer(scene);
+        const uint64_t first = Step(renderer).address;
+        scene->Find("/Render/View")->Set(RealTimeAPI::kMaxBounces, 3);
+        scene->Find("/Render/View")->Set(BackgroundAPI::kBackgroundColor, Float3{1, 0, 0});
+        EXPECT_EQ(Step(renderer).address, first);
+    });
+}
+
 TEST(ProductsTest, EditingAProductOrItsSensorPreparesItAgain) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = OneCamera(device);
