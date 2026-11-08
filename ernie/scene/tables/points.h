@@ -21,13 +21,14 @@ namespace ernie {
 struct PointsStats {
     uint32_t clouds = 0;
     uint32_t built = 0;
+    uint32_t refit = 0;
     uint32_t points = 0;
 };
 
 class PointsTable : public Table {
   public:
-    PointsTable(Structure& structure, bvh::Builder& builder)
-        : m_structure(structure), m_builder(builder) {}
+    PointsTable(Structure& structure, bvh::Builder& builder, uint32_t maxRefits = 16)
+        : m_structure(structure), m_builder(builder), m_maxRefits(maxRefits) {}
 
     std::string_view Name() const override {
         return "points";
@@ -55,10 +56,12 @@ class PointsTable : public Table {
         uint32_t pointBasedRow = kNoRow;
         uint32_t row = kNoRow;
         uint32_t capacity = 0;
+        uint32_t refits = 0;
         Ref<bvh::Blas> blas;
         Ref<device::Buffer> boxes;
         ArrayRef bounds{};
-        bool build = false;
+        bool update = false;
+        bool fresh = false;
     };
 
     void Place(uint32_t prim);
@@ -69,6 +72,7 @@ class PointsTable : public Table {
 
     Structure& m_structure;
     bvh::Builder& m_builder;
+    uint32_t m_maxRefits;
     Ref<device::Program> m_program;
     std::unordered_map<uint32_t, Cloud> m_clouds;
     std::unordered_map<uint32_t, uint32_t> m_byPointBasedRow;

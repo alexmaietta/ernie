@@ -74,7 +74,7 @@ So a moving cloud is bound by the BLAS rebuild, many small clouds are bound by p
 
 ### 4. Efficiency
 
-- A refit or rebuild policy per Points prim, refitting up to a limit and then rebuilding as the instance table's `maxRefits` does, chosen from the moving benchmark, since the rebuild is almost all of a moving step.
+- A refit or rebuild policy per Points prim (done). Moved points refit their BLAS and rebuild after `SceneDesc::maxRefits` refits, and a count change rebuilds. On hardware traversal a moving step drops from 6.1 to 1.3 ms at 1M points, 86 to 19 ms at 16M, and 77 to 30 ms for 4096 worlds of 1k, and on software traversal from 1.6 to 0.4 ms at 1k.
 - Per-cloud CPU work in `PointsTable::Run` and `Build` that scales to thousands of worlds, and batched BLAS builds for many small clouds.
 - A lower fixed cost for small software BLAS builds.
 - Capacity that grows geometrically, with inactive boxes for dead slots, so spawning and killing particles doesn't reallocate the BLAS.

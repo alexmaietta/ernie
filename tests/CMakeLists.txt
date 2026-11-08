@@ -111,6 +111,7 @@ ernie_test(
         unit/scene/utest_scene_bounds.cpp
         unit/scene/utest_scene_structure.cpp
         unit/scene/utest_scene_meshes.cpp
+        unit/scene/utest_scene_points.cpp
         unit/scene/utest_scene_transforms.cpp
         unit/scene/utest_scene_instancers.cpp
         unit/scene/utest_scene_instances.cpp

@@ -70,14 +70,15 @@ void PointsTable::Link(Cloud& cloud) {
             cloud.boxes = device.CreateBuffer({.bytes = uint64_t(points.count) * sizeof(BvhBox),
                                                .usage = device::BufferUsage::AccelBuildInput,
                                                .label = "point boxes"});
-            cloud.blas = m_builder.CreateBlas(
-                device::AccelBoxes{.boxes = cloud.boxes->Slice(0), .count = points.count});
+            cloud.blas = m_builder.CreateBlas(device::AccelBoxes{
+                .boxes = cloud.boxes->Slice(0), .count = points.count, .refittable = true});
         }
+        cloud.fresh = true;
     }
     if (cloud.bounds.count == 0) {
         cloud.bounds = store.Arrays(ColumnType::Float3Array).Allocate(2);
     }
-    cloud.build = points.count > 0;
+    cloud.update = points.count > 0;
     PointsRecord record{};
     if (cloud.blas) {
         record.blas = cloud.blas->Handle();
@@ -128,7 +129,7 @@ void PointsTable::Run(const ChangeSet& changes, TableVersions& versions) {
                 const auto owner = owners.find(row);
                 if (owner != owners.end()) {
                     Cloud& cloud = m_clouds.at(owner->second);
-                    if (!cloud.build) {
+                    if (!cloud.update) {
                         Link(cloud);
                     }
                 }
@@ -155,20 +156,28 @@ void PointsTable::Run(const ChangeSet& changes, TableVersions& versions) {
 void PointsTable::Build(std::vector<uint32_t>& updated) {
     std::vector<PointsJob> jobs;
     std::vector<Ref<bvh::Blas>> built;
+    std::vector<Ref<bvh::Blas>> refit;
     uint32_t total = 0;
     const Prims& prims = m_structure.GetPrims();
     for (auto& [prim, cloud] : m_clouds) {
-        if (!cloud.build) {
+        if (!cloud.update) {
             continue;
         }
-        cloud.build = false;
+        cloud.update = false;
+        if (cloud.fresh || cloud.refits >= m_maxRefits) {
+            cloud.fresh = false;
+            cloud.refits = 0;
+            built.push_back(cloud.blas);
+        } else {
+            ++cloud.refits;
+            refit.push_back(cloud.blas);
+        }
         PointsJob job{};
         job.record = m_records.Row(cloud.row);
         job.boxes.address = cloud.boxes->Address();
         job.bounds.address = cloud.bounds.address;
         job.first = total;
         jobs.push_back(job);
-        built.push_back(cloud.blas);
         total += cloud.capacity;
         if (prims.Alive(prim)) {
             updated.push_back(prims.Record(prim).world);
@@ -176,6 +185,7 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     }
     m_stats.clouds = uint32_t(m_clouds.size());
     m_stats.built = uint32_t(built.size());
+    m_stats.refit = uint32_t(refit.size());
     m_stats.points = total;
     if (jobs.empty()) {
         return;
@@ -207,6 +217,7 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     encoder.EndZone();
     encoder.BeginZone(blasZone);
     m_builder.Build(encoder, built);
+    m_builder.Refit(encoder, refit);
     encoder.EndZone();
     queue.Submit(encoder.Finish());
 }
