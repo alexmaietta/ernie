@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -176,6 +177,35 @@ TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
         EXPECT_EQ(ids(), (std::pair<int64_t, int64_t>{7, 9}));
         inst.Set(PointInstancer::kIds, std::vector<int64_t>{3, 4});
         EXPECT_EQ(ids(), (std::pair<int64_t, int64_t>{3, 4}));
+    });
+}
+
+TEST(SurfaceTest, InstanceIdsReportEachPointsIdOrIndex) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 20});
+        const Prim cloud = scene->Define<Points>(
+            "/Cloud", {.points = {{-1.5, 0, 0}, {1.5, 0, 0}}, .widths = {1.5f}, .ids = {7, 9}});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::InstanceId});
+        scene->Define<RenderProduct>(
+            "/Render/View",
+            {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
+        Renderer renderer(scene);
+        const auto ids = [&] {
+            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            output.Wait();
+            const std::vector<int64_t> values =
+                output["/Render/View"].frames.at(0).Source("InstanceId").tensor.ToHost<int64_t>();
+            const uint32_t row = kSide / 2;
+            return std::tuple{values[row * kSide], values[row * kSide + kSide / 2],
+                              values[row * kSide + kSide - 1]};
+        };
+        EXPECT_EQ(ids(), (std::tuple<int64_t, int64_t, int64_t>{7, -1, 9}));
+        cloud.Set(Points::kIds, std::vector<int64_t>{});
+        EXPECT_EQ(ids(), (std::tuple<int64_t, int64_t, int64_t>{0, -1, 1}));
     });
 }
 

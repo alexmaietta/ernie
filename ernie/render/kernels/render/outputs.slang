@@ -2,6 +2,7 @@
 
 __exported import ernie.render.kernels.render.context;
 import ernie.device.kernels.device;
+import ernie.render.kernels.surface.point;
 import ernie.io.kernels.encoding;
 
 using namespace ernie;
@@ -72,14 +73,26 @@ void WriteSegmentation(RenderParams params, CapturePixel pixel, uint prim) {
     Write(pixel, RenderVarSource::StableIdSegmentation, StableWords(semantics.stableIds[prim]));
 }
 
-void WriteInstance(RenderParams params, CapturePixel pixel, uint slot, bool hit) {
+void WriteInstance(RenderParams params, CapturePixel pixel, SurfacePoint point, bool hit) {
     if (!Wants(pixel, RenderVarSource::InstanceId) &&
         !Wants(pixel, RenderVarSource::InstancerStableId)) {
         return;
     }
+    const uint slot = point.slot;
     SlotHit drawn = Drawn(kNoPrim, kNoPrim, 0, 0);
     if (hit) {
         drawn = params.tables->instances->hits[slot];
+        const ShapeRecord shape = params.tables->instances->shapes[slot];
+        if (ShapeKind(shape.kind) == ShapeKind::Points) {
+            const PointsRecord cloud = params.tables->points[shape.row];
+            const uint index = point.element.face;
+            Write(pixel, RenderVarSource::InstanceId,
+                  cloud.idCount == cloud.pointCount ? Ptr<int64_t>(cloud.ids)[index]
+                                                    : int64_t(index));
+            Write(pixel, RenderVarSource::InstancerStableId,
+                  StableWords(params.tables->semantics.stableIds[point.prim]));
+            return;
+        }
     }
     if (drawn.instancer == kNoPrim) {
         Write(pixel, RenderVarSource::InstanceId, int64_t(-1));

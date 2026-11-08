@@ -16,7 +16,7 @@ struct PointsJob {
     uint padding2;
 };
 
-ERNIE_CHECK_SIZE(PointsJob, 80);
+ERNIE_CHECK_SIZE(PointsJob, 104);
 
 struct PointsParams {
     Ptr<PointsJob> jobs;

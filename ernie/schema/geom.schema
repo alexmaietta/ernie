@@ -408,7 +408,7 @@ class Mesh : PointBased (
 }
 
 class Points : PointBased (
-    doc = "Particles, each drawn as a sphere at its point as wide as its width."
+    doc = "Particles, each drawn at its point as wide as its width, as a sphere, or as a disk facing its normal when normals are authored."
 ) {
     float[] widths (
         tracked
@@ -416,6 +416,12 @@ class Points : PointBased (
         group = "Geometry"
         displayName = "Widths"
         doc = "The diameter of each point, or a single diameter for every point. Empty draws each point 1 cm wide."
+    )
+    int64[] ids (
+        tracked
+        group = "Geometry"
+        displayName = "Ids"
+        doc = "A stable id per point, which the instance id output reports. Empty makes each point's index its id."
     )
 }
 

@@ -16,7 +16,7 @@ namespace ernie {
 
 namespace {
 
-constexpr ColumnRef kInputs[] = {kPointBasedPoints, kPointsWidths};
+constexpr ColumnRef kInputs[] = {kPointBasedPoints, kPointBasedNormals, kPointsWidths, kPointsIds};
 
 constexpr TableId kTableOutputs[] = {TableId::Points, TableId::PointsMoved};
 
@@ -61,6 +61,8 @@ void PointsTable::Link(Cloud& cloud) {
     ColumnStore& store = m_structure.GetColumnStore();
     const ArrayRef points = store.Array(kPointBasedPoints, cloud.pointBasedRow);
     const ArrayRef widths = store.Array(kPointsWidths, cloud.row);
+    const ArrayRef normals = store.Array(kPointBasedNormals, cloud.pointBasedRow);
+    const ArrayRef ids = store.Array(kPointsIds, cloud.row);
     if (points.count > cloud.capacity || points.count < cloud.capacity / 4) {
         cloud.capacity = points.count > cloud.capacity
                              ? std::max(points.count, cloud.capacity + cloud.capacity / 2)
@@ -92,6 +94,10 @@ void PointsTable::Link(Cloud& cloud) {
         record.widths = widths.address;
         record.pointCount = points.count;
         record.widthCount = widths.count;
+        record.normals = normals.address;
+        record.normalCount = normals.count;
+        record.ids = ids.address;
+        record.idCount = ids.count;
         record.bounds = cloud.bounds;
     }
     const Prims& prims = m_structure.GetPrims();
@@ -142,7 +148,9 @@ void PointsTable::Run(const ChangeSet& changes, TableVersions& versions) {
             }
         };
         relink(kPointBasedPoints, m_byPointBasedRow);
+        relink(kPointBasedNormals, m_byPointBasedRow);
         relink(kPointsWidths, m_byRow);
+        relink(kPointsIds, m_byRow);
     }
     std::vector<uint32_t> updated;
     Build(updated);

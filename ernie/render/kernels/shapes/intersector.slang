@@ -12,12 +12,10 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
-ShapeHit CenteredShapeHit(ShapeRecord record, float radius, Ray ray) {
+ShapeHit CenteredShapeHit(ShapeRecord record, Ray ray) {
     switch (ShapeKind(record.kind)) {
     case ShapeKind::Sphere:
         return Sphere(1).Intersect(ray);
-    case ShapeKind::Points:
-        return Sphere(radius).Intersect(ray);
     case ShapeKind::Plane:
         return Plane(2, 2).Intersect(ray);
     case ShapeKind::Cylinder:
@@ -46,19 +44,43 @@ ShapeHit CenteredShapeHit(ShapeRecord record, float radius, Ray ray) {
     }
 }
 
-ShapeHit LocalShapeHit(ShapeRecord record, Ptr<PointsRecord> points, uint primitive, Ray ray) {
-    Ray local = ray;
-    float radius = 1;
-    if (ShapeKind(record.kind) == ShapeKind::Points) {
-        const PointsRecord cloud = points[record.row];
-        local.origin -= Ptr<Float3>(cloud.points)[primitive].Vector();
-        radius = PointRadius(cloud, primitive);
+Ray Centered(Ray ray, out float closest) {
+    closest = -dot(ray.origin, ray.direction) / dot(ray.direction, ray.direction);
+    Ray centered = ray;
+    centered.origin = ray.origin + closest * ray.direction;
+    centered.tMin = ray.tMin - closest;
+    return centered;
+}
+
+ShapeHit PointHit(PointsRecord cloud, uint point, Ray ray) {
+    ray.origin -= Ptr<Float3>(cloud.points)[point].Vector();
+    float closest;
+    const Ray centered = Centered(ray, closest);
+    const float radius = PointRadius(cloud, point);
+    float3 normal = float3(0);
+    if (cloud.normalCount > 0) {
+        normal = Ptr<Float3>(cloud.normals)[cloud.normalCount == cloud.pointCount ? point : 0].Vector();
     }
-    const float closest = -dot(local.origin, local.direction) / dot(local.direction, local.direction);
-    Ray centered = local;
-    centered.origin = local.origin + closest * local.direction;
-    centered.tMin = local.tMin - closest;
-    ShapeHit hit = CenteredShapeHit(record, radius, centered);
+    ShapeHit hit;
+    if (dot(normal, normal) > 0) {
+        hit.normal = normalize(normal);
+        const float facing = dot(centered.direction, hit.normal);
+        hit.t = -dot(centered.origin, hit.normal) / facing;
+        const float3 at = centered.origin + hit.t * centered.direction;
+        hit.inside = facing != 0 && hit.t >= centered.tMin && dot(at, at) <= radius * radius;
+    } else {
+        hit = Sphere(radius).Intersect(centered);
+    }
+    hit.t += closest;
+    return hit;
+}
+
+ShapeHit LocalShapeHit(ShapeRecord record, Ptr<PointsRecord> points, uint primitive, Ray ray) {
+    if (ShapeKind(record.kind) == ShapeKind::Points) {
+        return PointHit(points[record.row], primitive, ray);
+    }
+    float closest;
+    ShapeHit hit = CenteredShapeHit(record, Centered(ray, closest));
     hit.t += closest;
     return hit;
 }

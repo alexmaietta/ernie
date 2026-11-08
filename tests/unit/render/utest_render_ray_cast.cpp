@@ -361,6 +361,41 @@ TEST(RayCastTest, RecountedPointsHitOnlyTheLivingAcrossCapacityChanges) {
     });
 }
 
+TEST(RayCastTest, PointsWithNormalsAreDisksFacingThem) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim facing = scene->Define<Points>(
+            "/Facing", {.points = {{3, 0, 0}, {3, 4, 0}}, .normals = {{-2, 0, 0}}, .widths = {1}});
+        scene->Define<Points>(
+            "/Each",
+            {.points = {{3, 8, 0}, {3, 12, 0}}, .normals = {{1, 0, 0}, {0, 0, 1}}, .widths = {1}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins =
+            Floats(device, {0, 0, 0, 0, 0.45f, 0, 0, 0.45f, 0.45f, 0, 8, 0, 0, 12, 0, 3, -5, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0}, 3);
+        const auto cast = [&] {
+            return caster.Cast(rays, {.outputs = RayOutput::Distance | RayOutput::Normal});
+        };
+        RayHits hits = cast();
+        std::vector<float> distance = hits.distance.ToHost<float>();
+        const std::vector<float> normal = hits.normal.ToHost<float>();
+        EXPECT_NEAR(distance[0], 3, 1e-4);
+        EXPECT_NEAR(distance[1], 3, 1e-4);
+        EXPECT_TRUE(std::isinf(distance[2]));
+        EXPECT_NEAR(distance[3], 3, 1e-4);
+        EXPECT_TRUE(std::isinf(distance[4]));
+        EXPECT_TRUE(std::isinf(distance[5]));
+        EXPECT_NEAR(std::abs(normal[0]), 1, 1e-4);
+        EXPECT_NEAR(normal[1], 0, 1e-4);
+
+        facing.Set(Points::kNormals, std::vector<Float3>{});
+        distance = cast().distance.ToHost<float>();
+        EXPECT_NEAR(distance[0], 2.5, 1e-4);
+        EXPECT_NEAR(distance[5], 4.5, 1e-4);
+    });
+}
+
 TEST(RayCastTest, InstancedMeshCopiesHitAtTheirOwnPlaces) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

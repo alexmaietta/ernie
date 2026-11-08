@@ -63,7 +63,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
             WriteNormal(pixel, float3(0));
             Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(float3(0), false));
             WriteSegmentation(params, pixel, kNoPrim);
-            WriteInstance(params, pixel, first.slot, false);
+            WriteInstance(params, pixel, first, false);
             return;
         }
         Write(pixel, RenderVarSource::DistanceToCamera, first.distance);
@@ -72,6 +72,6 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraModel> {
         WriteNormal(pixel, first.shadingNormal);
         Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(albedo, true));
         WriteSegmentation(params, pixel, first.prim);
-        WriteInstance(params, pixel, first.slot, true);
+        WriteInstance(params, pixel, first, true);
     }
 }
