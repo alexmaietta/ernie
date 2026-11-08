@@ -106,10 +106,9 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     }
     const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
     std::set<uint32_t> due;
-    for (const auto& [path, planned] : plan.products) {
-        const ResolvedProduct* product = resolved.Find(m_products.at(path).prim);
-        if (product != nullptr && product->due) {
-            due.insert(product->prim);
+    for (const uint32_t prim : plan.plan->products) {
+        if (resolved.Find(prim)->due) {
+            due.insert(prim);
         }
     }
 
@@ -125,14 +124,14 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         return result;
     }
 
-    if (!plan.taxonomies.empty()) {
-        m_scene->Require(plan.taxonomies);
+    if (!plan.plan->taxonomies.empty()) {
+        m_scene->Require(plan.plan->taxonomies);
     }
     if (m_scene->Pending()) {
         published = m_scene->Publish({}, stream);
     }
     const Snapshot snapshot = m_scene->Acquire();
-    if (!plan.taxonomies.empty()) {
+    if (!plan.plan->taxonomies.empty()) {
         UpdateMaps();
     }
     const OutputSet& set = AcquireSet(plan);
@@ -164,7 +163,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    result.m_done = plan.captureCount > 0 ? Trace(set, due, snapshot) : published;
+    result.m_done = plan.plan->captureCount > 0 ? Trace(set, due, snapshot) : published;
     m_scene->Release(snapshot);
     return result;
 }
@@ -191,68 +190,41 @@ void RendererImpl::DropStaleProducts() {
 }
 
 RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> products) {
-    const std::set<std::string_view> requested(products.begin(), products.end());
-    for (auto cached = m_plans.begin(); cached != m_plans.end(); ++cached) {
-        if (std::ranges::equal(requested, std::views::keys(cached->products))) {
-            m_plans.splice(m_plans.begin(), m_plans, cached);
-            m_plan = &m_plans.front();
-            return *m_plan;
-        }
+    std::shared_ptr<const ProductPlan> planned =
+        SceneImpl::Get(*m_scene).GetProducts().Plan(products);
+    const auto cached = std::ranges::find_if(
+        m_plans, [&](const StepPlan& plan) { return plan.plan->id == planned->id; });
+    if (cached != m_plans.end()) {
+        m_plans.splice(m_plans.begin(), m_plans, cached);
+        m_plan = &m_plans.front();
+        return *m_plan;
     }
     ERNIE_ZONE("Render/PlanProducts");
 
-    StepPlan plan;
-    for (const std::string_view requestedPath : requested) {
-        const std::string path(requestedPath);
-        const Product& product = PrepareProduct(path);
-        Capture capture{};
-        capture.product = product.prim;
-        capture.width = product.record.width;
-        capture.height = product.record.height;
-        capture.missDistance = product.record.missDistance;
-        capture.returns = std::max(product.record.returns, 1u);
-        if (product.semantic) {
-            const auto found = std::ranges::find(plan.taxonomies, product.taxonomy);
-            capture.taxonomy = uint32_t(found - plan.taxonomies.begin());
-            if (found == plan.taxonomies.end()) {
-                plan.taxonomies.push_back(product.taxonomy);
-            }
-        }
-
+    StepPlan plan{planned};
+    for (size_t index = 0; index < planned->paths.size(); ++index) {
+        const std::string& path = planned->paths[index];
+        const Product& product = PrepareProduct(path, planned->products[index]);
         FrameOutput frame;
         for (const RenderVarOutput& output : product.outputs) {
             frame.renderVars[output.renderVarPath] = output;
         }
         plan.products[path] = ProductOutput{path, {std::move(frame)}};
-
-        const auto entry = uint32_t(product.entry);
-        Launch& launch = plan.launches[entry];
-        for (capture.layer = 0; capture.layer < product.sensors.size(); ++capture.layer) {
-            capture.sensor = product.sensors[capture.layer];
-            capture.firstPixel = launch.pixelCount;
-            launch.captures.push_back(capture);
-            launch.pixelCount += uint64_t(capture.width) * capture.height;
-        }
     }
-
     uint64_t launches = 0;
-    for (uint32_t entry = 0; entry < kRenderEntryCount; ++entry) {
-        const Launch& launch = plan.launches[entry];
-        plan.captureCount += uint32_t(launch.captures.size());
-        plan.pixelCount += launch.pixelCount;
-        launches += (launch.pixelCount + m_maxPixelsPerLaunch - 1) / m_maxPixelsPerLaunch;
+    for (const uint64_t pixels : planned->pixelCounts) {
+        launches += (pixels + m_maxPixelsPerLaunch - 1) / m_maxPixelsPerLaunch;
     }
     Log(LogLevel::Debug, "planned {}: {}, {} in {}", Counted(plan.products.size(), "product"),
-        Counted(plan.captureCount, "capture"), Counted(plan.pixelCount, "pixel"),
+        Counted(planned->captureCount, "capture"), Counted(planned->pixelCount, "pixel"),
         Counted(launches, "launch"));
     m_plans.push_front(std::move(plan));
     m_plan = &m_plans.front();
     if (m_plans.size() > kCachedPlans) {
         m_plans.pop_back();
         const auto unused = [&](const auto& entry) {
-            return std::ranges::none_of(m_plans, [&](const StepPlan& cached) {
-                return cached.products.contains(entry.first);
-            });
+            return std::ranges::none_of(
+                m_plans, [&](const StepPlan& kept) { return kept.products.contains(entry.first); });
         };
         const size_t dropped = std::erase_if(m_products, unused);
         Log(LogLevel::Debug, "dropped the least recently stepped plan and {} only it used",
@@ -261,23 +233,12 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
     return *m_plan;
 }
 
-RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
+RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path, uint32_t prim) {
     if (const auto found = m_products.find(path); found != m_products.end()) {
         return found->second;
     }
     ERNIE_ZONE("Render/PrepareProduct");
-    const std::optional<Prim> prim = m_scene->Find(path);
-    if (!prim || !prim->IsA<RenderProduct>()) {
-        throw Error("\"{}\" isn't a RenderProduct", path);
-    }
-    const ResolvedProduct* resolved = SceneImpl::Get(*m_scene).GetProducts().Find(prim->Index());
-    if (resolved == nullptr) {
-        throw Error("{} isn't published yet", path);
-    }
-    if (!resolved->error.empty()) {
-        throw Error("{}", resolved->error);
-    }
-    Product product{*resolved};
+    Product product{*SceneImpl::Get(*m_scene).GetProducts().Find(prim)};
     std::string sources;
     for (const ResolvedVar& var : product.vars) {
         const std::string_view source = kRenderVarSourceTokens[uint32_t(var.source)];
@@ -411,14 +372,24 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         set.overlays.push_back(std::move(overlay));
     }
     for (uint32_t entry = 0; entry < kRenderEntryCount; ++entry) {
-        std::vector<Capture> captures = plan.launches[entry].captures;
-        if (captures.empty()) {
+        const std::vector<PlannedCapture>& planned = plan.plan->captures[entry];
+        if (planned.empty()) {
             continue;
         }
-        for (Capture& capture : captures) {
-            const std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[capture.product];
+        std::vector<Capture> captures;
+        for (const PlannedCapture& each : planned) {
+            Capture& capture = captures.emplace_back(Capture{.firstPixel = each.firstPixel,
+                                                             .product = each.product,
+                                                             .sensor = each.sensor,
+                                                             .layer = each.layer,
+                                                             .width = each.width,
+                                                             .height = each.height,
+                                                             .taxonomy = each.taxonomy,
+                                                             .missDistance = each.missDistance,
+                                                             .returns = each.returns});
+            const std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[each.product];
             std::copy(slots.begin(), slots.end(), std::begin(capture.vars));
-            const auto found = primIds.find(capture.product);
+            const auto found = primIds.find(each.product);
             capture.primIds = found != primIds.end() ? found->second : 0;
         }
         set.captureBuffers[entry] = device.CreateBuffer({.label = "render captures"}, captures);

@@ -25,8 +25,6 @@
 
 namespace ernie {
 
-inline constexpr size_t kCachedPlans = 4;
-
 class RendererImpl {
   public:
     explicit RendererImpl(Ref<Scene> scene, const RendererDesc& desc = {});
@@ -37,11 +35,6 @@ class RendererImpl {
     struct Product : ResolvedProduct {
         uint32_t mapVersion = ~0u;
         std::vector<RenderVarOutput> outputs;
-    };
-
-    struct Launch {
-        std::vector<Capture> captures;
-        uint64_t pixelCount = 0;
     };
 
     struct OwnedVar {
@@ -78,10 +71,7 @@ class RendererImpl {
     };
 
     struct StepPlan {
-        std::array<Launch, kRenderEntryCount> launches;
-        uint32_t captureCount = 0;
-        uint64_t pixelCount = 0;
-        std::vector<Token> taxonomies;
+        std::shared_ptr<const ProductPlan> plan;
         std::map<std::string, ProductOutput, std::less<>> products;
         std::map<std::string, std::vector<std::string>, std::less<>> shownOverlays;
         std::vector<OutputSet> sets;
@@ -89,7 +79,7 @@ class RendererImpl {
 
     void DropStaleProducts();
     StepPlan& PlanProducts(std::span<const std::string> products);
-    Product& PrepareProduct(const std::string& path);
+    Product& PrepareProduct(const std::string& path, uint32_t prim);
     void UpdateMaps();
 
     OutputSet& AcquireSet(StepPlan& plan);

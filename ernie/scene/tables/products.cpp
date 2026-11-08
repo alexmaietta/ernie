@@ -246,6 +246,76 @@ const ResolvedProduct* ProductTable::Find(uint32_t prim) const {
     return found == m_products.end() ? nullptr : &found->second;
 }
 
+std::shared_ptr<const ProductPlan> ProductTable::Plan(std::span<const std::string> paths) {
+    std::vector<std::string> sorted(paths.begin(), paths.end());
+    std::ranges::sort(sorted);
+    sorted.erase(std::ranges::unique(sorted).begin(), sorted.end());
+    std::vector<const ResolvedProduct*> products;
+    std::vector<uint64_t> versions;
+    for (const std::string& path : sorted) {
+        const std::optional<Prim> prim = m_scene.Find(path);
+        if (!prim || !prim->IsA<RenderProduct>()) {
+            throw Error("\"{}\" isn't a RenderProduct", path);
+        }
+        const ResolvedProduct* product = Find(prim->Index());
+        if (product == nullptr) {
+            throw Error("{} isn't published yet", path);
+        }
+        if (!product->error.empty()) {
+            throw Error("{}", product->error);
+        }
+        products.push_back(product);
+        versions.push_back(product->version);
+    }
+
+    const std::lock_guard lock(m_planMutex);
+    const auto cached =
+        std::ranges::find_if(m_plans, [&](const auto& plan) { return plan->paths == sorted; });
+    if (cached != m_plans.end() && (*cached)->versions == versions) {
+        m_plans.splice(m_plans.begin(), m_plans, cached);
+        return m_plans.front();
+    }
+    if (cached != m_plans.end()) {
+        m_plans.erase(cached);
+    }
+    ERNIE_ZONE("Products/Plan");
+    auto plan = std::make_shared<ProductPlan>();
+    plan->id = ++m_planIds;
+    plan->paths = std::move(sorted);
+    plan->versions = std::move(versions);
+    for (const ResolvedProduct* product : products) {
+        const ProductRecord& record = product->record;
+        plan->products.push_back(product->prim);
+        PlannedCapture capture{.product = product->prim,
+                               .width = record.width,
+                               .height = record.height,
+                               .returns = std::max(record.returns, 1u),
+                               .missDistance = record.missDistance};
+        if (product->semantic) {
+            const auto found = std::ranges::find(plan->taxonomies, product->taxonomy);
+            capture.taxonomy = uint32_t(found - plan->taxonomies.begin());
+            if (found == plan->taxonomies.end()) {
+                plan->taxonomies.push_back(product->taxonomy);
+            }
+        }
+        const auto entry = uint32_t(product->entry);
+        uint64_t& pixels = plan->pixelCounts[entry];
+        for (capture.layer = 0; capture.layer < product->sensors.size(); ++capture.layer) {
+            capture.sensor = product->sensors[capture.layer];
+            capture.firstPixel = pixels;
+            plan->captures[entry].push_back(capture);
+            pixels += uint64_t(capture.width) * capture.height;
+        }
+        plan->captureCount += uint32_t(product->sensors.size());
+        plan->pixelCount += uint64_t(record.width) * record.height * product->sensors.size();
+    }
+    m_plans.push_front(plan);
+    if (m_plans.size() > kCachedPlans) {
+        m_plans.pop_back();
+    }
+    return plan;
+}
+
 ResolvedProduct ProductTable::Resolve(uint32_t index) const {
     const Prims& prims = m_structure.GetPrims();
     ResolvedProduct product;
