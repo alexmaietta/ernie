@@ -11,6 +11,7 @@
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
 #include "ernie/render/shaders.h"
+#include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
 #include "support/devices.h"
 #include "support/support.h"
@@ -369,6 +370,49 @@ struct TestEmitter {
         wall.surface.Set("authored", true);
         wall.surface.Set("emissivity", 0.5f);
         EXPECT_NEAR(Center(renderer).x / black, 0.5f, 0.01f);
+    });
+}
+
+TEST(SpectraTest, RadarReturnsFollowElectricalPropertiesRoughnessAndFrequency) {
+    ForEachDevice([](Device& device) {
+        Returns wall = ReturnsWall(device, 0);
+        Scene& scene = *wall.scene;
+        const Prim material = *scene.Find("/Looks/Paint");
+        const Prim itu = scene.Define<Shader>("/Looks/Paint/Radar", {.id = "ItuMaterial"});
+        material.Connect("radar", itu, "radar");
+        Renderer renderer(wall.scene);
+        const auto echo = [&](ItuMaterialKind kind) {
+            itu.Set(ItuMaterial::kMaterial, kind);
+            return RadarIntensity(renderer);
+        };
+        const float metal = echo(ItuMaterialKind::Metal);
+        const float concrete = echo(ItuMaterialKind::Concrete);
+        const float wood = echo(ItuMaterialKind::Wood);
+        EXPECT_GT(metal, concrete);
+        EXPECT_GT(concrete, wood);
+        EXPECT_GT(wood, 0);
+
+        const float ground = echo(ItuMaterialKind::WetGround);
+        const Prim radar = *scene.Find("/Radar");
+        radar.Set(Radar::kFrequency, 10.0f);
+        EXPECT_NEAR(echo(ItuMaterialKind::Metal), metal, 0.01f * metal);
+        EXPECT_NEAR(echo(ItuMaterialKind::WetGround) / ground, 0.914f, 0.02f);
+        radar.Set(Radar::kFrequency, 77.0f);
+
+        itu.Set(ItuMaterial::kMaterial, ItuMaterialKind::Concrete);
+        itu.Set(ItuMaterial::kRmsHeight, 0.003f);
+        EXPECT_LT(RadarIntensity(renderer), concrete);
+        itu.Set(ItuMaterial::kRmsHeight, 0.001f);
+        const Prim plane = *scene.Find("/Wall");
+        plane.Set(Xformable::kOrient, LookAlong({-std::sin(0.7f), 0, -std::cos(0.7f)}));
+        const float smoothTilted = RadarIntensity(renderer);
+        itu.Set(ItuMaterial::kRmsHeight, 0.003f);
+        EXPECT_GT(RadarIntensity(renderer), smoothTilted);
+
+        plane.Set(Xformable::kOrient, Quatd{});
+        material.Disconnect("radar");
+        wall.surface.Set(UsdPreviewSurface::kMetallic, 1.0f);
+        EXPECT_NEAR(RadarIntensity(renderer), metal, 0.01f * metal);
     });
 }
 

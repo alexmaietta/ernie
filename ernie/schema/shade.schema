@@ -273,6 +273,36 @@ class UsdTransform2d : Shader (
     )
 }
 
+class ItuMaterial : Shader (
+    doc = "A building or ground material from ITU-R P.2040's table, with its roughness at radar scale. A Material's ernie:radar connection to it sets how radar sees the material."
+) {
+    token info:id = ItuMaterial
+    token inputs:material = concrete (
+        tracked
+        allowed = [vacuum, concrete, brick, plasterboard, wood, glass, ceilingBoard, chipboard, plywood, marble, floorboard, metal, veryDryGround, mediumDryGround, wetGround]
+        enum = ItuMaterialKind
+        group = "Radar"
+        displayName = "Material"
+        doc = "The P.2040 material, whose permittivity and conductivity follow the radar's frequency."
+    )
+    float inputs:rmsHeight = 0.001 (
+        tracked
+        unit = meters
+        group = "Radar"
+        displayName = "RMS Height"
+        min = 0
+        doc = "The surface's RMS height at radar scale."
+    )
+    float inputs:correlationLength = 0.01 (
+        tracked
+        unit = meters
+        group = "Radar"
+        displayName = "Correlation Length"
+        min = 0
+        doc = "The distance over which the surface's heights stay correlated."
+    )
+}
+
 class TexturePlacement : Shader (
     doc = "Places textures from a primvar or projected from the shaded position, then transformed and optionally hex tiled. Textures whose coordinates connect to one placement share it."
 ) {

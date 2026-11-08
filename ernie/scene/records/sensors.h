@@ -98,8 +98,10 @@ ERNIE_CHECK_SIZE(LidarRecord, 80);
 struct RadarRecord {
     Float2 fieldOfView;
     Float2 range;
+    float frequency;
+    uint padding0;
 };
 
-ERNIE_CHECK_SIZE(RadarRecord, 16);
+ERNIE_CHECK_SIZE(RadarRecord, 24);
 
 }

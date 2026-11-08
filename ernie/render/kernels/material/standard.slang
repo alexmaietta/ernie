@@ -41,6 +41,11 @@ void LowerStandardSurface<Spectrum : ISpectrum>(SurfaceInputs inputs, float3 out
     closure.retroreflection = no_diff saturate(detach(inputs.retroreflection));
     closure.radarBackscatter = no_diff max(detach(inputs.radarBackscatter), 0.0f);
     closure.emissivityAuthored = inputs.emissivityAuthored;
+    closure.radio.electrical = inputs.electricalAuthored ? inputs.electrical
+                               : detach(inputs.metallic) > 0.5f ? ElectricalValue.Conductor()
+                                                                : inputs.electrical;
+    closure.radio.rmsHeight = detach(inputs.radarRoughness);
+    closure.radio.correlationLength = detach(inputs.radarCorrelation);
     closure.emissivity = inputs.emissivity.Evaluate<Spectrum>();
 }
 

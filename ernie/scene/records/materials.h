@@ -119,6 +119,16 @@ struct PackEntry {
 
 ERNIE_CHECK_SIZE(PackEntry, 24);
 
+struct RadioRecord {
+    uint kind;
+    uint valid;
+    float rmsHeight;
+    float correlationLength;
+    Float4 data;
+};
+
+ERNIE_CHECK_SIZE(RadioRecord, 32);
+
 struct CheckerRecord {
     Float3 colorA;
     uint enabled;

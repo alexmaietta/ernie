@@ -4,6 +4,7 @@ __exported import ernie.render.kernels.material.ibsdf;
 import ernie.render.kernels.material.primitives.diffuse;
 import ernie.render.kernels.material.primitives.ggx;
 __exported import ernie.render.kernels.material.registered;
+__exported import ernie.render.kernels.material.radio;
 
 static const uint kClosureLobes = 4;
 
@@ -131,6 +132,7 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
     no_diff float radarBackscatter;
     Spectrum emissivity;
     no_diff bool emissivityAuthored;
+    no_diff RadioClosure radio;
 
     [Differentiable]
     __init() {
@@ -146,6 +148,7 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
         radarBackscatter = 1;
         emissivity = Spectrum.Constant(1);
         emissivityAuthored = false;
+        radio = RadioClosure.Dielectric();
     }
 
     [Differentiable]

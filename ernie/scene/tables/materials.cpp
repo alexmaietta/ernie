@@ -36,6 +36,24 @@ constexpr std::string_view kPreviewInputNames[kPreviewInputs] = {
     "detailNormal", "detailAlbedo",       "displacement",
 };
 
+constexpr Float4 kItuMaterials[] = {
+    {1, 0, 0, 0},
+    {5.24f, 0, 0.0462f, 0.7822f},
+    {3.91f, 0, 0.0238f, 0.16f},
+    {2.73f, 0, 0.0085f, 0.9395f},
+    {1.99f, 0, 0.0047f, 1.0718f},
+    {6.31f, 0, 0.0036f, 1.3394f},
+    {1.48f, 0, 0.0011f, 1.0750f},
+    {2.58f, 0, 0.0217f, 0.7800f},
+    {2.71f, 0, 0.33f, 0},
+    {7.074f, 0, 0.0055f, 0.9262f},
+    {3.66f, 0, 0.0044f, 1.3515f},
+    {1, 0, 1e7f, 0},
+    {3, 0, 0.00015f, 2.52f},
+    {15, -0.1f, 0.035f, 1.63f},
+    {30, -0.4f, 0.15f, 1.30f},
+};
+
 constexpr float kVisibleFirstNm = 380;
 constexpr float kVisibleLastNm = 780;
 
@@ -76,7 +94,7 @@ std::vector<ColumnRef> MaterialInputs() {
     for (const SchemaId schema :
          {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
           SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
-          SchemaId::TexturePlacement, SchemaId::CheckerboardAPI}) {
+          SchemaId::TexturePlacement, SchemaId::ItuMaterial, SchemaId::CheckerboardAPI}) {
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t index = 0; index < columns.size(); ++index) {
             inputs.push_back({schema, &columns[index], index});
@@ -121,6 +139,7 @@ void MaterialTable::Describe(RenderTables& tables) const {
     tables.materialWords.address = m_words.Address();
     tables.checkers.address = m_checkers.Address();
     tables.temperatures.address = m_temperatures.Address();
+    tables.radios.address = m_radios ? m_radios->Address() : 0;
     tables.temperaturePrimvar = m_temperaturePrimvar;
 }
 
@@ -704,6 +723,46 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
     }
 }
 
+void MaterialTable::WriteRadios() {
+    const Prims& prims = m_structure.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
+    ColumnTable& itu = store.Schema(SchemaId::ItuMaterial);
+    const auto column = [&](ColumnRef ref) { return itu.Read(ref.index, 0, itu.Rows()); };
+    const std::vector<uint32_t> kinds = Items<uint32_t>(column(kItuMaterialMaterial));
+    const std::vector<float> heights = Items<float>(column(kItuMaterialRmsHeight));
+    const std::vector<float> lengths = Items<float>(column(kItuMaterialCorrelationLength));
+    std::vector<RadioRecord> radios(std::max(prims.Size(), 1u));
+    for (uint32_t material = 0; material < prims.Size(); ++material) {
+        if (!prims.Alive(material) || !IsA(prims.Record(material).schema, SchemaId::Material)) {
+            continue;
+        }
+        for (const Connection& connection : Connections(material)) {
+            if (connection.input != "radar") {
+                continue;
+            }
+            if (connection.source == kNoPrim ||
+                prims.Record(connection.source).schema != SchemaId::ItuMaterial) {
+                Log(LogLevel::Warning,
+                    "{}'s radar connects to {}, which isn't an ItuMaterial; radar sees its surface "
+                    "instead",
+                    m_structure.GetPaths().Path(material),
+                    connection.source == kNoPrim ? std::string("nothing")
+                                                 : m_structure.GetPaths().Path(connection.source));
+                continue;
+            }
+            const uint32_t row = prims.Row(connection.source, SchemaId::ItuMaterial);
+            const uint32_t kind = std::min<uint32_t>(kinds[row], std::size(kItuMaterials) - 1);
+            radios[material] = {.kind = 1,
+                                .valid = 1,
+                                .rmsHeight = heights[row],
+                                .correlationLength = lengths[row],
+                                .data = kItuMaterials[kind]};
+        }
+    }
+    m_radios =
+        m_structure.GetColumnStore().GetDevice().CreateBuffer({.label = "radio materials"}, radios);
+}
+
 void MaterialTable::WarnOutsideVisible() {
     const Prims& prims = m_structure.GetPrims();
     ColumnStore& store = m_structure.GetColumnStore();
@@ -808,6 +867,7 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     const uint32_t prims = m_structure.GetPrims().Size();
     m_temperatures.Reserve(device, std::max(prims, 1u));
     m_temperaturePrimvar = m_structure.GetTokens().Intern("ernie:temperature").id;
+    WriteRadios();
     if (prims == 0) {
         return;
     }

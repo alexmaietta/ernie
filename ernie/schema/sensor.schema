@@ -460,4 +460,11 @@ class Radar : Sensor (
         displayName = "Range"
         doc = "The nearest and farthest distances a return is reported at."
     )
+    float frequency = 77 (
+        tracked
+        group = "Returns"
+        displayName = "Frequency"
+        min = 0.001
+        doc = "The carrier frequency in gigahertz. Surfaces reflect by their permittivity and conductivity at it."
+    )
 }

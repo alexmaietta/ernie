@@ -282,5 +282,7 @@ void WriteRadars(uniform SensorParams p) {
     RadarRecord record;
     record.fieldOfView = Float2(radians(float2(data.fieldOfView[row].x, data.fieldOfView[row].y)));
     record.range = Float2(float2(data.range[row].x, data.range[row].y));
+    record.frequency = data.frequency[row];
+    record.padding0 = 0;
     p.radars[row] = record;
 }

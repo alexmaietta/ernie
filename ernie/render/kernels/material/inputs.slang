@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 __exported import ernie.render.kernels.material.spectral;
+__exported import ernie.render.kernels.material.radio;
 
 struct SurfaceInputs : IDifferentiable {
     SpectralValue baseColor;
@@ -17,6 +18,10 @@ struct SurfaceInputs : IDifferentiable {
     float radarBackscatter;
     SpectralValue emissivity;
     bool emissivityAuthored;
+    ElectricalValue electrical;
+    bool electricalAuthored;
+    float radarRoughness;
+    float radarCorrelation;
 
     [Differentiable]
     __init() {
@@ -34,5 +39,9 @@ struct SurfaceInputs : IDifferentiable {
         radarBackscatter = 1;
         emissivity = SpectralValue.Constant(1);
         emissivityAuthored = false;
+        electrical = ElectricalValue.Constant(5, 0.01f);
+        electricalAuthored = false;
+        radarRoughness = 0.001f;
+        radarCorrelation = 0.01f;
     }
 }

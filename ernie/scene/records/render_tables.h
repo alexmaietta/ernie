@@ -49,6 +49,7 @@ struct RenderTables {
     Ptr<CheckerRecord> checkers;
     SpectraRecord spectra;
     Ptr<float> temperatures;
+    Ptr<RadioRecord> radios;
     uint temperaturePrimvar;
     uint padding0;
     SemanticsData semantics;
@@ -56,6 +57,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 384);
+ERNIE_CHECK_SIZE(RenderTables, 392);
 
 }

@@ -50,7 +50,7 @@ class MaterialTable : public RenderTable {
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
         HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_checkers.Buffer(),
-                           m_temperatures.Buffer()});
+                           m_temperatures.Buffer(), m_radios});
     }
 
     const MaterialRecord& Record(uint32_t prim) const {
@@ -104,6 +104,7 @@ class MaterialTable : public RenderTable {
     void CarryPrevious(const std::vector<MaterialRecord>& before);
     void Define(uint32_t material, uint32_t definition, uint32_t words);
     void WarnOutsideVisible();
+    void WriteRadios();
     void ResolvePlacement(uint32_t placement, uint32_t mapping);
     std::vector<Connection> Connections(uint32_t prim);
     void CopyCell(ColumnRef column, uint32_t prim, uint32_t destination);
@@ -138,6 +139,7 @@ class MaterialTable : public RenderTable {
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
     DeviceTable<float> m_temperatures{"temperatures"};
     uint32_t m_temperaturePrimvar = 0;
+    Ref<device::Buffer> m_radios;
 };
 
 }

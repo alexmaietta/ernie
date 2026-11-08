@@ -14,6 +14,7 @@ struct RadarResponse : IResponse<RadarPattern> {
     HitQuery query;
     RenderTables* tables;
     float3 sensorVelocity;
+    float frequency;
     bool hit;
     float3 position;
     float distance;
@@ -30,6 +31,9 @@ struct RadarResponse : IResponse<RadarPattern> {
         response.tables = params.tables;
         response.sensorVelocity =
             PointVelocity(params.tables, context.capture->plan.sensor, pattern.frame.position);
+        response.frequency =
+            params.tables->radars[PrimRow(params.tables, context.capture->plan.sensor, kSlotRadar)]
+                .frequency;
         response.hit = false;
         response.position = float3(0);
         response.distance = 0;
@@ -48,7 +52,18 @@ struct RadarResponse : IResponse<RadarPattern> {
             ShadeContext(materials, materials.BoundMaterial(point.prim), point, -direction);
         OpticalClosure<MonoSpectrum> closure = OpticalClosure<MonoSpectrum>();
         ShadeDefinition<MonoSpectrum>(context, closure);
-        return closure.radarBackscatter;
+        RadioClosure radio = closure.radio;
+        if (context.material != kNoPrim) {
+            const RadioRecord record = tables->radios[context.material];
+            if (record.valid != 0) {
+                radio.electrical.kind = record.kind;
+                radio.electrical.data = record.data.Vector();
+                radio.rmsHeight = record.rmsHeight;
+                radio.correlationLength = record.correlationLength;
+            }
+        }
+        return closure.radarBackscatter *
+               radio.Backscatter(frequency, abs(dot(point.geometricNormal, direction)));
     }
 
     [mutating]
@@ -62,8 +77,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         hit = true;
         position = point.position;
         distance = point.distance;
-        intensity = Backscatter(point, ray.ray.direction) *
-                    abs(dot(point.geometricNormal, ray.ray.direction));
+        intensity = Backscatter(point, ray.ray.direction);
         radialVelocity = dot(velocity - sensorVelocity, ray.ray.direction);
         normal = point.shadingNormal;
         prim = point.prim;
