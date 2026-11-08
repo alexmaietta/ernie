@@ -18,7 +18,6 @@
 #include "ernie/device/slang/compiler.h"
 #include "ernie/io/kernels.h"
 #include "ernie/overlay/kernels.h"
-#include "ernie/ray_cast/kernels.h"
 #include "ernie/render/kernels.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/texture/kernels.h"
@@ -61,7 +60,7 @@ std::vector<RuntimeProgram> RuntimePrograms() {
         {&kOverlayKernels,
          "ernie.overlay.kernels.picks",
          {"ClearOverlayPicks", "MeasureOverlayPicks", "ChooseOverlayPicks", "ResolveOverlayPicks"}},
-        {&kRayCastKernels, "ernie.ray_cast.kernels.ray_cast", {"CastClosest", "CastAny"}},
+        {&kRenderKernels, "ernie.render.kernels.query.ray_cast", {"CastClosest", "CastAny"}},
         {&kRenderKernels,
          "ernie.render.kernels.render.render",
          {"RenderMinimalData", "RenderMinimalDisplayColor", "RenderMinimalTextureDiffuse",

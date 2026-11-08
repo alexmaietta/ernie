@@ -8,7 +8,7 @@
 
 #include "bench.h"
 #include "ernie/device/queue.h"
-#include "ernie/ray_cast/ray_cast.h"
+#include "ernie/render/ray_cast/ray_cast.h"
 #include "ernie/scene/scene.h"
 #include "support/geometry.h"
 

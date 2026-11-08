@@ -36,7 +36,6 @@ add_subdirectory(texture)
 add_subdirectory(scene)
 add_subdirectory(overlay)
 add_subdirectory(render)
-add_subdirectory(ray_cast)
 add_subdirectory(import)
 
 ernie_public_files(ernie.h)
@@ -51,7 +50,6 @@ ernie_shared_library(
     ernie_scene
     ernie_overlay
     ernie_render
-    ernie_ray_cast
     ernie_io
     ernie_import
     slang::slang

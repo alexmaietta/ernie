@@ -24,7 +24,7 @@
 #include "ernie/app/viewer/viewport/gizmo.h"
 #include "ernie/app/viewer/viewport/orbit_camera.h"
 #include "ernie/device/tensor.h"
-#include "ernie/ray_cast/ray_cast.h"
+#include "ernie/render/ray_cast/ray_cast.h"
 #include "ernie/scene/scene.h"
 
 namespace ernie::app {
