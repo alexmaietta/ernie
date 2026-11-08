@@ -50,15 +50,18 @@ uint FindView(OverlayParams p, uint tile) {
     return low;
 }
 
+float3 ViewOrigin(RenderTables* tables, WorldTransform w, uint world, uint viewWorld) {
+    return RenderTranslation(tables, w, viewWorld) + ShownOffset(tables->instances, viewWorld, world);
+}
+
 float3 RenderSpace(OverlayParams p, OverlayBatch batch, uint world, float3 point) {
     RenderTables* tables = p.tables;
-    InstanceLayout* layout = p.tables->instances;
     if (batch.anchor != kNoPrim) {
-        const WorldTransform transform = PrimWorld(p.tables, batch.anchor);
-        return transform.Apply(point) + RenderTranslation(p.tables, transform, world) +
-               ShownOffset(layout, world, tables->prims.world[batch.anchor]);
+        const WorldTransform transform = PrimWorld(tables, batch.anchor);
+        return transform.Apply(point) +
+               ViewOrigin(tables, transform, tables->prims.world[batch.anchor], world);
     }
-    return RenderPoint(p.tables, point, world);
+    return RenderPoint(tables, point, world);
 }
 
 float RecordRadius(OverlayRecord record) {
@@ -130,6 +133,64 @@ uint ReadByte(uint64_t address, uint index) {
 
 float Cross2(float2 a, float2 b) {
     return a.x * b.y - a.y * b.x;
+}
+
+struct FillTriangle {
+    float2 corners[3];
+    float area;
+    float side;
+
+    __init(OverlayFill fill) {
+        corners = {float2(fill.x[0], fill.y[0]), float2(fill.x[1], fill.y[1]),
+                   float2(fill.x[2], fill.y[2])};
+        area = Cross2(corners[1] - corners[0], corners[2] - corners[0]);
+        side = area > 0 ? 1 : -1;
+    }
+
+    float Inside(uint edge, float2 point) {
+        const float2 from = corners[edge];
+        const float2 along = corners[(edge + 1) % 3] - from;
+        return side * Cross2(along, point - from) / max(length(along), 1e-6f);
+    }
+
+    float3 Shares(float2 point) {
+        const float first = Cross2(corners[1] - point, corners[2] - point) / area;
+        const float second = Cross2(corners[2] - point, corners[0] - point) / area;
+        return float3(first, second, 1 - first - second);
+    }
+}
+
+float SegmentT(OverlayRecord record, float2 point) {
+    const float2 a = float2(record.ax, record.ay);
+    const float2 along = float2(record.bx, record.by) - a;
+    const float lengthSquared = dot(along, along);
+    return lengthSquared > 0 ? saturate(dot(point - a, along) / lengthSquared) : 0;
+}
+
+float SegmentDepth(OverlayRecord record, float t) {
+    return (record.flags & kOverlayPerspective) != 0
+               ? 1 / lerp(1 / record.depthA, 1 / record.depthB, t)
+               : lerp(record.depthA, record.depthB, t);
+}
+
+void AddUnder(inout float4 under, float3 color, float alpha) {
+    const float weight = (1 - under.w) * alpha;
+    under = float4(under.xyz + color * weight, under.w + weight);
+}
+
+namespace ernie {
+
+extension OverlayView {
+    uint PixelIndex(uint2 pixel) {
+        return (layer * height + pixel.y) * width + pixel.x;
+    }
+
+    uint2 TileCorner(uint tile) {
+        const uint local = tile - firstTile;
+        return uint2((local % columnCount) * kOverlayTile, (local / columnCount) * kOverlayTile);
+    }
+}
+
 }
 
 bool ResolveRow(OverlayBatch batch, uint viewWorld, uint item, out uint slice, out uint row) {

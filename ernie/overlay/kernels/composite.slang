@@ -73,16 +73,11 @@ float4 SampleImage(OverlayFill fill, float2 uv) {
 float TriangleCoverage(OverlayRecord record, OverlayFill fill, float2 point, inout float4 color,
                        out float depth) {
     depth = 0;
-    const float2 corners[3] = {float2(fill.x[0], fill.y[0]), float2(fill.x[1], fill.y[1]),
-                               float2(fill.x[2], fill.y[2])};
-    const float area = Cross2(corners[1] - corners[0], corners[2] - corners[0]);
-    const float side = area > 0 ? 1 : -1;
+    const FillTriangle triangle = FillTriangle(fill);
     const uint edges = (record.flags >> kOverlayEdgeShift) & kOverlayEdgeMask;
     float coverage = 1;
     for (uint edge = 0; edge < 3; ++edge) {
-        const float2 from = corners[edge];
-        const float2 along = corners[(edge + 1) % 3] - from;
-        const float inside = side * Cross2(along, point - from) / max(length(along), 1e-6f);
+        const float inside = triangle.Inside(edge, point);
         if (((edges >> edge) & 1) != 0) {
             coverage = min(coverage, saturate(inside + 0.5f));
         } else if (inside < 0) {
@@ -92,9 +87,7 @@ float TriangleCoverage(OverlayRecord record, OverlayFill fill, float2 point, ino
     if (coverage <= 0) {
         return 0;
     }
-    const float first = Cross2(corners[1] - point, corners[2] - point) / area;
-    const float second = Cross2(corners[2] - point, corners[0] - point) / area;
-    const float3 shares = float3(first, second, 1 - first - second);
+    const float3 shares = triangle.Shares(point);
     const bool perspective = (record.flags & kOverlayPerspective) != 0;
     const float3 depths = float3(fill.depth[0], fill.depth[1], fill.depth[2]);
     const float3 weights = perspective ? shares / depths : shares;
@@ -128,15 +121,13 @@ float4 Shade(OverlayRecord record, float4 color, float2 point, float sceneDepth,
         const float2 inside = min(point - a, b - point);
         coverage = saturate(min(inside.x, inside.y) + 0.5f);
     } else if (kind == uint(OverlayPiece::Segment)) {
-        const float2 along = b - a;
-        const float lengthSquared = dot(along, along);
-        t = lengthSquared > 0 ? saturate(dot(point - a, along) / lengthSquared) : 0;
-        coverage = saturate(RecordRadius(record) + 0.5f - length(point - (a + along * t)));
+        t = SegmentT(record, point);
+        coverage = saturate(RecordRadius(record) + 0.5f - length(point - lerp(a, b, t)));
         const uint dash = (record.flags >> kOverlayDashShift) & kOverlayPatternMask;
         if (dash > 0 && coverage > 0) {
             const float gap = float(max((record.flags >> kOverlayGapShift) & kOverlayPatternMask, 1u));
             const float period = float(dash) + gap;
-            const float phase = fmod(t * sqrt(lengthSquared), period);
+            const float phase = fmod(t * length(b - a), period);
             const float inside = phase < float(dash) ? min(phase, float(dash) - phase)
                                                      : -min(phase - float(dash), period - phase);
             coverage *= saturate(inside + 0.5f);
@@ -151,9 +142,7 @@ float4 Shade(OverlayRecord record, float4 color, float2 point, float sceneDepth,
     const bool flat = kind == uint(OverlayPiece::Glyph) || kind == uint(OverlayPiece::Box);
     const float depth = kind == uint(OverlayPiece::Triangle) ? fillDepth
                         : flat ? record.depthA
-                        : (record.flags & kOverlayPerspective) != 0
-                            ? 1 / lerp(1 / record.depthA, 1 / record.depthB, t)
-                            : lerp(record.depthA, record.depthB, t);
+                        : SegmentDepth(record, t);
     const uint mode = record.flags & kOverlayDepthMask;
     if (mode != uint(OverlayDepth::Always) && sceneDepth != missDistance &&
         depth > sceneDepth * (1 + kDepthSlack)) {
@@ -192,7 +181,7 @@ struct CompositePixel {
     __init(OverlayView view, uint2 pixel) {
         inside = pixel.x < view.width && pixel.y < view.height;
         const uint2 clamped = min(pixel, uint2(view.width, view.height) - 1);
-        index = (view.layer * view.height + clamped.y) * view.width + clamped.x;
+        index = view.PixelIndex(clamped);
         point = float2(pixel) + 0.5f;
         sceneDepth = view.depth[index];
         under = float4(0);
@@ -206,8 +195,7 @@ struct CompositePixel {
             return;
         }
         const float4 shaded = Shade(record, color, point, sceneDepth, missDistance, font, fills);
-        const float weight = (1 - under.w) * shaded.w;
-        under = float4(under.xyz + shaded.xyz * weight, under.w + weight);
+        AddUnder(under, shaded.xyz, shaded.w);
         done = under.w >= kOpaque;
     }
 
@@ -231,11 +219,8 @@ void CompositeOverlays(uniform OverlayParams p) {
     const uint end = p.occupied[at + 3];
     const uint thread = LocalThreadIndex();
     const OverlayView view = p.views[p.occupied[at + 1]];
-    const uint local = tile - view.firstTile;
-    const uint2 corner =
-        uint2((local % view.columnCount) * kOverlayTile, (local / view.columnCount) * kOverlayTile);
-    CompositePixel pixel =
-        CompositePixel(view, corner + uint2(thread % kOverlayTile, thread / kOverlayTile));
+    CompositePixel pixel = CompositePixel(
+        view, view.TileCorner(tile) + uint2(thread % kOverlayTile, thread / kOverlayTile));
 
     uint chunkEnd = end;
     while (chunkEnd > start) {

@@ -17,15 +17,11 @@ bool MeasurePick(OverlayParams p, OverlayRecord record, float2 point, out PickMe
     const float2 b = float2(record.bx, record.by);
     const uint kind = (record.flags >> kOverlayKindShift) & kOverlayKindMask;
     if (kind == uint(OverlayPiece::Segment)) {
-        const float2 along = b - a;
-        const float lengthSquared = dot(along, along);
-        const float t = lengthSquared > 0 ? saturate(dot(point - a, along) / lengthSquared) : 0;
-        measure.nearest = a + along * t;
+        const float t = SegmentT(record, point);
+        measure.nearest = lerp(a, b, t);
         measure.along = t;
         measure.distance = max(length(point - measure.nearest) - RecordRadius(record), 0.0f);
-        measure.depth = (record.flags & kOverlayPerspective) != 0
-                            ? 1 / lerp(1 / record.depthA, 1 / record.depthB, t)
-                            : lerp(record.depthA, record.depthB, t);
+        measure.depth = SegmentDepth(record, t);
         return true;
     }
     if (kind == uint(OverlayPiece::Marker)) {
@@ -36,21 +32,14 @@ bool MeasurePick(OverlayParams p, OverlayRecord record, float2 point, out PickMe
     }
     if (kind == uint(OverlayPiece::Triangle)) {
         const OverlayFill fill = p.fills[asuint(record.depthA)];
-        const float2 corners[3] = {float2(fill.x[0], fill.y[0]), float2(fill.x[1], fill.y[1]),
-                                   float2(fill.x[2], fill.y[2])};
-        const float area = Cross2(corners[1] - corners[0], corners[2] - corners[0]);
-        const float side = area > 0 ? 1 : -1;
+        const FillTriangle triangle = FillTriangle(fill);
         float outside = 0;
         for (uint edge = 0; edge < 3; ++edge) {
-            const float2 from = corners[edge];
-            const float2 along = corners[(edge + 1) % 3] - from;
-            const float inside = side * Cross2(along, point - from) / max(length(along), 1e-6f);
-            outside = max(outside, -inside);
+            outside = max(outside, -triangle.Inside(edge, point));
         }
         measure.distance = outside;
-        const float first = Cross2(corners[1] - point, corners[2] - point) / area;
-        const float second = Cross2(corners[2] - point, corners[0] - point) / area;
-        const float3 shares = saturate(float3(first, second, 1 - first - second));
+        const float3 shares = saturate(triangle.Shares(point));
+        const float2 corners[3] = triangle.corners;
         const float total = max(shares.x + shares.y + shares.z, 1e-6f);
         measure.nearest = (corners[0] * shares.x + corners[1] * shares.y + corners[2] * shares.z) /
                           total;
@@ -88,7 +77,7 @@ uint PickKey(OverlayParams p, uint pick, uint local, out PickMeasure measure) {
     const uint mode = record.flags & kOverlayDepthMask;
     if (mode == uint(OverlayDepth::Test)) {
         const uint2 pixel = uint2(clamp(measure.nearest, float2(0), float2(view.width - 1, view.height - 1)));
-        const float sceneDepth = view.depth[(view.layer * view.height + pixel.y) * view.width + pixel.x];
+        const float sceneDepth = view.depth[view.PixelIndex(pixel)];
         if (sceneDepth != view.missDistance && measure.depth > sceneDepth * (1 + kDepthSlack)) {
             return ~0u;
         }
@@ -140,10 +129,8 @@ void ChooseOverlayPicks(uniform OverlayParams p) {
     }
 }
 
-void PickRay(OverlayParams p, OverlayView view, float2 pixel, out float3 origin,
+void PickRay(CameraModel camera, OverlayView view, float2 pixel, out float3 origin,
              out float3 direction) {
-    RenderTables* tables = p.tables;
-    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
     const float2 film = float2(pixel.x / float(view.width) * 2 - 1, 1 - pixel.y / float(view.height) * 2);
     const CameraRay ray = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));
     origin = ray.ray.origin;
@@ -162,10 +149,11 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     const OverlayView view = p.views[query.view];
     RenderTables* tables = p.tables;
     result.world = tables->prims.world[view.camera];
+    const CameraModel camera = CameraModel.Load(tables, view.camera);
     float3 origin;
     float3 direction;
-    PickRay(p, view, float2(query.x, query.y), origin, direction);
-    const float3 eye = origin - RenderShift(p.tables, result.world, result.world);
+    PickRay(camera, view, float2(query.x, query.y), origin, direction);
+    const float3 eye = origin - RenderShift(tables, result.world, result.world);
     result.origin = {eye.x, eye.y, eye.z};
     result.direction = {direction.x, direction.y, direction.z};
     if (result.work == ~0u || p.viewItemCount == 0) {
@@ -183,8 +171,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     PickKey(p, pick, local, measure);
     float3 through;
     float3 along;
-    PickRay(p, view, measure.nearest, through, along);
-    const CameraModel camera = CameraModel.Load(p.tables, view.camera);
+    PickRay(camera, view, measure.nearest, through, along);
     const float start = camera.ImagePlaneDistance(through);
     const float rate = camera.ImagePlaneDistance(through + along) - start;
     const float3 position = through + along * (rate != 0 ? (measure.depth - start) / rate : 0);
@@ -199,8 +186,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
                       : kNoPrim;
     result.distance = measure.distance;
     result.depth = measure.depth;
-    const uint world = tables->prims.world[view.camera];
-    const float3 found = position - RenderShift(p.tables, world, world);
+    const float3 found = position - RenderShift(tables, result.world, result.world);
     result.position = {found.x, found.y, found.z};
     p.pickResults[pick] = result;
 }

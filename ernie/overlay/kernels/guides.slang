@@ -62,9 +62,9 @@ bool LightPiece(RenderTables* tables, uint prim, uint piece, float length, out f
     case SchemaId::SphereLight: {
         const float radius =
             shape.treatAsPoint != 0 ? 0.05f * length : max(shape.radius, 0.02f * length);
-        const uint circle = piece / kOverlaySphereSegments;
-        const float3 u = circle == 0 ? float3(0, 1, 0) : circle == 1 ? float3(0, 0, 1) : float3(1, 0, 0);
-        const float3 v = circle == 0 ? float3(0, 0, 1) : circle == 1 ? float3(1, 0, 0) : float3(0, 1, 0);
+        float3 u;
+        float3 v;
+        SphereRing(piece / kOverlaySphereSegments, u, v);
         RingPiece(float3(0), u, v, radius, piece % kOverlaySphereSegments, kOverlaySphereSegments,
                   a, b);
         return true;
@@ -144,14 +144,14 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
             if (!PrimBounded(tables, prim)) {
                 return false;
             }
-            low = p.tables->primBounds[prim].lower.Vector();
-            high = p.tables->primBounds[prim].upper.Vector();
+            low = tables->primBounds[prim].lower.Vector();
+            high = tables->primBounds[prim].upper.Vector();
             world = tables->prims.world[prim];
             if (low.x == high.x && low.y == high.y && low.z == high.z) {
                 return false;
             }
         }
-        if (!all(low <= high) || !WorldShown(p.tables->instances, viewWorld, world)) {
+        if (!all(low <= high) || !WorldShown(tables->instances, viewWorld, world)) {
             return false;
         }
         float3 lowCorner;
@@ -165,9 +165,9 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
             a = RenderSpace(p, batch, viewWorld, a);
             b = RenderSpace(p, batch, viewWorld, b);
         } else {
-            float3 shift = RenderShift(p.tables, world, viewWorld);
+            float3 shift = RenderShift(tables, world, viewWorld);
             if (world != viewWorld) {
-                shift += ShownOffset(p.tables->instances, viewWorld, world);
+                shift += ShownOffset(tables->instances, viewWorld, world);
             }
             a += shift;
             b += shift;
@@ -179,12 +179,11 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         return false;
     }
     const uint world = tables->prims.world[prim];
-    if (!WorldShown(p.tables->instances, viewWorld, world)) {
+    if (!WorldShown(tables->instances, viewWorld, world)) {
         return false;
     }
-    const WorldTransform w = PrimWorld(p.tables, prim);
-    const float3 origin = RenderTranslation(p.tables, w, viewWorld) +
-                          ShownOffset(p.tables->instances, viewWorld, world);
+    const WorldTransform w = PrimWorld(tables, prim);
+    const float3 origin = ViewOrigin(tables, w, world, viewWorld);
     float3 from;
     float3 to;
     switch (batch.primShape) {

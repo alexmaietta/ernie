@@ -28,8 +28,8 @@ void UniteOverlayBoxes(uniform OverlayUniteParams u) {
     if (group >= u.boxCount || !PrimBounded(tables, prim)) {
         return;
     }
-    const float3 low = u.tables->primBounds[prim].lower.Vector();
-    const float3 high = u.tables->primBounds[prim].upper.Vector();
+    const float3 low = tables->primBounds[prim].lower.Vector();
+    const float3 high = tables->primBounds[prim].upper.Vector();
     if (low.x == high.x && low.y == high.y && low.z == high.z) {
         return;
     }
@@ -58,15 +58,13 @@ void OutlineOverlays(uniform OverlayParams p) {
         return;
     }
     const uint thread = LocalThreadIndex();
-    const uint local = tile - view.firstTile;
-    const int2 pixel = int2((local % view.columnCount) * kOverlayTile + thread % kOverlayTile,
-                            (local / view.columnCount) * kOverlayTile + thread / kOverlayTile);
+    const int2 pixel =
+        int2(view.TileCorner(tile) + uint2(thread % kOverlayTile, thread / kOverlayTile));
     const int2 size = int2(view.width, view.height);
     if (any(pixel >= size)) {
         return;
     }
-    const uint base = view.layer * view.height * view.width;
-    const uint index = base + uint(pixel.y) * view.width + uint(pixel.x);
+    const uint index = view.PixelIndex(uint2(pixel));
     float4 under = float4(0);
     for (uint at = 0; at < p.outlineCount; ++at) {
         const OverlayOutline outline = p.outlines[at];
@@ -84,8 +82,7 @@ void OutlineOverlays(uniform OverlayParams p) {
                     continue;
                 }
                 const int2 other = clamp(pixel + int2(dx, dy), int2(0), size - 1);
-                if (Outlined(outline, view.primIds[base + uint(other.y) * view.width +
-                                                   uint(other.x)]) != centre) {
+                if (Outlined(outline, view.primIds[view.PixelIndex(uint2(other))]) != centre) {
                     nearest = distance;
                 }
             }
@@ -93,8 +90,7 @@ void OutlineOverlays(uniform OverlayParams p) {
         const float coverage = saturate(outline.width + 0.5f - nearest);
         if (coverage > 0) {
             const float4 color = DecodeOverlayColor(outline.color);
-            const float weight = (1 - under.w) * color.w * coverage;
-            under = float4(under.xyz + color.xyz * weight, under.w + weight);
+            AddUnder(under, color.xyz, color.w * coverage);
         }
     }
     if (!(under.w > 0)) {

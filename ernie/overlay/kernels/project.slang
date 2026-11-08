@@ -83,7 +83,7 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     float pixelRadius = 0.5f * size;
     if ((batch.flags & kOverlayMeters) != 0) {
         const float3 middle = 0.5f * (a + b);
-        const float3 right = normalize(PrimWorld(p.tables, view.camera).x.Vector());
+        const float3 right = normalize(PrimWorld(tables, view.camera).x.Vector());
         const float2 centre = Pixel(camera.model.Project(middle).film, view);
         const float2 side = Pixel(camera.model.Project(middle + right * (0.5f * size)).film, view);
         pixelRadius = length(side - centre);

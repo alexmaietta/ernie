@@ -35,14 +35,13 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, OverlayCamer
                 return false;
             }
             const uint world = tables->prims.world[prim];
-            if (!WorldShown(p.tables->instances, viewWorld, world)) {
+            if (!WorldShown(tables->instances, viewWorld, world)) {
                 return false;
             }
             const Lens lens = Lens(tables, prim);
             const float distance = batch.length > 0 ? batch.length : 1;
-            const WorldTransform w = PrimWorld(p.tables, prim);
-            const float3 offset = RenderTranslation(p.tables, w, viewWorld) +
-                                  ShownOffset(p.tables->instances, viewWorld, world);
+            const WorldTransform w = PrimWorld(tables, prim);
+            const float3 offset = ViewOrigin(tables, w, world, viewWorld);
             origin = w.Apply(lens.Corner(float2(-1, 1), distance)) + offset;
             right = w.Apply(lens.Corner(float2(1, 1), distance)) + offset;
             down = w.Apply(lens.Corner(float2(-1, -1), distance)) + offset;

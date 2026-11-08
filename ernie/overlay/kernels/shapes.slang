@@ -32,6 +32,11 @@ void BoxEdge(uint piece, out float3 low, out float3 high) {
     high[axis] = 1;
 }
 
+void SphereRing(uint circle, out float3 u, out float3 v) {
+    u = circle == 0 ? float3(0, 1, 0) : circle == 1 ? float3(0, 0, 1) : float3(1, 0, 0);
+    v = circle == 0 ? float3(0, 0, 1) : circle == 1 ? float3(1, 0, 0) : float3(0, 1, 0);
+}
+
 void RingPiece(float3 center, float3 u, float3 v, float radius, uint step, uint steps,
                out float3 a, out float3 b) {
     const float2 from = Turn(step, steps) * radius;
@@ -87,26 +92,18 @@ bool Generate(ShapeRow shape, uint piece, out float3 a, out float3 b, inout floa
         return true;
     }
     case uint(OverlayKind::Spheres): {
-        const float radius = shape.Scalar();
-        const uint circle = piece / kOverlaySphereSegments;
-        const uint step = piece % kOverlaySphereSegments;
-        const float2 from = Turn(step, kOverlaySphereSegments) * radius;
-        const float2 to = Turn(step + 1, kOverlaySphereSegments) * radius;
-        const float3 u = circle == 0 ? float3(0, 1, 0) : circle == 1 ? float3(0, 0, 1) : float3(1, 0, 0);
-        const float3 v = circle == 0 ? float3(0, 0, 1) : circle == 1 ? float3(1, 0, 0) : float3(0, 1, 0);
-        b = a + u * to.x + v * to.y;
-        a = a + u * from.x + v * from.y;
+        float3 u;
+        float3 v;
+        SphereRing(piece / kOverlaySphereSegments, u, v);
+        RingPiece(a, u, v, shape.Scalar(), piece % kOverlaySphereSegments, kOverlaySphereSegments,
+                  a, b);
         return true;
     }
     case uint(OverlayKind::Circles): {
         float3 u;
         float3 v;
         Perpendiculars(shape.End(), u, v);
-        const float radius = shape.Scalar();
-        const float2 from = Turn(piece, kOverlayCircleSegments) * radius;
-        const float2 to = Turn(piece + 1, kOverlayCircleSegments) * radius;
-        b = a + u * to.x + v * to.y;
-        a = a + u * from.x + v * from.y;
+        RingPiece(a, u, v, shape.Scalar(), piece, kOverlayCircleSegments, a, b);
         return true;
     }
     case uint(OverlayKind::Frames): {
