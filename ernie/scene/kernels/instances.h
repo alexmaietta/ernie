@@ -20,10 +20,11 @@ struct InstanceParams {
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
     Ptr<MeshRecord> meshes;
+    Ptr<WorldTransform> slotWorlds;
     uint64_t unitBox;
 };
 
-ERNIE_CHECK_SIZE(InstanceParams, 88);
+ERNIE_CHECK_SIZE(InstanceParams, 96);
 
 struct OriginParams {
     Ptr<SceneData> scene;

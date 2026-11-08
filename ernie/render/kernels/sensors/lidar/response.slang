@@ -64,10 +64,11 @@ struct LidarResponse : IResponse<LidarPattern> {
         float reflectance = 1;
         bool retroreflective = false;
         const uint material = PrimImageable(tables, prim).material;
-        if (material != kNoPrim && HasApi(scene, material, kApiNonVisualMaterialAPI)) {
-            const uint row = ApiRow(scene, material, kApiNonVisualMaterialAPI);
-            reflectance = scene->schemas.nonVisualMaterialAPI.nonvisualLidarReflectance[row];
-            retroreflective = scene->schemas.nonVisualMaterialAPI.nonvisualRetroreflective[row] != 0;
+        if (material != kNoPrim && HasApi(tables, material, kApiNonVisualMaterialAPI)) {
+            const NonVisualRecord nonVisual =
+                tables->nonVisuals[ApiRow(tables, material, kApiNonVisualMaterialAPI)];
+            reflectance = nonVisual.lidarReflectance;
+            retroreflective = nonVisual.retroreflective != 0;
         }
         return retroreflective ? reflectance : reflectance * abs(dot(normal, direction));
     }

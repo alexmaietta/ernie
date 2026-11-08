@@ -76,6 +76,7 @@ std::vector<RuntimeProgram> RuntimePrograms() {
          "ernie.scene.kernels.lights",
          {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights", "WriteLightCdf"}},
         {&kSceneKernels, "ernie.scene.kernels.readback", {"GatherRows"}},
+        {&kSceneKernels, "ernie.scene.kernels.materials", {"WriteMaterials"}},
         {&kSceneKernels,
          "ernie.scene.kernels.sensors",
          {"WriteCameras", "WriteLidars", "WriteRadars"}},

@@ -93,14 +93,12 @@ Placement ProjectedPlacement(SurfacePoint point, float2 st, float weight, float3
     return placement;
 }
 
-void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point, uint row,
+void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point, MappingRecord m,
                                        PlacementSettings settings, inout V visitor) {
-    SceneData* scene = query.scene;
-    TextureMappingAPIData* m = &scene->schemas.textureMappingAPI;
-    const TextureProjection projection = TextureProjection(m.projection[row]);
+    const TextureProjection projection = TextureProjection(m.projection);
     const bool uv = projection == TextureProjection::Uv;
     Placement surface = {};
-    const bool object = !uv && TextureSpace(m.projectionSpace[row]) == TextureSpace::Object;
+    const bool object = !uv && TextureSpace(m.projectionSpace) == TextureSpace::Object;
     ObjectSpace space = {};
     float3 p = point.position;
     float3 n = point.shadingNormal;
@@ -108,17 +106,16 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
     float3 blend = float3(0);
     WorldTransform w = {};
     if (uv ? point.element.mesh : object) {
-        w = SlotWorld(scene, query.tables->transforms, query.tables->imageables, query.layout,
-                      point.slot);
+        w = query.tables->slotWorlds[point.slot];
     }
     if (uv) {
-        const PrimvarRef primvar = FindPrimvar(query.tables, point.slot, m.uvPrimvar[row]);
+        const PrimvarRef primvar = FindPrimvar(query.tables, point.slot, m.uvPrimvar);
         float4 value;
         const float2 st = ReadPrimvar(primvar, point.element, value) ? value.xy : float2(0);
         float3 tangent;
         float3 bitangent;
         float density;
-        if (!UvTangents(query, point, primvar, m.uvPrimvar[row], w, tangent, bitangent,
+        if (!UvTangents(query, point, primvar, m.uvPrimvar, w, tangent, bitangent,
                         density)) {
             const Basis frame = Basis(point.shadingNormal);
             tangent = frame.tangent;
@@ -132,9 +129,9 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
             p = space.ToObject(point.position - space.origin);
             n = normalize(mul(space.axes, point.shadingNormal));
         } else {
-            p = point.position - RenderShift(scene, query.tables, query.world, query.world);
+            p = point.position - RenderShift(query.tables, query.world, query.world);
         }
-        tile = max(m.tileSize[row], 1e-6f);
+        tile = max(m.tileSize, 1e-6f);
         const float3 a = abs(n);
         if (projection == TextureProjection::Planar) {
             blend = float3(0, 0, 1);
@@ -142,7 +139,7 @@ void ForEachPlacement<V : IPlacementVisitor>(HitQuery query, SurfacePoint point,
             const uint dominant = a.x >= a.y && a.x >= a.z ? 0 : (a.y >= a.z ? 1 : 2);
             blend[dominant] = 1;
         } else {
-            const float k = 1 / max(m.triplanarBlend[row], 1.0f / 32);
+            const float k = 1 / max(m.triplanarBlend, 1.0f / 32);
             const float3 sharp = pow(max(a, float3(1e-6f)), float3(k));
             blend = sharp / (sharp.x + sharp.y + sharp.z);
         }
@@ -284,23 +281,23 @@ struct SurfaceTexels<let Inputs : uint> : IPlacementVisitor {
 }
 
 float3 CheckerColor(MaterialQuery query, SurfacePoint point, float3 color) {
-    SceneData* scene = query.hit.scene;
-    const uint row = ApiRow(scene, point.prim, kApiCheckerboardAPI);
-    CheckerboardAPIData* c = &scene->schemas.checkerboardAPI;
-    if (c.checkerboard[row] == 0) {
+    RenderTables* tables = query.hit.tables;
+    if (!HasApi(tables, point.prim, kApiCheckerboardAPI)) {
         return color;
     }
-    const uint axis = scene->schemas.plane.axis[PrimRow(scene, point.prim, kSlotPlane)];
+    const CheckerRecord c = tables->checkers[ApiRow(tables, point.prim, kApiCheckerboardAPI)];
+    if (c.enabled == 0) {
+        return color;
+    }
+    const uint axis = c.axis;
     const ObjectSpace space =
-        TransformSpace(query.hit, point.slot,
-                       SlotWorld(scene, query.hit.tables->transforms, query.hit.tables->imageables,
-                                 query.hit.layout, point.slot));
+        TransformSpace(query.hit, point.slot, tables->slotWorlds[point.slot]);
     const float3 local = space.ToObject(point.position - space.origin);
     const float2 plane = float2(local[(axis + 1) % 3], local[(axis + 2) % 3]);
     const float3 reach = space.ToObject(point.stretch);
     const float2 along = float2(reach[(axis + 1) % 3], reach[(axis + 2) % 3]);
-    const float tile = 2 * max(c.checkerSize[row], 1e-6f);
-    const uint64_t handle = scene->textureBindings[kCheckerTextureBinding];
+    const float tile = 2 * max(c.size, 1e-6f);
+    const uint64_t handle = tables->textureBindings[kCheckerTextureBinding];
     float t;
     if (handle != 0) {
         t = TextureFromHandle(handle)
@@ -311,5 +308,5 @@ float3 CheckerColor(MaterialQuery query, SurfacePoint point, float3 color) {
         const int2 cell = int2(floor(2 * plane / tile));
         t = ((cell.x + cell.y) & 1) != 0 ? 1.0f : 0.0f;
     }
-    return lerp(c.checkerColorA[row].Vector(), c.checkerColorB[row].Vector(), t);
+    return lerp(c.colorA.Vector(), c.colorB.Vector(), t);
 }

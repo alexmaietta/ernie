@@ -24,6 +24,7 @@ ernie_object_library(
     systems/instance_layout.cpp
     systems/instances.cpp
     systems/lights.cpp
+    systems/materials.cpp
     systems/products.cpp
     systems/readback.cpp
     systems/regions.cpp

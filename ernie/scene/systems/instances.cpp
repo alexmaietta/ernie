@@ -195,6 +195,7 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
+    params.slotWorlds.address = m_slotWorlds.Address();
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -253,11 +254,12 @@ std::set<uint32_t> Instances::Tlases(uint32_t world) const {
 void Instances::Describe(RenderTables& tables) const {
     tables.instances.address = m_layout ? m_layout->Address() : 0;
     tables.origins.address = m_renderOrigins.Address();
+    tables.slotWorlds.address = m_slotWorlds.Address();
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_layout, m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(),
-                       m_instancing, m_renderOrigins.Buffer()});
+                       m_slotWorlds.Buffer(), m_instancing, m_renderOrigins.Buffer()});
     if (m_tlas) {
         held.emplace_back(m_tlas);
     }

@@ -25,6 +25,7 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
     const UnitShape shape = PlaceShape(scene, prim, w);
     p.shapes[slot] = shape.record;
+    p.slotWorlds[slot] = w;
     uint64_t blas = p.unitBox;
     if (ShapeKind(shape.record.kind) == ShapeKind::Mesh) {
         blas = schema == SchemaId::Mesh ? p.meshes[PrimRow(scene, prim, kSlotMesh)].blas

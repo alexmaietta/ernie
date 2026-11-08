@@ -200,10 +200,12 @@ void Instances::Relayout() {
     m_records.Allocate(device, slots);
     m_shapes.Allocate(device, slots);
     m_hits.Allocate(device, slots);
+    m_slotWorlds.Allocate(device, slots);
     m_renderOrigins.Allocate(device, m_worlds + 1);
     device::CommandEncoder clear = device.GetQueue().CreateEncoder();
     for (const Ref<device::Buffer>& buffer :
-         {m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(), m_renderOrigins.Buffer()}) {
+         {m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(), m_slotWorlds.Buffer(),
+          m_renderOrigins.Buffer()}) {
         clear.Fill(*buffer);
     }
     device.GetQueue().Submit(clear.Finish());

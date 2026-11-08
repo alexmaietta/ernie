@@ -137,70 +137,65 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
                                                                 uint material,
                                                                 inout SurfacePoint point,
                                                                 out SurfaceTexels<Inputs> base) {
-        SceneData* scene = query.hit.scene;
-        const uint row = PrimRow(scene, material, kSlotUsdPreviewSurface);
-        UsdPreviewSurfaceData* d = &scene->schemas.usdPreviewSurface;
-        SurfaceDetailAPIData* s = &scene->schemas.surfaceDetailAPI;
-        const uint detail = ApiRow(scene, material, kApiSurfaceDetailAPI);
+        RenderTables* tables = query.hit.tables;
+        PreviewRecord* d = &tables->previews[PrimRow(tables, material, kSlotUsdPreviewSurface)];
         const uint textures = query.Textures(material);
-        const bool detailed = s.enableDetail[detail] != 0;
-        const float2 tilt = s.normal[detail].Vector().xy;
+        const bool detailed = d.detail.enableDetail != 0;
+        const float2 tilt = d.detail.normal.Vector().xy;
         const bool bent = tilt.x != 0 || tilt.y != 0;
         base = SurfaceTexels<Inputs>(query, point.shadingNormal);
         base.bindings = query.Bindings(textures, 0);
         float3 normal = point.shadingNormal;
-        float3 diffuse = d.diffuseColor[row].Vector();
+        float3 diffuse = d.diffuseColor.Vector();
         if (textures != kNoTextures || detailed || bent) {
             const bool directX =
-                NormalConvention(s.normalConvention[detail]) == NormalConvention::DirectX;
+                NormalConvention(d.detail.normalConvention) == NormalConvention::DirectX;
             if (Normals) {
                 base.normalHandle = query.Texture(textures, uint(PreviewTexture::Normal));
-                base.normalValue = s.normal[detail].Vector();
-                base.normalInfluence = s.normalTextureInfluence[detail];
-                base.normalStrength = s.normalStrength[detail];
+                base.normalValue = d.detail.normal.Vector();
+                base.normalInfluence = d.detail.normalTextureInfluence;
+                base.normalStrength = d.detail.normalStrength;
                 base.directX = directX;
             }
-            const uint mapping = ApiRow(scene, material, kApiTextureMappingAPI);
-            TextureMappingAPIData* m = &scene->schemas.textureMappingAPI;
             PlacementSettings settings;
-            settings.uv.angle = radians(m.uvRotation[mapping]);
-            settings.uv.scale = m.uvScale[mapping].Vector();
-            settings.uv.offset = m.uvOffset[mapping].Vector();
+            settings.uv.angle = radians(d.mapping.uvRotation);
+            settings.uv.scale = d.mapping.uvScale.Vector();
+            settings.uv.offset = d.mapping.uvOffset.Vector();
             settings.fine = false;
             settings.single = query.minimal;
-            settings.hex = m.hexTiling[mapping] != 0;
-            settings.hexContrast = m.hexTilingContrast[mapping];
-            settings.hexRotation = m.hexTilingRotation[mapping] / 180;
+            settings.hex = d.mapping.hexTiling != 0;
+            settings.hexContrast = d.mapping.hexTilingContrast;
+            settings.hexRotation = d.mapping.hexTilingRotation / 180;
             settings.frameNormal = point.shadingNormal;
-            ForEachPlacement(query.hit, point, mapping, settings, base);
+            ForEachPlacement(query.hit, point, d.mapping, settings, base);
             normal = base.MappedNormal();
-            diffuse = MixedColor(d.diffuseColor[row], base.texels[0], base.Handle(0),
-                                 d.diffuseColorTextureChannel[row],
-                                 d.diffuseColorTextureInfluence[row]);
+            diffuse = MixedColor(d.diffuseColor, base.texels[0], base.Handle(0),
+                                 d.diffuseColorTextureChannel,
+                                 d.diffuseColorTextureInfluence);
             if (detailed) {
                 SurfaceTexels<1> fine = SurfaceTexels<1>(query, normal);
                 fine.bindings = query.Bindings(textures, uint(PreviewTexture::DetailAlbedo));
                 if (Normals) {
                     fine.normalHandle =
                         query.Texture(textures, uint(PreviewTexture::DetailNormal));
-                    fine.normalValue = s.detailNormal[detail].Vector();
-                    fine.normalInfluence = s.detailNormalTextureInfluence[detail];
-                    fine.normalStrength = s.detailNormalStrength[detail];
+                    fine.normalValue = d.detail.detailNormal.Vector();
+                    fine.normalInfluence = d.detail.detailNormalTextureInfluence;
+                    fine.normalStrength = d.detail.detailNormalStrength;
                     fine.directX = directX;
                 }
                 settings.fine = true;
-                settings.detail.angle = radians(s.detailRotation[detail]);
-                settings.detail.scale = s.detailScale[detail].Vector();
-                settings.detail.offset = s.detailOffset[detail].Vector();
-                settings.hex = s.detailHexTiling[detail] != 0;
+                settings.detail.angle = radians(d.detail.detailRotation);
+                settings.detail.scale = d.detail.detailScale.Vector();
+                settings.detail.offset = d.detail.detailOffset.Vector();
+                settings.hex = d.detail.detailHexTiling != 0;
                 settings.frameNormal = normal;
-                ForEachPlacement(query.hit, point, mapping, settings, fine);
+                ForEachPlacement(query.hit, point, d.mapping, settings, fine);
                 normal = fine.MappedNormal();
                 const float3 overlay =
-                    MixedColor(s.detailAlbedo[detail], fine.texels[0], fine.Handle(0),
-                               s.detailAlbedoTextureChannel[detail],
-                               s.detailAlbedoTextureInfluence[detail]);
-                diffuse *= lerp(float3(1), 2 * overlay, s.detailAlbedoStrength[detail]);
+                    MixedColor(d.detail.detailAlbedo, fine.texels[0], fine.Handle(0),
+                               d.detail.detailAlbedoTextureChannel,
+                               d.detail.detailAlbedoTextureInfluence);
+                diffuse *= lerp(float3(1), 2 * overlay, d.detail.detailAlbedoStrength);
             }
         }
         if (dot(normal, point.shadingNormal) > 0) {
@@ -216,30 +211,29 @@ struct PreviewSurface<Spectrum : ISpectrum> : IMaterial<Spectrum> {
 
     static PreviewSurface<Spectrum> Load(MaterialQuery query, uint material,
                                          inout SurfacePoint point) {
-        SceneData* scene = query.hit.scene;
-        const uint row = PrimRow(scene, material, kSlotUsdPreviewSurface);
-        UsdPreviewSurfaceData* d = &scene->schemas.usdPreviewSurface;
+        RenderTables* tables = query.hit.tables;
+        PreviewRecord* d = &tables->previews[PrimRow(tables, material, kSlotUsdPreviewSurface)];
         SurfaceTexels<kTextureInputs> base;
         const float3 diffuse = Mapped<kTextureInputs, true>(query, material, point, base);
         return PreviewSurface<Spectrum>(
             diffuse,
-            MixedColor(d.emissiveColor[row], base.texels[1], base.Handle(1),
-                       d.emissiveColorTextureChannel[row], d.emissiveColorTextureInfluence[row]),
-            d.useSpecularWorkflow[row] != 0,
-            MixedColor(d.specularColor[row], base.texels[2], base.Handle(2),
-                       d.specularColorTextureChannel[row], d.specularColorTextureInfluence[row]),
-            MixedFloat(d.metallic[row], base.texels[3], base.Handle(3),
-                       d.metallicTextureChannel[row], d.metallicTextureInfluence[row]),
-            MixedFloat(d.roughness[row], base.texels[4], base.Handle(4),
-                       d.roughnessTextureChannel[row], d.roughnessTextureInfluence[row]),
-            MixedFloat(d.clearcoat[row], base.texels[5], base.Handle(5),
-                       d.clearcoatTextureChannel[row], d.clearcoatTextureInfluence[row]),
-            MixedFloat(d.clearcoatRoughness[row], base.texels[6], base.Handle(6),
-                       d.clearcoatRoughnessTextureChannel[row],
-                       d.clearcoatRoughnessTextureInfluence[row]),
-            MixedFloat(d.opacity[row], base.texels[7], base.Handle(7),
-                       d.opacityTextureChannel[row], d.opacityTextureInfluence[row]),
-            d.ior[row]);
+            MixedColor(d.emissiveColor, base.texels[1], base.Handle(1),
+                       d.emissiveColorTextureChannel, d.emissiveColorTextureInfluence),
+            d.useSpecularWorkflow != 0,
+            MixedColor(d.specularColor, base.texels[2], base.Handle(2),
+                       d.specularColorTextureChannel, d.specularColorTextureInfluence),
+            MixedFloat(d.metallic, base.texels[3], base.Handle(3),
+                       d.metallicTextureChannel, d.metallicTextureInfluence),
+            MixedFloat(d.roughness, base.texels[4], base.Handle(4),
+                       d.roughnessTextureChannel, d.roughnessTextureInfluence),
+            MixedFloat(d.clearcoat, base.texels[5], base.Handle(5),
+                       d.clearcoatTextureChannel, d.clearcoatTextureInfluence),
+            MixedFloat(d.clearcoatRoughness, base.texels[6], base.Handle(6),
+                       d.clearcoatRoughnessTextureChannel,
+                       d.clearcoatRoughnessTextureInfluence),
+            MixedFloat(d.opacity, base.texels[7], base.Handle(7),
+                       d.opacityTextureChannel, d.opacityTextureInfluence),
+            d.ior);
     }
 
     [Differentiable]

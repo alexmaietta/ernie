@@ -9,6 +9,7 @@
 #include "ernie/scene/kernels/tables/geometry.h"
 #include "ernie/scene/kernels/tables/hierarchy.h"
 #include "ernie/scene/kernels/tables/instances.h"
+#include "ernie/scene/kernels/tables/materials.h"
 #include "ernie/scene/kernels/tables/prims.h"
 #include "ernie/scene/kernels/tables/products.h"
 #include "ernie/scene/kernels/tables/sensors.h"
@@ -30,16 +31,20 @@ struct RenderTables {
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
     Ptr<RenderOrigin> origins;
+    Ptr<WorldTransform> slotWorlds;
     Ptr<CameraRecord> cameras;
     Ptr<LidarRecord> lidars;
     Ptr<RadarRecord> radars;
     Ptr<ProductRecord> products;
+    Ptr<PreviewRecord> previews;
+    Ptr<NonVisualRecord> nonVisuals;
+    Ptr<CheckerRecord> checkers;
     SemanticsData semantics;
     uint worldCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 216);
+ERNIE_CHECK_SIZE(RenderTables, 248);
 
 #ifdef __SLANG__
 
@@ -91,7 +96,7 @@ float3 RenderPoint(RenderTables* tables, float3 point, uint world) {
     return (point - origin.high.Vector()) - origin.low.Vector();
 }
 
-float3 RenderShift(SceneData* scene, RenderTables* tables, uint from, uint world) {
+float3 RenderShift(RenderTables* tables, uint from, uint world) {
     const RenderOrigin origin = TlasOrigin(tables, world);
     InstanceLayout* layout = tables->instances;
     if (from >= tables->worldCount || layout->worldOrigins[from] == kNoRow) {

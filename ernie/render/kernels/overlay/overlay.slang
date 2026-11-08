@@ -452,7 +452,7 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
             a = RenderSpace(p, batch, viewWorld, a);
             b = RenderSpace(p, batch, viewWorld, b);
         } else {
-            float3 shift = RenderShift(scene, p.tables, world, viewWorld);
+            float3 shift = RenderShift(p.tables, world, viewWorld);
             if (world != viewWorld) {
                 shift += ShownOffset(p.tables->instances, viewWorld, world);
             }
@@ -1771,7 +1771,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     float3 origin;
     float3 direction;
     PickRay(p, view, float2(query.x, query.y), origin, direction);
-    const float3 eye = origin - RenderShift(scene, p.tables, result.world, result.world);
+    const float3 eye = origin - RenderShift(p.tables, result.world, result.world);
     result.origin = {eye.x, eye.y, eye.z};
     result.direction = {direction.x, direction.y, direction.z};
     if (result.work == ~0u || p.viewItemCount == 0) {
@@ -1806,7 +1806,7 @@ void ResolveOverlayPicks(uniform OverlayParams p) {
     result.distance = measure.distance;
     result.depth = measure.depth;
     const uint world = scene->prims.world[view.camera];
-    const float3 found = position - RenderShift(scene, p.tables, world, world);
+    const float3 found = position - RenderShift(p.tables, world, world);
     result.position = {found.x, found.y, found.z};
     p.pickResults[pick] = result;
 }

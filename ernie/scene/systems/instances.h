@@ -145,6 +145,7 @@ class Instances : public System {
     Ref<device::Buffer> m_layout;
     InstanceLayout m_header{};
     DeviceTable<SlotHit> m_hits{"instance hits"};
+    DeviceTable<WorldTransform> m_slotWorlds{"slot worlds"};
     Ref<device::Buffer> m_instancing;
     std::vector<Instancer> m_instancers;
     std::set<uint32_t> m_instancerPrims;

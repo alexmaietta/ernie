@@ -19,6 +19,7 @@
 #include "ernie/scene/systems/hierarchy.h"
 #include "ernie/scene/systems/instances.h"
 #include "ernie/scene/systems/lights.h"
+#include "ernie/scene/systems/materials.h"
 #include "ernie/scene/systems/products.h"
 #include "ernie/scene/systems/readback.h"
 #include "ernie/scene/systems/semantics.h"
@@ -178,6 +179,7 @@ class SceneImpl {
     Semantics m_semantics;
     Sensors m_sensors;
     Products m_products;
+    Materials m_materials;
     Instances m_instances;
     Surfaces m_surfaces;
     Lights m_lights;
