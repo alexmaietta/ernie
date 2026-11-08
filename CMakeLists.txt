@@ -6,7 +6,7 @@ endif()
 set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "")
 project(
     Ernie
-    VERSION 0.1.0
+    VERSION 0.1.1
     DESCRIPTION
         "Efficient Renderer for Natural and Interplanetary Environments: a physically-based, real-time, spectral renderer for planetary robotics and sensing"
     HOMEPAGE_URL "https://github.com/alexmaietta/ernie"

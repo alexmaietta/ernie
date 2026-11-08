@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-08
+
 ### Fixed
 
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
@@ -34,5 +36,6 @@ The first release of Ernie, a real-time spectral GPU renderer for planetary robo
 - Infinite planes no longer stretch scene and world bounds, and finite planes get flat boxes.
 - Cylinders, cones and capsules no longer show black speckles on their lit sides when seen from far away.
 
-[unreleased]: https://github.com/alexmaietta/ernie/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/alexmaietta/ernie/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/alexmaietta/ernie/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alexmaietta/ernie/releases/tag/v0.1.0
