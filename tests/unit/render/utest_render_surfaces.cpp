@@ -120,6 +120,32 @@ TEST(SurfaceTest, DisplayColorsFollowThePrimAndEachInstancerCopy) {
     });
 }
 
+TEST(SurfaceTest, EachPointTakesItsOwnDisplayColor) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = TwoTiles(device);
+        const Prim cloud = scene->Define<Points>(
+            "/Cloud", {.primvars = {Primvar::Create("displayColor", Interpolation::Vertex,
+                                                    std::vector<Float3>{{1, 0, 0}, {0, 0, 1}})},
+                       .points = {{0, 0, 0}, {10, 0, 0}},
+                       .widths = {2}});
+        Renderer renderer(scene);
+        Colors colors = CenterColors(renderer);
+        EXPECT_GT(colors.first.x, 0);
+        EXPECT_EQ(colors.first.z, 0);
+        EXPECT_EQ(colors.second.x, 0);
+        EXPECT_GT(colors.second.z, 0);
+
+        cloud.Set(Points::kPrimvars,
+                  std::vector<Primvar>{Primvar::Create("displayColor", Interpolation::Vertex,
+                                                       std::vector<Float3>{{0, 1, 0}, {1, 0, 0}})});
+        colors = CenterColors(renderer);
+        EXPECT_GT(colors.first.y, 0);
+        EXPECT_EQ(colors.first.x, 0);
+        EXPECT_GT(colors.second.x, 0);
+        EXPECT_EQ(colors.second.z, 0);
+    });
+}
+
 TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

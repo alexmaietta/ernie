@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -235,6 +236,72 @@ TEST(RayCastTest, MovedAndRecountedPointsHitWhereTheyAre) {
         cloud.Set(Points::kPoints, std::vector<Float3>{});
         distance = cast();
         EXPECT_TRUE(std::isinf(distance[0]) && std::isinf(distance[1]) && std::isinf(distance[2]));
+    });
+}
+
+TEST(RayCastTest, AGridOfPointsIsHitOncePerPointAndMissedBetween) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kAcross = 16;
+        const Ref<Scene> scene = Scene::Create(device);
+        std::vector<Float3> points;
+        for (uint32_t y = 0; y < kAcross; ++y) {
+            for (uint32_t z = 0; z < kAcross; ++z) {
+                points.push_back({3, float(y), float(z)});
+            }
+        }
+        scene->Define<Points>("/Grid", {.points = points, .widths = {0.5f}});
+        std::vector<float> origins;
+        std::vector<float> directions;
+        for (uint32_t y = 0; y < 2 * kAcross - 1; ++y) {
+            for (uint32_t z = 0; z < 2 * kAcross - 1; ++z) {
+                origins.insert(origins.end(), {0, 0.5f * float(y), 0.5f * float(z)});
+                directions.insert(directions.end(), {1, 0, 0});
+            }
+        }
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, origins, 3);
+        rays.directions = Floats(device, directions, 3);
+        const std::vector<uint32_t> hit = caster.Cast(rays).hit.ToHost<uint32_t>();
+        uint32_t hits = 0;
+        uint32_t strays = 0;
+        for (uint32_t y = 0; y < 2 * kAcross - 1; ++y) {
+            for (uint32_t z = 0; z < 2 * kAcross - 1; ++z) {
+                const uint32_t h = hit[y * (2 * kAcross - 1) + z];
+                (y % 2 == 0 && z % 2 == 0 ? hits : strays) += h;
+            }
+        }
+        EXPECT_EQ(hits, kAcross * kAcross);
+        EXPECT_EQ(strays, 0u);
+    });
+}
+
+TEST(RayCastTest, PointsWrittenThroughAMappingHitWhereTheyWereWritten) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Points>("/Cloud", {.points = {{3, 0, 0}, {3, 4, 0}}, .widths = {1}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0, 0, 0, 0, 4, 0, 0, 8, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0, 1, 0, 0, 1, 0, 0}, 3);
+        ASSERT_NEAR(caster.Cast(rays).distance.ToHost<float>()[0], 2.5, 1e-4);
+
+        const std::vector<Float3> simulated = {{6, 0, 0}, {3, 8, 0}};
+        const Ref<device::Buffer> source =
+            device.CreateBuffer({.label = "simulated points"}, std::span<const Float3>(simulated));
+        Mapping mapping = scene->Select("/Cloud").GetArray<Float3>("points").Map(MapAccess::Write);
+        const Tensor& values = mapping.Values();
+        device::Queue& queue = device.GetQueue();
+        device::CommandEncoder encoder = queue.CreateEncoder();
+        encoder.Copy(source->Slice(0),
+                     values.GetBuffer().Slice(values.Offset(), sizeof(Float3) * simulated.size()));
+        queue.Submit(encoder.Finish());
+        mapping.Close();
+
+        const std::vector<float> distance = caster.Cast(rays).distance.ToHost<float>();
+        EXPECT_NEAR(distance[0], 5.5, 1e-4);
+        EXPECT_TRUE(std::isinf(distance[1]));
+        EXPECT_NEAR(distance[2], 2.5, 1e-4);
     });
 }
 

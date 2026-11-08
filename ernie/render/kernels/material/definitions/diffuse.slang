@@ -9,7 +9,7 @@ using namespace ernie;
 struct DiffuseMaterial : IStandardMaterial {
     static float3 Color(ShadeContext context) {
         RenderTables* tables = context.materials.hit.tables;
-        const float3 display = SurfaceDisplayColor(tables, context.point.slot);
+        const float3 display = SurfaceDisplayColor(tables, context.point.slot, context.point.element);
         if (PrimSchema(tables, context.point.prim) != SchemaId::Plane) {
             return display;
         }

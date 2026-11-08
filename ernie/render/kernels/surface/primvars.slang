@@ -114,9 +114,13 @@ bool ReadInstancePrimvar(RenderTables* tables, uint slot, uint name, out float4 
     return true;
 }
 
-float3 SurfaceDisplayColor(RenderTables* tables, uint slot) {
+float3 SurfaceDisplayColor(RenderTables* tables, uint slot, SurfaceElement element) {
+    const uint name = tables->instances->displayColorName;
     float4 tint;
-    if (ReadInstancePrimvar(tables, slot, tables->instances->displayColorName, tint)) {
+    if (ReadInstancePrimvar(tables, slot, name, tint)) {
+        return tint.xyz;
+    }
+    if (ReadPrimvar(FindPrimvar(tables, slot, name), element, tint)) {
         return tint.xyz;
     }
     return tables->surfaces[slot].displayColor.Vector();
