@@ -320,7 +320,7 @@ void MeshBuilder::Link(const Mesh& mesh) {
         record.bounds = shape.bounds;
     }
     if (m_records.Set(mesh.meshRow, record) && m_structure.GetPrims().Alive(mesh.prim)) {
-        AddWorld(m_relinked, m_structure.GetPrims().At(mesh.prim).world);
+        AddWorld(m_relinked, m_structure.GetPrims().Record(mesh.prim).world);
     }
 }
 
@@ -331,7 +331,7 @@ void MeshBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     m_stats.refit = 0;
     m_stats.triangulated = 0;
     const auto isMesh = [&](uint32_t prim) {
-        return prims.Alive(prim) && IsA(prims.At(prim).schema, SchemaId::Mesh);
+        return prims.Alive(prim) && IsA(prims.Record(prim).schema, SchemaId::Mesh);
     };
     const auto forget = [&](uint32_t prim) {
         Mesh& mesh = m_meshes.at(prim);
@@ -469,7 +469,7 @@ void MeshBuilder::Update(std::vector<uint32_t>& updated) {
     const Prims& prims = m_structure.GetPrims();
     for (const auto& [prim, mesh] : m_meshes) {
         if (mesh.shape && mesh.shape->updated == Runs() && prims.Alive(prim)) {
-            AddWorld(updated, prims.At(prim).world);
+            AddWorld(updated, prims.Record(prim).world);
         }
     }
 

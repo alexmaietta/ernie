@@ -54,9 +54,9 @@ void TransformBuilder::Hold(std::vector<Ref<const RefCounted>>& held) const {
 
 uint32_t TransformBuilder::ParentRow(uint32_t prim) const {
     const Prims& prims = m_structure.GetPrims();
-    uint32_t up = prims.At(prim).parent;
-    while (up != kNoPrim && !IsA(prims.At(up).schema, SchemaId::Imageable)) {
-        up = prims.At(up).parent;
+    uint32_t up = prims.Record(prim).parent;
+    while (up != kNoPrim && !IsA(prims.Record(up).schema, SchemaId::Imageable)) {
+        up = prims.Record(up).parent;
     }
     return up == kNoPrim ? kNoRow : prims.Row(up, SchemaId::Imageable);
 }
@@ -74,10 +74,10 @@ void TransformBuilder::Rebuild() {
     m_rows.clear();
     std::vector<std::vector<uint32_t>> segments(prims.WorldCount() + 1);
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
-        if (!prims.Alive(prim) || !IsA(prims.At(prim).schema, SchemaId::Imageable)) {
+        if (!prims.Alive(prim) || !IsA(prims.Record(prim).schema, SchemaId::Imageable)) {
             continue;
         }
-        const PrimRecord& record = prims.At(prim);
+        const PrimRecord& record = prims.Record(prim);
         const uint32_t row = prims.Row(prim, SchemaId::Imageable);
         m_parents.Set(row, ParentRow(prim));
         if (IsA(record.schema, SchemaId::Xformable)) {
@@ -133,19 +133,19 @@ bool TransformBuilder::Apply(const ChangeSet& changes) {
     }
     for (const StructureEntry& entry : changes.added) {
         if (!prims.Alive(entry.prim) || prims.Generation(entry.prim) != entry.generation ||
-            !IsA(prims.At(entry.prim).schema, SchemaId::Imageable)) {
+            !IsA(prims.Record(entry.prim).schema, SchemaId::Imageable)) {
             continue;
         }
         const uint32_t row = prims.Row(entry.prim, SchemaId::Imageable);
         if (row >= m_parents.Rows()) {
             return false;
         }
-        if (IsA(prims.At(entry.prim).schema, SchemaId::Xformable) &&
+        if (IsA(prims.Record(entry.prim).schema, SchemaId::Xformable) &&
             prims.Row(entry.prim, SchemaId::Xformable) >= m_transforms.Rows()) {
             return false;
         }
         m_parents.Set(row, ParentRow(entry.prim));
-        m_xforms.Set(row, IsA(prims.At(entry.prim).schema, SchemaId::Xformable)
+        m_xforms.Set(row, IsA(prims.Record(entry.prim).schema, SchemaId::Xformable)
                               ? prims.Row(entry.prim, SchemaId::Xformable)
                               : kNoRow);
         segment(WorldSlot(entry.world)).push_back(row);

@@ -631,7 +631,7 @@ void Viewport::UpdateGuides() {
     std::vector<Prim> stack;
     const View roots = m_scene->Select("/*");
     for (const uint32_t root : roots.Prims()) {
-        const Prim prim = m_scene->At(root);
+        const Prim prim = m_scene->ByIndex(root);
         if (!prim.IsSession()) {
             stack.push_back(prim);
         }
@@ -1279,7 +1279,7 @@ bool Viewport::SendGesture(OverlayGesture gesture, const OverlayHit& hit, ImVec2
             return false;
         }
         if (gesture == OverlayGesture::Click) {
-            m_selection.Set(m_scene->At(hit.prim).Path());
+            m_selection.Set(m_scene->ByIndex(hit.prim).Path());
         }
         return gesture == OverlayGesture::Press;
     }
@@ -1434,7 +1434,7 @@ void Viewport::LandPick() {
         }
         return;
     }
-    const std::string path = m_scene->At(prim).Path();
+    const std::string path = m_scene->ByIndex(prim).Path();
     if (m_pickToggles) {
         m_selection.Toggle(path);
     } else {
@@ -1526,7 +1526,7 @@ void Viewport::RefreshWorlds() {
         std::vector<Prim> stack;
         const View roots = m_scene->Select("/*");
         for (const uint32_t root : roots.Prims()) {
-            const Prim prim = m_scene->At(root);
+            const Prim prim = m_scene->ByIndex(root);
             if (!prim.IsSession()) {
                 stack.push_back(prim);
             }

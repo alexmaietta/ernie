@@ -30,7 +30,7 @@ Image Checkerboard() {
     for (uint32_t y = 0; y < kCheckerSide; ++y) {
         for (uint32_t x = 0; x < kCheckerSide; ++x) {
             const float value = (x / half + y / half + 1) % 2 == 0 ? 0.0f : 1.0f;
-            image.At(x, y) = {value, value, value, 1};
+            image.Pixel(x, y) = {value, value, value, 1};
         }
     }
     return image;

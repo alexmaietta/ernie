@@ -65,8 +65,8 @@ class Publisher {
         std::vector<Ref<device::Buffer>> changed;
     };
 
-    Ordinal StampAt(Ordinal ordinal) const;
-    Ordinal OrdinalAt(Ordinal stamp, Ordinal sealing) const;
+    Ordinal SealedStamp(Ordinal ordinal) const;
+    Ordinal SealedOrdinal(Ordinal stamp, Ordinal sealing) const;
     ChangeSet Build(Ordinal since, Ordinal until, Ordinal sealing,
                     std::span<const ColumnRef> columns,
                     std::vector<Ref<device::Buffer>>* reused = nullptr);

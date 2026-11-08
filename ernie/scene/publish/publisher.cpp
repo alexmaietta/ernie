@@ -45,12 +45,12 @@ void Publisher::Add(TableBuilder& system) {
     m_systems.push_back({&system});
 }
 
-Ordinal Publisher::StampAt(Ordinal ordinal) const {
+Ordinal Publisher::SealedStamp(Ordinal ordinal) const {
     const auto after = std::ranges::upper_bound(m_sealed, ordinal, {}, &Sealed::ordinal);
     return after == m_sealed.begin() ? 0 : std::prev(after)->stamp;
 }
 
-Ordinal Publisher::OrdinalAt(Ordinal stamp, Ordinal sealing) const {
+Ordinal Publisher::SealedOrdinal(Ordinal stamp, Ordinal sealing) const {
     const auto found = std::ranges::lower_bound(m_sealed, stamp, {}, &Sealed::stamp);
     return found == m_sealed.end() ? sealing : found->ordinal;
 }
@@ -60,8 +60,8 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
                            std::vector<Ref<device::Buffer>>* reused) {
     ColumnStore& store = m_structure.GetColumnStore();
     ChangeSet changes;
-    changes.since = since == 0 ? 0 : OrdinalAt(since, sealing);
-    changes.until = OrdinalAt(until, sealing);
+    changes.since = since == 0 ? 0 : SealedOrdinal(since, sealing);
+    changes.until = SealedOrdinal(until, sealing);
     changes.sinceStamp = since;
     changes.untilStamp = until;
     changes.resync = since == 0;
@@ -69,7 +69,7 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
         if (entry.ordinal <= since || entry.ordinal > until) {
             continue;
         }
-        entry.ordinal = OrdinalAt(entry.ordinal, sealing);
+        entry.ordinal = SealedOrdinal(entry.ordinal, sealing);
         if (entry.api != SchemaId::None) {
             changes.apis.push_back(entry);
         } else {
@@ -214,7 +214,7 @@ ChangeSet Publisher::Changes(Ordinal since, std::span<const ColumnRef> columns) 
         throw Error("Changes since {}, but only {} is published", since, Published());
     }
     const Ordinal until = m_sealed.empty() ? 0 : m_sealed.back().stamp;
-    return Build(StampAt(since), until, Published(), columns);
+    return Build(SealedStamp(since), until, Published(), columns);
 }
 
 void Publisher::Seal() {

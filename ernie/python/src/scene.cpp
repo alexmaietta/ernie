@@ -43,7 +43,7 @@ struct SceneSelection {
     std::vector<Prim> Prims() const {
         std::vector<Prim> prims;
         for (const uint32_t index : view.Prims()) {
-            prims.push_back(scene->At(index));
+            prims.push_back(scene->ByIndex(index));
         }
         return prims;
     }

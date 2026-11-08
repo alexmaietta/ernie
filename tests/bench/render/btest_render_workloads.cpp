@@ -368,7 +368,7 @@ std::string TextureFile(uint32_t index) {
         for (uint32_t y = 0; y < kTextureSide; ++y) {
             for (uint32_t x = 0; x < kTextureSide; ++x) {
                 const bool odd = ((x / 16) + (y / 16)) % 2 != 0;
-                image.At(x, y) = odd ? Rgba{hue, 0.4f, 1 - hue, 1} : Rgba{0.9f, 0.9f, 0.85f, 1};
+                image.Pixel(x, y) = odd ? Rgba{hue, 0.4f, 1 - hue, 1} : Rgba{0.9f, 0.9f, 0.85f, 1};
             }
         }
         WritePng(path.string(), image);

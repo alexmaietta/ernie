@@ -146,7 +146,7 @@ void SemanticBuilder::Resolve(uint32_t prim, std::map<uint64_t, Labels>& reads) 
                     break;
                 }
             }
-            at = prims.At(at).parent;
+            at = prims.Record(at).parent;
         }
         uint32_t id = 1;
         if (at != kNoPrim) {
@@ -376,7 +376,7 @@ IdEntries SemanticBuilder::StableIdEntries() const {
     IdEntries entries;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim) ||
-            (!IsA(prims.At(prim).schema, SchemaId::Gprim) && !m_labelRows.contains(prim))) {
+            (!IsA(prims.Record(prim).schema, SchemaId::Gprim) && !m_labelRows.contains(prim))) {
             continue;
         }
         IdEntry& entry = entries.emplace_back();

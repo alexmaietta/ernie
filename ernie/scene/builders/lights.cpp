@@ -231,7 +231,7 @@ bool LightBuilder::Restructured(const ChangeSet& changes) const {
     for (const StructureEntry& entry : changes.added) {
         if (prims.Alive(entry.prim) && prims.Generation(entry.prim) == entry.generation &&
             (prims.HasApi(entry.prim, SchemaId::LightAPI) ||
-             IsA(prims.At(entry.prim).schema, SchemaId::World))) {
+             IsA(prims.Record(entry.prim).schema, SchemaId::World))) {
             return true;
         }
     }
@@ -251,7 +251,7 @@ void LightBuilder::Relayout() {
         if (!prims.Alive(prim)) {
             continue;
         }
-        const PrimRecord& record = prims.At(prim);
+        const PrimRecord& record = prims.Record(prim);
         if (IsA(record.schema, SchemaId::World)) {
             m_worldPrims.insert(prim);
         }
@@ -264,7 +264,7 @@ void LightBuilder::Relayout() {
     }
     std::vector<uint32_t> domes;
     for (const uint32_t prim : m_lights) {
-        if (prims.At(prim).schema == SchemaId::DomeLight) {
+        if (prims.Record(prim).schema == SchemaId::DomeLight) {
             domes.push_back(prim);
         }
     }

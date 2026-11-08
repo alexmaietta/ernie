@@ -37,7 +37,7 @@ Image Gradient(uint32_t width, uint32_t height) {
     Image image(width, height);
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
-            image.At(x, y) = {float(x) / float(width), float(y) / float(height), 0.5f, 1};
+            image.Pixel(x, y) = {float(x) / float(width), float(y) / float(height), 0.5f, 1};
         }
     }
     return image;

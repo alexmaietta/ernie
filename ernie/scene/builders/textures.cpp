@@ -174,7 +174,7 @@ void TextureBuilder::Refresh(uint32_t prim) {
 
 void TextureBuilder::Publish(uint32_t prim, const Material& material) {
     const Prims& prims = m_structure.GetPrims();
-    const SchemaId schema = prims.At(prim).schema;
+    const SchemaId schema = prims.Record(prim).schema;
     TextureRecord record{};
     if (IsA(schema, SchemaId::Material) || schema == SchemaId::DomeLight) {
         record.textures = material.bindings;
@@ -196,7 +196,7 @@ void TextureBuilder::Publish(uint32_t prim, const Material& material) {
         }
     }
     m_records.Set(prim, record);
-    Rebound(prims.At(prim).world);
+    Rebound(prims.Record(prim).world);
 }
 
 void TextureBuilder::Rebound(uint32_t world) {
@@ -213,7 +213,7 @@ void TextureBuilder::Release(uint32_t prim) {
     m_records.Set(prim, TextureRecord{});
     const Prims& prims = m_structure.GetPrims();
     if (prims.Alive(prim)) {
-        Rebound(prims.At(prim).world);
+        Rebound(prims.Record(prim).world);
     } else {
         Rebound(kGlobalWorld);
     }
@@ -246,7 +246,7 @@ const std::vector<uint32_t>& TextureBuilder::Read(Cells& cells, SchemaId table, 
 
 void TextureBuilder::Rebind(uint32_t prim, Cells& cells) {
     const Prims& prims = m_structure.GetPrims();
-    const SchemaId schema = prims.At(prim).schema;
+    const SchemaId schema = prims.Record(prim).schema;
     Material material;
     TextureWrap wrap = TextureWrap::Repeat;
     if (prims.HasApi(prim, SchemaId::TextureMappingAPI)) {
@@ -307,7 +307,7 @@ void TextureBuilder::Rebind(uint32_t prim, Cells& cells) {
     for (const RowKey& row : material.rows) {
         m_byRow[row] = prim;
     }
-    m_structure.GetColumnStore().StampWorld(prims.At(prim).world);
+    m_structure.GetColumnStore().StampWorld(prims.Record(prim).world);
     m_materials[prim] = std::move(material);
 }
 
@@ -315,8 +315,8 @@ void TextureBuilder::Run(const ChangeSet& changes, TableWrites& writes) {
     ERNIE_ZONE("Textures/Run");
     const Prims& prims = m_structure.GetPrims();
     const auto textured = [&](uint32_t prim) {
-        return prims.Alive(prim) && (m_slots.contains(prims.At(prim).schema) ||
-                                     IsA(prims.At(prim).schema, SchemaId::Plane));
+        return prims.Alive(prim) && (m_slots.contains(prims.Record(prim).schema) ||
+                                     IsA(prims.Record(prim).schema, SchemaId::Plane));
     };
 
     const std::set<uint32_t> loaded = Collect();

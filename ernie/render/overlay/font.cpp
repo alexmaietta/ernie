@@ -49,7 +49,7 @@ class Table {
         return (uint32_t{U16(offset)} << 16) | U16(offset + 2);
     }
 
-    Table At(size_t offset) const {
+    Table Subtable(size_t offset) const {
         return {m_data, m_size, m_at + offset};
     }
 
@@ -69,7 +69,7 @@ std::optional<uint16_t> CoverageIndex(const Table& coverage, uint16_t glyph) {
         }
     } else if (coverage.U16(0) == 2) {
         for (uint16_t i = 0; i < count; ++i) {
-            const Table range = coverage.At(4 + 6u * i);
+            const Table range = coverage.Subtable(4 + 6u * i);
             if (glyph >= range.U16(0) && glyph <= range.U16(2)) {
                 return uint16_t(range.U16(4) + glyph - range.U16(0));
             }
@@ -87,7 +87,7 @@ uint16_t GlyphClass(const Table& classes, uint16_t glyph) {
     } else if (classes.U16(0) == 2) {
         const uint16_t count = classes.U16(2);
         for (uint16_t i = 0; i < count; ++i) {
-            const Table range = classes.At(4 + 6u * i);
+            const Table range = classes.Subtable(4 + 6u * i);
             if (glyph >= range.U16(0) && glyph <= range.U16(2)) {
                 return range.U16(4);
             }
@@ -113,13 +113,13 @@ struct PairTable {
 
 PairTable BuildPairTable(const Table& sub, const std::vector<uint16_t>& glyphs) {
     PairTable table{sub, {}, {}, {}};
-    const Table coverage = sub.At(sub.U16(2));
+    const Table coverage = sub.Subtable(sub.U16(2));
     for (const uint16_t glyph : glyphs) {
         const std::optional<uint16_t> index = CoverageIndex(coverage, glyph);
         table.index.push_back(index ? *index : -1);
         if (sub.U16(0) == 2) {
-            table.firstClasses.push_back(GlyphClass(sub.At(sub.U16(8)), glyph));
-            table.secondClasses.push_back(GlyphClass(sub.At(sub.U16(10)), glyph));
+            table.firstClasses.push_back(GlyphClass(sub.Subtable(sub.U16(8)), glyph));
+            table.secondClasses.push_back(GlyphClass(sub.Subtable(sub.U16(10)), glyph));
         }
     }
     return table;
@@ -133,7 +133,7 @@ std::optional<int16_t> PairSetAdjustment(const Table& set, uint16_t second, uint
         const size_t middle = (low + high) / 2;
         const uint16_t glyph = set.U16(2 + middle * stride);
         if (glyph == second) {
-            return XAdvance(set.At(4 + middle * stride), format);
+            return XAdvance(set.Subtable(4 + middle * stride), format);
         }
         if (glyph < second) {
             low = middle + 1;
@@ -157,7 +157,7 @@ std::optional<int16_t> PairAdjustment(const PairTable& pairs, size_t a, size_t b
         if (index >= sub.U16(8)) {
             return std::nullopt;
         }
-        return PairSetAdjustment(sub.At(sub.U16(10 + 2u * index)), second, format,
+        return PairSetAdjustment(sub.Subtable(sub.U16(10 + 2u * index)), second, format,
                                  2 + firstSize + secondSize);
     }
     if (sub.U16(0) == 2) {
@@ -169,7 +169,8 @@ std::optional<int16_t> PairAdjustment(const PairTable& pairs, size_t a, size_t b
             return std::nullopt;
         }
         return XAdvance(
-            sub.At(16 + (size_t{first} * secondCount + next) * (firstSize + secondSize)), format);
+            sub.Subtable(16 + (size_t{first} * secondCount + next) * (firstSize + secondSize)),
+            format);
     }
     return std::nullopt;
 }
@@ -180,15 +181,15 @@ std::vector<std::vector<Table>> FindKernLookups(const unsigned char* data, size_
         return lookups;
     }
     const Table table(data, size, size_t(gpos));
-    const Table features = table.At(table.U16(6));
-    const Table list = table.At(table.U16(8));
+    const Table features = table.Subtable(table.U16(6));
+    const Table list = table.Subtable(table.U16(8));
     std::vector<uint16_t> indices;
     for (uint16_t f = 0; f < features.U16(0); ++f) {
-        const Table record = features.At(2 + 6u * f);
+        const Table record = features.Subtable(2 + 6u * f);
         if (record.U32(0) != kGposKern) {
             continue;
         }
-        const Table feature = features.At(record.U16(4));
+        const Table feature = features.Subtable(record.U16(4));
         for (uint16_t i = 0; i < feature.U16(2); ++i) {
             indices.push_back(feature.U16(4 + 2u * i));
         }
@@ -199,14 +200,14 @@ std::vector<std::vector<Table>> FindKernLookups(const unsigned char* data, size_
         if (index >= list.U16(0)) {
             continue;
         }
-        const Table lookup = list.At(list.U16(2 + 2u * index));
+        const Table lookup = list.Subtable(list.U16(2 + 2u * index));
         std::vector<Table> subtables;
         for (uint16_t s = 0; s < lookup.U16(4); ++s) {
-            Table sub = lookup.At(lookup.U16(6 + 2u * s));
+            Table sub = lookup.Subtable(lookup.U16(6 + 2u * s));
             uint16_t type = lookup.U16(0);
             if (type == 9) {
                 type = sub.U16(2);
-                sub = sub.At(sub.U32(4));
+                sub = sub.Subtable(sub.U32(4));
             }
             if (type == 2) {
                 subtables.push_back(sub);

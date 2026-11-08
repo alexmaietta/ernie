@@ -82,7 +82,7 @@ class Paths {
     };
 
     static uint64_t Key(uint32_t parent, Token name);
-    const Node& At(uint32_t prim) const;
+    const Node& Get(uint32_t prim) const;
     uint32_t Child(uint32_t parent, std::string_view name) const;
     std::optional<Lazy> Locate(uint32_t prim) const;
     void Materialize(uint32_t prim);

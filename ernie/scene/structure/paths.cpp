@@ -28,7 +28,7 @@ uint64_t Paths::Key(uint32_t parent, Token name) {
     return (uint64_t(parent) << 32) | name.id;
 }
 
-const Paths::Node& Paths::At(uint32_t prim) const {
+const Paths::Node& Paths::Get(uint32_t prim) const {
     if (prim >= m_nodes.size() || !m_nodes[prim].used) {
         throw Error("No prim {} in the hierarchy", prim);
     }
@@ -265,7 +265,7 @@ std::string_view Paths::Name(uint32_t prim) const {
     if (const std::optional<Lazy> lazy = Locate(prim); lazy && lazy->index > 0) {
         return m_tokens->Text(lazy->block->shape.name[lazy->index]);
     }
-    return m_tokens->Text(At(prim).name);
+    return m_tokens->Text(Get(prim).name);
 }
 
 uint32_t Paths::Parent(uint32_t prim) const {
@@ -273,16 +273,16 @@ uint32_t Paths::Parent(uint32_t prim) const {
         const uint32_t count = uint32_t(lazy->block->shape.parent.size());
         return lazy->block->firstPrim + lazy->copy * count + lazy->block->shape.parent[lazy->index];
     }
-    return At(prim).parent;
+    return Get(prim).parent;
 }
 
 uint32_t Paths::Depth(uint32_t prim) const {
     if (const std::optional<Lazy> lazy = Locate(prim); lazy && lazy->index > 0) {
         const uint32_t count = uint32_t(lazy->block->shape.parent.size());
-        return At(lazy->block->firstPrim + lazy->copy * count).depth +
+        return Get(lazy->block->firstPrim + lazy->copy * count).depth +
                lazy->block->shape.depth[lazy->index];
     }
-    return At(prim).depth;
+    return Get(prim).depth;
 }
 
 std::vector<uint32_t> Paths::Children(uint32_t prim) const {
@@ -298,7 +298,7 @@ std::vector<uint32_t> Paths::Children(uint32_t prim) const {
         }
         return children;
     }
-    return At(prim).children;
+    return Get(prim).children;
 }
 
 std::vector<uint32_t> Paths::Subtree(uint32_t prim) const {

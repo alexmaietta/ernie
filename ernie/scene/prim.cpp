@@ -32,7 +32,7 @@ void Prim::Check() const {
 
 SchemaId Prim::Schema() const {
     Check();
-    return SceneImpl::Get(*m_scene).GetStructure().GetPrims().At(m_index).schema;
+    return SceneImpl::Get(*m_scene).GetStructure().GetPrims().Record(m_index).schema;
 }
 
 bool Prim::IsSession() const {
@@ -42,7 +42,7 @@ bool Prim::IsSession() const {
 
 uint32_t Prim::World() const {
     Check();
-    return SceneImpl::Get(*m_scene).GetStructure().GetPrims().At(m_index).world;
+    return SceneImpl::Get(*m_scene).GetStructure().GetPrims().Record(m_index).world;
 }
 
 std::string Prim::Path() const {
@@ -57,7 +57,8 @@ std::string_view Prim::Name() const {
 
 std::optional<Prim> Prim::Parent() const {
     Check();
-    const uint32_t parent = SceneImpl::Get(*m_scene).GetStructure().GetPrims().At(m_index).parent;
+    const uint32_t parent =
+        SceneImpl::Get(*m_scene).GetStructure().GetPrims().Record(m_index).parent;
     if (parent == kNoPrim) {
         return std::nullopt;
     }

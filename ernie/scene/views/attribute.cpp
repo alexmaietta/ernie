@@ -712,7 +712,7 @@ void UntypedAttribute::SetArray(uint32_t index, Span<const std::byte> items) {
         std::memcpy(targets.data(), items.data(), items.size());
         m_view->GetStructure().MarkTargets(targets);
     }
-    store.StampWorld(m_view->GetStructure().GetPrims().At(m_view->Prims()[index]).world);
+    store.StampWorld(m_view->GetStructure().GetPrims().Record(m_view->Prims()[index]).world);
 }
 
 std::vector<std::byte> UntypedAttribute::GetArray(uint32_t index) const {
@@ -745,7 +745,7 @@ void UntypedAttribute::SetTargets(uint32_t index, const std::vector<std::string>
     Structure& structure = m_view->GetStructure();
     const uint32_t prim = m_view->Prims()[index];
     structure.SetTargets(prim, Rows().rows.at(index), m_column, paths);
-    GetColumnStore().StampWorld(structure.GetPrims().At(prim).world);
+    GetColumnStore().StampWorld(structure.GetPrims().Record(prim).world);
 }
 
 std::vector<std::string> UntypedAttribute::GetTargets(uint32_t index) const {

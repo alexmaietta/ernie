@@ -243,14 +243,14 @@ Prim Scene::Move(Prim prim, std::string_view path) {
     structure.Move(prim.Index(), path);
     std::vector<std::string> xformable;
     for (const uint32_t moved : structure.GetPaths().Subtree(prim.Index())) {
-        if (IsA(structure.GetPrims().At(moved).schema, SchemaId::Xformable)) {
+        if (IsA(structure.GetPrims().Record(moved).schema, SchemaId::Xformable)) {
             xformable.push_back(structure.GetPaths().Path(moved));
         }
     }
     if (!xformable.empty()) {
         Select(xformable, SchemaId::Xformable).Get(Xformable::kTranslate.Column()).MarkChanged();
     }
-    return At(prim.Index());
+    return ByIndex(prim.Index());
 }
 
 Prim Scene::Rename(Prim prim, std::string_view name) {
@@ -482,7 +482,7 @@ std::optional<Prim> Scene::Find(std::string_view path) const {
     return m_impl->Handle(prim);
 }
 
-Prim Scene::At(uint32_t index) const {
+Prim Scene::ByIndex(uint32_t index) const {
     if (!m_impl->GetStructure().GetPrims().Alive(index)) {
         throw Error("No prim {}", index);
     }
@@ -584,7 +584,8 @@ std::vector<uint32_t> PathPrims(const Scene& scene, Span<const std::string> path
 
 std::vector<uint32_t> BoundableRows(const Prims& prims, std::vector<uint32_t> indices) {
     for (uint32_t& prim : indices) {
-        prim = prims.Alive(prim) && IsA(prims.At(prim).schema, SchemaId::Boundable) ? prim : kNoRow;
+        prim = prims.Alive(prim) && IsA(prims.Record(prim).schema, SchemaId::Boundable) ? prim
+                                                                                        : kNoRow;
     }
     return indices;
 }
@@ -728,7 +729,7 @@ PrimCopy Scene::Copy(Prim prim) {
 
     std::vector<Pending> reads;
     for (const uint32_t index : structure.GetPaths().Subtree(prim.Index())) {
-        const PrimRecord& record = structure.GetPrims().At(index);
+        const PrimRecord& record = structure.GetPrims().Record(index);
         const std::string path = structure.GetPaths().Path(index);
         CopiedPrim& copied = state->prims.emplace_back();
         copied.relative = path.substr(state->root.size());
@@ -741,7 +742,7 @@ PrimCopy Scene::Copy(Prim prim) {
         for (const SchemaId table : PrimTables(record.schema, record.apis)) {
             std::vector<std::string> names = {""};
             if (IsMultipleApi(table)) {
-                names = At(index).Instances(table);
+                names = ByIndex(index).Instances(table);
                 for (const std::string& name : names) {
                     copied.instances.emplace_back(table, name);
                 }
@@ -755,13 +756,13 @@ PrimCopy Scene::Copy(Prim prim) {
                 }
             }
         }
-        const View view = Select(At(index));
+        const View view = Select(ByIndex(index));
         for (CopiedValue& value : copied.values) {
             const ColumnInfo& info = *value.Column().column;
             const UntypedAttribute attribute =
                 value.instance.empty()
                     ? view.Get(value.Column())
-                    : Select(At(index), value.owner, value.instance).Get(value.Column());
+                    : Select(ByIndex(index), value.owner, value.instance).Get(value.Column());
             if (info.type == ColumnType::PrimArray) {
                 value.strings = attribute.GetTargets(0);
             } else if (info.type == ColumnType::TokenArray) {
@@ -828,7 +829,7 @@ Prim Scene::Paste(const PrimCopy& copy, std::string_view path) {
 
     for (size_t at = 0; at < state.prims.size(); ++at) {
         const CopiedPrim& copied = state.prims[at];
-        const Prim prim = At(pasted[at].Index());
+        const Prim prim = ByIndex(pasted[at].Index());
         const View view = Select(prim);
         for (const CopiedValue& value : copied.values) {
             const ColumnInfo& info = *value.Column().column;
@@ -861,7 +862,7 @@ Prim Scene::Paste(const PrimCopy& copy, std::string_view path) {
             AddFile(file, bytes, prim);
         }
     }
-    return At(pasted.front().Index());
+    return ByIndex(pasted.front().Index());
 }
 
 }

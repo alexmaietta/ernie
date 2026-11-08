@@ -36,7 +36,7 @@ uint32_t Prims::Generation(uint32_t prim) const {
     return m_records[prim].generation;
 }
 
-const PrimRecord& Prims::At(uint32_t prim) const {
+const PrimRecord& Prims::Record(uint32_t prim) const {
     if (!Alive(prim)) {
         throw Error("No prim {}", prim);
     }
@@ -44,7 +44,7 @@ const PrimRecord& Prims::At(uint32_t prim) const {
 }
 
 uint32_t Prims::FindRow(uint32_t prim, SchemaId table) const {
-    const PrimRecord& record = At(prim);
+    const PrimRecord& record = Record(prim);
     const uint32_t slot = PrimSlot(record.schema, record.apis, table);
     return slot == kNoSlot ? kNoRow : m_slotRows[record.slots + slot];
 }
@@ -61,14 +61,14 @@ std::vector<uint32_t> Prims::Rows(std::span<const uint32_t> prims, SchemaId tabl
 uint32_t Prims::Row(uint32_t prim, SchemaId table) const {
     const uint32_t row = FindRow(prim, table);
     if (row == kNoRow) {
-        throw Error("Prim {}, a {}, has no {} data", prim, Info(At(prim).schema).name,
+        throw Error("Prim {}, a {}, has no {} data", prim, Info(Record(prim).schema).name,
                     Info(table).name);
     }
     return row;
 }
 
 bool Prims::HasApi(uint32_t prim, SchemaId api) const {
-    return ernie::HasApi(At(prim).apis, api);
+    return ernie::HasApi(Record(prim).apis, api);
 }
 
 std::span<const ApiInstance> Prims::Instances(uint32_t prim, SchemaId api) const {
@@ -128,7 +128,7 @@ void Prims::Check(const BlockShape& shape, std::span<const uint32_t> parents) co
         if (parent == kNoPrim) {
             continue;
         }
-        const PrimRecord& record = At(parent);
+        const PrimRecord& record = Record(parent);
         if (worlds && record.world != kGlobalWorld) {
             throw Error("Worlds added inside world {}; worlds don't nest", record.world);
         }
@@ -301,7 +301,7 @@ void Prims::StageRecord(uint32_t prim) {
 }
 
 void Prims::CheckRemovable(uint32_t prim) const {
-    for (const SchemaId table : PrimTables(At(prim).schema, At(prim).apis)) {
+    for (const SchemaId table : PrimTables(Record(prim).schema, Record(prim).apis)) {
         if (m_store.Pinned(table)) {
             throw Error("{} data is mapped or attached, so prims with it can't be removed until "
                         "the mapping closes or the attachment is released",
@@ -322,7 +322,7 @@ void Prims::Renew(uint32_t prim) {
 
 void Prims::Remove(uint32_t prim) {
     CheckRemovable(prim);
-    const PrimRecord record = At(prim);
+    const PrimRecord record = Record(prim);
     const std::vector<SchemaId> tables = PrimTables(record.schema, record.apis);
     for (uint32_t slot = 0; slot < tables.size(); ++slot) {
         if (!IsMultipleApi(tables[slot])) {

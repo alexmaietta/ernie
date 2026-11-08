@@ -61,8 +61,8 @@ void BoundsBuilder::Relayout() {
     const uint32_t worlds = prims.WorldCount();
     std::vector<uint32_t> origins(std::max(worlds, 1u), kNoRow);
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
-        if (prims.Alive(prim) && IsA(prims.At(prim).schema, SchemaId::World)) {
-            origins[prims.At(prim).world] = prims.Row(prim, SchemaId::Xformable);
+        if (prims.Alive(prim) && IsA(prims.Record(prim).schema, SchemaId::World)) {
+            origins[prims.Record(prim).world] = prims.Row(prim, SchemaId::Xformable);
         }
     }
     m_origins =

@@ -87,7 +87,7 @@ std::vector<InstanceBuilder::Instancer> InstanceBuilder::GatherInstancers() cons
         if (!prims.Alive(prim)) {
             continue;
         }
-        const PrimRecord& record = prims.At(prim);
+        const PrimRecord& record = prims.Record(prim);
         Instancer instancer{.prim = prim, .world = record.world};
         if (record.schema == SchemaId::PointInstancer) {
             const uint32_t row = prims.Row(prim, SchemaId::PointInstancer);
@@ -109,7 +109,7 @@ std::vector<InstanceBuilder::Instancer> InstanceBuilder::GatherInstancers() cons
 
 bool InstanceBuilder::Member(uint32_t prim) const {
     const Prims& prims = m_structure.GetPrims();
-    for (uint32_t at = prim; at != kNoPrim; at = prims.At(at).parent) {
+    for (uint32_t at = prim; at != kNoPrim; at = prims.Record(at).parent) {
         if (m_roots.contains(at)) {
             return true;
         }
@@ -148,9 +148,9 @@ void InstanceBuilder::Relayout() {
         if (!prims.Alive(prim)) {
             continue;
         }
-        const PrimRecord& record = prims.At(prim);
+        const PrimRecord& record = prims.Record(prim);
         uint32_t root = kNoPrim;
-        for (uint32_t at = prim; at != kNoPrim && root == kNoPrim; at = prims.At(at).parent) {
+        for (uint32_t at = prim; at != kNoPrim && root == kNoPrim; at = prims.Record(at).parent) {
             if (m_roots.contains(at)) {
                 root = at;
             }
@@ -300,7 +300,7 @@ void InstanceBuilder::BuildInstancing() {
         uint32_t start = 0;
         uint32_t lightStart = 0;
         for (const uint32_t drawable : m_drawables[root]) {
-            const uint32_t light = IsEmitter(uint32_t(prims.At(drawable).schema)) ? 1 : 0;
+            const uint32_t light = IsEmitter(uint32_t(prims.Record(drawable).schema)) ? 1 : 0;
             local.push_back({.prim = drawable,
                              .start = start,
                              .slots = 1,
@@ -354,10 +354,10 @@ void InstanceBuilder::BuildInstancing() {
                 entry.count = pieced.count;
                 entry.width = pieced.width;
                 entry.lights = pieced.lights;
-                entry.parent = instancer.native ? root : prims.At(root).parent;
+                entry.parent = instancer.native ? root : prims.Record(root).parent;
                 while (entry.parent != kNoPrim &&
-                       !IsA(prims.At(entry.parent).schema, SchemaId::Xformable)) {
-                    entry.parent = prims.At(entry.parent).parent;
+                       !IsA(prims.Record(entry.parent).schema, SchemaId::Xformable)) {
+                    entry.parent = prims.Record(entry.parent).parent;
                 }
             }
             width = std::max(width, entry.width);
@@ -403,7 +403,7 @@ void InstanceBuilder::BuildInstancing() {
         for (const uint32_t root : instancer.roots) {
             if (root != kNoPrim) {
                 for (const uint32_t drawable : m_drawables[root]) {
-                    worlds.insert(prims.At(drawable).world);
+                    worlds.insert(prims.Record(drawable).world);
                 }
             }
         }
@@ -547,7 +547,7 @@ std::optional<std::set<uint32_t>> InstanceBuilder::Apply(const ChangeSet& change
         if (!prims.Alive(entry.prim) || prims.Generation(entry.prim) != entry.generation) {
             continue;
         }
-        const SchemaId schema = prims.At(entry.prim).schema;
+        const SchemaId schema = prims.Record(entry.prim).schema;
         if (IsA(schema, SchemaId::World) || schema == SchemaId::RenderProduct ||
             schema == SchemaId::PointInstancer ||
             prims.HasApi(entry.prim, SchemaId::PrototypeAPI) || Member(entry.prim)) {

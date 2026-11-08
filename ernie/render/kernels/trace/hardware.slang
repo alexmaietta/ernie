@@ -2,7 +2,7 @@
 
 __exported import ernie.render.kernels.trace.itracer;
 
-RaytracingAccelerationStructure AccelAt(uint64_t address) {
+RaytracingAccelerationStructure Accel(uint64_t address) {
     return spirv_asm {
         result:$$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address
     };
@@ -32,7 +32,7 @@ struct HardwareTracer : ITracer {
                                                        F filter, I intersector, bool any) {
         const uint flags = filter.Opaque() ? RAY_FLAG_FORCE_OPAQUE : RAY_FLAG_FORCE_NON_OPAQUE;
         RayQuery<F.kRayFlags> query;
-        query.TraceRayInline(AccelAt(tlas),
+        query.TraceRayInline(Accel(tlas),
                              flags | (any ? RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH : 0), mask,
                              ToRayDesc(ray));
         float2 attributes = float2(0);

@@ -70,7 +70,7 @@ ColumnStore::ColumnStore(device::Device& device)
     m_worlds.Allocate(1);
 }
 
-const ColumnStore::Entry& ColumnStore::At(SchemaId schema) const {
+const ColumnStore::Entry& ColumnStore::Lookup(SchemaId schema) const {
     if (uint32_t(schema) >= m_entries.size()) {
         throw Error("No data for schema {}", uint32_t(schema));
     }
@@ -78,15 +78,15 @@ const ColumnStore::Entry& ColumnStore::At(SchemaId schema) const {
 }
 
 Table& ColumnStore::Schema(SchemaId schema) {
-    return *At(schema).table;
+    return *Lookup(schema).table;
 }
 
 const Table& ColumnStore::Schema(SchemaId schema) const {
-    return *At(schema).table;
+    return *Lookup(schema).table;
 }
 
 void ColumnStore::Pin(SchemaId schema) {
-    At(schema);
+    Lookup(schema);
     ++m_entries[uint32_t(schema)].pins;
 }
 
@@ -164,7 +164,7 @@ Attachment ColumnStore::Detach(ColumnRef column, std::span<const uint32_t> rows)
 }
 
 bool ColumnStore::Pinned(SchemaId schema) const {
-    return At(schema).pins > 0;
+    return Lookup(schema).pins > 0;
 }
 
 ArrayHeap& ColumnStore::Arrays(ColumnType type) {
@@ -180,12 +180,12 @@ ArrayHeap& ColumnStore::Arrays(ColumnType type) {
 }
 
 uint32_t ColumnStore::PrimsColumn(SchemaId schema) const {
-    At(schema);
+    Lookup(schema);
     return Info(schema).columnCount;
 }
 
 uint32_t ColumnStore::StampColumn(ColumnRef column) const {
-    const std::vector<uint32_t>& stamps = At(column.schema).stamps;
+    const std::vector<uint32_t>& stamps = Lookup(column.schema).stamps;
     if (column.index >= stamps.size()) {
         throw Error("{} has no column {}", Info(column.schema).name, column.index);
     }
@@ -203,7 +203,7 @@ void ColumnStore::Touch(ColumnRef column) {
 
 uint64_t ColumnStore::LastWrite(ColumnRef column) const {
     StampColumn(column);
-    return At(column.schema).writes[column.index];
+    return Lookup(column.schema).writes[column.index];
 }
 
 StampTarget ColumnStore::Stamps(ColumnRef column) {

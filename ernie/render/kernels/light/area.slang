@@ -296,7 +296,7 @@ struct AreaLight<Spectrum : ISpectrum> : ILight<Spectrum> {
         return Emitted(direction, point);
     }
 
-    float PdfAt(float3 position, float3 point) {
+    float PointPdf(float3 position, float3 point) {
         const float3 offset = point - position;
         const float distance2 = dot(offset, offset);
         const float cosine = dot(-offset * rsqrt(max(distance2, 1e-30f)), SurfaceNormal(point));

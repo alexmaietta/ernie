@@ -149,7 +149,7 @@ Image ReadIes(std::string_view text) {
         for (uint32_t y = 0; y < kIesRows; ++y) {
             const float value =
                 float(Interpolate(vertical, column, 180.0 * y / (kIesRows - 1)) / peak);
-            image.At(x, y) = {value, value, value, 1};
+            image.Pixel(x, y) = {value, value, value, 1};
         }
     }
     return image;

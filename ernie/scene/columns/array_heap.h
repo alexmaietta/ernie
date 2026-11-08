@@ -68,7 +68,7 @@ class ArrayHeap {
         uint64_t bytes = 0;
     };
 
-    const Entry& At(const ArrayRef& array) const;
+    const Entry& Lookup(const ArrayRef& array) const;
     uint32_t AddRun(HeapBlock block, uint32_t live);
 
     Heap& m_heap;

@@ -210,7 +210,7 @@ class ColumnStore {
         uint32_t row = 0;
     };
 
-    const Entry& At(SchemaId schema) const;
+    const Entry& Lookup(SchemaId schema) const;
     void Place(std::byte* data, uint32_t offset, uint64_t address) const;
     void FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,
                    std::span<const std::byte> cell);

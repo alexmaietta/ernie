@@ -18,7 +18,7 @@ ViewState::ViewState(Structure& structure, SchemaId schema, std::vector<uint32_t
     const ernie::Prims& records = structure.GetPrims();
     m_generations.reserve(m_prims.size());
     for (const uint32_t prim : m_prims) {
-        const PrimRecord& record = records.At(prim);
+        const PrimRecord& record = records.Record(prim);
         if (schema != SchemaId::None && !IsA(record.schema, schema) &&
             !HasApi(record.apis, schema)) {
             throw Error("Prim {}, a {}, isn't a {}", prim, Info(record.schema).name,
@@ -62,7 +62,7 @@ const ViewRows& ViewState::Rows(SchemaId table) {
                             Info(table).name, m_structure.GetTokens().Text(Token{m_instance}));
             }
         }
-        const uint32_t world = records.At(m_prims[index]).world;
+        const uint32_t world = records.Record(m_prims[index]).world;
         rows.rows.push_back(row);
         ++rows.live;
         worlds.insert(world);
@@ -134,7 +134,7 @@ View View::World(uint32_t world) const {
     if (m_state) {
         const ernie::Prims& records = m_state->GetStructure().GetPrims();
         for (uint32_t index = 0; index < m_state->Size(); ++index) {
-            if (m_state->Live(index) && records.At(m_state->Prims()[index]).world == world) {
+            if (m_state->Live(index) && records.Record(m_state->Prims()[index]).world == world) {
                 prims.push_back(m_state->Prims()[index]);
             }
         }
@@ -200,7 +200,7 @@ ColumnRef View::Column(std::string_view field) const {
         uint64_t shared = ~uint64_t(0);
         for (const uint32_t prim : m_state->Prims()) {
             if (prims.Alive(prim)) {
-                shared &= prims.At(prim).apis;
+                shared &= prims.Record(prim).apis;
             }
         }
         if (const ColumnRef column = FindColumn(m_state->Schema(), shared, field)) {
@@ -213,7 +213,7 @@ ColumnRef View::Column(std::string_view field) const {
             continue;
         }
         if (const ColumnRef column =
-                FindColumn(prims.At(prim).schema, prims.At(prim).apis, field)) {
+                FindColumn(prims.Record(prim).schema, prims.Record(prim).apis, field)) {
             return column;
         }
     }

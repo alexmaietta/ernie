@@ -33,7 +33,7 @@ Image Gradient() {
     Image image(4, 3);
     for (uint32_t y = 0; y < image.height; ++y) {
         for (uint32_t x = 0; x < image.width; ++x) {
-            image.At(x, y) = {float(x) / 3, float(y) / 2, 0.25f, 1};
+            image.Pixel(x, y) = {float(x) / 3, float(y) / 2, 0.25f, 1};
         }
     }
     return image;
@@ -121,9 +121,9 @@ TEST(ImageTest, GpuTensorsAreWrittenAndRead) {
         const Image loaded = LoadImageFile(path, ImageEncoding::Linear);
         ASSERT_EQ(loaded.width, 3u);
         ASSERT_EQ(loaded.height, 2u);
-        EXPECT_NEAR(loaded.At(2, 1).r, 105.0f / 255, 1e-6f);
-        const Rgba direct = ImageFromTensor(second, ImageEncoding::Linear).At(2, 1);
-        EXPECT_NEAR(direct.r, loaded.At(2, 1).r, 1e-6f);
+        EXPECT_NEAR(loaded.Pixel(2, 1).r, 105.0f / 255, 1e-6f);
+        const Rgba direct = ImageFromTensor(second, ImageEncoding::Linear).Pixel(2, 1);
+        EXPECT_NEAR(direct.r, loaded.Pixel(2, 1).r, 1e-6f);
         EXPECT_NEAR(direct.b, 1.0f, 1e-6f);
         std::filesystem::remove(path);
     });
@@ -145,7 +145,7 @@ TEST(ImageTest, WriteImagePicksTheFormat) {
         EXPECT_EQ(LoadImageFile(png, ImageEncoding::Linear).width, 3u);
         const std::filesystem::path exr = WriteImage(Temporary("ernie_io_any"), depth);
         EXPECT_EQ(exr.extension(), ".exr");
-        EXPECT_NEAR(LoadImageFile(exr, ImageEncoding::Linear).At(1, 1).r, 4.5f, 1e-6f);
+        EXPECT_NEAR(LoadImageFile(exr, ImageEncoding::Linear).Pixel(1, 1).r, 4.5f, 1e-6f);
         const std::filesystem::path jpeg = Temporary("ernie_io_any.JPG");
         EXPECT_EQ(WriteImage(jpeg, color), jpeg);
         EXPECT_TRUE(std::filesystem::exists(jpeg));
@@ -226,7 +226,7 @@ TEST(ImageTest, HostValuesAreColorizedAndWritten) {
     EXPECT_EQ(LoadImageFile(png, ImageEncoding::Linear).width, 2u);
     const std::filesystem::path exr = WriteImage(Temporary("ernie_io_depth"), Pixels(depth, 2, 2));
     EXPECT_EQ(exr.extension(), ".exr");
-    EXPECT_NEAR(LoadImageFile(exr, ImageEncoding::Linear).At(1, 0).r, 10.0f, 1e-6f);
+    EXPECT_NEAR(LoadImageFile(exr, ImageEncoding::Linear).Pixel(1, 0).r, 10.0f, 1e-6f);
     for (const std::filesystem::path& path : {png, exr}) {
         std::filesystem::remove(path);
     }

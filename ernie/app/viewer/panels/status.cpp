@@ -115,7 +115,7 @@ Panel CreateInfoPanel(Ref<Scene> scene, Ref<device::Device> device,
                     types->counts.clear();
                     const View roots = scene->Select("/*");
                     for (const uint32_t root : roots.Prims()) {
-                        CountTypes(scene->At(root), types->counts);
+                        CountTypes(scene->ByIndex(root), types->counts);
                     }
                 }
                 for (const auto& [type, count] : types->counts) {

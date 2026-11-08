@@ -264,7 +264,7 @@ struct SoftwareTexture : ITexture {
     }
 }
 
-uint UdimTileAt(float2 st) {
+uint UdimTile(float2 st) {
     const float2 cell = floor(st);
     if (cell.x < 0 || cell.x >= 10 || cell.y < 0 || cell.y >= 1000) {
         return 0;
@@ -273,7 +273,7 @@ uint UdimTileAt(float2 st) {
 }
 
 uint UdimFind(UdimTileRecord* tiles, uint numTiles, float2 st) {
-    const uint tile = UdimTileAt(st);
+    const uint tile = UdimTile(st);
     uint low = 0;
     uint high = numTiles;
     while (low < high) {
@@ -298,8 +298,8 @@ struct UdimSet : ITexture {
         this.textures = textures;
     }
 
-    static uint TileAt(float2 st) {
-        return UdimTileAt(st);
+    static uint Tile(float2 st) {
+        return UdimTile(st);
     }
 
     uint Find(float2 st) {

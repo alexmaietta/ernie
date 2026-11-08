@@ -324,7 +324,7 @@ void TangentBuilder::Link(uint32_t prim, const Mesh& mesh) {
     }
     const Prims& prims = m_structure.GetPrims();
     if (m_records.Set(mesh.meshRow, record) && prims.Alive(prim)) {
-        const uint32_t world = prims.At(prim).world;
+        const uint32_t world = prims.Record(prim).world;
         if (std::ranges::find(m_relinked, world) == m_relinked.end()) {
             m_relinked.push_back(world);
         }
@@ -426,7 +426,7 @@ void TangentBuilder::Process(const ChangeSet& changes) {
         return m_cells;
     };
     const auto isMesh = [&](uint32_t prim) {
-        return prims.Alive(prim) && IsA(prims.At(prim).schema, SchemaId::Mesh);
+        return prims.Alive(prim) && IsA(prims.Record(prim).schema, SchemaId::Mesh);
     };
 
     std::set<uint32_t> placed;

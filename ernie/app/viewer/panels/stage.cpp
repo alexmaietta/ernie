@@ -138,7 +138,7 @@ class Stage {
         m_session.reset();
         const View roots = m_scene->Select("/*");
         for (const uint32_t root : roots.Prims()) {
-            const Prim prim = m_scene->At(root);
+            const Prim prim = m_scene->ByIndex(root);
             if (prim.IsSession()) {
                 m_session = Add(prim);
             } else {

@@ -44,11 +44,11 @@ struct ERNIE_API Image {
     Image(uint32_t w, uint32_t h, Rgba fill = {})
         : width(w), height(h), pixels(size_t(w) * h, fill) {}
 
-    Rgba& At(uint32_t x, uint32_t y) {
+    Rgba& Pixel(uint32_t x, uint32_t y) {
         return pixels[size_t(y) * width + x];
     }
 
-    const Rgba& At(uint32_t x, uint32_t y) const {
+    const Rgba& Pixel(uint32_t x, uint32_t y) const {
         return pixels[size_t(y) * width + x];
     }
 

@@ -87,7 +87,7 @@ TEST(SceneTest, ABatchIsOneDenseView) {
         EXPECT_EQ(view.Get<float>(kSphereRadius).Get(), std::vector<float>(500, 0.5f));
         EXPECT_EQ(scene.Select("/Ball*").PrimCount(), 500u);
         const PrimRange plain = scene.Define(Paths("/Box", 3), SchemaId::Cube);
-        EXPECT_EQ(scene.At(plain.Index(2, 0)).Path(), "/Box2");
+        EXPECT_EQ(scene.ByIndex(plain.Index(2, 0)).Path(), "/Box2");
     });
 }
 
@@ -120,7 +120,7 @@ TEST(SceneTest, ClonesFillNewWorlds) {
         EXPECT_EQ(copies.count, 2u);
         EXPECT_EQ(copies.firstWorld, 1u);
         EXPECT_EQ(scene.WorldCount(), 4u);
-        EXPECT_EQ(scene.At(copies.Index(2, 1)).World(), 3u);
+        EXPECT_EQ(scene.ByIndex(copies.Index(2, 1)).World(), 3u);
     });
 }
 

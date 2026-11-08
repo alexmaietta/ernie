@@ -78,7 +78,7 @@ class Prims {
 
     bool Alive(uint32_t prim) const;
     uint32_t Generation(uint32_t prim) const;
-    const PrimRecord& At(uint32_t prim) const;
+    const PrimRecord& Record(uint32_t prim) const;
     uint32_t Row(uint32_t prim, SchemaId table) const;
     uint32_t FindRow(uint32_t prim, SchemaId table) const;
     std::vector<uint32_t> Rows(std::span<const uint32_t> prims, SchemaId table) const;

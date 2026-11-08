@@ -69,11 +69,11 @@ struct Textures {
                 const float u = float(x) / kTextureSide;
                 const float v = float(y) / kTextureSide;
                 const bool odd = ((x / 32) + (y / 32)) % 2 != 0;
-                color.At(x, y) = odd ? Rgba{0.8f, 0.3f, 0.2f, 1} : Rgba{0.2f, 0.5f, 0.8f, 1};
-                bumps.At(x, y) = {0.5f + 0.3f * std::sin(40 * u), 0.5f + 0.3f * std::cos(40 * v), 1,
-                                  1};
+                color.Pixel(x, y) = odd ? Rgba{0.8f, 0.3f, 0.2f, 1} : Rgba{0.2f, 0.5f, 0.8f, 1};
+                bumps.Pixel(x, y) = {0.5f + 0.3f * std::sin(40 * u), 0.5f + 0.3f * std::cos(40 * v),
+                                     1, 1};
                 const float r = 0.3f + 0.4f * std::abs(std::sin(10 * (u + v)));
-                rough.At(x, y) = {r, r, r, 1};
+                rough.Pixel(x, y) = {r, r, r, 1};
             }
         }
         albedo = (directory / "albedo.png").string();

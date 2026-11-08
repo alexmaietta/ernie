@@ -215,7 +215,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
             if (camera) {
                 return emitted;
             }
-            const float pdf = light.PdfAt(origin, point.position) * Selection(query.tlas, i);
+            const float pdf = light.PointPdf(origin, point.position) * Selection(query.tlas, i);
             return emitted.Scale(Weight(scatteredPdf, scatteredDelta, pdf));
         }
         return Spectrum.Constant(0);

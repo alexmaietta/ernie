@@ -86,7 +86,7 @@ void Toolbar::Refresh() {
         m_cameras.clear();
         const View roots = m_scene->Select("/*");
         for (const uint32_t root : roots.Prims()) {
-            const Prim prim = m_scene->At(root);
+            const Prim prim = m_scene->ByIndex(root);
             if (!prim.IsSession()) {
                 CollectCameras(prim, m_cameras);
             }

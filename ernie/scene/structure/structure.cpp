@@ -129,7 +129,7 @@ std::vector<uint32_t> Structure::Select(std::string_view pattern, SchemaId schem
     }
     if (schema != SchemaId::None) {
         std::erase_if(level, [&](uint32_t prim) {
-            return !IsA(m_prims.At(prim).schema, schema) && !m_prims.HasApi(prim, schema);
+            return !IsA(m_prims.Record(prim).schema, schema) && !m_prims.HasApi(prim, schema);
         });
     }
     return level;
@@ -137,7 +137,7 @@ std::vector<uint32_t> Structure::Select(std::string_view pattern, SchemaId schem
 
 uint32_t Structure::NewParent(std::string_view path) const {
     if (const uint32_t existing = m_paths.Find(path); existing != Paths::kNone) {
-        throw Error("\"{}\" is already a {}", path, Info(m_prims.At(existing).schema).name);
+        throw Error("\"{}\" is already a {}", path, Info(m_prims.Record(existing).schema).name);
     }
     m_paths.FindParent(path);
     const auto [parentPath, name] = SplitLast(path, '/');
@@ -201,7 +201,7 @@ void Structure::RemoveBlock(const PrimBlock& block) {
 
 void Structure::Logged(uint32_t prim, bool added, SchemaId api) {
     m_log.push_back(
-        {m_store.Stamp(), prim, m_prims.Generation(prim), m_prims.At(prim).world, added, api});
+        {m_store.Stamp(), prim, m_prims.Generation(prim), m_prims.Record(prim).world, added, api});
 }
 
 std::vector<uint32_t> Structure::Applicable(std::span<const uint32_t> prims, SchemaId api,
@@ -221,7 +221,7 @@ std::vector<uint32_t> Structure::Applicable(std::span<const uint32_t> prims, Sch
         if (!m_prims.Alive(prim)) {
             throw Error("Prim {} was removed", prim);
         }
-        const SchemaId schema = m_prims.At(prim).schema;
+        const SchemaId schema = m_prims.Record(prim).schema;
         if (!AppliesTo(api, schema) && !Includes(schema, api)) {
             throw Error("{} doesn't apply to {}, a {}", Info(api).name, m_paths.Path(prim),
                         Info(schema).name);
@@ -251,7 +251,7 @@ void Structure::Unapply(std::span<const uint32_t> prims, SchemaId api,
         if (!m_prims.Alive(prim)) {
             throw Error("Prim {} was removed", prim);
         }
-        const SchemaId schema = m_prims.At(prim).schema;
+        const SchemaId schema = m_prims.Record(prim).schema;
         if (!multiple && Includes(schema, api)) {
             throw Error("{} is built into {}, so {} can't lose it", Info(api).name,
                         Info(schema).name, m_paths.Path(prim));
@@ -361,7 +361,7 @@ std::vector<Structure::Referrer> Structure::Referrers(std::span<const uint32_t> 
         if (!m_prims.Alive(prim) || gone.contains(prim)) {
             continue;
         }
-        const PrimRecord& record = m_prims.At(prim);
+        const PrimRecord& record = m_prims.Record(prim);
         for (const SchemaId table : PrimTables(record.schema, record.apis)) {
             const Span<const ColumnInfo> columns = Columns(table);
             for (uint32_t index = 0; index < columns.size(); ++index) {
@@ -452,7 +452,7 @@ void Structure::Remove(uint32_t prim) {
     }
     for (const Retarget& retarget : retargets) {
         SetTargets(retarget.prim, retarget.row, retarget.column, retarget.paths);
-        m_store.StampWorld(m_prims.At(retarget.prim).world);
+        m_store.StampWorld(m_prims.Record(retarget.prim).world);
     }
 }
 
@@ -464,8 +464,8 @@ void Structure::Move(uint32_t prim, std::string_view path) {
     if (parent == Paths::kNone && path.rfind('/') != 0) {
         throw Error("Path \"{}\" has no parent", path);
     }
-    const PrimRecord& record = m_prims.At(prim);
-    const uint32_t world = parent == Paths::kRoot ? kGlobalWorld : m_prims.At(parent).world;
+    const PrimRecord& record = m_prims.Record(prim);
+    const uint32_t world = parent == Paths::kRoot ? kGlobalWorld : m_prims.Record(parent).world;
     const bool isWorld = IsA(record.schema, SchemaId::World);
     if (isWorld ? world != kGlobalWorld : world != record.world) {
         throw Error("\"{}\" can't move to \"{}\": prims stay in their world, and worlds don't nest",
@@ -549,7 +549,7 @@ PrimBlock Structure::Clone(uint32_t source, std::span<const std::string> targets
         for (const uint32_t prim : sources) {
             m_prims.CheckRemovable(prim);
         }
-        parents.push_back(m_prims.At(source).parent);
+        parents.push_back(m_prims.Record(source).parent);
         paths.push_back(root);
     }
     std::set<std::string_view> seen;
@@ -568,7 +568,7 @@ PrimBlock Structure::Clone(uint32_t source, std::span<const std::string> targets
     std::unordered_map<uint32_t, uint32_t> position;
     std::vector<uint32_t> worlds;
     for (uint32_t i = 0; i < sources.size(); ++i) {
-        const PrimRecord& record = m_prims.At(sources[i]);
+        const PrimRecord& record = m_prims.Record(sources[i]);
         position[sources[i]] = i;
         shape.schemas.push_back(record.schema);
         shape.parents.push_back(i == 0 ? kNoPrim : position.at(record.parent));
@@ -642,7 +642,7 @@ void Structure::CloneArrays(const PrimBlock& block, std::span<const uint32_t> so
 void Structure::CloneInstances(const PrimBlock& block, std::span<const uint32_t> sources,
                                const std::unordered_map<uint32_t, uint32_t>& position) {
     for (uint32_t i = 0; i < sources.size(); ++i) {
-        const uint64_t apis = m_prims.At(sources[i]).apis;
+        const uint64_t apis = m_prims.Record(sources[i]).apis;
         std::vector<uint32_t> copies;
         for (uint32_t copy = 0; copy < block.copies; ++copy) {
             copies.push_back(block.Prim(copy, i));

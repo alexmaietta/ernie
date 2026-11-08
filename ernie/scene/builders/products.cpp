@@ -89,13 +89,13 @@ ResolvedProduct ProductBuilder::Resolve(uint32_t index) const {
     const Prims& prims = m_structure.GetPrims();
     ResolvedProduct product;
     product.prim = index;
-    const Prim prim = m_scene.At(index);
+    const Prim prim = m_scene.ByIndex(index);
     const std::string path = prim.Path();
     const View view(m_structure, SchemaId::RenderProduct, std::vector<uint32_t>{index});
     const auto targets = [&](ColumnRef column, SchemaId schema) {
         const std::vector<uint32_t> found = view.GetArray<uint32_t>(column).Get(0);
         for (const uint32_t target : found) {
-            if (!prims.Alive(target) || !IsA(prims.At(target).schema, schema)) {
+            if (!prims.Alive(target) || !IsA(prims.Record(target).schema, schema)) {
                 throw Error("{}'s {} targets prim {}, which isn't a {}", path, column.column->field,
                             target, Info(schema).name);
             }
@@ -120,8 +120,8 @@ ResolvedProduct ProductBuilder::Resolve(uint32_t index) const {
     record.background = backgrounds.empty() ? kNoPrim : backgrounds.front();
     record.backgroundKind = uint32_t(SchemaId::None);
     if (record.background != kNoPrim && prims.Alive(record.background)) {
-        const Prim background = m_scene.At(record.background);
-        record.backgroundKind = uint32_t(prims.At(record.background).schema);
+        const Prim background = m_scene.ByIndex(record.background);
+        record.backgroundKind = uint32_t(prims.Record(record.background).schema);
         if (background.IsA<ColorBackground>()) {
             record.backgroundLow = background.Get(ColorBackground::kColor);
         } else if (background.IsA<GradientBackground>()) {
@@ -143,16 +143,16 @@ ResolvedProduct ProductBuilder::Resolve(uint32_t index) const {
         if (product.sensors.empty()) {
             throw Error("{} renders no sensor", path);
         }
-        const Prim lead = m_scene.At(product.sensors.front());
-        const SchemaId schema = prims.At(lead.Index()).schema;
+        const Prim lead = m_scene.ByIndex(product.sensors.front());
+        const SchemaId schema = prims.Record(lead.Index()).schema;
         const Uint2 resolution = prim.Get(RenderProduct::kResolution);
         const Shape shape = SensorShape(lead, resolution);
         record.sensorSchema = uint32_t(schema);
         record.frameRate = lead.Get(SensorAPI::kSensorFrameRate);
         record.startTime = lead.Get(SensorAPI::kSensorStartTime);
         for (const uint32_t sensor : product.sensors) {
-            const Prim each = m_scene.At(sensor);
-            if (prims.At(sensor).schema != schema) {
+            const Prim each = m_scene.ByIndex(sensor);
+            if (prims.Record(sensor).schema != schema) {
                 throw Error("{} stacks {} and {}, which are different kinds of sensor", path,
                             lead.Path(), each.Path());
             }
@@ -173,7 +173,7 @@ ResolvedProduct ProductBuilder::Resolve(uint32_t index) const {
             throw Error("{} has a resolution of {} x {}", path, record.width, record.height);
         }
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
-            const Prim each = m_scene.At(var);
+            const Prim each = m_scene.ByIndex(var);
             product.vars.push_back({.prim = var,
                                     .path = each.Path(),
                                     .source = each.Get(RenderVar::kSourceName),
@@ -191,7 +191,7 @@ void ProductBuilder::Run(const ChangeSet&, TableWrites&) {
     const Prims& prims = m_structure.GetPrims();
     std::map<uint32_t, ResolvedProduct> resolved;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
-        if (!prims.Alive(prim) || prims.At(prim).schema != SchemaId::RenderProduct) {
+        if (!prims.Alive(prim) || prims.Record(prim).schema != SchemaId::RenderProduct) {
             continue;
         }
         ResolvedProduct product = Resolve(prim);

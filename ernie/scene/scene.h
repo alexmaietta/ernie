@@ -218,7 +218,7 @@ class ERNIE_API Scene : public RefCounted {
     ImportJob Import(std::string_view path, const ImportReader& reader, const ImportDesc& desc);
 
     std::optional<Prim> Find(std::string_view path) const;
-    Prim At(uint32_t index) const;
+    Prim ByIndex(uint32_t index) const;
     View Select(std::string_view pattern, SchemaId schema = SchemaId::None) const;
     View Select(Span<const std::string> paths, SchemaId schema = SchemaId::None) const;
     View Select(const PrimRange& range, SchemaId schema = SchemaId::None, uint32_t index = 0) const;

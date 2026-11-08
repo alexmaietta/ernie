@@ -58,7 +58,7 @@ TEST(StructureTest, ADefinedPrimHasItsRecordPathAndFallbacks) {
         const PrimBlock block = structure.Define(SchemaId::Sphere, paths);
         const uint32_t prim = block.firstPrim;
         EXPECT_EQ(structure.Find("/Ball"), prim);
-        const PrimRecord& record = structure.GetPrims().At(prim);
+        const PrimRecord& record = structure.GetPrims().Record(prim);
         EXPECT_EQ(record.schema, SchemaId::Sphere);
         EXPECT_EQ(record.parent, kNoPrim);
         EXPECT_EQ(record.world, kGlobalWorld);
@@ -194,9 +194,9 @@ TEST(StructureTest, WorldsHoldTheirSubtreesAndDontNest) {
         }
         const std::vector<std::string> sun = {"/Sun"};
         structure.Define(SchemaId::Sphere, sun);
-        EXPECT_EQ(structure.GetPrims().At(structure.Find("/Env")).world, 0u);
-        EXPECT_EQ(structure.GetPrims().At(structure.Find("/Env/Ball")).world, 0u);
-        EXPECT_EQ(structure.GetPrims().At(structure.Find("/Sun")).world, kGlobalWorld);
+        EXPECT_EQ(structure.GetPrims().Record(structure.Find("/Env")).world, 0u);
+        EXPECT_EQ(structure.GetPrims().Record(structure.Find("/Env/Ball")).world, 0u);
+        EXPECT_EQ(structure.GetPrims().Record(structure.Find("/Sun")).world, kGlobalWorld);
         const std::vector<std::string> nested = {"/Env/Inner"};
         EXPECT_THROW(structure.Define(SchemaId::World, nested), Error);
         EXPECT_EQ(structure.GetPrims().WorldCount(), 1u);
@@ -220,7 +220,7 @@ TEST(StructureTest, ClonesCopyValuesIntoNewWorlds) {
         for (uint32_t copy = 0; copy < 3; ++copy) {
             const uint32_t prim = structure.Find(std::format("/Env{}/Ball", copy + 1));
             ASSERT_EQ(prim, block.Prim(copy, 1));
-            EXPECT_EQ(structure.GetPrims().At(prim).world, copy + 1);
+            EXPECT_EQ(structure.GetPrims().Record(prim).world, copy + 1);
             const uint32_t row = structure.GetPrims().Row(prim, SchemaId::Sphere);
             EXPECT_EQ(Read<float>(store, kSphereRadius, row, 1), std::vector<float>{4.0f});
             EXPECT_EQ(Stamps(store, kXformableTranslate,
@@ -241,8 +241,9 @@ TEST(StructureTest, MovingTheSourceKeepsItsWorldNumbers) {
         EXPECT_EQ(block.firstWorld, 0u);
         EXPECT_EQ(structure.GetPrims().WorldCount(), 3u);
         for (uint32_t world = 0; world < 3; ++world) {
-            EXPECT_EQ(structure.GetPrims().At(structure.Find(std::format("/Env{}", world))).world,
-                      world);
+            EXPECT_EQ(
+                structure.GetPrims().Record(structure.Find(std::format("/Env{}", world))).world,
+                world);
         }
         EXPECT_EQ(structure.GetPrims().LiveCount(), 3u);
     });

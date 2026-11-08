@@ -94,10 +94,10 @@ std::vector<ArrayRef> ArrayHeap::Borrow(Ref<device::Buffer> buffer, uint32_t arr
 }
 
 bool ArrayHeap::Borrowed(const ArrayRef& array) const {
-    return array.address != 0 && m_runs[At(array).run].borrowed;
+    return array.address != 0 && m_runs[Lookup(array).run].borrowed;
 }
 
-const ArrayHeap::Entry& ArrayHeap::At(const ArrayRef& array) const {
+const ArrayHeap::Entry& ArrayHeap::Lookup(const ArrayRef& array) const {
     const auto found = m_arrays.find(array.address);
     if (found == m_arrays.end()) {
         throw Error("{} holds no array at {:#x}", m_label, array.address);
@@ -107,21 +107,21 @@ const ArrayHeap::Entry& ArrayHeap::At(const ArrayRef& array) const {
 
 ArrayRef ArrayHeap::Share(const ArrayRef& array) {
     if (array.address != 0) {
-        At(array);
+        Lookup(array);
         ++m_arrays.at(array.address).references;
     }
     return array;
 }
 
 uint32_t ArrayHeap::References(const ArrayRef& array) const {
-    return array.address == 0 ? 0 : At(array).references;
+    return array.address == 0 ? 0 : Lookup(array).references;
 }
 
 void ArrayHeap::Free(const ArrayRef& array) {
     if (array.address == 0) {
         return;
     }
-    At(array);
+    Lookup(array);
     Entry& entry = m_arrays.at(array.address);
     if (--entry.references > 0) {
         return;
@@ -143,7 +143,7 @@ void ArrayHeap::Free(const ArrayRef& array) {
 }
 
 device::BufferRange ArrayHeap::Range(const ArrayRef& array) const {
-    const Run& run = m_runs[At(array).run];
+    const Run& run = m_runs[Lookup(array).run];
     return run.block.buffer->Slice(array.address - run.block.buffer->Address(),
                                    uint64_t(array.capacity) * m_itemBytes);
 }
