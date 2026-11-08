@@ -967,7 +967,7 @@ void ViewerImpl::Frame() {
 
 void ViewerImpl::DrawCreateMenu() {
     std::array<std::vector<SchemaId>, std::size(kPrimGroupNames)> groups;
-    for (uint32_t id = 0; id < uint32_t(SchemaId::Count); ++id) {
+    for (uint32_t id = 0; id < SchemaCount(); ++id) {
         if (Info(SchemaId(id)).kind == SchemaKind::Concrete) {
             groups[size_t(Classify(SchemaId(id)))].push_back(SchemaId(id));
         }

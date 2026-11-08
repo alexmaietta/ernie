@@ -28,7 +28,7 @@ using namespace nb::literals;
 namespace ernie::python {
 
 SchemaId FindSchema(std::string_view name) {
-    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
+    for (uint32_t index = 0; index < SchemaCount(); ++index) {
         if (Info(SchemaId(index)).name == name) {
             return SchemaId(index);
         }

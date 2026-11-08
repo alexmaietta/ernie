@@ -3,6 +3,7 @@ ernie_object_library(
     ernie_scene
     columns/array_pool.cpp
     columns/column_store.cpp
+    schema/runtime.cpp
     columns/column_table.cpp
     columns/device_heap.cpp
     prim.cpp
@@ -85,6 +86,7 @@ ernie_public_files(
     rotation.h
     scene.h
     schema/ids.h
+    schema/runtime.h
     schema/schema.h
     schema/types.h
     structure/tokens.h

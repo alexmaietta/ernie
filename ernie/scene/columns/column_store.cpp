@@ -58,21 +58,22 @@ ColumnStore::ColumnStore(device::Device& device)
       m_slots(m_heap, "prim slots", {{4, kNoPrimFill}}),
       m_worlds(m_heap, "world stamps", {{sizeof(uint64_t), 0}}) {
     m_entries.reserve(uint32_t(SchemaId::Count));
-    for (uint32_t id = 0; id < uint32_t(SchemaId::Count); ++id) {
-        const SchemaId schema = SchemaId(id);
-        Entry entry;
-        std::vector<TableColumn> columns = SchemaColumns(schema, entry.stamps);
-        entry.table = std::make_unique<ColumnTable>(
-            m_heap, fmt::format("{} data", Info(schema).name), columns);
-        entry.writes.assign(Info(schema).columnCount, 0);
-        m_entries.push_back(std::move(entry));
-    }
+    Lookup(SchemaId(uint32_t(SchemaId::Count) - 1));
     m_worlds.Allocate(1);
 }
 
 const ColumnStore::Entry& ColumnStore::Lookup(SchemaId schema) const {
-    if (uint32_t(schema) >= m_entries.size()) {
+    if (uint32_t(schema) >= SchemaCount()) {
         throw Error("No data for schema {}", uint32_t(schema));
+    }
+    while (m_entries.size() <= uint32_t(schema)) {
+        const SchemaId added = SchemaId(uint32_t(m_entries.size()));
+        Entry entry;
+        std::vector<TableColumn> columns = SchemaColumns(added, entry.stamps);
+        entry.table = std::make_unique<ColumnTable>(
+            m_heap, std::format("{} data", Info(added).name), columns);
+        entry.writes.assign(Info(added).columnCount, 0);
+        m_entries.push_back(std::move(entry));
     }
     return m_entries[uint32_t(schema)];
 }

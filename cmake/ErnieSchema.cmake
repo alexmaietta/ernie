@@ -2042,9 +2042,10 @@ function(ernie_generate_schemas directory)
         "${tokens_text}\n"
         "inline constexpr std::array<ColumnInfo, ${column_count}> kColumns = {{\n${columns_text}}};\n\n"
         "inline constexpr SchemaInfo kSchemaInfo[uint32_t(SchemaId::Count)] = {\n${info}};\n\n"
+        "template <class W> void WriteRuntimeFallbacks(SchemaId schema, W& w);\n\n"
         "template <class W> void WriteFallbacks(SchemaId schema, W& w) {\n"
         "    switch (schema) {\n${fallbacks_text}"
-        "    default:\n        return;\n    }\n}\n\n"
+        "    default:\n        WriteRuntimeFallbacks(schema, w);\n        return;\n    }\n}\n\n"
         "}\n\n#endif\n"
     )
     _ernie_schema_write("${directory}/registry.h" text)

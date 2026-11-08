@@ -234,8 +234,8 @@ class ColumnStore {
     static uint64_t ArrayKey(ColumnRef column, uint32_t row);
 
     device::Device& m_device;
-    DeviceHeap m_heap;
-    std::vector<Entry> m_entries;
+    mutable DeviceHeap m_heap;
+    mutable std::vector<Entry> m_entries;
     ColumnTable m_prims;
     ColumnTable m_slots;
     ColumnTable m_worlds;

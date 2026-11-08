@@ -127,6 +127,7 @@ ernie_test(
         unit/scene/utest_scene_column_store.cpp
         unit/scene/utest_scene_connections.cpp
         unit/scene/utest_scene_materials.cpp
+        unit/scene/utest_scene_runtime_schemas.cpp
         unit/scene/utest_scene_tables.cpp
         unit/scene/utest_scene_tangents.cpp
         unit/scene/utest_scene_textures.cpp

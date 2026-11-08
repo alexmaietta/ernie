@@ -97,7 +97,7 @@ void Prims::Check(const BlockShape& shape, std::span<const uint32_t> parents) co
     bool worlds = false;
     for (uint32_t i = 0; i < shape.schemas.size(); ++i) {
         const SchemaId schema = shape.schemas[i];
-        if (uint32_t(schema) >= uint32_t(SchemaId::Count)) {
+        if (uint32_t(schema) >= SchemaCount()) {
             throw Error("No schema {}", uint32_t(schema));
         }
         if (Info(schema).kind != SchemaKind::Concrete) {

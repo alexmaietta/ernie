@@ -7,9 +7,12 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
+#include "ernie/export.h"
 #include "ernie/util/span.h"
 
 namespace ernie {
@@ -187,6 +190,14 @@ template <class T> struct Field {
     constexpr ColumnRef Column() const;
 };
 
+using RuntimeValue = std::variant<bool, int32_t, float, Float2, Float3, Float4, std::string>;
+
+ERNIE_API uint32_t SchemaCount();
+ERNIE_API const SchemaInfo& RuntimeInfo(SchemaId schema);
+ERNIE_API Span<const ColumnInfo> RuntimeColumns(SchemaId schema);
+ERNIE_API Span<const SchemaId> RuntimeSlots(SchemaId schema);
+ERNIE_API const RuntimeValue& RuntimeFallback(SchemaId schema, uint32_t column);
+
 }
 
 #endif
@@ -197,8 +208,12 @@ template <class T> struct Field {
 
 namespace ernie {
 
+constexpr bool IsRuntime(SchemaId schema) {
+    return uint32_t(schema) >= uint32_t(SchemaId::Count);
+}
+
 constexpr const SchemaInfo& Info(SchemaId schema) {
-    return kSchemaInfo[uint32_t(schema)];
+    return IsRuntime(schema) ? RuntimeInfo(schema) : kSchemaInfo[uint32_t(schema)];
 }
 
 constexpr Span<const SchemaId> Apis(SchemaId schema) {
@@ -206,6 +221,9 @@ constexpr Span<const SchemaId> Apis(SchemaId schema) {
 }
 
 constexpr Span<const ColumnInfo> Columns(SchemaId schema) {
+    if (IsRuntime(schema)) {
+        return RuntimeColumns(schema);
+    }
     return Span<const ColumnInfo>(kColumns).subspan(Info(schema).firstColumn,
                                                     Info(schema).columnCount);
 }
@@ -213,6 +231,9 @@ constexpr Span<const ColumnInfo> Columns(SchemaId schema) {
 inline constexpr uint32_t kNoSlot = 0xFFFFFFFF;
 
 constexpr Span<const SchemaId> Slots(SchemaId schema) {
+    if (IsRuntime(schema)) {
+        return RuntimeSlots(schema);
+    }
     return Span<const SchemaId>(kSchemaSlots)
         .subspan(Info(schema).firstSlot, Info(schema).slotCount);
 }
@@ -300,8 +321,8 @@ constexpr uint32_t PrimSlot(SchemaId schema, uint64_t apis, SchemaId table) {
     return IsApi(table) ? ApiSlot(schema, apis, table) : Slot(schema, table);
 }
 
-constexpr SchemaId ShaderSchema(std::string_view id) {
-    for (uint32_t index = 0; index < uint32_t(SchemaId::Count); ++index) {
+inline SchemaId ShaderSchema(std::string_view id) {
+    for (uint32_t index = 0; index < SchemaCount(); ++index) {
         const SchemaId schema = SchemaId(index);
         if (Info(schema).name == id && Info(schema).kind == SchemaKind::Concrete &&
             IsA(schema, SchemaId::Shader)) {
@@ -372,6 +393,21 @@ constexpr ColumnRef FindColumn(SchemaId schema, uint64_t apis, std::string_view 
         }
     }
     return {};
+}
+
+template <class W> void WriteRuntimeFallbacks(SchemaId schema, W& w) {
+    if (!IsRuntime(schema)) {
+        return;
+    }
+    WriteFallbacks(Info(schema).base, w);
+    if (IsA(schema, SchemaId::Shader)) {
+        w.Set(SchemaId::Shader, FindOwnColumn(SchemaId::Shader, "id").index,
+              std::string(Info(schema).name));
+    }
+    for (uint32_t column = 0; column < Info(schema).columnCount; ++column) {
+        std::visit([&](const auto& value) { w.Set(schema, column, value); },
+                   RuntimeFallback(schema, column));
+    }
 }
 
 }
