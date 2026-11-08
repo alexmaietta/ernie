@@ -133,7 +133,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    const uint64_t runs = SceneImpl::Get(*m_scene).GetPublisher().TableRuns();
+    const uint64_t runs = snapshot.Version();
     std::set<uint32_t> stale;
     for (const uint32_t prim : due) {
         if (const auto traced = set.traced.find(prim);

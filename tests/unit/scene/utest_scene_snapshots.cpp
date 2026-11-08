@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -10,6 +11,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/util/error.h"
 #include "support/devices.h"
 
 namespace ernie {
@@ -160,6 +162,35 @@ TEST(SnapshotTest, AcquiringWithoutAPublishSharesOnePin) {
         for (const Snapshot* snapshot : {&first, &second, &idle}) {
             scene.Release(*snapshot);
         }
+    });
+}
+
+TEST(SnapshotTest, VersionsMoveOnlyWithTheTablesThatChanged) {
+    ForEachScene([](Scene& scene, device::Device&) {
+        const Prim ball = scene.Define<Sphere>("/Ball");
+        scene.Publish().Wait();
+        const auto versions = [&] {
+            const Snapshot snapshot = scene.Acquire(Stream::Host());
+            const std::array<uint64_t, 3> read = {snapshot.Version(), snapshot.Version("hierarchy"),
+                                                  snapshot.Version("materials")};
+            scene.Release(snapshot);
+            return read;
+        };
+        const std::array<uint64_t, 3> first = versions();
+        scene.Publish().Wait();
+        EXPECT_EQ(versions(), first);
+
+        ball.Set(Xformable::kTranslate, Double3{1, 0, 0});
+        scene.Publish().Wait();
+        const std::array<uint64_t, 3> moved = versions();
+        EXPECT_GT(moved[0], first[0]);
+        EXPECT_GT(moved[1], first[1]);
+        EXPECT_EQ(moved[2], first[2]);
+
+        const Snapshot snapshot = scene.Acquire(Stream::Host());
+        EXPECT_THROW((void)snapshot.Version("nothing"), Error);
+        scene.Release(snapshot);
+        EXPECT_EQ(Snapshot{}.Version(), 0u);
     });
 }
 

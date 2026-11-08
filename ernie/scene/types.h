@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ernie/device/operation.h"
@@ -70,6 +71,9 @@ struct ERNIE_API Snapshot {
     device::Operation ready;
     uint64_t tables = 0;
     std::shared_ptr<const void> pinned;
+
+    uint64_t Version() const;
+    uint64_t Version(std::string_view table) const;
 };
 
 }

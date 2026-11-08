@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "ernie/device/operation.h"
@@ -21,6 +23,8 @@ struct PinnedTables {
     Ref<device::Buffer> header;
     RenderTables tables{};
     std::vector<Ref<const RefCounted>> held;
+    uint64_t content = 0;
+    std::vector<std::pair<std::string_view, uint64_t>> versions;
 
     static const PinnedTables& From(const Snapshot& snapshot) {
         return *static_cast<const PinnedTables*>(snapshot.pinned.get());
@@ -30,10 +34,6 @@ struct PinnedTables {
 class Publisher {
   public:
     explicit Publisher(Structure& structure) : m_structure(structure) {}
-
-    uint64_t TableRuns() const {
-        return m_tableRuns;
-    }
 
     Ordinal Published() const {
         return m_sealed.empty() ? 0 : m_sealed.back().ordinal;

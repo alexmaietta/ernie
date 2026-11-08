@@ -894,7 +894,14 @@ void RegisterSnapshot(nb::module_& module) {
     nb::class_<Snapshot>(module, "Snapshot")
         .def_ro("ordinal", &Snapshot::ordinal)
         .def_ro("tables", &Snapshot::tables)
-        .def_prop_ro("ready", [](const Snapshot& snapshot) { return snapshot.ready.Ready(); });
+        .def_prop_ro("ready", [](const Snapshot& snapshot) { return snapshot.ready.Ready(); })
+        .def_prop_ro("version", [](const Snapshot& snapshot) { return snapshot.Version(); })
+        .def(
+            "table_version",
+            [](const Snapshot& snapshot, std::string_view table) {
+                return snapshot.Version(table);
+            },
+            nb::arg("table"));
 }
 
 void RegisterSelection(nb::module_& module) {

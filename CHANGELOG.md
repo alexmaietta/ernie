@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Release candidates. `ERNIE_PRERELEASE` in `CMakeLists.txt` names one, such as `rc1`, and a matching `v0.1.1rc1` tag publishes `0.1.1rc1` to PyPI and as a GitHub pre-release, with the Docker image tagged `0.1.1rc1` alone and Debian and RPM packages versioned `0.1.1~rc1` so the final release upgrades them. CI also runs on pushes to `release-*` branches.
+- `Snapshot::Version` and `Snapshot::Version(table)` tell what a snapshot holds. The first moves whenever any table changes and the second whenever the named table does, such as `"hierarchy"` or `"materials"`. A consumer keeps the numbers and compares them with a later snapshot to tell whether anything it reads changed, for example to restart accumulation. Python's `snapshot.version` and `snapshot.table_version(name)` do the same.
 - `Scene::WorldTransforms`, `Scene::ReadWorldTransformsAsync` and Python's `scene.world_transforms(paths)` read world transforms as of the latest publish.
 - `Scene::PrimBounds`, `Scene::ReadPrimBoundsAsync` and Python's `scene.prim_bounds(paths)` read each prim's world box, relative to its world's origin, as of the latest publish.
 - Snapshots carry `tables`, the device address of the render tables header, and keep every table it points to alive until they're destroyed.

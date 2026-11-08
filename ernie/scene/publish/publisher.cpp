@@ -240,8 +240,10 @@ void Publisher::Seal() {
     }
     pinned->tables = tables;
     pinned->held.emplace_back(pinned->header);
+    pinned->content = m_tableRuns;
     for (const Scheduled& scheduled : m_scheduled) {
         scheduled.table->Hold(pinned->held);
+        pinned->versions.emplace_back(scheduled.table->Name(), scheduled.table->Runs());
     }
     m_pinned = std::move(pinned);
 }
@@ -271,6 +273,27 @@ void Publisher::Release(const Snapshot& snapshot, Stream consumer) {
     }
     m_structure.GetColumnStore().GetDevice().GetQueue().Follow(consumer);
     --m_outstanding;
+}
+
+uint64_t Snapshot::Version() const {
+    return pinned ? PinnedTables::From(*this).content : 0;
+}
+
+uint64_t Snapshot::Version(std::string_view table) const {
+    if (!pinned) {
+        return 0;
+    }
+    const PinnedTables& held = PinnedTables::From(*this);
+    for (const auto& [name, version] : held.versions) {
+        if (name == table) {
+            return version;
+        }
+    }
+    std::string names;
+    for (const auto& [name, version] : held.versions) {
+        names += (names.empty() ? "" : ", ") + std::string(name);
+    }
+    throw Error("A snapshot has no table \"{}\", only {}", table, names);
 }
 
 }
