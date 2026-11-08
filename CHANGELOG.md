@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Release candidates. `ERNIE_PRERELEASE` in `CMakeLists.txt` names one, such as `rc1`, and a matching `v0.1.1rc1` tag publishes `0.1.1rc1` to PyPI and as a GitHub pre-release, with the Docker image tagged `0.1.1rc1` alone and Debian and RPM packages versioned `0.1.1~rc1` so the final release upgrades them. CI also runs on pushes to `release-*` branches.
+
 ### Fixed
 
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.

@@ -38,7 +38,8 @@ install.components = ["python"]
 [tool.scikit-build.metadata.version]
 provider = "scikit_build_core.metadata.regex"
 input = "CMakeLists.txt"
-regex = '''project\(\s*Ernie\s+VERSION\s+(?P<value>[0-9]+\.[0-9]+\.[0-9]+)'''
+regex = '''(?s)project\(\s*Ernie\s+VERSION\s+(?P<value>[0-9]+\.[0-9]+\.[0-9]+).*?set\(ERNIE_PRERELEASE\s+"(?P<prerelease>(?:(?:a|b|rc)[0-9]+)?)"\)'''
+result = "{value}{prerelease}"
 
 [tool.scikit-build.cmake.define]
 ERNIE_BUILD_PYTHON = "ON"

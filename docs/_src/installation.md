@@ -150,7 +150,7 @@ The image is Ubuntu 24.04 with Ernie installed in `/opt/ernie`.
 docker run --rm -it ghcr.io/alexmaietta/ernie
 ```
 
-Tags follow releases, so `0.1.0`, `0.1` and `latest`. Add `--gpus all` to render on an NVIDIA GPU, which needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host.
+Tags follow releases, so `0.1.0`, `0.1` and `latest`. Release candidates such as `0.1.1rc1` only get their own tag. Add `--gpus all` to render on an NVIDIA GPU, which needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host.
 
 `CMAKE_PREFIX_PATH` already points at Ernie, so a project mounted into the container can build against it.
 

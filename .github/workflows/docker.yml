@@ -28,7 +28,11 @@ jobs:
           image=ghcr.io/${GITHUB_REPOSITORY,,}
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           version=${GITHUB_REF_NAME#v}
-          for tag in "$version" "${version%.*}" latest; do
+          tags=("$version")
+          if [[ ! "$version" =~ (a|b|rc)[0-9]+$ ]]; then
+            tags+=("${version%.*}" latest)
+          fi
+          for tag in "${tags[@]}"; do
             docker tag ernie:test "$image:$tag"
             docker push "$image:$tag"
           done
