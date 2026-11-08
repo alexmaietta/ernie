@@ -154,6 +154,28 @@ TEST(InstancersTest, CountChangesAndHiddenIdsKeepTheLayoutAndBoundsFollowCopies)
     });
 }
 
+TEST(InstancersTest, RestackingAlongsideAGlobalMoveRebuildsInsteadOfRefitting) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim inst = scene->Define<PointInstancer>(
+            "/Inst", {.prototypes = {"/Inst/Protos/Box"},
+                      .protoIndices = {0, 0, 0},
+                      .positions = {{5, 0, 0}, {10, 0, 0}, {15, 0, 0}}});
+        Prototype(*scene);
+        const Prim sun = scene->Define<Sphere>("/Sun");
+        scene->Publish({.wait = true});
+        const Instances& instances = SceneImpl::Get(*scene).GetInstances();
+        const uint32_t relayouts = instances.Relayouts();
+
+        inst.Set(PointInstancer::kPositions, std::vector<Float3>{{5, 0, 0}, {10, 0, 0}});
+        sun.Set(Xformable::kTranslate, Double3{0, 0, 9});
+        scene->Publish({.wait = true});
+        EXPECT_EQ(instances.Relayouts(), relayouts);
+        EXPECT_EQ(instances.Stats().built, instances.Stats().tlases);
+        EXPECT_EQ(instances.Stats().refit, 0u);
+    });
+}
+
 TEST(InstancersTest, NestedInstancersMultiplyThroughEveryLevel) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

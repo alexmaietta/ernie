@@ -151,20 +151,21 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_geometry(m_catalog, *m_builder), m_bounds(m_catalog, m_instances),
       m_tangents(m_catalog, m_geometry), m_textures(m_catalog, desc.textureThreads),
       m_semantics(m_catalog), m_instances(m_catalog, *m_builder, desc.maxRefits),
-      m_lights(m_catalog, m_instances), m_readback(device) {
+      m_surfaces(m_catalog, m_instances), m_lights(m_catalog, m_instances), m_readback(device) {
     m_timeline.Add(m_hierarchy);
     m_timeline.Add(m_geometry);
     m_timeline.Add(m_tangents);
     m_timeline.Add(m_textures);
     m_timeline.Add(m_semantics);
     m_timeline.Add(m_instances);
+    m_timeline.Add(m_surfaces);
     m_timeline.Add(m_bounds);
     m_timeline.Add(m_lights);
     m_store.Prepare();
     m_builder->Prepare();
-    for (System* system :
-         std::initializer_list<System*>{&m_hierarchy, &m_geometry, &m_bounds, &m_tangents,
-                                        &m_textures, &m_semantics, &m_instances, &m_lights}) {
+    for (System* system : std::initializer_list<System*>{&m_hierarchy, &m_geometry, &m_bounds,
+                                                         &m_tangents, &m_textures, &m_semantics,
+                                                         &m_instances, &m_surfaces, &m_lights}) {
         system->Prepare();
     }
     if (desc.waitForKernels) {

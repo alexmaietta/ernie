@@ -16,9 +16,10 @@ enum class TableId : uint32_t {
     Tangents,
     Textures,
     Instances,
+    Slots,
 };
 
-inline constexpr uint32_t kTableCount = 7;
+inline constexpr uint32_t kTableCount = 8;
 
 class TableLog {
   public:

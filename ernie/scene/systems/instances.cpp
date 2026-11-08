@@ -61,11 +61,7 @@ constexpr ColumnRef kLayoutInputs[] = {kPointInstancerPrototypes, kPointInstance
 
 const std::vector<ColumnRef>& InputColumns() {
     static const std::vector<ColumnRef> inputs = [] {
-        std::vector<ColumnRef> columns = {
-            kPointBasedPoints,      kPointBasedNormals,     kPointBasedNormalsInterpolation,
-            kMeshFaceVertexIndices, kMeshSubdivisionScheme, kPointInstancerOrientations,
-            kPointInstancerScales,  kRenderProductCamera,   kGprimPrimvars,
-            kGprimDisplayColor,     kPointInstancerPrimvars};
+        std::vector<ColumnRef> columns(std::begin(kPlacement), std::end(kPlacement));
         columns.insert(columns.end(), std::begin(kActivation), std::end(kActivation));
         columns.insert(columns.end(), std::begin(kLayoutInputs), std::end(kLayoutInputs));
         return columns;
@@ -269,14 +265,12 @@ void Instances::Relayout() {
     m_tlas = m_builder.CreateTlas(capacities);
     const uint32_t slots = uint32_t(m_regions.Items().size());
     m_records.Allocate(device, slots);
-    m_surfaces.Allocate(device, slots);
     m_shapes.Allocate(device, slots);
     m_hits.Allocate(device, slots);
     m_renderOrigins.Allocate(device, m_worlds + 1);
     device::CommandEncoder clear = device.GetQueue().CreateEncoder();
     for (const Ref<device::Buffer>& buffer :
-         {m_records.Buffer(), m_shapes.Buffer(), m_surfaces.Buffer(), m_hits.Buffer(),
-          m_renderOrigins.Buffer()}) {
+         {m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(), m_renderOrigins.Buffer()}) {
         clear.Fill(*buffer);
     }
     device.GetQueue().Submit(clear.Finish());
@@ -671,50 +665,18 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
         log.Wrote(TableId::Instances, std::vector<uint32_t>{kGlobalWorld});
     }
     const uint32_t tlases = m_regions.Size();
-    const uint32_t worlds = m_worlds;
-
-    std::vector<uint32_t> dirty;
-    const bool global = relaid || store.LastWrite(kRenderProductCamera) > m_seen ||
-                        std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
-    if (global) {
-        dirty.resize(tlases);
-        std::iota(dirty.begin(), dirty.end(), 0u);
-    } else {
-        for (const uint32_t world : changes.worlds) {
-            if (world < worlds) {
-                dirty.push_back(world);
-            }
-        }
-        for (const uint32_t tlas : structural) {
-            if (std::ranges::find(dirty, tlas) == dirty.end()) {
-                dirty.push_back(tlas);
-            }
-        }
-        for (const uint32_t world : changes.worlds) {
-            if (const auto shown = m_shownIn.find(world); shown != m_shownIn.end()) {
-                for (const uint32_t tlas : shown->second) {
-                    if (std::ranges::find(dirty, tlas) == dirty.end()) {
-                        dirty.push_back(tlas);
-                    }
-                }
-            }
-            if (const auto watched = m_watch.find(world); watched != m_watch.end()) {
-                for (const uint32_t tlas : watched->second) {
-                    if (std::ranges::find(dirty, tlas) == dirty.end()) {
-                        dirty.push_back(tlas);
-                    }
-                }
-            }
-        }
-        if (restacked) {
-            for (uint32_t tlas = 0; tlas < tlases; ++tlas) {
-                structural.insert(tlas);
-                if (std::ranges::find(dirty, tlas) == dirty.end()) {
-                    dirty.push_back(tlas);
-                }
-            }
+    if (restacked) {
+        for (uint32_t tlas = 0; tlas < tlases; ++tlas) {
+            structural.insert(tlas);
         }
     }
+    std::set<uint32_t> touched = structural;
+    const bool global = relaid || store.LastWrite(kRenderProductCamera) > m_seen ||
+                        std::ranges::find(changes.worlds, kGlobalWorld) != changes.worlds.end();
+    for (const uint32_t world : global ? std::vector<uint32_t>{kGlobalWorld} : changes.worlds) {
+        touched.merge(Tlases(world));
+    }
+    const std::vector<uint32_t> dirty(touched.begin(), touched.end());
     const auto written = [&](std::span<const ColumnRef> columns) {
         return std::ranges::any_of(
             columns, [&](ColumnRef column) { return store.LastWrite(column) > m_seen; });
@@ -756,6 +718,13 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
         }
     }
     m_stats.built = uint32_t(built.size());
+    if (!built.empty()) {
+        std::vector<uint32_t> rebuilt;
+        for (const uint32_t tlas : built) {
+            rebuilt.push_back(TlasWorld(tlas, m_worlds));
+        }
+        log.Wrote(TableId::Slots, rebuilt);
+    }
     m_stats.refit = uint32_t(refit.size());
 
     device::Device& device = store.GetDevice();
@@ -772,7 +741,6 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
     params.transforms = changes.tables->transforms;
     params.imageables = changes.tables->imageables;
     params.meshes = changes.tables->meshes;
-    params.surfaces.address = m_surfaces.Address();
     params.unitBox = m_unitBox->Handle();
 
     device::Queue& queue = device.GetQueue();
@@ -809,15 +777,33 @@ void Instances::Run(const ChangeSet& changes, TableLog& log) {
     queue.Submit(encoder.Finish());
 }
 
+std::set<uint32_t> Instances::Tlases(uint32_t world) const {
+    std::set<uint32_t> tlases;
+    if (world == kGlobalWorld) {
+        for (uint32_t tlas = 0; tlas < m_regions.Size(); ++tlas) {
+            tlases.insert(tlas);
+        }
+        return tlases;
+    }
+    if (world < m_worlds) {
+        tlases.insert(world);
+    }
+    for (const auto* map : {&m_shownIn, &m_watch}) {
+        if (const auto found = map->find(world); found != map->end()) {
+            tlases.insert(found->second.begin(), found->second.end());
+        }
+    }
+    return tlases;
+}
+
 void Instances::Describe(RenderTables& tables) const {
     tables.instances.address = m_layout ? m_layout->Address() : 0;
     tables.origins.address = m_renderOrigins.Address();
-    tables.surfaces.address = m_surfaces.Address();
 }
 
 void Instances::Hold(std::vector<Ref<const RefCounted>>& held) const {
     HoldBuffers(held, {m_layout, m_records.Buffer(), m_shapes.Buffer(), m_hits.Buffer(),
-                       m_instancing, m_renderOrigins.Buffer(), m_surfaces.Buffer()});
+                       m_instancing, m_renderOrigins.Buffer()});
     if (m_tlas) {
         held.emplace_back(m_tlas);
     }

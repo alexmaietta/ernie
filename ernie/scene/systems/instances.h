@@ -46,7 +46,7 @@ class Instances : public System {
     }
 
     std::span<const TableId> TableOutputs() const override {
-        static constexpr TableId kTables[] = {TableId::Instances};
+        static constexpr TableId kTables[] = {TableId::Instances, TableId::Slots};
         return kTables;
     }
 
@@ -100,6 +100,8 @@ class Instances : public System {
     std::span<const uint32_t> InstancePrims() const {
         return m_regions.Items();
     }
+
+    std::set<uint32_t> Tlases(uint32_t world) const;
 
     uint32_t Relayouts() const {
         return m_relayouts;
@@ -160,7 +162,6 @@ class Instances : public System {
     uint64_t m_offsetBasesOffset = 0;
     uint64_t m_offsetsOffset = 0;
     DeviceTable<RenderOrigin> m_renderOrigins{"render origins"};
-    DeviceTable<SurfaceRecord> m_surfaces{"instance surfaces"};
     Ref<device::Buffer> m_viewers;
     std::vector<uint32_t> m_products;
     Ref<device::Buffer> m_productBuffer;

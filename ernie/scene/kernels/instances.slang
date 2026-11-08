@@ -25,32 +25,6 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
     const UnitShape shape = PlaceShape(scene, prim, w);
     p.shapes[slot] = shape.record;
-    SurfaceRecord surface = {};
-    if (SchemaIsA(uint(schema), SchemaId::Gprim)) {
-        const uint gprimRow = PrimRow(scene, prim, kSlotGprim);
-        surface.primvars = scene->schemas.gprim.primvars[gprimRow];
-        surface.displayColor = scene->schemas.gprim.displayColor[gprimRow];
-    }
-    if (schema == SchemaId::Mesh) {
-        const uint meshRow = PrimRow(scene, prim, kSlotMesh);
-        const uint pointsRow = PrimRow(scene, prim, kSlotPointBased);
-        const MeshRecord mesh = p.meshes[meshRow];
-        const ArrayRef authored = scene->schemas.pointBased.normals[pointsRow];
-        surface.points = scene->schemas.pointBased.points[pointsRow].address;
-        surface.indices = scene->schemas.mesh.faceVertexIndices[meshRow].address;
-        surface.corners = mesh.corners.address;
-        surface.faces = mesh.faces.address;
-        surface.smooth = mesh.normals.address;
-        surface.meshRow = meshRow;
-        const bool subdivided =
-            scene->schemas.mesh.subdivisionScheme[meshRow] != uint(SubdivisionScheme::None);
-        if (!subdivided && authored.count > 0) {
-            surface.normals = authored.address;
-            surface.normalsInterpolation = scene->schemas.pointBased.normalsInterpolation[pointsRow];
-            surface.normalsCount = authored.count;
-        }
-    }
-    p.surfaces[slot] = surface;
     uint64_t blas = p.unitBox;
     if (ShapeKind(shape.record.kind) == ShapeKind::Mesh) {
         blas = schema == SchemaId::Mesh ? p.meshes[PrimRow(scene, prim, kSlotMesh)].blas
@@ -109,11 +83,6 @@ InstanceRecord Expand(InstanceParams p, uint item, uint world, uint local, uint 
     }
     const InstanceRecord record =
         PlaceInstance(p, copy.prim, copy.world, copy.shown, world, local, slot);
-    if (SchemaId(p.scene->prims.schema[block.instancer]) == SchemaId::PointInstancer) {
-        p.surfaces[slot].instancerPrimvars =
-            p.scene->schemas.pointInstancer
-                .primvars[PrimRow(p.scene, block.instancer, kSlotPointInstancer)];
-    }
     if (record.blas == 0) {
         p.hits[slot] = Drawn(kNoPrim, block.instancer, copy.instance, local - block.first);
     }
@@ -135,7 +104,7 @@ void WriteInstances(uniform InstanceParams p) {
         p.hits[slot] = Drawn(kNoPrim, kNoPrim, 0, 0);
         return;
     }
-    const uint world = tlas == layout->worldCount ? kGlobalWorld : tlas;
+    const uint world = TlasWorld(tlas, layout->worldCount);
     const uint item = layout->instancePrims[slot];
     if ((item & kInstancerSlot) != 0) {
         const uint instancer = layout->blocks[item & ~kInstancerSlot].instancer;

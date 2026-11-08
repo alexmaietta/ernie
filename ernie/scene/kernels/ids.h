@@ -21,4 +21,8 @@ ERNIE_SHARED uint TlasIndex(uint world, uint worldCount) {
     return world < worldCount ? world : worldCount;
 }
 
+ERNIE_SHARED uint TlasWorld(uint tlas, uint worldCount) {
+    return tlas < worldCount ? tlas : kGlobalWorld;
+}
+
 }

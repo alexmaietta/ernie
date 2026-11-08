@@ -19,6 +19,7 @@
 #include "ernie/scene/systems/geometry.h"
 #include "ernie/scene/systems/hierarchy.h"
 #include "ernie/scene/systems/instances.h"
+#include "ernie/scene/systems/surfaces.h"
 #include "ernie/scene/timeline/timeline.h"
 #include "support/devices.h"
 
@@ -62,6 +63,7 @@ struct Work {
     uint32_t tlasBuilt = 0;
     uint32_t tlasRefit = 0;
     uint32_t instancesWritten = 0;
+    uint32_t surfacesWritten = 0;
     bool hierarchyRebuilt = false;
     bool instancesRelaid = false;
 
@@ -70,10 +72,11 @@ struct Work {
 
 void PrintTo(const Work& work, std::ostream* out) {
     *out << fmt::format("{{hierarchy rows {}, BLAS built {} refit {}, TLAS built {} refit {}, "
-                        "instances written {}, hierarchy rebuilt {}, instances relaid {}}}",
+                        "instances written {}, surfaces written {}, hierarchy rebuilt {}, "
+                        "instances relaid {}}}",
                         work.hierarchyRows, work.blasBuilt, work.blasRefit, work.tlasBuilt,
-                        work.tlasRefit, work.instancesWritten, work.hierarchyRebuilt,
-                        work.instancesRelaid);
+                        work.tlasRefit, work.instancesWritten, work.surfacesWritten,
+                        work.hierarchyRebuilt, work.instancesRelaid);
 }
 
 struct Case {
@@ -87,18 +90,18 @@ const Case kCases[] = {
     {"an attribute no system reads does nothing",
      [](Fixture& f) { f.One(f.quads[0], SchemaId::Gprim).Get<bool>(kGprimDoubleSided).Set(false); },
      {}},
-    {"a display color rewrites its world's surfaces without touching the TLAS",
+    {"a display color rewrites its world's surfaces without running instances",
      [](Fixture& f) {
          f.One(f.balls[0], SchemaId::Gprim).Get<Float3>(kGprimDisplayColor).Set(Float3{1, 0, 0});
      },
-     {.instancesWritten = 3}},
-    {"authored normals rewrite their world's surfaces without touching the TLAS",
+     {.surfacesWritten = 3}},
+    {"authored normals rewrite their world's surfaces without running instances",
      [](Fixture& f) {
          f.One(f.quads[0], SchemaId::PointBased)
              .GetArray<Float3>(kPointBasedNormals)
              .Set(0, std::vector<Float3>(4, Float3{0, 0, 1}));
      },
-     {.instancesWritten = 3}},
+     {.surfacesWritten = 3}},
     {"moving a prim refits its world only",
      [](Fixture& f) { f.Move(f.balls[0], {2, 0, 0}); },
      {.hierarchyRows = 3, .tlasRefit = 1, .instancesWritten = 3}},
@@ -113,19 +116,19 @@ const Case kCases[] = {
      {.hierarchyRows = 7, .tlasRefit = 3, .instancesWritten = 7}},
     {"resizing a shape rebuilds its world",
      [](Fixture& f) { f.One(f.balls[1], SchemaId::Sphere).Get<float>(kSphereRadius).Set(2.0f); },
-     {.tlasBuilt = 1, .instancesWritten = 3}},
+     {.tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"hiding a prim rebuilds its world",
      [](Fixture& f) {
          f.One(f.balls[0], SchemaId::Imageable)
              .Get<Visibility>(kImageableVisibility)
              .Set(Visibility::Invisible);
      },
-     {.hierarchyRows = 3, .tlasBuilt = 1, .instancesWritten = 3}},
+     {.hierarchyRows = 3, .tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"changing a prim's purpose rebuilds its world",
      [](Fixture& f) {
          f.One(f.balls[0], SchemaId::Imageable).Get<Purpose>(kImageablePurpose).Set(Purpose::Guide);
      },
-     {.hierarchyRows = 3, .tlasBuilt = 1, .instancesWritten = 3}},
+     {.hierarchyRows = 3, .tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"moving shared points in place refits the BLAS once and every world using it",
      [](Fixture& f) {
          const ArrayRef points = f.store.Array(kPointBasedPoints, f.PointsRow(f.quads[0]));
@@ -139,7 +142,7 @@ const Case kCases[] = {
          f.store.SetArray(kPointBasedPoints, f.PointsRow(f.quads[1]),
                           f.NewArray(ColumnType::Float3Array, std::as_bytes(std::span(kQuad)), 4));
      },
-     {.blasBuilt = 1, .tlasBuilt = 1, .instancesWritten = 3}},
+     {.blasBuilt = 1, .tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"new topology for one clone builds one BLAS and rebuilds its world",
      [](Fixture& f) {
          const std::vector<int32_t> counts = {3, 3};
@@ -150,23 +153,24 @@ const Case kCases[] = {
          f.store.SetArray(kMeshFaceVertexIndices, row,
                           f.NewArray(ColumnType::IntArray, std::as_bytes(std::span(indices)), 6));
      },
-     {.blasBuilt = 1, .tlasBuilt = 1, .instancesWritten = 3}},
+     {.blasBuilt = 1, .tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"defining a prim updates and rebuilds only its world",
      [](Fixture& f) {
          f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Env0/Extra"});
      },
-     {.hierarchyRows = 4, .tlasBuilt = 1, .instancesWritten = 4}},
+     {.hierarchyRows = 4, .tlasBuilt = 1, .instancesWritten = 4, .surfacesWritten = 4}},
     {"removing a prim updates and rebuilds only its world",
      [](Fixture& f) { f.catalog.Remove(f.balls[1]); },
-     {.hierarchyRows = 2, .tlasBuilt = 1, .instancesWritten = 2}},
+     {.hierarchyRows = 2, .tlasBuilt = 1, .instancesWritten = 2, .surfacesWritten = 2}},
     {"defining a global prim rebuilds every TLAS, since every world holds it",
      [](Fixture& f) { f.catalog.Define(SchemaId::Sphere, std::vector<std::string>{"/Moon"}); },
-     {.hierarchyRows = 8, .tlasBuilt = 3, .instancesWritten = 10}},
+     {.hierarchyRows = 8, .tlasBuilt = 3, .instancesWritten = 10, .surfacesWritten = 10}},
     {"defining a world lays everything out again",
      [](Fixture& f) { f.catalog.Define(SchemaId::World, std::vector<std::string>{"/Env2"}); },
      {.hierarchyRows = 8,
       .tlasBuilt = 4,
       .instancesWritten = 8,
+      .surfacesWritten = 8,
       .hierarchyRebuilt = true,
       .instancesRelaid = true}},
 };
@@ -185,9 +189,11 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
             Hierarchy hierarchy(catalog);
             Geometry geometry(catalog, *builder);
             Instances instances(catalog, *builder);
+            Surfaces surfaces(catalog, instances);
             timeline.Add(hierarchy);
             timeline.Add(geometry);
             timeline.Add(instances);
+            timeline.Add(surfaces);
 
             Fixture f{device, store, catalog, {}, {}, kNoPrim};
             catalog.Define(SchemaId::World, std::vector<std::string>{"/Env0"});
@@ -210,6 +216,7 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
             const uint32_t hierarchyRuns = hierarchy.Runs();
             const uint32_t geometryRuns = geometry.Runs();
             const uint32_t instancesRuns = instances.Runs();
+            const uint32_t surfacesRuns = surfaces.Runs();
             const uint64_t submitted = device.GetQueue().Submitted();
             c.change(f);
             timeline.Publish(2).Wait();
@@ -226,6 +233,9 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
                 work.tlasBuilt = instances.Stats().built;
                 work.tlasRefit = instances.Stats().refit;
                 work.instancesWritten = instances.Stats().written;
+            }
+            if (surfaces.Runs() != surfacesRuns) {
+                work.surfacesWritten = surfaces.Written();
             }
             work.hierarchyRebuilt = hierarchy.Rebuilds() != hierarchyRebuilds;
             work.instancesRelaid = instances.Relayouts() != instanceRelayouts;
