@@ -540,16 +540,19 @@ void RegisterPrimvar(nb::module_& module) {
 void RegisterScene(nb::module_& module) {
     nb::class_<Scene>(module, "Scene")
         .def(nb::new_([](std::optional<Ref<device::Device>> device, device::Traversal traversal,
-                         uint32_t maxRefits, bool waitForKernels) {
+                         uint32_t maxRefits, uint32_t pointsPerBox, bool waitForKernels) {
                  nb::gil_scoped_release release;
                  const SceneDesc desc{.traversal = traversal,
                                       .maxRefits = maxRefits,
+                                      .pointsPerBox = pointsPerBox,
                                       .waitForKernels = waitForKernels};
                  return device ? Scene::Create(**device, desc) : Scene::Create(desc);
              }),
              nb::arg("device") = nb::none(), nb::kw_only(),
              nb::arg("traversal") = device::Traversal::Auto,
-             nb::arg("max_refits") = SceneDesc{}.maxRefits, nb::arg("wait_for_kernels") = true)
+             nb::arg("max_refits") = SceneDesc{}.maxRefits,
+             nb::arg("points_per_box") = SceneDesc{}.pointsPerBox,
+             nb::arg("wait_for_kernels") = true)
         .def(
             "load_shaders",
             [](Ref<Scene> scene, const std::string& path) { return LoadShaders(*scene, path); },
@@ -1035,6 +1038,18 @@ void RegisterSelection(nb::module_& module) {
                                         stream};
             },
             nb::arg("field"), nb::arg("access") = "write", nb::arg("stream") = nb::none(),
+            nb::keep_alive<0, 1>())
+        .def(
+            "map_primvar",
+            [](const SceneSelection& source, std::string_view name, std::string_view access,
+               std::optional<uintptr_t> stream) {
+                UntypedAttribute target = source.view.Get("primvars");
+                nb::gil_scoped_release release;
+                return new SceneMapping{source.scene,
+                                        target.MapPrimvar(name, Access(access), ToStream(stream)),
+                                        stream};
+            },
+            nb::arg("name"), nb::arg("access") = "write", nb::arg("stream") = nb::none(),
             nb::keep_alive<0, 1>())
         .def(
             "read_poses",
