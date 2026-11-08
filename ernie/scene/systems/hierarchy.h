@@ -54,6 +54,7 @@ class Hierarchy : public System {
 
   private:
     void Rebuild();
+    void WriteMotions(bool restructured);
     bool Apply(const ChangeSet& changes);
     uint32_t ParentRow(uint32_t prim) const;
 
@@ -70,6 +71,8 @@ class Hierarchy : public System {
     Ref<device::Buffer> m_segmentCount;
     DeviceTable<WorldTransform> m_transforms{"transforms"};
     DeviceTable<ResolvedImageable> m_imageables{"imageables"};
+    DeviceTable<MotionRecord> m_motions{"motion records"};
+    uint64_t m_motionSeen = 0;
     bool m_built = false;
     uint64_t m_seen = 0;
     uint32_t m_dispatched = 0;

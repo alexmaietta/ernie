@@ -22,6 +22,7 @@ struct RenderTables {
     PrimTable prims;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
+    Ptr<MotionRecord> motions;
     Ptr<MeshRecord> meshes;
     Ptr<TangentRecord> tangents;
     Ptr<SurfaceRecord> surfaces;
@@ -45,7 +46,7 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 264);
+ERNIE_CHECK_SIZE(RenderTables, 272);
 
 #ifdef __SLANG__
 

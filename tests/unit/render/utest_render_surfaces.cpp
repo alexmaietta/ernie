@@ -49,6 +49,9 @@ TEST(SurfaceTest, RadarSeesTheMotionOfTheNearestMovingAncestor) {
 
         scene->Apply<MotionAPI>(radar, {.motionVelocity = {0, 0, -1}});
         EXPECT_NEAR(CenterVelocity(renderer), 2, 1e-3f);
+
+        cart.Set(MotionAPI::kMotionVelocity, Float3{0, 0, -5});
+        EXPECT_NEAR(CenterVelocity(renderer), 4, 1e-3f);
     });
 }
 

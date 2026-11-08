@@ -32,6 +32,15 @@ struct ResolveParams {
 
 ERNIE_CHECK_SIZE(ResolveParams, 104);
 
+struct MotionParams {
+    Ptr<SceneData> scene;
+    Ptr<MotionRecord> motions;
+    uint rows;
+    uint padding;
+};
+
+ERNIE_CHECK_SIZE(MotionParams, 24);
+
 static const uint kHierarchyGroup = 64;
 static const uint kMaxHierarchyDepth = 256;
 

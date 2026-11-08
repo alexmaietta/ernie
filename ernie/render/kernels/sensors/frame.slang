@@ -43,13 +43,13 @@ float3 SphericalDirection(float azimuth, float elevation) {
     return float3(-sin(azimuth) * cos(elevation), sin(elevation), -cos(azimuth) * cos(elevation));
 }
 
-float3 PointVelocity(SceneData* scene, RenderTables* tables, uint prim, float3 position) {
+float3 PointVelocity(RenderTables* tables, uint prim, float3 position) {
     const uint at = PrimImageable(tables, prim).motion;
     if (at == kNoPrim) {
         return float3(0);
     }
-    const uint row = ApiRow(scene, at, kApiMotionAPI);
-    const float3 linear = scene->schemas.motionAPI.motionVelocity[row].Vector();
-    const float3 angular = radians(scene->schemas.motionAPI.motionAngularVelocity[row].Vector());
+    const MotionRecord motion = tables->motions[ApiRow(tables, at, kApiMotionAPI)];
+    const float3 linear = motion.linear.Vector();
+    const float3 angular = motion.angular.Vector();
     return linear + cross(angular, position - LoadSensorFrame(tables, at).position);
 }

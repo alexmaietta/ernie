@@ -28,7 +28,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         response.query = context.query;
         response.scene = params.scene;
         response.tables = params.tables;
-        response.sensorVelocity = PointVelocity(params.scene, params.tables,
+        response.sensorVelocity = PointVelocity(params.tables,
                                                 context.capture->sensor, pattern.frame.position);
         response.hit = false;
         response.position = float3(0);
@@ -56,7 +56,7 @@ struct RadarResponse : IResponse<RadarPattern> {
             return;
         }
         const SurfacePoint point = ComputeSurfacePoint(query, ray.ray, primHit, ray.spread);
-        const float3 velocity = PointVelocity(scene, tables, point.prim, point.position);
+        const float3 velocity = PointVelocity(tables, point.prim, point.position);
         hit = true;
         position = point.position;
         distance = point.distance;

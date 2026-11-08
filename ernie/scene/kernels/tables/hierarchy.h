@@ -14,4 +14,13 @@ struct ResolvedImageable {
 
 ERNIE_CHECK_SIZE(ResolvedImageable, 16);
 
+struct MotionRecord {
+    Float3 linear;
+    uint padding0;
+    Float3 angular;
+    uint padding1;
+};
+
+ERNIE_CHECK_SIZE(MotionRecord, 32);
+
 }

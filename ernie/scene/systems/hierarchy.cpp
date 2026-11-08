@@ -26,7 +26,9 @@ constexpr ColumnRef kInputs[] = {kXformableTranslate,
                                  kXformableResetXformStack,
                                  kImageableVisibility,
                                  kImageablePurpose,
-                                 kMaterialBindingAPIMaterialBinding};
+                                 kMaterialBindingAPIMaterialBinding,
+                                 kMotionAPIMotionVelocity,
+                                 kMotionAPIMotionAngularVelocity};
 
 constexpr TableId kTableOutputs[] = {TableId::Transforms, TableId::Imageables};
 
@@ -43,10 +45,11 @@ std::span<const TableId> Hierarchy::TableOutputs() const {
 void Hierarchy::Describe(RenderTables& tables) const {
     tables.transforms.address = m_transforms.Address();
     tables.imageables.address = m_imageables.Address();
+    tables.motions.address = m_motions.Address();
 }
 
 void Hierarchy::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held, {m_transforms.Buffer(), m_imageables.Buffer()});
+    HoldBuffers(held, {m_transforms.Buffer(), m_imageables.Buffer(), m_motions.Buffer()});
 }
 
 uint32_t Hierarchy::ParentRow(uint32_t prim) const {
@@ -177,6 +180,7 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     if (rebuild) {
         Rebuild();
     }
+    WriteMotions(rebuild || !changes.apis.empty());
 
     std::vector<uint32_t> segments;
     const bool global =
@@ -257,6 +261,28 @@ void Hierarchy::Run(const ChangeSet& changes, TableLog& log) {
     queue.Submit(encoder.Finish());
 }
 
+void Hierarchy::WriteMotions(bool restructured) {
+    Store& store = m_catalog.GetStore();
+    const bool written = store.LastWrite(kMotionAPIMotionVelocity) > m_motionSeen ||
+                         store.LastWrite(kMotionAPIMotionAngularVelocity) > m_motionSeen;
+    m_motionSeen = store.WriteSequence();
+    device::Device& device = store.GetDevice();
+    const bool grown = m_motions.Reserve(device, store.Schema(SchemaId::MotionAPI).Capacity());
+    const uint32_t rows = store.Schema(SchemaId::MotionAPI).Rows();
+    if (rows == 0 || !(written || restructured || grown)) {
+        return;
+    }
+    MotionParams params{};
+    params.scene.address = store.DeviceData();
+    params.motions.address = m_motions.Address();
+    params.rows = rows;
+    device::Queue& queue = device.GetQueue();
+    device::CommandEncoder encoder = queue.CreateEncoder();
+    encoder.Dispatch(Kernels().Entry("WriteMotions"), params,
+                     {.x = device::GroupCount(rows, kHierarchyGroup)});
+    queue.Submit(encoder.Finish());
+}
+
 void Hierarchy::Prepare() {
     Kernels();
 }
@@ -266,7 +292,7 @@ device::Program& Hierarchy::Kernels() {
         m_program = m_catalog.GetStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.kernels.hierarchy"},
              .library = &kSceneKernels,
-             .entries = {"ResolveRows"},
+             .entries = {"ResolveRows", "WriteMotions"},
              .label = "hierarchy"});
     }
     return *m_program;

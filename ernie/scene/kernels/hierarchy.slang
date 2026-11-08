@@ -190,3 +190,19 @@ void ResolveRows(uniform ResolveParams p) {
     resolved.motion = motion;
     p.imageables[row] = resolved;
 }
+
+[shader("compute")]
+[numthreads(kHierarchyGroup, 1, 1)]
+void WriteMotions(uniform MotionParams p) {
+    const uint row = LinearThreadIndex();
+    if (row >= p.rows) {
+        return;
+    }
+    MotionAPIData* motion = &p.scene->schemas.motionAPI;
+    MotionRecord record;
+    record.linear = motion.motionVelocity[row];
+    record.angular = Float3(radians(motion.motionAngularVelocity[row].Vector()));
+    record.padding0 = 0;
+    record.padding1 = 0;
+    p.motions[row] = record;
+}
