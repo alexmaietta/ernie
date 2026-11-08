@@ -230,7 +230,7 @@ Viewport::Viewport(ViewportDesc desc, Ref<Scene> scene, Ref<device::Device> devi
     } else if (m_scene) {
         DefineSession();
         m_renderer = m_desc.renderer ? m_desc.renderer : std::make_shared<Renderer>(m_scene);
-        m_renderer->ShowOverlays(m_product);
+        m_scene->Find(m_product)->Set(RenderProduct::kOverlays, std::vector<std::string>{"*"});
         m_delegate = std::make_shared<ErnieDelegate>(m_renderer, *this, m_shownVar);
     }
     if (m_product.empty()) {
@@ -444,7 +444,7 @@ void Viewport::ShowSceneOverlays(bool shown) {
 
 std::vector<std::string> Viewport::SceneOverlayNames() const {
     std::vector<std::string> names =
-        m_renderer ? m_renderer->OverlayNames() : std::vector<std::string>();
+        m_renderer ? m_renderer->GetOverlays()->Names() : std::vector<std::string>();
     std::erase_if(names, [](const std::string& name) { return name.starts_with(kViewerOverlays); });
     return names;
 }
@@ -467,7 +467,8 @@ void Viewport::SyncOverlays() {
     if (shown == m_shownOverlays) {
         return;
     }
-    m_renderer->ShowOverlays(m_product, shown);
+    m_scene->Find(m_product)->Set(RenderProduct::kOverlays,
+                                  shown.empty() ? std::vector<std::string>{"*"} : shown);
     m_shownOverlays = std::move(shown);
 }
 
@@ -769,7 +770,7 @@ void Viewport::UpdateGuides() {
         shown.Prims(unchosen(lights, chosenLights), OverlayPrimShape::Lights,
                     {.color = kLightGuideColor, .width = 1, .depth = OverlayDepth::XRay});
     }
-    m_renderer->SetOverlay(kGuidesOverlay, shown);
+    m_renderer->GetOverlays()->Set(kGuidesOverlay, shown);
 
     Overlay selection;
     const OverlayStyle chosen{
@@ -787,7 +788,7 @@ void Viewport::UpdateGuides() {
     }
     selection.Prims(chosenCameras, OverlayPrimShape::Frustums, chosen);
     selection.Prims(chosenLights, OverlayPrimShape::Lights, chosen);
-    m_renderer->SetOverlay(kSelectionOverlay, selection);
+    m_renderer->GetOverlays()->Set(kSelectionOverlay, selection);
 }
 
 void Viewport::AddOverlay(std::function<void(const ViewportRect&)> draw) {
@@ -1493,11 +1494,11 @@ void Viewport::TrackGestures(ImVec2 imageMin, ImVec2 imageSize, bool pressed) {
         const float width = float(shown->Shape()[1]);
         const float height = float(shown->Shape()[0]);
         const float scale = width / std::max(imageSize.x, 1.0f);
-        m_hoverPick =
-            m_renderer->PickOverlay(m_product,
-                                    {(mouse.x - imageMin.x) / std::max(imageSize.x, 1.0f) * width,
-                                     (mouse.y - imageMin.y) / std::max(imageSize.y, 1.0f) * height},
-                                    6 * scale * ImGui::GetStyle().FontScaleDpi);
+        m_hoverPick = m_renderer->GetOverlays()->Pick(
+            m_product,
+            {(mouse.x - imageMin.x) / std::max(imageSize.x, 1.0f) * width,
+             (mouse.y - imageMin.y) / std::max(imageSize.y, 1.0f) * height},
+            6 * scale * ImGui::GetStyle().FontScaleDpi);
     }
     if (pressed && m_hoverHit &&
         SendGesture(OverlayGesture::Press, *m_hoverHit, mouse, imageMin, imageSize)) {

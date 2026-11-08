@@ -120,6 +120,17 @@ struct OverlayFont {
     float textHeight = 0;
 };
 
+struct OverlaysImpl {
+    static OverlaysImpl& Get(Overlays& overlays) {
+        return *overlays.m_impl;
+    }
+
+    device::Device& device;
+    mutable std::mutex mutex;
+    std::map<std::string, OverlayContents, std::less<>> layers;
+    std::vector<std::shared_ptr<OverlayPickState>> picks;
+};
+
 const OverlayFont& OverlayTextFont();
 std::vector<uint8_t> OverlayCodes(std::string_view text);
 

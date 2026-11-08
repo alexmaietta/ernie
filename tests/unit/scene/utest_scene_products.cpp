@@ -71,5 +71,22 @@ TEST(ProductsTest, PlanningAProductItsSensorCannotOutputThrows) {
     });
 }
 
+TEST(ProductsTest, OnlyCameraProductsDrawOverlays) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = TwoProducts(device);
+        scene->Define<Radar>("/Radar");
+        const Prim depths = *scene->Find("/Render/Depths");
+        depths.Set(RenderProduct::kOverlays, std::vector<std::string>{"*"});
+        scene->Publish().Wait();
+        const std::vector<std::string> paths = {"/Render/Depths"};
+        ProductTable& products = SceneImpl::Get(*scene).GetProducts();
+        EXPECT_EQ(products.Plan(paths)->products.size(), 1u);
+        EXPECT_EQ(products.Find(depths.Index())->overlays, std::vector<std::string>{"*"});
+        depths.Set(RenderProduct::kCamera, std::vector<std::string>{"/Radar"});
+        scene->Publish().Wait();
+        EXPECT_THROW(products.Plan(paths), Error);
+    });
+}
+
 }
 }

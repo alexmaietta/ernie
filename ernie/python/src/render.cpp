@@ -124,16 +124,37 @@ void RegisterOutputs(nb::module_& module) {
 }
 
 void RegisterRenderer(nb::module_& module) {
+    nb::class_<Overlays>(module, "Overlays")
+        .def(nb::new_([](Ref<device::Device> device) { return Overlays::Create(*device); }),
+             nb::arg("device"))
+        .def("set", &Overlays::Set, nb::arg("name"), nb::arg("overlay"),
+             nb::call_guard<nb::gil_scoped_release>())
+        .def("remove", &Overlays::Remove, nb::arg("name"), nb::call_guard<nb::gil_scoped_release>())
+        .def("names", &Overlays::Names)
+        .def(
+            "pick",
+            [](Overlays& overlays, std::string_view product, nb::handle pixel, float radius,
+               uint32_t layer) {
+                Float2 at;
+                Assign(at, pixel);
+                return overlays.Pick(product, at, radius, layer);
+            },
+            nb::arg("product"), nb::arg("pixel"), nb::kw_only(), nb::arg("radius") = 6.0f,
+            nb::arg("layer") = 0);
+
     nb::class_<Renderer>(module, "Renderer")
         .def(
             "__init__",
-            [](Renderer* renderer, Ref<Scene> scene, uint64_t maxPixelsPerLaunch) {
+            [](Renderer* renderer, Ref<Scene> scene, uint64_t maxPixelsPerLaunch,
+               std::optional<Ref<Overlays>> overlays) {
                 nb::gil_scoped_release release;
-                new (renderer)
-                    Renderer(std::move(scene), {.maxPixelsPerLaunch = maxPixelsPerLaunch});
+                new (renderer) Renderer(std::move(scene),
+                                        {.maxPixelsPerLaunch = maxPixelsPerLaunch,
+                                         .overlays = overlays ? *overlays : Ref<Overlays>()});
             },
             nb::arg("scene"), nb::kw_only(),
-            nb::arg("max_pixels_per_launch") = RendererDesc{}.maxPixelsPerLaunch)
+            nb::arg("max_pixels_per_launch") = RendererDesc{}.maxPixelsPerLaunch,
+            nb::arg("overlays") = nb::none())
         .def(
             "step",
             [](Renderer& renderer, const std::vector<std::string>& products, double dt,
@@ -142,29 +163,7 @@ void RegisterRenderer(nb::module_& module) {
             },
             nb::arg("products"), nb::arg("dt") = 0.0, nb::arg("stream") = nb::none(),
             nb::call_guard<nb::gil_scoped_release>())
-        .def("set_overlay", &Renderer::SetOverlay, nb::arg("name"), nb::arg("overlay"),
-             nb::call_guard<nb::gil_scoped_release>())
-        .def("overlay_names", &Renderer::OverlayNames)
-        .def("remove_overlay", &Renderer::RemoveOverlay, nb::arg("name"),
-             nb::call_guard<nb::gil_scoped_release>())
-        .def(
-            "show_overlays",
-            [](Renderer& renderer, std::string_view product,
-               const std::vector<std::string>& names) { renderer.ShowOverlays(product, names); },
-            nb::arg("product"), nb::arg("names") = std::vector<std::string>{},
-            nb::call_guard<nb::gil_scoped_release>())
-        .def(
-            "pick_overlay",
-            [](Renderer& renderer, std::string_view product, nb::handle pixel, float radius,
-               uint32_t layer) {
-                Float2 at;
-                Assign(at, pixel);
-                return renderer.PickOverlay(product, at, radius, layer);
-            },
-            nb::arg("product"), nb::arg("pixel"), nb::kw_only(), nb::arg("radius") = 6.0f,
-            nb::arg("layer") = 0)
-        .def("hide_overlays", &Renderer::HideOverlays, nb::arg("product"),
-             nb::call_guard<nb::gil_scoped_release>());
+        .def_prop_ro("overlays", &Renderer::GetOverlays);
 }
 
 struct OverlaySources {

@@ -1158,6 +1158,61 @@ OverlayPass::OverlayPass(device::Device& device)
     *static_cast<uint32_t*>(m_pairsNeeded->Mapped()) = 0;
 }
 
+Overlays::Overlays(device::Device& device) : m_impl(std::make_unique<OverlaysImpl>(device)) {}
+
+Overlays::~Overlays() = default;
+
+Ref<Overlays> Overlays::Create(device::Device& device) {
+    return Ref<Overlays>(new Overlays(device));
+}
+
+void Overlays::Set(std::string_view name, Overlay overlay) {
+    OverlayContents contents = OverlayPass::Share(overlay);
+    if (contents) {
+        OverlayPass::CheckDevice(*contents, m_impl->device);
+    }
+    OverlayContents previous;
+    const std::lock_guard lock(m_impl->mutex);
+    const auto found = m_impl->layers.find(name);
+    if (found == m_impl->layers.end()) {
+        if (contents) {
+            m_impl->layers.emplace(std::string(name), std::move(contents));
+        }
+        return;
+    }
+    previous = std::exchange(found->second, std::move(contents));
+    if (!found->second) {
+        m_impl->layers.erase(found);
+    }
+}
+
+void Overlays::Remove(std::string_view name) {
+    Set(name, Overlay());
+}
+
+std::vector<std::string> Overlays::Names() const {
+    const std::lock_guard lock(m_impl->mutex);
+    std::vector<std::string> names;
+    for (const auto& [name, contents] : m_impl->layers) {
+        names.push_back(name);
+    }
+    return names;
+}
+
+OverlayPick Overlays::Pick(std::string_view product, Float2 pixel, float radius, uint32_t layer) {
+    if (!(radius >= 0)) {
+        throw Error("An overlay pick's radius is at least 0, not {}", radius);
+    }
+    auto state = std::make_shared<OverlayPickState>();
+    state->product = std::string(product);
+    state->layer = layer;
+    state->pixel = pixel;
+    state->radius = radius;
+    const std::lock_guard lock(m_impl->mutex);
+    m_impl->picks.push_back(state);
+    return OverlayPick(std::move(state));
+}
+
 OverlayContents OverlayPass::Share(const Overlay& overlay) {
     return overlay.Empty() ? nullptr : overlay.m_data;
 }

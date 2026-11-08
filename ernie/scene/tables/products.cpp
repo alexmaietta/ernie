@@ -226,8 +226,9 @@ bool SamePlan(const ResolvedProduct& a, const ResolvedProduct& b) {
            x.returns == y.returns && x.frameRate == y.frameRate && x.startTime == y.startTime &&
            x.missDistance == y.missDistance && x.renderMode == y.renderMode &&
            x.minimalMode == y.minimalMode && x.spectralMode == y.spectralMode &&
-           a.sensors == b.sensors && a.vars == b.vars && a.taxonomy == b.taxonomy &&
-           a.entry == b.entry && a.semantic == b.semantic && a.error == b.error;
+           a.sensors == b.sensors && a.vars == b.vars && a.overlays == b.overlays &&
+           a.taxonomy == b.taxonomy && a.entry == b.entry && a.semantic == b.semantic &&
+           a.error == b.error;
 }
 
 }
@@ -410,6 +411,11 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
             product.semantic |= added.semantic;
         }
         product.entry = SelectEntry(product, kind);
+        product.overlays = prim.Get(RenderProduct::kOverlays);
+        if (!product.overlays.empty() && !kind.shades) {
+            throw Error("{} draws overlays over a {}, and only cameras draw them", path,
+                        Info(kind.schema).name);
+        }
     } catch (const Error& error) {
         product.error = error.what();
     }

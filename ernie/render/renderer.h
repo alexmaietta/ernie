@@ -21,6 +21,7 @@ class Scene;
 
 struct ERNIE_API RendererDesc {
     uint64_t maxPixelsPerLaunch = uint64_t(1) << 30;
+    Ref<Overlays> overlays;
 };
 
 class ERNIE_API Renderer {
@@ -32,13 +33,7 @@ class ERNIE_API Renderer {
 
     RenderOutput Step(Span<const std::string> products, double dt, Stream stream = Stream::None());
 
-    void SetOverlay(std::string_view name, Overlay overlay);
-    void RemoveOverlay(std::string_view name);
-    std::vector<std::string> OverlayNames() const;
-    void ShowOverlays(std::string_view product, Span<const std::string> names = {});
-    void HideOverlays(std::string_view product);
-    OverlayPick PickOverlay(std::string_view product, Float2 pixel, float radius = 6,
-                            uint32_t layer = 0);
+    const Ref<Overlays>& GetOverlays() const;
 
   private:
     std::unique_ptr<RendererImpl> m_impl;

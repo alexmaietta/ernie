@@ -499,7 +499,7 @@ void Gizmo::Draw() {
     if (m_path.empty() || !m_world || !m_camera || mode == GizmoMode::None) {
         if (!m_drawn.empty()) {
             m_drawn.clear();
-            m_renderer->RemoveOverlay(kGizmoOverlay);
+            m_renderer->GetOverlays()->Remove(kGizmoOverlay);
         }
         return;
     }
@@ -574,7 +574,7 @@ void Gizmo::Draw() {
         middle.size = 12;
         overlay.Marker(centre, middle);
     }
-    m_renderer->SetOverlay(kGizmoOverlay, overlay);
+    m_renderer->GetOverlays()->Set(kGizmoOverlay, overlay);
 }
 
 }

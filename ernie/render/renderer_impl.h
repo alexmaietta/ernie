@@ -68,7 +68,6 @@ class RendererImpl {
     struct StepPlan {
         std::shared_ptr<const ProductPlan> plan;
         std::map<std::string, ProductOutput, std::less<>> products;
-        std::map<std::string, std::vector<std::string>, std::less<>> shownOverlays;
         std::vector<OutputSet> sets;
     };
 
@@ -85,15 +84,9 @@ class RendererImpl {
                                                 const OutputSet& set, const std::set<uint32_t>& due,
                                                 const Snapshot& snapshot);
 
-    void SetOverlay(std::string_view name, Overlay overlay);
-    void RemoveOverlay(std::string_view name);
-    std::vector<std::string> OverlayNames() const;
-    void ShowOverlays(std::string_view product, std::span<const std::string> names);
-    void HideOverlays(std::string_view product);
-    OverlayPick PickOverlay(std::string_view product, Float2 pixel, float radius, uint32_t layer);
-
     Ref<Scene> m_scene;
     uint64_t m_maxPixelsPerLaunch;
+    Ref<Overlays> m_overlays;
     Ref<device::Program> m_renderProgram;
 
     std::map<std::string, ResolvedProduct> m_products;
@@ -103,11 +96,7 @@ class RendererImpl {
     StepPlan* m_plan = nullptr;
 
     std::mutex m_stepMutex;
-    mutable std::mutex m_overlayMutex;
-    std::map<std::string, OverlayContents, std::less<>> m_overlays;
-    std::map<std::string, std::vector<std::string>, std::less<>> m_shownOverlays;
     std::optional<OverlayPass> m_overlayPass;
-    std::vector<std::shared_ptr<OverlayPickState>> m_picks;
     std::vector<std::shared_ptr<OverlayPickState>> m_servedPicks;
 };
 

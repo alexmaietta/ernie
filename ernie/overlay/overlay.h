@@ -6,8 +6,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ernie/device/operation.h"
+#include "ernie/device/ref.h"
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
 #include "ernie/overlay/kernels/style.h"
@@ -322,6 +324,26 @@ class ERNIE_API Overlay {
     OverlayData& Edit();
 
     std::shared_ptr<OverlayData> m_data;
+};
+
+struct OverlaysImpl;
+
+class ERNIE_API Overlays : public RefCounted {
+  public:
+    static Ref<Overlays> Create(device::Device& device);
+    ~Overlays() override;
+
+    void Set(std::string_view name, Overlay overlay);
+    void Remove(std::string_view name);
+    std::vector<std::string> Names() const;
+    OverlayPick Pick(std::string_view product, Float2 pixel, float radius = 6, uint32_t layer = 0);
+
+  private:
+    friend struct OverlaysImpl;
+
+    explicit Overlays(device::Device& device);
+
+    std::unique_ptr<OverlaysImpl> m_impl;
 };
 
 ERNIE_API device::Tensor CompositeOverlay(const device::Tensor& color,

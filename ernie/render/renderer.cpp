@@ -48,7 +48,8 @@ constexpr size_t kHeldOutputsWarning = 8;
 
 RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
     : m_scene(scene ? std::move(scene) : throw Error("A renderer of no scene")),
-      m_maxPixelsPerLaunch(std::clamp<uint64_t>(desc.maxPixelsPerLaunch, 1, ~uint32_t(0))) {
+      m_maxPixelsPerLaunch(std::clamp<uint64_t>(desc.maxPixelsPerLaunch, 1, ~uint32_t(0))),
+      m_overlays(desc.overlays ? desc.overlays : Overlays::Create(m_scene->GetDevice())) {
     m_renderProgram = m_scene->GetDevice().CreateProgram(
         {.modules = {"ernie.render.kernels.render.render"},
          .library = &kRenderKernels,
@@ -71,25 +72,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     const std::lock_guard stepping(m_stepMutex);
     device::Operation published = m_scene->Publish({.dt = dt}, stream);
     DropStaleProducts();
-    std::map<std::string, std::vector<std::string>, std::less<>> shown;
-    {
-        const std::lock_guard lock(m_overlayMutex);
-        for (const std::string& path : products) {
-            if (const auto found = m_shownOverlays.find(path); found != m_shownOverlays.end()) {
-                shown.insert(*found);
-            }
-        }
-    }
     StepPlan& plan = PlanProducts(products);
-    for (const auto& [path, names] : shown) {
-        if (!IsA(SchemaId(m_products.at(path).record.sensorSchema), SchemaId::Camera)) {
-            throw Error("{} renders no camera, and only cameras show overlays", path);
-        }
-    }
-    if (plan.shownOverlays != shown) {
-        plan.sets.clear();
-        plan.shownOverlays = std::move(shown);
-    }
     const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
     std::set<uint32_t> due;
     for (const uint32_t prim : plan.plan->products) {
@@ -254,9 +237,10 @@ void RendererImpl::UpdateMaps() {
 RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     bool outlined = false;
     {
-        const std::lock_guard lock(m_overlayMutex);
-        outlined = std::ranges::any_of(
-            m_overlays, [](const auto& entry) { return entry.second && entry.second->Outlined(); });
+        const OverlaysImpl& overlays = OverlaysImpl::Get(*m_overlays);
+        const std::lock_guard lock(overlays.mutex);
+        outlined = std::ranges::any_of(overlays.layers,
+                                       [](const auto& entry) { return entry.second->Outlined(); });
     }
     for (OutputSet& set : plan.sets) {
         if (set.outlined == outlined &&
@@ -299,7 +283,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
             slots[uint32_t(var.source)] = tensor.Address();
             set.vars.push_back({path, var.path, std::move(tensor), {}});
         }
-        if (!plan.shownOverlays.contains(path)) {
+        if (product.overlays.empty()) {
             continue;
         }
         const std::vector<int64_t> shape = {int64_t(product.sensors.size()), product.record.height,
@@ -489,26 +473,26 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
                                                           const Snapshot& snapshot) {
     std::vector<std::pair<std::string, OverlayContents>> named;
     {
-        const std::lock_guard lock(m_overlayMutex);
-        named.assign(m_overlays.begin(), m_overlays.end());
+        OverlaysImpl& overlays = OverlaysImpl::Get(*m_overlays);
+        const std::lock_guard lock(overlays.mutex);
+        named.assign(overlays.layers.begin(), overlays.layers.end());
         std::vector<std::shared_ptr<OverlayPickState>> waiting;
-        for (std::shared_ptr<OverlayPickState>& pick : m_picks) {
+        for (std::shared_ptr<OverlayPickState>& pick : overlays.picks) {
             const auto product = m_products.find(pick->product);
             const bool served = product != m_products.end() && due.contains(product->second.prim);
             (served ? m_servedPicks : waiting).push_back(std::move(pick));
         }
-        m_picks = std::move(waiting);
+        overlays.picks = std::move(waiting);
     }
     if (set.overlays.empty()) {
         return {};
     }
     const auto matches = [](const std::vector<std::string>& patterns, std::string_view name) {
-        return patterns.empty() || std::ranges::any_of(patterns, [&](const std::string& pattern) {
-                   return pattern.ends_with('*')
-                              ? name.starts_with(
-                                    std::string_view(pattern).substr(0, pattern.size() - 1))
-                              : name == pattern;
-               });
+        return std::ranges::any_of(patterns, [&](const std::string& pattern) {
+            return pattern.ends_with('*')
+                       ? name.starts_with(std::string_view(pattern).substr(0, pattern.size() - 1))
+                       : name == pattern;
+        });
     };
 
     std::vector<OverlayContents> used;
@@ -522,7 +506,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
             continue;
         }
         encoder.Fill(overlay.tensor.GetBuffer());
-        const std::vector<std::string>& patterns = m_plan->shownOverlays.at(overlay.product);
+        const std::vector<std::string>& patterns = product.overlays;
         uint64_t mask = 0;
         for (size_t at = 0; at < named.size(); ++at) {
             if (!matches(patterns, named[at].first)) {
@@ -596,67 +580,6 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     return used;
 }
 
-void RendererImpl::SetOverlay(std::string_view name, Overlay overlay) {
-    OverlayContents contents = OverlayPass::Share(overlay);
-    if (contents) {
-        OverlayPass::CheckDevice(*contents, m_scene->GetDevice());
-    }
-    OverlayContents previous;
-    const std::lock_guard lock(m_overlayMutex);
-    const auto found = m_overlays.find(name);
-    if (found == m_overlays.end()) {
-        if (contents) {
-            m_overlays.emplace(std::string(name), std::move(contents));
-        }
-        return;
-    }
-    previous = std::exchange(found->second, std::move(contents));
-    if (!found->second) {
-        m_overlays.erase(found);
-    }
-}
-
-OverlayPick RendererImpl::PickOverlay(std::string_view product, Float2 pixel, float radius,
-                                      uint32_t layer) {
-    if (!(radius >= 0)) {
-        throw Error("An overlay pick's radius is at least 0, not {}", radius);
-    }
-    auto state = std::make_shared<OverlayPickState>();
-    state->product = std::string(product);
-    state->layer = layer;
-    state->pixel = pixel;
-    state->radius = radius;
-    const std::lock_guard lock(m_overlayMutex);
-    m_picks.push_back(state);
-    return OverlayPick(std::move(state));
-}
-
-void RendererImpl::RemoveOverlay(std::string_view name) {
-    SetOverlay(name, Overlay());
-}
-
-std::vector<std::string> RendererImpl::OverlayNames() const {
-    const std::lock_guard lock(m_overlayMutex);
-    std::vector<std::string> names;
-    for (const auto& [name, contents] : m_overlays) {
-        names.push_back(name);
-    }
-    return names;
-}
-
-void RendererImpl::ShowOverlays(std::string_view product, std::span<const std::string> names) {
-    const std::lock_guard lock(m_overlayMutex);
-    m_shownOverlays.insert_or_assign(std::string(product),
-                                     std::vector<std::string>(names.begin(), names.end()));
-}
-
-void RendererImpl::HideOverlays(std::string_view product) {
-    const std::lock_guard lock(m_overlayMutex);
-    if (const auto found = m_shownOverlays.find(product); found != m_shownOverlays.end()) {
-        m_shownOverlays.erase(found);
-    }
-}
-
 Renderer::Renderer(Ref<Scene> scene, const RendererDesc& desc)
     : m_impl(std::make_unique<RendererImpl>(std::move(scene), desc)) {}
 
@@ -668,29 +591,8 @@ RenderOutput Renderer::Step(Span<const std::string> products, double dt, Stream 
     return m_impl->Step(products, dt, stream);
 }
 
-void Renderer::SetOverlay(std::string_view name, Overlay overlay) {
-    m_impl->SetOverlay(name, std::move(overlay));
-}
-
-void Renderer::RemoveOverlay(std::string_view name) {
-    m_impl->RemoveOverlay(name);
-}
-
-std::vector<std::string> Renderer::OverlayNames() const {
-    return m_impl->OverlayNames();
-}
-
-void Renderer::ShowOverlays(std::string_view product, Span<const std::string> names) {
-    m_impl->ShowOverlays(product, names);
-}
-
-void Renderer::HideOverlays(std::string_view product) {
-    m_impl->HideOverlays(product);
-}
-
-OverlayPick Renderer::PickOverlay(std::string_view product, Float2 pixel, float radius,
-                                  uint32_t layer) {
-    return m_impl->PickOverlay(product, pixel, radius, layer);
+const Ref<Overlays>& Renderer::GetOverlays() const {
+    return m_impl->m_overlays;
 }
 
 }

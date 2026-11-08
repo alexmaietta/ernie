@@ -83,6 +83,7 @@ struct ResolvedProduct {
     ProductRecord record{};
     std::vector<uint32_t> sensors;
     std::vector<ResolvedVar> vars;
+    std::vector<std::string> overlays;
     Token taxonomy;
     RenderEntry entry = RenderEntry::MinimalData;
     bool semantic = false;

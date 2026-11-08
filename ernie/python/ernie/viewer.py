@@ -129,7 +129,7 @@ class Manipulator:
     def invalidate(self):
         overlay = Overlay()
         self.build(overlay)
-        self.renderer.set_overlay(self.name, overlay)
+        self.renderer.overlays.set(self.name, overlay)
 
     def on_model_changed(self, name):
         self.invalidate()
@@ -155,7 +155,7 @@ class Manipulator:
     def close(self):
         self.viewer.remove_handler(self._handler)
         self.model.unsubscribe(self._listener)
-        self.renderer.remove_overlay(self.name)
+        self.renderer.overlays.remove(self.name)
 
     def _handle(self, event):
         if event.hit.overlay != self.name:

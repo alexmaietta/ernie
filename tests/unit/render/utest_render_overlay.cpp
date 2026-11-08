@@ -24,6 +24,10 @@ constexpr uint32_t kWidth = 32;
 constexpr uint32_t kHeight = 24;
 const std::vector<std::string> kProducts = {"/Render/View"};
 
+void Show(Scene& scene, std::vector<std::string> layers) {
+    scene.Find("/Render/View")->Set(RenderProduct::kOverlays, std::move(layers));
+}
+
 Ref<Scene> Empty(Device& device) {
     const Ref<Scene> scene = Scene::Create(device);
     scene->Define<Camera>("/Cam",
@@ -34,6 +38,7 @@ Ref<Scene> Empty(Device& device) {
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {kWidth, kHeight}, .orderedVars = {"/Render/Color"}});
     scene->Select("/Render/View").Get<RenderMode>("renderMode").Set(RenderMode::Minimal);
+    Show(*scene, {"*"});
     return scene;
 }
 
@@ -81,16 +86,17 @@ std::vector<uint8_t> Drawn(Renderer& renderer) {
 
 TEST(OverlayTest, DrawsPicksAndHidesOverlays) {
     ForEachDevice([](Device& device) {
-        Renderer renderer(Empty(device));
-        renderer.SetOverlay("shapes", EveryShape());
-        renderer.ShowOverlays("/Render/View");
+        const Ref<Scene> scene = Empty(device);
+        Renderer renderer(scene);
+        Overlays& overlays = *renderer.GetOverlays();
+        overlays.Set("shapes", EveryShape());
         const std::vector<uint8_t> drawn = Drawn(renderer);
         ASSERT_EQ(drawn.size(), size_t(kWidth) * kHeight * 4);
         const size_t center = (size_t(kHeight / 2) * kWidth + kWidth / 2) * 4;
         EXPECT_GT(drawn[center], 200);
         EXPECT_LT(drawn[center + 1], 80);
 
-        OverlayPick pick = renderer.PickOverlay("/Render/View", {kWidth / 2.0f, kHeight / 2.0f});
+        OverlayPick pick = overlays.Pick("/Render/View", {kWidth / 2.0f, kHeight / 2.0f});
         Drawn(renderer);
         pick.Wait();
         EXPECT_TRUE(pick.Ready());
@@ -100,11 +106,11 @@ TEST(OverlayTest, DrawsPicksAndHidesOverlays) {
         ASSERT_TRUE(pick.Ray());
         EXPECT_NEAR(pick.Ray()->origin.y, -5, 1e-3);
 
-        renderer.HideOverlays("/Render/View");
-        const std::vector<uint8_t> hidden = Drawn(renderer);
-        EXPECT_TRUE(hidden.empty() || hidden[center + 3] == 0);
-        renderer.ShowOverlays("/Render/View", std::vector<std::string>{"shapes"});
-        renderer.RemoveOverlay("shapes");
+        Show(*scene, {});
+        EXPECT_TRUE(Drawn(renderer).empty());
+        Show(*scene, {"sha*"});
+        EXPECT_GT(Drawn(renderer)[center], 200);
+        overlays.Remove("shapes");
         const std::vector<uint8_t> removed = Drawn(renderer);
         EXPECT_TRUE(removed.empty() || removed[center + 3] == 0);
     });
@@ -113,14 +119,14 @@ TEST(OverlayTest, DrawsPicksAndHidesOverlays) {
 TEST(OverlayTest, AnchorsShapesOnTheScreen) {
     ForEachDevice([](Device& device) {
         Renderer renderer(Empty(device));
+        Overlays& overlays = *renderer.GetOverlays();
         const OverlayStyle corner{.color = {1, 0, 0, 1}, .screen = Float2{1, 1}};
         const OverlayStyle top{.color = {0, 1, 0, 1}, .size = 4, .screen = Float2{0, 0}};
         Overlay overlay;
         overlay.Rectangle({-5, -5, 0}, {3, 0, 0}, {0, 3, 0}, corner, true)
             .Marker({4, 4, 0}, top)
             .Line({0, 12, 0}, {10, 12, 0}, {.color = {0, 0, 1, 1}, .screen = Float2{0, 0}});
-        renderer.SetOverlay("screen", overlay);
-        renderer.ShowOverlays("/Render/View");
+        overlays.Set("screen", overlay);
         const std::vector<uint8_t> drawn = Drawn(renderer);
         ASSERT_EQ(drawn.size(), size_t(kWidth) * kHeight * 4);
         const size_t red = At(kWidth - 5, kHeight - 5);
@@ -132,7 +138,7 @@ TEST(OverlayTest, AnchorsShapesOnTheScreen) {
         EXPECT_GT(drawn[blue + 2], 200);
         EXPECT_EQ(drawn[At(kWidth / 2, 4) + 3], 0);
 
-        OverlayPick pick = renderer.PickOverlay("/Render/View", {kWidth - 5.0f, kHeight - 5.0f});
+        OverlayPick pick = overlays.Pick("/Render/View", {kWidth - 5.0f, kHeight - 5.0f});
         Drawn(renderer);
         pick.Wait();
         ASSERT_TRUE(pick.Hit());
@@ -163,8 +169,7 @@ TEST(OverlayTest, SizesPrimFramesInPixels) {
         Overlay overlay;
         overlay.Prims(prims, OverlayPrimShape::Frames,
                       {.width = 2, .depth = OverlayDepth::Always, .screenSized = true}, 8);
-        renderer.SetOverlay("frames", overlay);
-        renderer.ShowOverlays("/Render/View");
+        renderer.GetOverlays()->Set("frames", overlay);
         const std::vector<uint8_t> drawn = Drawn(renderer);
         ASSERT_EQ(drawn.size(), size_t(kWidth) * kHeight * 4);
         const size_t inside = At(kWidth / 2 + 5, kHeight / 2);

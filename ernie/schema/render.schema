@@ -202,6 +202,12 @@ class RenderProduct : Typed, MinimalAPI, BackgroundAPI, RealTimeAPI (
         displayName = "Render Vars"
         doc = "The render variables written, in order."
     )
+    token[] overlays (
+        tracked
+        group = "Product"
+        displayName = "Overlays"
+        doc = "The overlay layers drawn over each camera's image, returned beside the render variables as an image of their own. A name ending in * matches every layer it starts, so * draws them all. Empty draws none. Only cameras draw overlays."
+    )
     float textureLodBias = -0.5 (
         group = "Textures"
         displayName = "LOD Bias"
