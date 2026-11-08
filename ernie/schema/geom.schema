@@ -415,7 +415,7 @@ class Points : PointBased (
         unit = meters
         group = "Geometry"
         displayName = "Widths"
-        doc = "The diameter of each point, or a single diameter for every point. Empty draws each point 1 cm wide."
+        doc = "The diameter of each point, or a single diameter for every point. Empty draws each point 1 wide, as Storm does, since USD leaves the fallback to the renderer."
     )
     int64[] ids (
         tracked

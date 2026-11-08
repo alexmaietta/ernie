@@ -5,7 +5,7 @@
 
 namespace ernie {
 
-static const float kDefaultPointWidth = 0.01f;
+static const float kDefaultPointWidth = 1.0f;
 
 struct PointsRecord {
     uint64_t blas;

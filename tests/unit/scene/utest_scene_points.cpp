@@ -117,7 +117,8 @@ TEST(PointsTest, ACountChangeRebuildsANewBlas) {
         EXPECT_EQ(s.points.Stats().built, 1u);
         EXPECT_EQ(s.points.Stats().refit, 0u);
         EXPECT_EQ(s.points.Record(0).pointCount, 3u);
-        ExpectBounds(s.Bounds(prim), {-0.005f, -0.005f, -0.005f}, {4.005f, 8.005f, 0.005f});
+        const float r = kDefaultPointWidth / 2;
+        ExpectBounds(s.Bounds(prim), {-r, -r, -r}, {4 + r, 8 + r, r});
     });
 }
 

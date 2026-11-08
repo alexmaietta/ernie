@@ -29,7 +29,7 @@ GPU simulations already have two zero-copy paths. `Map(MapAccess::Write)` hands 
 
 ### 1. Spheres (done)
 
-- `Points : PointBased` schema with `widths`. One width applies to every point, a width per point applies to each, and empty widths draw points 1 cm wide (`kDefaultPointWidth`).
+- `Points : PointBased` schema with `widths`. One width applies to every point, a width per point applies to each, and empty widths draw points 1 wide (`kDefaultPointWidth`), matching Storm since USD leaves the fallback to the renderer.
 - `PointsTable` with box writes, local bounds and a BLAS rebuild on every change.
 - Sphere intersection in both tracers, shading from the hit, vertex primvars by point index, and prim and slot bounds.
 - Points under prototype roots draw through PointInstancers like any gprim.
@@ -112,15 +112,14 @@ Still open from this milestone.
     | Box, 1M moving, software, 8 per box | 1.88 ms | 1.39 ms |
 
     Trace time roughly halves and software traversal now gains from clustering (1.39 ms at 8 per box against 1.83 ms at 1). The packed copy costs 16 bytes per point and its writes grow the box pass from 1.4 to 1.8 ms at 4M. One point per box is still best for batched worlds (21.6 ms) and stationary clouds, so the default stays 1, and 4 to 8 per box suits single large moving clouds.
-- Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path.
+- Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path. Deferred for now.
 
 ### 5. Simulation handoff and motion
 
 - Changing counts on attached and mapped points, through a capacity-sized buffer whose dead slots the box kernel skips.
 - Simulation writes that overlap tracing the previous step, through the snapshot ring planned in `TODO.md`.
-- Motion blur from `velocities`, growing each box by the shutter and intersecting the moving sphere.
+- Motion blur from `velocities`, growing each box by the shutter and intersecting the moving sphere. Deferred for now.
 
 ## Open questions
 
-- Is 1 cm the right default width? USD leaves it to the renderer, and Storm uses 1.
 - Are hardware spheres worth adding, given that the AMD presentation favours the portable box path?
