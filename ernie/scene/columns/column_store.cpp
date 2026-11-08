@@ -511,10 +511,10 @@ std::vector<uint32_t> ColumnStore::ArrayRows(ColumnRef column, Ordinal since, Or
     if (found == m_arrayWrites.end()) {
         return rows;
     }
-    for (const ArrayWrite& write : found->second) {
-        if (write.stamp > since && write.stamp <= until) {
-            rows.push_back(write.row);
-        }
+    const std::vector<ArrayWrite>& writes = found->second;
+    for (auto at = std::ranges::upper_bound(writes, since, {}, &ArrayWrite::stamp);
+         at != writes.end() && at->stamp <= until; ++at) {
+        rows.push_back(at->row);
     }
     std::ranges::sort(rows);
     rows.erase(std::ranges::unique(rows).begin(), rows.end());
@@ -530,9 +530,17 @@ void ColumnStore::LogArrayRows(ColumnRef column, std::span<const uint32_t> rows)
     }
 }
 
-void ColumnStore::TrimArrayWrites(Ordinal through) {
+void ColumnStore::TrimArrayWrites(Ordinal through,
+                                  std::span<const std::pair<ColumnRef, Ordinal>> held) {
     for (auto& [key, writes] : m_arrayWrites) {
-        std::erase_if(writes, [&](const ArrayWrite& write) { return write.stamp <= through; });
+        Ordinal kept = through;
+        for (const auto& [column, seen] : held) {
+            if (ArrayKey(column, 0) == key) {
+                kept = std::min(kept, seen);
+            }
+        }
+        writes.erase(writes.begin(),
+                     std::ranges::upper_bound(writes, kept, {}, &ArrayWrite::stamp));
     }
 }
 

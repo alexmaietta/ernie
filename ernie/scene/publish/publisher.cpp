@@ -173,10 +173,25 @@ void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
         scheduled.ran = true;
     }
     Ordinal seen = stamp;
+    std::vector<std::pair<ColumnRef, Ordinal>> held;
     for (const Scheduled& scheduled : m_scheduled) {
-        seen = std::min(seen, scheduled.stamp);
+        if (scheduled.table->Structural()) {
+            seen = std::min(seen, scheduled.stamp);
+        }
+        for (const ColumnRef column : scheduled.table->Inputs()) {
+            if (!IsArray(column.column->type)) {
+                continue;
+            }
+            const auto found = std::ranges::find_if(
+                held, [&](const auto& entry) { return entry.first.column == column.column; });
+            if (found == held.end()) {
+                held.emplace_back(column, scheduled.stamp);
+            } else {
+                found->second = std::min(found->second, scheduled.stamp);
+            }
+        }
     }
-    store.TrimArrayWrites(seen);
+    store.TrimArrayWrites(stamp, held);
     if (!m_scheduled.empty()) {
         m_structure.TrimLog(seen);
     }

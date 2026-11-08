@@ -253,6 +253,27 @@ TEST(PublisherTest, TheStructureLogKeepsOnlyWhatTablesHaveNotSeen) {
     });
 }
 
+TEST(PublisherTest, ArrayWritesAreKeptOnlyForTheTablesThatReadThem) {
+    ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
+        Counter points({kPointBasedPoints});
+        Counter moves({kXformableTranslate});
+        publisher.Add(points);
+        publisher.Add(moves);
+        const PrimBlock block = structure.Define(SchemaId::Mesh, Paths("/Mesh", 8));
+        publisher.Publish(1);
+        const View view(structure, SchemaId::Mesh, block);
+        const std::vector<Float3> triangle = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+        for (uint32_t i = 0; i < 8; ++i) {
+            view.GetArray<Float3>(kPointBasedPoints).Set(i, triangle);
+            publisher.Publish(2 + i);
+        }
+        EXPECT_EQ(points.runs, 9u);
+        EXPECT_EQ(moves.runs, 1u);
+        EXPECT_TRUE(
+            structure.GetColumnStore().ArrayRows(kPointBasedPoints, 0, ~uint64_t(0)).empty());
+    });
+}
+
 TEST(PublisherTest, SnapshotsAreCountedAndOrdered) {
     ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
         EXPECT_THROW(publisher.Acquire(), Error);

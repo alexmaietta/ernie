@@ -135,7 +135,7 @@ class ColumnStore {
     void SetArray(ColumnRef column, uint32_t row, const ArrayRef& array);
     std::vector<uint32_t> ArrayRows(ColumnRef column, Ordinal since, Ordinal until) const;
     void LogArrayRows(ColumnRef column, std::span<const uint32_t> rows);
-    void TrimArrayWrites(Ordinal through);
+    void TrimArrayWrites(Ordinal through, std::span<const std::pair<ColumnRef, Ordinal>> held = {});
 
     void SetCounts(uint32_t prims, uint32_t worlds);
 
