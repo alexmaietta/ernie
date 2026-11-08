@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/mesh_builder.h"
+#include "ernie/scene/builders/meshes.h"
 
 #include <algorithm>
 #include <bit>

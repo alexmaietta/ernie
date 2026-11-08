@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/product_builder.h"
+#include "ernie/scene/builders/products.h"
 
 #include <algorithm>
 #include <optional>

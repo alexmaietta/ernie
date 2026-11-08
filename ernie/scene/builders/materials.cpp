@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/material_builder.h"
+#include "ernie/scene/builders/materials.h"
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"

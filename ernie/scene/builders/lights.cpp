@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/light_builder.h"
+#include "ernie/scene/builders/lights.h"
 
 #include <algorithm>
 #include <cmath>

@@ -8,7 +8,7 @@
 
 #include "ernie/device/operation.h"
 #include "ernie/device/stream.h"
-#include "ernie/scene/builders/table_builder.h"
+#include "ernie/scene/builders/builder.h"
 #include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/structure/structure.h"

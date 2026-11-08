@@ -17,7 +17,7 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/builders/table_builder.h"
+#include "ernie/scene/builders/builder.h"
 #include "ernie/scene/builders/table_storage.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/meshes.h"

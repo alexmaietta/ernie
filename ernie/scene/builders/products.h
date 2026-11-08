@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "ernie/scene/builders/table_builder.h"
+#include "ernie/scene/builders/builder.h"
 #include "ernie/scene/builders/table_storage.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/products.h"

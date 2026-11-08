@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/sensor_builder.h"
+#include "ernie/scene/builders/sensors.h"
 
 #include <algorithm>
 

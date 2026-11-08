@@ -12,7 +12,7 @@
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/mesh_builder.h"
+#include "ernie/scene/builders/meshes.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"

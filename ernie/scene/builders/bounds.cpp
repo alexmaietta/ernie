@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/bounds_builder.h"
+#include "ernie/scene/builders/bounds.h"
 
 #include <algorithm>
 #include <bit>

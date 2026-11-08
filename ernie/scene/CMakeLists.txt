@@ -1,20 +1,20 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_scene
-    builders/bounds_builder.cpp
-    builders/instance_builder.cpp
+    builders/bounds.cpp
     builders/instance_layout.cpp
-    builders/light_builder.cpp
-    builders/material_builder.cpp
-    builders/mesh_builder.cpp
-    builders/product_builder.cpp
+    builders/instances.cpp
+    builders/lights.cpp
+    builders/materials.cpp
+    builders/meshes.cpp
+    builders/products.cpp
     builders/regions.cpp
-    builders/semantic_builder.cpp
-    builders/sensor_builder.cpp
-    builders/surface_builder.cpp
-    builders/tangent_builder.cpp
-    builders/texture_builder.cpp
-    builders/transform_builder.cpp
+    builders/semantics.cpp
+    builders/sensors.cpp
+    builders/surfaces.cpp
+    builders/tangents.cpp
+    builders/textures.cpp
+    builders/transforms.cpp
     columns/array_heap.cpp
     columns/column_store.cpp
     columns/heap.cpp

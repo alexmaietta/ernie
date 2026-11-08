@@ -9,7 +9,7 @@
 
 #include "ernie/device/device.h"
 #include "ernie/io/image.h"
-#include "ernie/scene/builders/texture_builder.h"
+#include "ernie/scene/builders/textures.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/change_set.h"

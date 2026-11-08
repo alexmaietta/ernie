@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/semantic_builder.h"
+#include "ernie/scene/builders/semantics.h"
 
 #include <algorithm>
 #include <cstring>

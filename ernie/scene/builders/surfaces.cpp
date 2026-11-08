@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/surface_builder.h"
+#include "ernie/scene/builders/surfaces.h"
 
 #include <algorithm>
 #include <set>

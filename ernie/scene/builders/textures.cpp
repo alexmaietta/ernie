@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/texture_builder.h"
+#include "ernie/scene/builders/textures.h"
 
 #include <algorithm>
 #include <span>
