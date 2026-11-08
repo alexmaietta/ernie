@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstring>
+#include <format>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -220,15 +221,76 @@ void Toolbar::DrawSettingsMenu() {
     ImGui::Separator();
     ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
     const float field = 10 * ImGui::GetFontSize();
+    RenderResolution& resolution = m_viewport.resolution;
     if (ImGui::BeginMenu("Render Resolution")) {
-        int percent = int(std::round(m_scale * 100));
-        ImGui::SetNextItemWidth(field);
-        if (ImGui::SliderInt("##resolution", &percent, 25, 100, "%d%% of the viewport")) {
-            m_scale = float(percent) / 100;
+        if (ImGui::MenuItem("Viewport Size", nullptr, !resolution.custom)) {
+            resolution.custom = false;
         }
-        ImGui::SetItemTooltip("Render fewer pixels and scale them up, for speed on slower GPUs");
+        ImGui::SetItemTooltip("Render as many pixels as the viewport shows");
+        ImGui::SeparatorText("Sensors");
+        constexpr std::pair<uint32_t, uint32_t> kPresets[] = {
+            {64, 64},    {128, 128},   {256, 256},   {320, 240},   {640, 400},  {1024, 1024},
+            {1280, 720}, {1920, 1080}, {2048, 1080}, {2560, 1440}, {3840, 2160}};
+        for (const auto& [width, height] : kPresets) {
+            if (width == 1280) {
+                ImGui::SeparatorText("Displays");
+            }
+            const std::string label = std::format("{} x {}", width, height);
+            if (ImGui::MenuItem(label.c_str(), nullptr,
+                                resolution.custom && resolution.width == width &&
+                                    resolution.height == height)) {
+                resolution = {.custom = true,
+                              .width = width,
+                              .height = height,
+                              .lockAspect = resolution.lockAspect,
+                              .scale = resolution.scale,
+                              .fill = resolution.fill};
+            }
+        }
+        ImGui::SeparatorText("Custom");
+        const double aspect = double(resolution.width) / double(std::max(resolution.height, 1u));
+        const auto side = [&](const char* id, uint32_t& value, uint32_t& other, double ratio) {
+            int typed = int(value);
+            ImGui::SetNextItemWidth(4.5f * ImGui::GetFontSize());
+            if (ImGui::InputInt(id, &typed, 0, 0)) {
+                resolution.custom = true;
+                value = uint32_t(std::clamp(typed, 1, 16384));
+                if (resolution.lockAspect) {
+                    other = uint32_t(std::clamp(int(std::lround(value * ratio)), 1, 16384));
+                }
+            }
+        };
+        side("##width", resolution.width, resolution.height, 1 / aspect);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("x");
+        ImGui::SameLine();
+        side("##height", resolution.height, resolution.width, aspect);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%.2f:1", aspect);
+        ImGui::Checkbox("Lock Aspect Ratio", &resolution.lockAspect);
+        ImGui::SetItemTooltip("Change the other side to keep the shape when typing one");
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Render Scale")) {
+        for (const int percent : {25, 50, 75, 100, 125, 150, 200}) {
+            const std::string label = std::format("{}%", percent);
+            if (ImGui::MenuItem(label.c_str(), nullptr,
+                                std::abs(resolution.scale * 100 - float(percent)) < 0.5f)) {
+                resolution.scale = float(percent) / 100;
+            }
+        }
+        ImGui::Separator();
+        int percent = int(std::lround(resolution.scale * 100));
+        ImGui::SetNextItemWidth(field);
+        if (ImGui::SliderInt("##scale", &percent, 10, 400, "%d%%", ImGuiSliderFlags_Logarithmic)) {
+            resolution.scale = float(percent) / 100;
+        }
+        ImGui::SetItemTooltip("Render fewer pixels for speed, or more to supersample");
+        ImGui::EndMenu();
+    }
+    ImGui::MenuItem("Fill Viewport", nullptr, &resolution.fill);
+    ImGui::SetItemTooltip("Fit the image to the viewport; off, show it a texel per pixel");
+    ImGui::Separator();
     ViewportGuides& guides = m_viewport.guides;
     if (ImGui::BeginMenu("Selection")) {
         ImGui::Checkbox("Outline", &guides.outline);

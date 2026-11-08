@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RenderProduct:overlays` names the overlay layers a camera product draws, with a trailing `*` matching by prefix and `*` drawing them all. The overlay still comes back as `FrameOutput::overlay`, beside the render vars.
 - The viewer draws the world's axes as the camera sees them in the viewport's bottom left corner, and its eye menu adds selection axes, every geometry prim's bounds in a color each, and a checkbox for each scene overlay.
 - The viewer's grid has two levels of lines that fade between zoom levels and toward its edge, and its settings set a fixed spacing, the lines to each major line, its extent, its height and the brightness of its minor and major lines.
+- The viewer's properties panel resets a field to its schema default with the square at its end, shows translations, orientations, scales and other vectors as red, green and blue x, y and z fields, and picks relationship targets from a stage tree as well as by path or by dropping prims.
+- The viewer's render resolution menu offers the viewport's size, sensor and display presets, or a custom size with a locked aspect. Its render scale menu offers 25 to 200 percent, and Fill Viewport fits the image to the viewport or shows it a texel per pixel.
 
 ### Changed
 
@@ -58,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A publish that throws in a system no longer loses the writes made before the next publish, because the store's stamp advances and systems record what they've seen only after they run.
 - Changing how many copies a point instancer draws in the same publish as moving a prim every world holds rebuilds each TLAS instead of refitting it with the old instance counts.
 - Contact shadows and occlusion hold far from a world's origin, because new rays start from the hit's own floating point error bound instead of an offset that grew with distance.
+- The viewer frames the scene when it opens, which it skipped because it read the scene's bounds before the first publish.
+- A selection outline traces only the edges where the selected prims are in front, so selecting a ground no longer outlines everything standing on it.
 
 ## [0.1.0] - 2026-11-06
 

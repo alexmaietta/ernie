@@ -418,9 +418,10 @@ void Viewport::Advance(const device::Operation& lastDraw) {
             1.0 / targetRenderFps) {
         return;
     }
-    const float scale = m_toolbar->Scale();
-    const Extent size{std::max(1u, uint32_t(float(m_size.width) * scale)),
-                      std::max(1u, uint32_t(float(m_size.height) * scale))};
+    const Extent base = resolution.custom ? Extent{resolution.width, resolution.height} : m_size;
+    const float scale = std::clamp(resolution.scale, 0.01f, 8.0f);
+    const Extent size{std::max(1u, uint32_t(std::lround(float(base.width) * scale))),
+                      std::max(1u, uint32_t(std::lround(float(base.height) * scale)))};
     m_renderSize = size;
     if (!Fit(size)) {
         return;
@@ -555,13 +556,16 @@ void Viewport::Draw(Presenter& presenter, std::optional<ViewportRect> fixed, boo
         ImVec2 imageMin = origin;
         ImVec2 imageSize = size;
         if (const device::Tensor* shown = Shown()) {
-            if (m_leader) {
-                const float aspect = float(shown->Shape()[1]) / float(shown->Shape()[0]);
+            const ImVec2 texels{float(shown->Shape()[1]), float(shown->Shape()[0])};
+            if (!resolution.fill && !m_leader) {
+                imageSize = {texels.x / scale.x, texels.y / scale.y};
+            } else {
+                const float aspect = texels.x / texels.y;
                 imageSize = size.x / size.y > aspect ? ImVec2{size.y * aspect, size.y}
                                                      : ImVec2{size.x, size.x / aspect};
-                imageMin = {origin.x + 0.5f * (size.x - imageSize.x),
-                            origin.y + 0.5f * (size.y - imageSize.y)};
             }
+            imageMin = {origin.x + 0.5f * (size.x - imageSize.x),
+                        origin.y + 0.5f * (size.y - imageSize.y)};
             presenter.Viewport(list, *shown, imageMin,
                                {imageMin.x + imageSize.x, imageMin.y + imageSize.y});
             const device::Tensor* overlay = ShownOverlay();
@@ -1254,7 +1258,16 @@ void Viewport::LandFraming() {
         }
         grow(whole.lower, whole.upper);
     }
+    const bool unpublished =
+        !m_framingPrims && std::ranges::any_of(m_framing, [](const device::Download& read) {
+            return read.Bytes().empty();
+        });
     m_framing.clear();
+    if (unpublished) {
+        m_framing.push_back(m_framingWorlds ? m_scene->ReadAllBoundsAsync()
+                                            : m_scene->ReadBoundsAsync());
+        return;
+    }
     const double margin = std::exchange(m_framingMargin, kFraming);
     if (box.lower.x > box.upper.x) {
         return;

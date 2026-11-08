@@ -105,6 +105,15 @@ struct GridGuide {
     bool operator==(const GridGuide&) const = default;
 };
 
+struct RenderResolution {
+    bool custom = false;
+    uint32_t width = 1280;
+    uint32_t height = 720;
+    bool lockAspect = true;
+    float scale = 1;
+    bool fill = true;
+};
+
 struct ViewportGuides {
     GridGuide grid;
     bool cameras = true;
@@ -292,6 +301,7 @@ class Viewport {
 
     bool visible = true;
     ViewportGuides guides;
+    RenderResolution resolution;
     std::function<bool(const OverlayEvent&)> overlayEvents;
     bool hudShown = true;
     bool toolbarShown = true;

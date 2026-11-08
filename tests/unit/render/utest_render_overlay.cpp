@@ -179,5 +179,28 @@ TEST(OverlayTest, SizesPrimFramesInPixels) {
     });
 }
 
+TEST(OverlayTest, OutlinesOnlyTheSelectedSurfacesEdges) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Empty(device);
+        scene->Define<Cube>("/Wall", {.translate = {0, 10, 0}, .scale = {50, 1, 50}});
+        scene->Define<Cube>("/Box", {.size = 1});
+        Renderer renderer(scene);
+        const auto outlined = [&](std::string_view path) {
+            const std::vector<uint32_t> prims = {scene->Find(path)->Index()};
+            Overlay overlay;
+            overlay.Outline(prims, {.color = {1, 0.5f, 0, 1}, .width = 2});
+            renderer.GetOverlays()->Set("outline", overlay);
+            const std::vector<uint8_t> drawn = Drawn(renderer);
+            size_t count = 0;
+            for (size_t at = 3; at < drawn.size(); at += 4) {
+                count += drawn[at] > 0 ? 1 : 0;
+            }
+            return count;
+        };
+        EXPECT_EQ(outlined("/Wall"), 0u);
+        EXPECT_GT(outlined("/Box"), 0u);
+    });
+}
+
 }
 }

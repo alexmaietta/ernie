@@ -72,6 +72,7 @@ void OutlineOverlays(uniform OverlayParams p) {
             continue;
         }
         const bool centre = Outlined(outline, view.primIds[index]);
+        const float centreDepth = view.depth[index];
         const int reach = int(ceil(outline.width));
         float nearest = 1e9f;
         for (int dy = -reach; dy <= reach; ++dy) {
@@ -82,7 +83,15 @@ void OutlineOverlays(uniform OverlayParams p) {
                     continue;
                 }
                 const int2 other = clamp(pixel + int2(dx, dy), int2(0), size - 1);
-                if (Outlined(outline, view.primIds[view.PixelIndex(uint2(other))]) != centre) {
+                const uint otherIndex = view.PixelIndex(uint2(other));
+                if (Outlined(outline, view.primIds[otherIndex]) == centre) {
+                    continue;
+                }
+                const float otherDepth = view.depth[otherIndex];
+                const float selectedDepth = centre ? centreDepth : otherDepth;
+                const float plainDepth = centre ? otherDepth : centreDepth;
+                if (plainDepth == view.missDistance ||
+                    plainDepth >= selectedDepth * (1 - kDepthSlack)) {
                     nearest = distance;
                 }
             }

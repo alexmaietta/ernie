@@ -23,10 +23,6 @@ class Toolbar {
 
     void Draw(ImVec2 min);
 
-    float Scale() const {
-        return m_scale;
-    }
-
   private:
     void Refresh();
     bool BeginPill(const char* id, const std::string& label, const char* tip);
@@ -52,7 +48,6 @@ class Toolbar {
     double m_requested = -1;
     RenderMode m_mode = RenderMode::RealTime;
     MinimalMode m_minimal = MinimalMode::Full;
-    float m_scale = 1;
     std::string m_worldSearch;
     Editor* m_editor = nullptr;
     bool m_lensOpen = false;
