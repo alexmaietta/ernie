@@ -183,7 +183,7 @@ void Geometry::Triangulate() {
         const device::ZoneScope scope(encoder, zone);
         encoder.Fill(*histogram);
         dispatch(encoder, "EmitTriangles", params, faces);
-        m_sort->Sort(encoder, *keys, *values, corners, std::max(1, std::bit_width(points - 1)));
+        m_sort->Sort(encoder, *keys, *values, corners, std::max<int>(1, std::bit_width(points - 1)));
         scan(points).ExclusiveSum(encoder, *histogram, *pointStarts, points);
         dispatch(encoder, "WriteAdjacency", params, corners);
         dispatch(encoder, "WriteStarts", params, points);

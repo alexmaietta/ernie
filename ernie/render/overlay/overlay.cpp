@@ -1796,7 +1796,7 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
     encoder.EndZone();
     encoder.BeginZone(sorting);
     m_sort->Sort(encoder, *m_keys, *m_values, *m_pairCount, m_pairCapacity,
-                 uint32_t(std::max(1, std::bit_width(tileCount - 1))));
+                 uint32_t(std::max<int>(1, std::bit_width(tileCount - 1))));
     encoder.EndZone();
     encoder.Barrier();
     encoder.BeginZone(ranging);
@@ -1875,7 +1875,7 @@ void OverlayPass::RecordGroups(device::CommandEncoder& encoder) {
                          {.x = device::GroupCount(params.rows, kOverlayGroup)});
         m_groupSort->Sort(encoder, buffers.keys->Slice(0, uint64_t(params.rows) * 4),
                           buffers.order->Slice(0, uint64_t(params.rows) * 4), params.rows,
-                          uint32_t(std::max(1, std::bit_width(params.groups + 1))));
+                          uint32_t(std::max<int>(1, std::bit_width(params.groups + 1))));
         encoder.Barrier();
         encoder.Dispatch(m_program->Entry("StartOverlayGroups"), params,
                          {.x = device::GroupCount(params.groups + 3, kOverlayGroup)});
