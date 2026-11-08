@@ -5,3 +5,102 @@ class SensorPipeline : NodeGraph (
 abstract class SensorNode : Shader (
     doc = "One step of a sensor pipeline, named by info:id. Token and bool inputs pick how the step is built, so changing one compiles the pipeline again, while numeric inputs are values that change without compiling."
 ) {}
+
+class CameraSignal : SensorNode (
+    doc = "The photoelectron rate a camera's trace measured, as its detector's channels see it. It's how a pipeline asks the trace for its signal."
+) {
+    token info:id = CameraSignal
+    token inputs:layout = full (
+        tracked
+        allowed = [full, mosaic]
+        group = "Signal"
+        displayName = "Layout"
+        doc = "full gives every pixel all of the pattern's channels. mosaic gives each pixel only the channel at its site, as a Bayer or other mosaic sensor reads it, which is the raw signal and takes a third of the memory. Patterns without a mosaic always give full."
+    )
+    token inputs:precision = float (
+        tracked
+        allowed = [float, half]
+        group = "Signal"
+        displayName = "Precision"
+        doc = "Whether the rate is stored as 32-bit or 16-bit floats."
+    )
+}
+
+class Integrate : SensorNode (
+    doc = "Integrates the photoelectron rate over the exposure into mean photoelectrons."
+) {
+    token info:id = Integrate
+    float inputs:time = 0 (
+        tracked
+        unit = seconds
+        group = "Exposure"
+        displayName = "Time"
+        min = 0
+        doc = "The integration time. 0 takes the camera's exposure:time."
+    )
+}
+
+class Emva1288 : SensorNode (
+    doc = "Adds a camera's noise as EMVA 1288 models it, from the camera's detector values. Dark current at the detector's temperature and photo response non-uniformity add to the mean, shot noise draws the collected charge, the full well clips it, and read noise and dark signal non-uniformity add to it."
+) {
+    token info:id = Emva1288
+    token inputs:shot = poisson (
+        tracked
+        allowed = [poisson, gaussian, off]
+        group = "Noise"
+        displayName = "Shot Noise"
+        doc = "poisson draws exact counts at low means and a normal approximation above about 20 electrons. gaussian always uses the normal approximation. off leaves the mean."
+    )
+    bool inputs:fixedPatterns = true (
+        tracked
+        group = "Noise"
+        displayName = "Fixed Patterns"
+        doc = "Whether photo response and dark signal non-uniformity apply. They stay fixed for a camera across frames and runs."
+    )
+    float inputs:time = 0 (
+        tracked
+        unit = seconds
+        group = "Noise"
+        displayName = "Time"
+        min = 0
+        doc = "The time dark current builds over. 0 takes the camera's exposure:time."
+    )
+}
+
+class Adc : SensorNode (
+    doc = "Converts charge to digital numbers with the detector's system gain scaled by exposure:iso, its black level and its bit depth."
+) {
+    token info:id = Adc
+}
+
+class Gain : SensorNode (
+    doc = "Scales digital numbers, as a digital gain does."
+) {
+    token info:id = Gain
+    float inputs:gain = 1 (
+        tracked
+        group = "Gain"
+        displayName = "Gain"
+        min = 0
+        doc = "The factor applied."
+    )
+}
+
+class ToColor : SensorNode (
+    doc = "Maps digital numbers to scene-linear color between the black level and the largest value the bit depth holds. Red, green and blue channels become color, and a single channel becomes gray."
+) {
+    token info:id = ToColor
+}
+
+class Encode : SensorNode (
+    doc = "Encodes scene-linear color for display, clamped to the displayable range."
+) {
+    token info:id = Encode
+    token inputs:transfer = srgb (
+        tracked
+        allowed = [srgb, rec709]
+        group = "Encode"
+        displayName = "Transfer"
+        doc = "srgb applies the sRGB curve, and rec709 the Rec. 709 camera curve."
+    )
+}

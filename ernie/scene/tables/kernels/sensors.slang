@@ -51,7 +51,11 @@ void WriteCameras(uniform SensorParams p) {
     record.exposure = sensitivity * light * exp2(data.exposure[row]);
     record.readout = max(data.shutterReadout[row], 0.0f);
     record.fNumber = exposureFStop > 0 ? exposureFStop : fStop > 0 ? fStop : 1;
+    record.exposureTime = max(data.exposureTime[row], 0.0f);
+    record.iso = max(data.exposureIso[row], 0.0f);
     record.padding0 = 0;
+    record.padding1 = 0;
+    record.padding2 = 0;
     p.cameras[row] = record;
 }
 

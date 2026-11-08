@@ -20,10 +20,14 @@ struct CameraRecord {
     float exposure;
     float readout;
     float fNumber;
+    float exposureTime;
+    float iso;
     uint padding0;
+    uint padding1;
+    uint padding2;
 };
 
-ERNIE_CHECK_SIZE(CameraRecord, 80);
+ERNIE_CHECK_SIZE(CameraRecord, 96);
 
 struct DistortionRecord {
     Float4 radial;

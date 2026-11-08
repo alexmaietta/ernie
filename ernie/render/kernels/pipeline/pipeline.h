@@ -28,7 +28,7 @@ struct PipelineCapture {
     uint capture;
     uint identity;
     uint firstValue;
-    uint padding0;
+    uint camera;
 };
 
 ERNIE_CHECK_SIZE(PipelineCapture, 48);

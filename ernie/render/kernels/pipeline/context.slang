@@ -58,6 +58,10 @@ struct PointContext {
         return params.tables->detectors[element.capture->detector];
     }
 
+    CameraRecord Camera() {
+        return params.tables->cameras[element.capture->camera];
+    }
+
     NoiseStream Noise(uint stream) {
         const PipelineCapture capture = *element.capture;
         return NoiseStream(capture.identity, element.index, node, stream, capture.capture);
