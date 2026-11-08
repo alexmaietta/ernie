@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include <gtest/gtest.h>
+
+#include "ernie/render/renderer.h"
+#include "ernie/render/standalone.h"
+#include "ernie/scene/scene.h"
+#include "ernie/scene/tables/semantics.h"
+#include "support/devices.h"
+#include "unit/pipeline/registry.h"
+
+namespace ernie {
+namespace {
+
+constexpr uint32_t kWidth = 6;
+constexpr uint32_t kHeight = 4;
+constexpr float kExposureTime = 0.5f;
+
+Prim Node(Scene& scene, const std::string& path, const char* id) {
+    return scene.Define<Shader>(path, {.id = id});
+}
+
+Ref<Scene> Sky(device::Device& device, DetectorPattern pattern) {
+    Ref<Scene> scene = Scene::Create(device);
+    scene->Define<DomeLight>("/Sky", {});
+    const Prim camera = scene->Define<Camera>("/Cam", {.focalLength = 10});
+    camera.Set(Camera::kExposureTime, kExposureTime);
+    camera.Set(DetectorAPI::kDetectorPattern, pattern);
+    scene->Define<Scope>("/Pipes");
+    scene->Define<Scope>("/Render");
+    scene->Define<RenderVar>("/Render/Rate", {.sourceName = "ElectronRate"});
+    return scene;
+}
+
+void DefineRaw(Scene& scene) {
+    const Prim pipe = scene.Define<SensorPipeline>("/Pipes/Raw");
+    const Prim signal = Node(scene, "/Pipes/Raw/Signal", "CameraSignal");
+    const Prim integrate = Node(scene, "/Pipes/Raw/Integrate", "Integrate");
+    integrate.Connect("electronRate", signal, "electronRate");
+    const Prim emva = Node(scene, "/Pipes/Raw/Noise", "Emva1288");
+    emva.Connect("electrons", integrate, "electrons");
+    const Prim adc = Node(scene, "/Pipes/Raw/Adc", "Adc");
+    adc.Connect("electrons", emva, "electrons");
+    const Prim gain = Node(scene, "/Pipes/Raw/Gain", "Gain");
+    gain.Set(Gain::kGain, 2.0f);
+    gain.Connect("digital", adc, "digital");
+    pipe.Connect("raw", gain, "digital");
+    scene.Define<RenderVar>("/Render/Raw", {.sourceName = "raw"});
+}
+
+pipeline::PipelineDesc RawDesc() {
+    using pipeline::test::Link;
+    pipeline::PipelineDesc desc{.prim = 1, .path = "/Pipes/Raw"};
+    const auto node = [&](uint32_t prim, const char* name, const char* id,
+                          std::vector<Link> links) {
+        pipeline::NodeDesc& added = desc.nodes.emplace_back(
+            pipeline::NodeDesc{.prim = prim, .path = std::string("/Pipes/Raw/") + name, .id = id});
+        for (const Link& link : links) {
+            added.inputs.push_back({link.input, link.source, "", link.output});
+        }
+    };
+    node(2, "Signal", "CameraSignal", {});
+    node(3, "Integrate", "Integrate", {{"electronRate", 2, "electronRate"}});
+    node(4, "Noise", "Emva1288", {{"electrons", 3, "electrons"}});
+    node(5, "Adc", "Adc", {{"electrons", 4, "electrons"}});
+    node(6, "Gain", "Gain", {{"digital", 5, "digital"}});
+    desc.nodes.back().values = {{"gain", {2}}};
+    desc.outputs = {{"raw", 6, "", "digital"}};
+    return desc;
+}
+
+std::vector<float> Host(const FrameOutput& frame, const std::string& source) {
+    return frame.Source(source).tensor.ToHost<float>();
+}
+
+TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Sky(device, DetectorPattern::Rgb);
+        DefineRaw(*scene);
+        scene->Find("/Cam")->Set(Camera::kPipelineBinding, std::vector<std::string>{"/Pipes/Raw"});
+        scene->Define<RenderProduct>("/Render/View",
+                                     {.renderMode = RenderMode::RealTime,
+                                      .camera = {"/Cam"},
+                                      .resolution = {kWidth, kHeight},
+                                      .orderedVars = {"/Render/Rate", "/Render/Raw"}});
+        Renderer renderer(scene);
+        const Pipeline standalone(device, RawDesc());
+        PipelineRunDesc run{.exposureTime = kExposureTime, .identity = HashPath("/Cam").words[0]};
+        std::vector<float> previous;
+        for (uint32_t capture = 0; capture < 2; ++capture) {
+            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            output.Wait();
+            const FrameOutput& frame = output["/Render/View"].frames.at(0);
+            const RenderVarOutput& raw = frame.Source("raw");
+            EXPECT_EQ(std::vector<int64_t>(raw.tensor.Shape().begin(), raw.tensor.Shape().end()),
+                      (std::vector<int64_t>{1, kHeight, kWidth, 3}));
+            run.inputs = {{"/Pipes/Raw/Signal", frame.Source("ElectronRate").tensor}};
+            run.capture = capture;
+            const std::vector<float> traced = raw.tensor.ToHost<float>();
+            EXPECT_EQ(traced, standalone.Run(run).at("raw").ToHost<float>()) << capture;
+            EXPECT_NE(traced, previous);
+            previous = traced;
+        }
+    });
+}
+
+TEST(PipelinesTest, ProductsShareRunsSampleMosaicsAndOverrideTheirSensors) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Sky(device, DetectorPattern::Rggb);
+        DefineRaw(*scene);
+        const Prim pipe = scene->Define<SensorPipeline>("/Pipes/Mosaic");
+        const Prim mosaic = Node(*scene, "/Pipes/Mosaic/Mosaic", "CameraSignal");
+        mosaic.Set(CameraSignal::kLayout, CameraSignalLayout::Mosaic);
+        const Prim sampled = Node(*scene, "/Pipes/Mosaic/Sampled", "Integrate");
+        sampled.Connect("electronRate", mosaic, "electronRate");
+        const Prim full = Node(*scene, "/Pipes/Mosaic/Full", "CameraSignal");
+        const Prim integrate = Node(*scene, "/Pipes/Mosaic/Integrate", "Integrate");
+        integrate.Connect("electronRate", full, "electronRate");
+        const Prim adc = Node(*scene, "/Pipes/Mosaic/Adc", "Adc");
+        adc.Connect("electrons", integrate, "electrons");
+        const Prim color = Node(*scene, "/Pipes/Mosaic/Color", "ToColor");
+        color.Connect("digital", adc, "digital");
+        const Prim meter = Node(*scene, "/Pipes/Mosaic/Meter", "Meter");
+        meter.Connect("color", color, "color");
+        pipe.Connect("mosaic", sampled, "electrons");
+        pipe.Connect("color", color, "color");
+        pipe.Connect("stat", meter, "stat");
+        scene->Find("/Cam")->Set(Camera::kPipelineBinding,
+                                 std::vector<std::string>{"/Pipes/Mosaic"});
+        scene->Define<RenderVar>("/Render/Mosaic", {.sourceName = "mosaic"});
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = "color"});
+        scene->Define<RenderVar>("/Render/Stat", {.sourceName = "stat"});
+        const auto product = [&](const char* path, std::vector<std::string> vars,
+                                 std::vector<std::string> binding) {
+            scene->Define<RenderProduct>(path, {.renderMode = RenderMode::RealTime,
+                                                .camera = {"/Cam"},
+                                                .resolution = {kWidth, kHeight},
+                                                .pipelineBinding = std::move(binding),
+                                                .orderedVars = std::move(vars)});
+        };
+        product("/Render/A", {"/Render/Rate", "/Render/Mosaic", "/Render/Color", "/Render/Stat"},
+                {});
+        product("/Render/B", {"/Render/Mosaic"}, {});
+        product("/Render/C", {"/Render/Raw"}, {"/Pipes/Raw"});
+        Renderer renderer(scene);
+        RenderOutput output =
+            renderer.Step(std::vector<std::string>{"/Render/A", "/Render/B", "/Render/C"}, 0);
+        output.Wait();
+        const FrameOutput& a = output["/Render/A"].frames.at(0);
+        const std::vector<float> rates = Host(a, "ElectronRate");
+        const std::vector<float> electrons = Host(a, "mosaic");
+        ASSERT_EQ(electrons.size(), size_t(kWidth * kHeight));
+        for (uint32_t y = 0; y < kHeight; ++y) {
+            for (uint32_t x = 0; x < kWidth; ++x) {
+                const uint32_t pixel = y * kWidth + x;
+                const uint32_t site = std::vector<uint32_t>{0, 1, 1, 2}[(x & 1) | ((y & 1) << 1)];
+                EXPECT_FLOAT_EQ(electrons[pixel], rates[pixel * 3 + site] * kExposureTime)
+                    << x << ", " << y;
+            }
+        }
+        EXPECT_GT(electrons[0], 0);
+        EXPECT_EQ(Host(output["/Render/B"].frames.at(0), "mosaic"), electrons);
+
+        const std::vector<float> colors = Host(a, "color");
+        const std::vector<float> stat = Host(a, "stat");
+        ASSERT_EQ(stat.size(), size_t(pipeline::kStatWords));
+        EXPECT_FLOAT_EQ(stat[pipeline::kStatWords - 1], float(kWidth * kHeight));
+        for (uint32_t channel = 0; channel < 3; ++channel) {
+            double sum = 0;
+            for (uint32_t pixel = 0; pixel < kWidth * kHeight; ++pixel) {
+                sum += colors[pixel * 3 + channel];
+            }
+            EXPECT_NEAR(stat[channel], sum / (kWidth * kHeight), 1e-5) << channel;
+        }
+
+        const FrameOutput& c = output["/Render/C"].frames.at(0);
+        EXPECT_EQ(c.Source("raw").tensor.Shape()[3], 3);
+        EXPECT_EQ(c.renderVars.size(), 1u);
+    });
+}
+
+}
+}

@@ -129,6 +129,7 @@ ernie_test(
         unit/render/utest_render_lidar.cpp
         unit/render/utest_render_origin.cpp
         unit/render/utest_render_overlay.cpp
+        unit/render/utest_render_pipelines.cpp
         unit/render/utest_render_ray_cast.cpp
         unit/render/utest_render_ray_origin.cpp
         unit/render/utest_render_materials.cpp

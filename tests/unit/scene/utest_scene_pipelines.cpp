@@ -127,6 +127,10 @@ TEST(PipelinesTest, ProductsReadOutputsOfTheirOwnOrTheirSensorsPipeline) {
             EXPECT_EQ(run.products, expected);
         }
 
+        rig.scene->Find("/Render/B")->Set(RenderProduct::kResolution, Uint2{4, 2});
+        rig.scene->Publish().Wait();
+        EXPECT_EQ(impl.GetPlans().Plan(paths)->pipelines.size(), 3u);
+
         rig.scene->Find("/Render/C")
             ->Set(RenderProduct::kOrderedVars, std::vector<std::string>{"/Render/Raw"});
         rig.scene->Publish().Wait();

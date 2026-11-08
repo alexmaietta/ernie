@@ -52,6 +52,26 @@ uint HalfStride(uint channels) {
     return (channels + 1) & ~1u;
 }
 
+uint MosaicSite(uint pattern, uint2 coord) {
+    const uint site = (coord.x & 1) | ((coord.y & 1) << 1);
+    switch (DetectorPattern(pattern)) {
+    case DetectorPattern::Rggb:
+        return uint4(0, 1, 1, 2)[site];
+    case DetectorPattern::Bggr:
+        return uint4(2, 1, 1, 0)[site];
+    case DetectorPattern::Grbg:
+        return uint4(1, 0, 2, 1)[site];
+    case DetectorPattern::Gbrg:
+        return uint4(1, 2, 0, 1)[site];
+    case DetectorPattern::Rccb:
+        return uint4(0, 1, 1, 2)[site];
+    case DetectorPattern::Rccc:
+        return site == 0 ? 0 : 1;
+    default:
+        return 0;
+    }
+}
+
 PipelineValue ValueSlot(PipelineParams p, PipelineCapture* capture, uint slot) {
     return p.values[capture->firstValue + slot];
 }
@@ -59,7 +79,12 @@ PipelineValue ValueSlot(PipelineParams p, PipelineCapture* capture, uint slot) {
 S ReadSignalAt<S : ISignal>(PipelineParams p, PipelineCapture* capture, uint slot, uint index) {
     const PipelineValue value = ValueSlot(p, capture, slot);
     Channels channels = Channels(value.channels);
-    if ((value.flags & kSignalHalf) != 0) {
+    if ((value.flags & kSignalSampled) != 0) {
+        const uint stride = value.flags >> kSignalStrideShift;
+        const uint2 coord = uint2(index % capture->width, index / capture->width);
+        const uint site = MosaicSite(p.tables->detectors[capture->detector].pattern, coord);
+        channels[0] = Ptr<float>(value.address)[uint64_t(index) * stride + site];
+    } else if ((value.flags & kSignalHalf) != 0) {
         Ptr<uint> words = Ptr<uint>(value.address);
         const uint64_t first = uint64_t(index) * HalfStride(value.channels) / 2;
         [ForceUnroll]

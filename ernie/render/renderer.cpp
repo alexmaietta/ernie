@@ -12,6 +12,7 @@
 #include <ranges>
 #include <set>
 #include <span>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include "ernie/render/kernels/render/render.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/semantics.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
 
@@ -183,6 +185,11 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     const Snapshot snapshot = m_scene->Acquire();
     UpdateRenderProgram();
     OutputSet& set = AcquireSet(plan);
+    const std::vector<PipelineRun> pipelineRuns = PrepareRuns(planned, due);
+    std::set<uint32_t> ran;
+    for (const PipelineRun& run : pipelineRuns) {
+        ran.insert(run.products.begin(), run.products.end());
+    }
     SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
     for (size_t index = 0; index < planned.products.size(); ++index) {
         const ResolvedProduct& product = *planned.products[index];
@@ -194,12 +201,14 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
                 .frames.emplace_back(FrameOutput{.startTime = result.simulationStartTime,
                                                  .endTime = result.simulationEndTime});
         for (const ResolvedVar& var : product.vars) {
-            if (!var.output.empty()) {
+            if (!var.output.empty() && !ran.contains(uint32_t(index))) {
                 continue;
             }
             RenderVarOutput& output = frame.renderVars[var.path];
             output.renderVarPath = var.path;
-            output.sourceName = kRenderVarSourceTokens[uint32_t(var.source)];
+            output.sourceName = var.output.empty()
+                                    ? std::string(kRenderVarSourceTokens[uint32_t(var.source)])
+                                    : var.output;
             if (var.semantic && var.source != RenderVarSource::PointCloud) {
                 const SemanticMap map = semantics.Map(var.source, product.taxonomy);
                 output.idMap = map.map;
@@ -214,7 +223,11 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         if (frames.empty()) {
             continue;
         }
-        RenderVarOutput& output = frames[0].renderVars.at(var.renderVar);
+        const auto found = frames[0].renderVars.find(var.renderVar);
+        if (found == frames[0].renderVars.end()) {
+            continue;
+        }
+        RenderVarOutput& output = found->second;
         if (var.channel.empty()) {
             output.tensor = var.tensor;
         } else {
@@ -237,7 +250,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             set.traced[prim] = runs;
         }
     }
-    result.m_done = Trace(planned, set, due, stale, snapshot);
+    result.m_done = Trace(planned, set, due, stale, snapshot, pipelineRuns);
     m_scene->Release(snapshot);
     return result;
 }
@@ -290,15 +303,13 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     std::map<uint32_t, std::array<uint64_t, kRenderVarSourceCount>> addresses;
     std::map<uint32_t, uint64_t> primIds;
     const ProductPlan& planned = *plan.plan;
+    const PipelineTable& pipelines = SceneImpl::Get(*m_scene).GetPipelines();
     for (uint32_t index = 0; index < planned.products.size(); ++index) {
         const std::string& path = planned.paths[index];
         const ResolvedProduct& product = *planned.products[index];
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
         for (const ResolvedVar& var : product.vars) {
-            if (!var.output.empty()) {
-                continue;
-            }
-            if (var.source == RenderVarSource::PointCloud) {
+            if (var.output.empty() && var.source == RenderVarSource::PointCloud) {
                 uint64_t& clouds = slots[uint32_t(var.source)];
                 clouds = AcquireCloud(set, index, path, product, var, clouds);
                 continue;
@@ -312,8 +323,27 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
             const Ref<device::Buffer> buffer =
                 device.CreateBuffer({.bytes = bytes, .usage = usage, .label = var.path});
             device::Tensor tensor(buffer, 0, var.type, var.shape);
-            slots[uint32_t(var.source)] = tensor.Address();
-            set.vars.push_back({index, var.path, std::move(tensor), {}});
+            if (var.output.empty()) {
+                slots[uint32_t(var.source)] = tensor.Address();
+            }
+            set.vars.push_back({index, var.path, std::move(tensor), {}, var.output});
+        }
+        const std::shared_ptr<const PipelineInstance> instance =
+            product.pipeline == kNoPrim ? nullptr : pipelines.Find(product.pipeline);
+        if (instance && std::ranges::any_of(instance->resolved.nodes, [&](const auto& node) {
+                return pipelines.Registry()[node.def].kind == pipeline::NodeKind::Source;
+            })) {
+            uint64_t& rates = slots[uint32_t(RenderVarSource::ElectronRate)];
+            if (rates == 0) {
+                const uint64_t bytes = uint64_t(product.sensors.size()) * product.width *
+                                       product.height * std::max(product.channels, 1u) *
+                                       sizeof(float);
+                rates = set.rateBuffers
+                            .emplace_back(
+                                device.CreateBuffer({.bytes = bytes, .label = path + " rates"}))
+                            ->Address();
+            }
+            set.rates[index] = rates;
         }
         if (product.overlays.empty()) {
             continue;
@@ -420,9 +450,10 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::s
     return address;
 }
 
-device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& set,
+device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
                                       const std::set<uint32_t>& due,
-                                      const std::set<uint32_t>& stale, const Snapshot& snapshot) {
+                                      const std::set<uint32_t>& stale, const Snapshot& snapshot,
+                                      std::span<const PipelineRun> runs) {
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
     params.tables.address = snapshot.tables;
@@ -473,6 +504,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
         encoder.Dispatch(RenderEntry("RenderScatterPoints"), scatter,
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});
     }
+    RecordRuns(encoder, plan, set, runs, snapshot);
     encoder.EndZone();
     std::vector<std::string> stepped;
     std::vector<OverlayOutput> views;
@@ -532,6 +564,246 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
     }
     OverlayPass::Serve(picks, done);
     return done;
+}
+
+std::vector<RendererImpl::PipelineRun> RendererImpl::PrepareRuns(const ProductPlan& plan,
+                                                                 const std::set<uint32_t>& due) {
+    const PipelineTable& table = SceneImpl::Get(*m_scene).GetPipelines();
+    const bool wait = SceneImpl::Get(*m_scene).WaitsForKernels();
+    std::shared_ptr<const pipeline::PipelineSet> definitions;
+    std::vector<PipelineRun> runs;
+    for (const PlannedPipeline& planned : plan.pipelines) {
+        PipelineRun run{.planned = &planned, .instance = table.Find(planned.pipeline)};
+        for (const uint32_t product : planned.products) {
+            if (due.contains(plan.products[product]->prim)) {
+                run.products.push_back(product);
+            }
+        }
+        if (run.products.empty() || !run.instance || !run.instance->error.empty()) {
+            continue;
+        }
+        const uint32_t id = run.instance->definition;
+        if (m_failedPipelines.contains(id)) {
+            continue;
+        }
+        try {
+            std::shared_ptr<const CompiledPipeline>& compiled = m_pipelinePrograms[id];
+            if (!compiled) {
+                definitions = definitions ? definitions : table.Definitions();
+                compiled =
+                    CompilePipeline(m_scene->GetDevice(), definitions->Find(id), table.Registry());
+            }
+            run.compiled = compiled;
+            for (const std::string& entry : compiled->generated.entries) {
+                device::Kernel& kernel = compiled->program->Entry(entry);
+                if (!wait && !kernel.Ready()) {
+                    run.compiled = nullptr;
+                    break;
+                }
+                kernel.Wait();
+            }
+        } catch (const std::exception& error) {
+            Log(LogLevel::Error, "compiling {} failed, so its outputs are left out: {}",
+                run.instance->path, error.what());
+            m_failedPipelines.insert(id);
+            m_pipelinePrograms.erase(id);
+            continue;
+        }
+        if (!run.compiled) {
+            if (m_pendingPipelines.insert(id).second) {
+                Log(LogLevel::Info, "{} is compiling, so its outputs are left out until it's ready",
+                    run.instance->path);
+            }
+            continue;
+        }
+        runs.push_back(std::move(run));
+    }
+    return runs;
+}
+
+void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan& plan,
+                              OutputSet& set, std::span<const PipelineRun> runs,
+                              const Snapshot& snapshot) {
+    if (runs.empty()) {
+        return;
+    }
+    device::Device& device = m_scene->GetDevice();
+    device::Queue& queue = device.GetQueue();
+    const pipeline::NodeRegistry& registry = SceneImpl::Get(*m_scene).GetPipelines().Registry();
+    const Prims& prims = SceneImpl::Get(*m_scene).GetStructure().GetPrims();
+    const auto layer = [&](uint32_t product, uint32_t sensor) {
+        const std::vector<uint32_t>& sensors = plan.products[product]->sensors;
+        return uint64_t(std::ranges::find(sensors, sensor) - sensors.begin());
+    };
+    const auto scratchBytes = [](const pipeline::SignalLayout& layout, uint64_t elements) {
+        const uint64_t bytes = (layout.perCapture ? 1 : elements) * layout.channels * sizeof(float);
+        return (bytes + pipeline::kArenaAlignment - 1) / pipeline::kArenaAlignment *
+               pipeline::kArenaAlignment;
+    };
+    const auto read = [&](const PipelineRun& run, const std::string& name) {
+        return std::ranges::any_of(set.vars, [&](const OwnedVar& var) {
+            return var.output == name &&
+                   std::ranges::find(run.products, var.product) != run.products.end();
+        });
+    };
+
+    struct Placed {
+        pipeline::ArenaLayout arena;
+        uint64_t base = 0;
+        uint64_t scratch = 0;
+    };
+
+    std::vector<Placed> placed;
+    uint64_t arenaBytes = 0;
+    for (const PipelineRun& run : runs) {
+        const ResolvedProduct& product = *plan.products[run.products.front()];
+        const uint64_t elements = uint64_t(product.width) * product.height;
+        Placed& each = placed.emplace_back(Placed{
+            pipeline::LayoutArena(run.compiled->definition->segments, product.layouts, elements),
+            arenaBytes});
+        each.scratch = each.base + each.arena.bytes;
+        arenaBytes = each.scratch;
+        for (const pipeline::ResolvedOutput& output : run.instance->resolved.outputs) {
+            const pipeline::SignalLayout& layout = product.layouts[output.value];
+            if (layout.perCapture || !read(run, output.name)) {
+                arenaBytes += scratchBytes(layout, elements);
+            }
+        }
+    }
+    if (!set.arena || set.arena->Bytes() < arenaBytes) {
+        set.arena =
+            device.CreateBuffer({.bytes = std::max<uint64_t>(arenaBytes, pipeline::kArenaAlignment),
+                                 .label = "pipeline arena"});
+    }
+
+    struct Batch {
+        const CompiledPipeline* compiled = nullptr;
+        std::vector<PipelineCapture> captures;
+        std::vector<PipelineValue> values;
+        uint64_t elements = 0;
+    };
+
+    std::map<uint32_t, Batch> batches;
+    std::vector<uint32_t> words;
+    std::vector<std::pair<device::BufferRange, device::BufferRange>> copies;
+    for (size_t index = 0; index < runs.size(); ++index) {
+        const PipelineRun& run = runs[index];
+        const PlannedPipeline& planned = *run.planned;
+        const uint32_t source = run.products.front();
+        const ResolvedProduct& product = *plan.products[source];
+        const pipeline::PipelineDefinition& definition = *run.compiled->definition;
+        const pipeline::GeneratedPipeline& generated = run.compiled->generated;
+        const pipeline::ResolvedPipeline& resolved = run.instance->resolved;
+        const uint64_t elements = uint64_t(product.width) * product.height;
+        PipelineState& state = m_pipelineStates[std::tuple(planned.pipeline, planned.sensor,
+                                                           product.width, product.height)];
+        if (!state.state || state.definition != definition.id) {
+            if (state.state) {
+                Log(LogLevel::Debug, "{} restarts its state on {} with a new definition",
+                    run.instance->path, m_scene->ByIndex(planned.sensor).Path());
+            }
+            std::vector<float> initial = pipeline::InitialState(definition, registry);
+            initial.resize(std::max<size_t>(initial.size(), 1));
+            state = {definition.id, 0, device.CreateBuffer({.label = "pipeline state"}, initial)};
+        }
+
+        Batch& batch = batches[definition.id];
+        batch.compiled = run.compiled.get();
+        const auto firstValue = uint32_t(batch.values.size());
+        const auto storedCount = uint32_t(definition.segments.stored.size());
+        uint64_t scratch = placed[index].scratch;
+        for (uint32_t slot = 0; slot < generated.slots.size(); ++slot) {
+            const uint32_t value = generated.slots[slot];
+            const pipeline::SignalLayout& layout = product.layouts[value];
+            PipelineValue entry{0, layout.channels, layout.mosaic ? kSignalMosaic : 0u};
+            if (registry[resolved.nodes[resolved.values[value].node].def].kind ==
+                pipeline::NodeKind::Source) {
+                const uint32_t stride = std::max(product.channels, 1u);
+                entry.address = set.rates.at(source) +
+                                layer(source, planned.sensor) * elements * stride * sizeof(float);
+                if (layout.mosaic) {
+                    entry.flags |= kSignalSampled | (stride << kSignalStrideShift);
+                }
+            } else if (slot < storedCount) {
+                entry.address =
+                    set.arena->Address() + placed[index].base + placed[index].arena.offsets[value];
+                entry.flags |= layout.element == pipeline::ElementType::F16 ? kSignalHalf : 0u;
+            } else {
+                const std::string& name = resolved.outputs[slot - storedCount].name;
+                const uint64_t bytes =
+                    (layout.perCapture ? pipeline::kStatWords : elements * layout.channels) *
+                    sizeof(float);
+                std::optional<device::BufferRange> written;
+                if (layout.perCapture || !read(run, name)) {
+                    written = device::BufferRange(*set.arena).Slice(scratch, bytes);
+                    scratch += scratchBytes(layout, elements);
+                }
+                for (const OwnedVar& var : set.vars) {
+                    if (var.output != name ||
+                        std::ranges::find(run.products, var.product) == run.products.end()) {
+                        continue;
+                    }
+                    const device::BufferRange target =
+                        device::BufferRange(var.tensor.GetBuffer())
+                            .Slice(var.tensor.Offset() + layer(var.product, planned.sensor) * bytes,
+                                   bytes);
+                    if (written) {
+                        copies.emplace_back(*written, target);
+                    } else {
+                        written = target;
+                    }
+                }
+                entry.address = written->Address();
+            }
+            batch.values.push_back(entry);
+        }
+
+        const uint32_t detector = prims.FindRow(planned.sensor, SchemaId::DetectorAPI);
+        const uint32_t camera = prims.FindRow(planned.sensor, SchemaId::Camera);
+        batch.captures.push_back(
+            {.firstElement = batch.elements,
+             .words = {words.size() * sizeof(uint32_t)},
+             .sensor = planned.sensor,
+             .detector = detector == kNoRow ? 0 : detector,
+             .width = product.width,
+             .height = product.height,
+             .capture = state.captures++,
+             .identity = HashPath(m_scene->ByIndex(planned.sensor).Path()).words[0],
+             .firstValue = firstValue,
+             .camera = camera == kNoRow ? 0 : camera,
+             .state = {state.state->Address()}});
+        words.insert(words.end(), run.instance->words.begin(), run.instance->words.end());
+        words.push_back(0);
+        batch.elements += elements;
+    }
+
+    const uint64_t wordAddress =
+        queue.Upload(words.data(), words.size() * sizeof(uint32_t)).Address();
+    encoder.Barrier();
+    for (auto& [id, batch] : batches) {
+        for (PipelineCapture& capture : batch.captures) {
+            capture.words.address += wordAddress;
+        }
+        const PipelineParams params{
+            .tables = {snapshot.tables},
+            .captures = {queue
+                             .Upload(batch.captures.data(),
+                                     batch.captures.size() * sizeof(PipelineCapture))
+                             .Address()},
+            .values = {queue
+                           .Upload(batch.values.data(), batch.values.size() * sizeof(PipelineValue))
+                           .Address()},
+            .elementCount = batch.elements,
+            .captureCount = uint32_t(batch.captures.size())};
+        RecordPipeline(encoder, *batch.compiled, params, uint32_t(batch.captures.size()),
+                       batch.elements);
+    }
+    for (const auto& [from, to] : copies) {
+        encoder.Copy(from, to);
+    }
+    if (!copies.empty()) {
+        encoder.Barrier();
+    }
 }
 
 Renderer::Renderer(Ref<Scene> scene, const RendererDesc& desc)

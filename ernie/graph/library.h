@@ -28,9 +28,9 @@ template <class Definition> class DefinitionSet {
         return m_entries;
     }
 
-    const Definition* Find(uint32_t id) const {
+    std::shared_ptr<const Definition> Find(uint32_t id) const {
         const auto found = std::ranges::lower_bound(m_entries, id, {}, &Entry::id);
-        return found != m_entries.end() && found->id == id ? found->definition.get() : nullptr;
+        return found != m_entries.end() && found->id == id ? found->definition : nullptr;
     }
 
     uint64_t Version() const {

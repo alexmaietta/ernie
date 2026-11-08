@@ -88,6 +88,7 @@ struct ProductShape {
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t returns = 0;
+    uint32_t channels = 0;
     float frameRate = 0;
     float startTime = 0;
     float missDistance = 0;
@@ -96,6 +97,7 @@ struct ProductShape {
     Token taxonomy;
     RenderEntry entry = RenderEntry::MinimalData;
     uint32_t pipeline = kNoPrim;
+    std::vector<pipeline::SignalLayout> layouts;
     bool semantic = false;
     std::string error;
 

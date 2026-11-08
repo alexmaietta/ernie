@@ -157,7 +157,6 @@ const SensorKind& FindSensorKind(SchemaId schema) {
 
 struct BoundPipeline {
     std::shared_ptr<const PipelineInstance> instance;
-    std::vector<pipeline::SignalLayout> layouts;
 };
 
 ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
@@ -168,7 +167,7 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
         throw Error("{} reads {}, which isn't an output the renderer writes or {} makes",
                     prim.Path(), name, bound.instance->path);
     }
-    const pipeline::SignalLayout& layout = bound.layouts[found->value];
+    const pipeline::SignalLayout& layout = product.layouts[found->value];
     ResolvedVar var{.prim = prim.Index(),
                     .path = prim.Path(),
                     .frame = prim.Get(RenderVar::kFrameOfReference),
@@ -408,6 +407,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 channels = DetectorChannels(m_scene.ByIndex(sensor)) == channels ? channels : 0;
             }
         }
+        product.channels = uint32_t(channels);
         const auto binding = [&](ColumnRef column, uint32_t at) {
             const View bound(m_structure, prims.Record(at).schema, std::vector<uint32_t>{at});
             const std::vector<uint32_t> found = bound.GetArray<uint32_t>(column).Get(0);
@@ -443,7 +443,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
             const bool mosaics = pattern != DetectorPattern::Mono &&
                                  pattern != DetectorPattern::Rgb &&
                                  pattern != DetectorPattern::Bands;
-            bound.layouts =
+            product.layouts =
                 pipeline::PropagateLayouts(bound.instance->resolved, m_pipelines.Registry(),
                                            {.channels = uint32_t(std::max<int64_t>(channels, 1)),
                                             .pattern = uint32_t(pattern),

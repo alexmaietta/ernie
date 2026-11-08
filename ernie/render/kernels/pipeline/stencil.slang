@@ -18,26 +18,6 @@ bool Mosaics(uint pattern) {
     }
 }
 
-uint MosaicSite(uint pattern, uint2 coord) {
-    const uint site = (coord.x & 1) | ((coord.y & 1) << 1);
-    switch (DetectorPattern(pattern)) {
-    case DetectorPattern::Rggb:
-        return uint4(0, 1, 1, 2)[site];
-    case DetectorPattern::Bggr:
-        return uint4(2, 1, 1, 0)[site];
-    case DetectorPattern::Grbg:
-        return uint4(1, 0, 2, 1)[site];
-    case DetectorPattern::Gbrg:
-        return uint4(1, 2, 0, 1)[site];
-    case DetectorPattern::Rccb:
-        return uint4(0, 1, 1, 2)[site];
-    case DetectorPattern::Rccc:
-        return site == 0 ? 0 : 1;
-    default:
-        return 0;
-    }
-}
-
 struct Neighborhood<S : ISignal> {
     PipelineParams params;
     PipelineElement element;

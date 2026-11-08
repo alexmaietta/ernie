@@ -69,7 +69,9 @@ std::shared_ptr<const ProductPlan> ProductPlans::Plan(std::span<const std::strin
             for (const uint32_t sensor : product->sensors) {
                 const auto found =
                     std::ranges::find_if(plan->pipelines, [&](const PlannedPipeline& run) {
-                        return run.pipeline == product->pipeline && run.sensor == sensor;
+                        const ResolvedProduct& first = *plan->products[run.products.front()];
+                        return run.pipeline == product->pipeline && run.sensor == sensor &&
+                               first.width == product->width && first.height == product->height;
                     });
                 PlannedPipeline& run = found != plan->pipelines.end()
                                            ? *found

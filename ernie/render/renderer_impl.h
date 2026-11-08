@@ -13,6 +13,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "ernie/algorithms/scan.h"
@@ -22,8 +23,10 @@
 #include "ernie/material/definition.h"
 #include "ernie/overlay/overlay_impl.h"
 #include "ernie/render/kernels/render/render.h"
+#include "ernie/render/pipelines.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/tables/pipelines.h"
 #include "ernie/scene/tables/plans.h"
 
 namespace ernie {
@@ -40,6 +43,7 @@ class RendererImpl {
         std::string renderVar;
         device::Tensor tensor;
         std::string channel;
+        std::string output;
     };
 
     struct OwnedCloud {
@@ -66,7 +70,23 @@ class RendererImpl {
         std::vector<OwnedOverlay> overlays;
         std::vector<OwnedCloud> clouds;
         std::map<uint32_t, std::pair<uint64_t, uint64_t>> traced;
+        std::map<uint32_t, uint64_t> rates;
+        std::vector<Ref<device::Buffer>> rateBuffers;
+        Ref<device::Buffer> arena;
         bool outlined = false;
+    };
+
+    struct PipelineRun {
+        const PlannedPipeline* planned = nullptr;
+        std::shared_ptr<const PipelineInstance> instance;
+        std::shared_ptr<const CompiledPipeline> compiled;
+        std::vector<uint32_t> products;
+    };
+
+    struct PipelineState {
+        uint32_t definition = 0;
+        uint32_t captures = 0;
+        Ref<device::Buffer> state;
     };
 
     struct StepPlan {
@@ -79,9 +99,12 @@ class RendererImpl {
     OutputSet& AcquireSet(StepPlan& plan);
     uint64_t AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
                           const ResolvedProduct& product, const ResolvedVar& var, uint64_t next);
-    device::Operation Trace(const ProductPlan& plan, const OutputSet& set,
-                            const std::set<uint32_t>& due, const std::set<uint32_t>& stale,
-                            const Snapshot& snapshot);
+    device::Operation Trace(const ProductPlan& plan, OutputSet& set, const std::set<uint32_t>& due,
+                            const std::set<uint32_t>& stale, const Snapshot& snapshot,
+                            std::span<const PipelineRun> runs);
+    std::vector<PipelineRun> PrepareRuns(const ProductPlan& plan, const std::set<uint32_t>& due);
+    void RecordRuns(device::CommandEncoder& encoder, const ProductPlan& plan, OutputSet& set,
+                    std::span<const PipelineRun> runs, const Snapshot& snapshot);
 
     Ref<Scene> m_scene;
     uint64_t m_maxPixelsPerLaunch;
@@ -102,6 +125,11 @@ class RendererImpl {
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;
     std::list<StepPlan> m_plans;
+
+    std::map<uint32_t, std::shared_ptr<const CompiledPipeline>> m_pipelinePrograms;
+    std::set<uint32_t> m_pendingPipelines;
+    std::set<uint32_t> m_failedPipelines;
+    std::map<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>, PipelineState> m_pipelineStates;
 
     std::mutex m_stepMutex;
     std::optional<OverlayPass> m_overlayPass;
