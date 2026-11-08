@@ -17,4 +17,11 @@ struct MeshRecord {
 
 ERNIE_CHECK_SIZE(MeshRecord, 104);
 
+struct SubsetRecord {
+    ArrayRef materials;
+    ArrayRef parts;
+};
+
+ERNIE_CHECK_SIZE(SubsetRecord, 32);
+
 }

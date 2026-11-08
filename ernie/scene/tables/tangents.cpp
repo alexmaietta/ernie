@@ -114,6 +114,39 @@ std::vector<Float3> SmoothCornerNormals(std::span<const Float3> points,
     return corners;
 }
 
+std::vector<Float3> FacetedCornerNormals(std::span<const Float3> points,
+                                         std::span<const int32_t> indices,
+                                         std::span<const int32_t> counts) {
+    std::vector<Float3> corners(indices.size(), Float3{0, 0, 1});
+    uint32_t first = 0;
+    for (const int32_t count : counts) {
+        const uint32_t size = uint32_t(std::max(count, 0));
+        if (first + size > indices.size()) {
+            break;
+        }
+        Float3 n{};
+        bool valid = size >= 3 && uint32_t(indices[first]) < points.size();
+        for (uint32_t k = 0; valid && k < size; ++k) {
+            const uint32_t a = uint32_t(indices[first + k]);
+            const uint32_t b = uint32_t(indices[first + (k + 1) % size]);
+            if (a >= points.size() || b >= points.size()) {
+                valid = false;
+                break;
+            }
+            const Float3 origin = points[uint32_t(indices[first])];
+            const Float3 c = Cross(Sub(points[a], origin), Sub(points[b], origin));
+            n = {n.x + c.x, n.y + c.y, n.z + c.z};
+        }
+        const float length = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+        if (valid && length > 0) {
+            std::fill_n(corners.begin() + first, size,
+                        Float3{n.x / length, n.y / length, n.z / length});
+        }
+        first += size;
+    }
+    return corners;
+}
+
 std::vector<Float4> MikkTangents(const TangentMesh& mesh) {
     std::vector<Float4> tangents(mesh.indices.size(), Float4{1, 0, 0, 1});
     Faces faces{.mesh = &mesh, .tangents = &tangents};
@@ -168,7 +201,7 @@ void TangentTable::Hold(std::vector<Ref<const RefCounted>>& held) const {
 
 void TangentTable::CacheCells(Mesh& mesh, const Cells& cells) const {
     mesh.interpolation = cells.interpolation[mesh.pointsRow];
-    mesh.smooth = cells.scheme[mesh.meshRow] != uint32_t(SubdivisionScheme::None) ? 1 : 0;
+    mesh.scheme = cells.scheme[mesh.meshRow];
 }
 
 TangentTable::Key TangentTable::KeyFor(const Mesh& mesh) const {
@@ -180,7 +213,7 @@ TangentTable::Key TangentTable::KeyFor(const Mesh& mesh) const {
     key.primvars = store.Array(kGprimPrimvars, mesh.gprimRow).address;
     key.normals = store.Array(kPointBasedNormals, mesh.pointsRow).address;
     key.interpolation = mesh.interpolation;
-    key.smooth = mesh.smooth;
+    key.scheme = mesh.scheme;
     return key;
 }
 
@@ -220,14 +253,25 @@ void TangentTable::Compute(const Mesh& mesh, const Key& key, Set& set) {
     }
     input.st = *corners;
     const ArrayRef normals = store.Array(kPointBasedNormals, mesh.pointsRow);
+    const SubdivisionScheme scheme = SubdivisionScheme(key.scheme);
+    const bool smooth =
+        scheme == SubdivisionScheme::CatmullClark || scheme == SubdivisionScheme::Loop;
+    const auto primvarNormals = std::ranges::find_if(primvars, [](const Primvar& primvar) {
+        return primvar.name == "normals" && primvar.type == PrimvarType::Float3 &&
+               primvar.elementSize == 1;
+    });
     std::optional<std::vector<Float3>> authored;
-    if (key.smooth == 0 && normals.count > 0) {
+    if (scheme == SubdivisionScheme::None && primvarNormals != primvars.end()) {
+        authored = CornerValues<Float3>(primvarNormals->Values<Float3>(), primvarNormals->indices,
+                                        primvarNormals->interpolation, input.indices, input.counts);
+    } else if (scheme == SubdivisionScheme::None && normals.count > 0) {
         authored =
             CornerValues<Float3>(Items<Float3>(float3s.Read(normals)), {},
                                  Interpolation(key.interpolation), input.indices, input.counts);
     }
-    input.normals =
-        authored ? *authored : SmoothCornerNormals(input.points, input.indices, input.counts);
+    input.normals = authored ? *authored
+                    : smooth ? SmoothCornerNormals(input.points, input.indices, input.counts)
+                             : FacetedCornerNormals(input.points, input.indices, input.counts);
     const std::vector<Float4> tangents = MikkTangents(input);
     if (tangents.empty()) {
         return;
@@ -238,24 +282,33 @@ void TangentTable::Compute(const Mesh& mesh, const Key& key, Set& set) {
     set.tangents = words.Allocate(set.words);
     words.Write(set.tangents, std::as_bytes(std::span(tangents)));
 
+    const bool faceted = !smooth && !authored;
     std::vector<uint32_t> triangles;
+    std::vector<uint32_t> cornerFaces(input.indices.size());
     uint32_t first = 0;
-    for (const int32_t count : input.counts) {
+    for (uint32_t face = 0; face < input.counts.size(); ++face) {
+        const int32_t count = input.counts[face];
         for (int32_t k = 1; k + 1 < count; ++k) {
             triangles.insert(triangles.end(),
                              {first, first + uint32_t(k), first + uint32_t(k) + 1});
         }
-        first += uint32_t(std::max(count, 0));
+        const uint32_t size = uint32_t(std::max(count, 0));
+        std::fill_n(cornerFaces.begin() + first, std::min<size_t>(size, cornerFaces.size() - first),
+                    face);
+        first += size;
     }
     std::map<std::array<uint32_t, 6>, uint32_t> keys;
     std::vector<uint32_t> groups(input.indices.size(), kNoRow);
     for (const uint32_t corner : triangles) {
         const Float2 uv = input.st[corner];
         const Float3 normal = authored ? input.normals[corner] : Float3{};
-        const std::array<uint32_t, 6> weld = {
-            uint32_t(input.indices[corner]),   std::bit_cast<uint32_t>(uv.x),
-            std::bit_cast<uint32_t>(uv.y),     std::bit_cast<uint32_t>(normal.x),
-            std::bit_cast<uint32_t>(normal.y), std::bit_cast<uint32_t>(normal.z)};
+        const std::array<uint32_t, 6> weld = {uint32_t(input.indices[corner]),
+                                              std::bit_cast<uint32_t>(uv.x),
+                                              std::bit_cast<uint32_t>(uv.y),
+                                              faceted ? cornerFaces[corner]
+                                                      : std::bit_cast<uint32_t>(normal.x),
+                                              std::bit_cast<uint32_t>(normal.y),
+                                              std::bit_cast<uint32_t>(normal.z)};
         groups[corner] = keys.try_emplace(weld, uint32_t(keys.size())).first->second;
     }
     std::vector<uint32_t> starts(keys.size() + 1, 0);
@@ -278,6 +331,7 @@ void TangentTable::Compute(const Mesh& mesh, const Key& key, Set& set) {
     if (authored) {
         deform.normals = device.CreateBuffer({.label = "tangent normals"}, input.normals);
     }
+    deform.faceted = faceted;
     deform.triangles = device.CreateBuffer({.label = "tangent triangles"}, triangles);
     deform.starts = device.CreateBuffer({.label = "tangent group starts"}, starts);
     deform.corners = device.CreateBuffer({.label = "tangent group corners"}, entries);
@@ -307,6 +361,7 @@ void TangentTable::Recompute(const Mesh& mesh, const Key& key, Set& set,
     params.tangents.address = set.tangents.address;
     params.groupCount = deform.groupCount;
     params.cornerCount = deform.cornerCount;
+    params.faceted = deform.faceted ? 1 : 0;
     encoder.Dispatch(Kernels().Entry("GroupTangents"), params,
                      {.x = device::GroupCount(params.groupCount, kTangentsGroup)});
     encoder.Dispatch(Kernels().Entry("CornerTangents"), params,

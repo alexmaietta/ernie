@@ -12,10 +12,13 @@ struct SurfaceRecord {
     uint64_t corners;
     uint64_t faces;
     uint64_t normals;
+    uint64_t normalIndices;
     uint64_t smooth;
     uint normalsInterpolation;
     uint normalsCount;
+    uint normalIndexCount;
     uint meshRow;
+    uint orientation;
     uint padding0;
     ArrayRef primvars;
     ArrayRef instancerPrimvars;
@@ -24,7 +27,7 @@ struct SurfaceRecord {
     int64_t instanceId;
 };
 
-ERNIE_CHECK_SIZE(SurfaceRecord, 120);
+ERNIE_CHECK_SIZE(SurfaceRecord, 136);
 
 static const float kRenderOriginCell = 64;
 

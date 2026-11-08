@@ -76,6 +76,7 @@ ernie_object_library(
     tables/semantics.cpp
     tables/sensors.cpp
     tables/spectra.cpp
+    tables/subsets.cpp
     tables/surfaces.cpp
     tables/tangents.cpp
     tables/textures.cpp

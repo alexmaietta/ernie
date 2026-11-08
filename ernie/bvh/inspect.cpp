@@ -226,7 +226,7 @@ class Walker {
         uint32_t primitive;
         BvhBox box;
         if (m_header.kind == kBvhInstances) {
-            primitive = Read<BvhInstance>(at).index;
+            primitive = Read<BvhInstance>(at).index & kBvhIndexMask;
             if (m_boxes.empty() || primitive >= m_boxes.size()) {
                 box = within;
             } else {

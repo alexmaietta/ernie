@@ -20,9 +20,11 @@ struct TangentParams {
     Ptr<Float4> tangents;
     uint groupCount;
     uint cornerCount;
+    uint faceted;
+    uint padding;
 };
 
-ERNIE_CHECK_SIZE(TangentParams, 96);
+ERNIE_CHECK_SIZE(TangentParams, 104);
 
 static const uint kTangentsGroup = 64;
 

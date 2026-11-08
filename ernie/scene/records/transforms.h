@@ -34,6 +34,24 @@ ResolvedImageable PrimImageable(AuthoredData* scene, Ptr<ResolvedImageable> imag
     return imageables[PrimRow(scene, prim, kSlotImageable)];
 }
 
+uint BindingRow(AuthoredData* scene, uint prim) {
+    return ApiRow(scene, prim, kApiMaterialBindingAPI);
+}
+
+uint BoundMaterial(AuthoredData* scene, uint prim, out bool binds) {
+    const ArrayRef binding =
+        scene->schemas.materialBindingAPI.materialBinding[BindingRow(scene, prim)];
+    binds = binding.count > 0;
+    if (!binds) {
+        return kNoPrim;
+    }
+    const uint target = Ptr<uint>(binding.address)[0];
+    const bool bound = target < scene->primCount &&
+                       (scene->prims.flags[target] & kPrimAlive) != 0 &&
+                       SchemaIsA(scene->prims.schema[target], SchemaId::Material);
+    return bound ? target : kNoPrim;
+}
+
 bool ImageableShown(ResolvedImageable resolved) {
     return resolved.visibility != uint(Visibility::Invisible) &&
            resolved.purpose != uint(Purpose::Proxy) && resolved.purpose != uint(Purpose::Guide);

@@ -142,6 +142,32 @@ TEST(MeshesTest, FacesAreFannedOnTheDeviceAndInvalidOnesSkipped) {
     });
 }
 
+TEST(MeshesTest, HoleFacesGetNoTriangles) {
+    ForEachScene([](Scene& s) {
+        const uint32_t prim =
+            s.structure
+                .Define<Mesh>(std::vector<std::string>{"/Holes"},
+                              {.points = std::vector<Float3>(6),
+                               .faceVertexIndices = {0, 1, 2, 1, 3, 4, 2, 3, 4, 5},
+                               .faceVertexCounts = {3, 4, 3},
+                               .holeIndices = {1, 7, -1}})
+                .firstPrim;
+        s.Publish();
+        EXPECT_EQ(s.geometry.Find(prim)->triangles, 2u);
+        EXPECT_EQ(s.Derived<int32_t>(prim, &MeshRecord::faces), (std::vector<int32_t>{0, 2}));
+
+        const uint32_t row = s.structure.GetPrims().Row(prim, SchemaId::Mesh);
+        ArrayPool& ints = s.store.Arrays(ColumnType::IntArray);
+        const std::vector<int32_t> holes = {0};
+        const ArrayRef array = ints.Allocate(uint32_t(holes.size()));
+        ints.Write(array, std::as_bytes(std::span(holes)));
+        s.store.SetArray(kMeshHoleIndices, row, array);
+        s.Publish();
+        EXPECT_EQ(s.geometry.Find(prim)->triangles, 3u);
+        EXPECT_EQ(s.Derived<int32_t>(prim, &MeshRecord::faces), (std::vector<int32_t>{1, 1, 2}));
+    });
+}
+
 TEST(MeshesTest, AMeshIndexingPastItsPointsHasNoShape) {
     ForEachScene([](Scene& s) {
         const uint32_t prim =

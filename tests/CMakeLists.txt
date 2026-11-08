@@ -136,6 +136,7 @@ ernie_test(
         unit/render/utest_render_spectra.cpp
         unit/render/utest_render_products.cpp
         unit/render/utest_render_renderer.cpp
+        unit/render/utest_render_meshes.cpp
         unit/render/utest_render_surfaces.cpp
 )
 

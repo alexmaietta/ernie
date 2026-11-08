@@ -37,6 +37,10 @@ std::vector<Float3> SmoothCornerNormals(std::span<const Float3> points,
                                         std::span<const int32_t> indices,
                                         std::span<const int32_t> counts);
 
+std::vector<Float3> FacetedCornerNormals(std::span<const Float3> points,
+                                         std::span<const int32_t> indices,
+                                         std::span<const int32_t> counts);
+
 template <class T>
 std::optional<std::vector<T>>
 CornerValues(std::span<const T> values, std::span<const int32_t> valueIndices,
@@ -126,7 +130,7 @@ class TangentTable : public RenderTable {
         uint64_t primvars = 0;
         uint64_t normals = 0;
         uint32_t interpolation = 0;
-        uint32_t smooth = 0;
+        uint32_t scheme = 0;
 
         auto operator<=>(const Key&) const = default;
     };
@@ -141,6 +145,7 @@ class TangentTable : public RenderTable {
         Ref<device::Buffer> results;
         uint32_t groupCount = 0;
         uint32_t cornerCount = 0;
+        bool faceted = false;
     };
 
     struct Set {
@@ -156,7 +161,7 @@ class TangentTable : public RenderTable {
         uint32_t meshRow = kNoRow;
         uint32_t gprimRow = kNoRow;
         uint32_t interpolation = 0;
-        uint32_t smooth = 0;
+        uint32_t scheme = 0;
         std::optional<Key> key;
         Set* set = nullptr;
     };

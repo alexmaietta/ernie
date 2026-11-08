@@ -44,7 +44,7 @@ multiple api class CollectionAPI (
 }
 
 multiple api class SemanticsLabelsAPI (
-    appliesTo = [Imageable]
+    appliesTo = [Imageable, GeomSubset]
     doc = "Semantic labels of a prim and its descendants, one list per taxonomy such as class. Descendants without labels in a taxonomy take their nearest labeled ancestor's."
 ) {
     token[] semantics:labels:__INSTANCE_NAME__ (
@@ -201,9 +201,17 @@ abstract class Gprim : Boundable (
         doc = "Every other primvar, packed into one table: a count, a PrimvarEntry per primvar sorted by name, then their values and indices."
     )
     bool doubleSided = false (
+        tracked
         group = "Geometry"
         displayName = "Double Sided"
-        doc = "Whether both sides of each face are visible."
+        doc = "Whether camera rays see the back of each face. Other rays always see both sides."
+    )
+    token orientation = rightHanded (
+        tracked
+        allowed = [rightHanded, leftHanded]
+        group = "Geometry"
+        displayName = "Orientation"
+        doc = "Which side is the front. rightHanded makes faces whose points wind counterclockwise face the viewer, and leftHanded makes clockwise faces face the viewer."
     )
 }
 
@@ -411,14 +419,44 @@ class Mesh : PointBased (
         displayName = "Face Vertex Counts"
         doc = "Number of vertices in each face."
     )
+    int[] holeIndices (
+        tracked
+        group = "Geometry"
+        displayName = "Hole Indices"
+        doc = "Faces that are not drawn, as indices into faceVertexCounts."
+    )
     token subdivisionScheme = catmullClark (
         tracked
         allowed = [catmullClark, loop, bilinear, none]
         group = "Geometry"
         displayName = "Subdivision Scheme"
-        doc = "The surface the faces describe. Any scheme but none is smooth, and its normals are computed rather than read from normals."
+        doc = "The surface the faces describe. catmullClark and loop shade smooth with computed normals, bilinear shades faceted, and none reads normals or shades faceted without them. Faces aren't refined yet."
     )
     bool doubleSided = true
+}
+
+class GeomSubset : Typed, MaterialBindingAPI (
+    doc = "A set of faces of its parent mesh, which a material binding or semantic labels apply to. Subsets in the materialBind family bind materials to their faces, and subsets with semantic labels label their faces."
+) {
+    token elementType = face (
+        tracked
+        allowed = [face, point, edge, segment, tetrahedron]
+        group = "Subset"
+        displayName = "Element Type"
+        doc = "What indices name. Only face subsets are drawn differently from their mesh."
+    )
+    int[] indices (
+        tracked
+        group = "Subset"
+        displayName = "Indices"
+        doc = "The faces in the subset, as indices into the mesh's faceVertexCounts."
+    )
+    token familyName (
+        tracked
+        group = "Subset"
+        displayName = "Family Name"
+        doc = "The family the subset belongs to, such as materialBind for subsets that bind materials."
+    )
 }
 
 class Points : PointBased (

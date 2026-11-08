@@ -35,6 +35,7 @@ static const uint kNormalsGroup = 64;
 struct TopologyJob {
     Ptr<int> indices;
     Ptr<int> counts;
+    Ptr<int> holes;
     Ptr<uint> triangles;
     Ptr<uint> corners;
     Ptr<uint> faces;
@@ -47,15 +48,16 @@ struct TopologyJob {
     uint covered;
     uint firstCorner;
     uint firstPoint;
-    uint padding;
+    uint holeCount;
 };
 
-ERNIE_CHECK_SIZE(TopologyJob, 88);
+ERNIE_CHECK_SIZE(TopologyJob, 96);
 
 struct TriangulateParams {
     Ptr<TopologyJob> jobs;
     Ptr<TopologyJob> emitted;
     Ptr<uint> work;
+    Ptr<uint> holes;
     Ptr<uint> faceStarts;
     Ptr<uint> triangleStarts;
     Ptr<uint> sizes;
@@ -68,10 +70,10 @@ struct TriangulateParams {
     uint faceCount;
     uint cornerCount;
     uint pointCount;
-    uint padding;
+    uint holeCount;
 };
 
-ERNIE_CHECK_SIZE(TriangulateParams, 104);
+ERNIE_CHECK_SIZE(TriangulateParams, 112);
 
 static const uint kTopologyGroup = 64;
 

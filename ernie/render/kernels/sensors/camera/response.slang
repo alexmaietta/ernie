@@ -104,7 +104,7 @@ struct CameraResponse<I : IIntegrator> : IResponse<CameraPattern> {
               camera.ImagePlaneDistance(first.position));
         WriteNormal(pixel, first.shadingNormal);
         Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(albedo, true));
-        WriteSegmentation(params, pixel, first.prim);
+        WriteSegmentation(params, pixel, first.part);
         WriteInstance(params, pixel, first, true);
     }
 }

@@ -391,29 +391,40 @@ ImportPlan ObjImporter::Read(std::string_view path, const ImportSource& source,
     for (size_t index = 0; index < shapes.size(); ++index) {
         context.Report("shapes", index, shapes.size());
         const tinyobj::shape_t& shape = shapes[index];
-        std::map<int, MeshBuilder> builders;
+        MeshBuilder builder(attributes, file);
+        std::map<int, std::vector<int32_t>> faces;
         size_t corner = 0;
         for (size_t face = 0; face < shape.mesh.num_face_vertices.size(); ++face) {
             const size_t count = shape.mesh.num_face_vertices[face];
             const int material =
                 face < shape.mesh.material_ids.size() ? shape.mesh.material_ids[face] : -1;
-            builders.try_emplace(material, attributes, file)
-                .first->second.AddFace(std::span(shape.mesh.indices).subspan(corner, count));
+            const bool bound = material >= 0 && size_t(material) < looks.size();
+            faces[bound ? material : -1].push_back(int32_t(face));
+            builder.AddFace(std::span(shape.mesh.indices).subspan(corner, count));
             corner += count;
         }
-        for (auto& [material, builder] : builders) {
-            const bool bound = material >= 0 && size_t(material) < looks.size();
-            const std::string name =
-                builders.size() > 1 && bound
-                    ? fmt::format("{}_{}", shape.name, materials[size_t(material)].name)
-                    : shape.name;
-            const std::string mesh = fmt::format("{}/{}", path, children.Take(name, "Mesh"));
-            const uint32_t faces = builder.FaceCount();
-            const uint32_t points = builder.PointCount();
-            plan.Define<Mesh>(mesh,
-                              std::move(builder).Finish(bound ? looks[size_t(material)] : ""));
-            Log(LogLevel::Debug, "read OBJ shape \"{}\" for {} with {} faces and {} points",
-                shape.name, mesh, faces, points);
+        const bool single = faces.size() <= 1;
+        const int only = faces.empty() ? -1 : faces.begin()->first;
+        const std::string mesh = fmt::format("{}/{}", path, children.Take(shape.name, "Mesh"));
+        const uint32_t faceCount = builder.FaceCount();
+        const uint32_t pointCount = builder.PointCount();
+        plan.Define<Mesh>(
+            mesh, std::move(builder).Finish(single && only >= 0 ? looks[size_t(only)] : ""));
+        Log(LogLevel::Debug, "read OBJ shape \"{}\" for {} with {} faces and {} points", shape.name,
+            mesh, faceCount, pointCount);
+        if (single) {
+            continue;
+        }
+        ChildNames subsets;
+        for (auto& [material, indices] : faces) {
+            if (material < 0) {
+                continue;
+            }
+            const std::string subset = fmt::format(
+                "{}/{}", mesh, subsets.Take(materials[size_t(material)].name, "Subset"));
+            plan.Define<GeomSubset>(subset, {.materialBinding = {looks[size_t(material)]},
+                                             .indices = std::move(indices),
+                                             .familyName = "materialBind"});
         }
     }
     context.Report("shapes", shapes.size(), shapes.size());

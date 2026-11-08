@@ -89,8 +89,15 @@ struct Case {
 const Case kCases[] = {
     {"nothing written does nothing", [](Fixture&) {}, {}},
     {"an attribute no system reads does nothing",
-     [](Fixture& f) { f.One(f.quads[0], SchemaId::Gprim).Get<bool>(kGprimDoubleSided).Set(false); },
+     [](Fixture& f) {
+         f.One(f.quads[0], SchemaId::PointBased)
+             .GetArray<Float3>(kPointBasedAccelerations)
+             .Set(0, std::vector<Float3>(4, Float3{0, 0, 1}));
+     },
      {}},
+    {"doubleSided rebuilds its world's TLAS for the new facing flags",
+     [](Fixture& f) { f.One(f.quads[0], SchemaId::Gprim).Get<bool>(kGprimDoubleSided).Set(false); },
+     {.tlasBuilt = 1, .instancesWritten = 3, .surfacesWritten = 3}},
     {"a display color rewrites its world's surfaces without running instances",
      [](Fixture& f) {
          f.One(f.balls[0], SchemaId::Gprim).Get<Float3>(kGprimDisplayColor).Set(Float3{1, 0, 0});

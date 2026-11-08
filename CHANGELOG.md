@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Release candidates. `ERNIE_PRERELEASE` in `CMakeLists.txt` names one, such as `rc1`, and a matching `v0.1.1rc1` tag publishes `0.1.1rc1` to PyPI and as a GitHub pre-release, with the Docker image tagged `0.1.1rc1` alone and Debian and RPM packages versioned `0.1.1~rc1` so the final release upgrades them. CI also runs on pushes to `release-*` branches.
+- `GeomSubset` names faces of its parent mesh. Subsets in the `materialBind` family bind a material to their faces, and subsets with `SemanticsLabelsAPI` in any family label their faces for segmentation, lidar and radar points. The first subset in child order wins where subsets overlap, and faces outside every subset take the mesh's material and labels.
+- The OBJ importer reads a shape that uses several materials as one mesh with a `materialBind` subset per material, instead of a mesh per material.
+- `Mesh:holeIndices` names faces that aren't drawn.
+- `Gprim:orientation` says which side of a mesh's faces is the front, and `doubleSided = false` hides the backs of a mesh's faces from camera rays. Shadow, bounce, lidar and radar rays still see both sides.
+- A `normals` primvar on a mesh overrides its `normals` attribute, with its own interpolation and indices, as USD's `primvars:normals` does.
+- `Primvar::Create` takes `Float4` values, and `double` and `Double3` values that it narrows to float.
 - Profiler zones also emit ROCTX ranges when a ROCm profiler such as `rocprofv3` or the ROCm Systems Profiler has loaded ROCTX into the process, the way they already emit NVTX ranges for Nsight Systems, so Ernie's CPU zones line up with HIP kernels on AMD's timelines. `ERNIE_ROCTX=1` loads ROCTX even without a profiler and `ERNIE_ROCTX=0` turns the ranges off.
 - `Snapshot::Version` and `Snapshot::Version(table)` tell what a snapshot holds. The first moves whenever any table changes and the second whenever the named table does, such as `"hierarchy"` or `"materials"`. A consumer keeps the numbers and compares them with a later snapshot to tell whether anything it reads changed, for example to restart accumulation. Python's `snapshot.version` and `snapshot.table_version(name)` do the same.
 - `Scene::WorldTransforms`, `Scene::ReadWorldTransformsAsync` and Python's `scene.world_transforms(paths)` read world transforms as of the latest publish.
@@ -27,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Meshes whose `subdivisionScheme` is `none` and that have no normals, and every `bilinear` mesh, shade faceted with each face's own normal. They used to shade with smooth normals, which only `catmullClark` and `loop` meshes do now. OBJ files without normals import as faceted meshes.
 - The `Normal` render var is the surface normal from the geometry, interpolated from its normals before materials and normal maps, in every render mode. Real-time products used to report the normal-mapped normal, and products without color outputs didn't.
 - The `Normal` render var has three float channels instead of four. Misses write a zero normal in place of the old fourth channel, and `ColorizeNormals` shows them as transparent.
 - Every TLAS is placed relative to a render origin that follows the first sensor a render product points at, so geometry near a camera stays precise up to solar system distances.

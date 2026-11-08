@@ -19,6 +19,7 @@ SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
         surface.primvars = scene->schemas.gprim.primvars[gprimRow];
         surface.displayColor = scene->schemas.gprim.displayColor[gprimRow];
         surface.displayOpacity = scene->schemas.gprim.displayOpacity[gprimRow];
+        surface.orientation = scene->schemas.gprim.orientation[gprimRow];
     }
     if (schema == SchemaId::Mesh) {
         const uint meshRow = PrimRow(scene, prim, kSlotMesh);
@@ -29,11 +30,24 @@ SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
         surface.indices = scene->schemas.mesh.faceVertexIndices[meshRow].address;
         surface.corners = mesh.corners.address;
         surface.faces = mesh.faces.address;
-        surface.smooth = mesh.normals.address;
         surface.meshRow = meshRow;
-        const bool subdivided =
-            scene->schemas.mesh.subdivisionScheme[meshRow] != uint(SubdivisionScheme::None);
-        if (!subdivided && authored.count > 0) {
+        const SubdivisionScheme scheme = SubdivisionScheme(scene->schemas.mesh.subdivisionScheme[meshRow]);
+        if (scheme == SubdivisionScheme::CatmullClark || scheme == SubdivisionScheme::Loop) {
+            surface.smooth = mesh.normals.address;
+        }
+        const bool polygonal = scheme == SubdivisionScheme::None;
+        PrimvarEntry normals;
+        if (polygonal && FindPrimvarEntry(surface.primvars.address, surface.primvars.count, p.normalsName,
+                                      normals) &&
+            PrimvarType(normals.type) == PrimvarType::Float3 && normals.elementSize == 1) {
+            surface.normals = surface.primvars.address + normals.values * sizeof(uint);
+            surface.normalsInterpolation = normals.interpolation;
+            surface.normalsCount = normals.valueCount;
+            if (normals.indexCount > 0) {
+                surface.normalIndices = surface.primvars.address + normals.indices * sizeof(uint);
+                surface.normalIndexCount = normals.indexCount;
+            }
+        } else if (polygonal && authored.count > 0) {
             surface.normals = authored.address;
             surface.normalsInterpolation = scene->schemas.pointBased.normalsInterpolation[pointsRow];
             surface.normalsCount = authored.count;

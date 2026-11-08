@@ -67,8 +67,16 @@ InstanceRecord PlaceInstance(InstanceParams p, uint prim, WorldTransform w, bool
             mask |= kCameraEmitterMask;
         }
     }
+    uint facing = 0;
+    if (ShapeKind(shape.record.kind) == ShapeKind::Mesh && SchemaIsA(uint(schema), SchemaId::Gprim)) {
+        const uint gprimRow = PrimRow(scene, prim, kSlotGprim);
+        const bool leftHanded =
+            Orientation(scene->schemas.gprim.orientation[gprimRow]) == Orientation::LeftHanded;
+        facing = (scene->schemas.gprim.doubleSided[gprimRow] != 0 ? kInstanceFacingCullDisable : 0) |
+                 (leftHanded ? kInstanceFlipFacing : 0);
+    }
     instance.custom = local | (mask << 24);
-    instance.flags = 0;
+    instance.flags = facing << 24;
     instance.blas = blas;
     return instance;
 }

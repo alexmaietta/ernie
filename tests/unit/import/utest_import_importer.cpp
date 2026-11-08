@@ -109,6 +109,47 @@ TEST(ImportTest, ReadsObjMeshesTurnedZUpAndScaled) {
     });
 }
 
+TEST(ImportTest, ObjMaterialsWithinAShapeBecomeGeomSubsets) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        constexpr std::string_view kTwoLooks = R"(mtllib shapes.mtl
+o Strip
+v 0 0 0
+v 1 0 0
+v 1 1 0
+v 0 1 0
+v 2 0 0
+v 2 1 0
+usemtl red
+f 1 2 3 4
+usemtl blue
+f 2 5 6 3
+usemtl none
+f 1 3 4
+)";
+        ImportSource source = Shapes(kTwoLooks);
+        source.files["shapes.mtl"] = Bytes("newmtl red\nKd 1 0 0\nnewmtl blue\nKd 0 0 1\n");
+        const Prim root = scene->Import("/Strip", source, {.synchronous = true}).Wait();
+        const std::vector<Prim> meshes = Meshes(root);
+        ASSERT_EQ(meshes.size(), 1u);
+        EXPECT_EQ(scene->Select(meshes[0]).GetArray<Float3>("points").Get(0).size(), 6u);
+        EXPECT_TRUE(MeshPrim(meshes[0]).MaterialBinding().empty());
+        std::vector<GeomSubsetPrim> subsets;
+        for (const Prim& child : meshes[0].Children()) {
+            if (child.IsA<GeomSubset>()) {
+                subsets.emplace_back(child);
+            }
+        }
+        ASSERT_EQ(subsets.size(), 2u);
+        for (const GeomSubsetPrim& subset : subsets) {
+            EXPECT_EQ(subset.FamilyName(), "materialBind");
+            ASSERT_EQ(subset.MaterialBinding().size(), 1u);
+            const bool red = subset.MaterialBinding()[0].ends_with("red");
+            EXPECT_EQ(subset.Indices(), (std::vector<int32_t>{red ? 0 : 1}));
+        }
+    });
+}
+
 TEST(ImportTest, RejectsBrokenAndUnknownFiles) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

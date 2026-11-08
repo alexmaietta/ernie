@@ -110,6 +110,20 @@ uint FindJob(Ptr<TopologyJob> jobs, uint count, uint item, uint field) {
 
 [shader("compute")]
 [numthreads(kTopologyGroup, 1, 1)]
+void MarkHoles(uniform TriangulateParams p) {
+    const uint3 thread = ThreadIndex();
+    const TopologyJob job = p.jobs[thread.y];
+    if (thread.x >= job.holeCount) {
+        return;
+    }
+    const int face = job.holes[thread.x];
+    if (face >= 0 && uint(face) < job.faceCount) {
+        p.holes[job.firstFace + uint(face)] = 1;
+    }
+}
+
+[shader("compute")]
+[numthreads(kTopologyGroup, 1, 1)]
 void FaceSizes(uniform TriangulateParams p) {
     const uint face = LinearThreadIndex();
     if (face >= p.faceCount) {
@@ -130,7 +144,7 @@ void FaceTriangles(uniform TriangulateParams p) {
     const TopologyJob job = p.jobs[index];
     const int size = job.counts[face - job.firstFace];
     const uint first = p.faceStarts[face] - p.faceStarts[job.firstFace];
-    bool valid = size >= 3 && first + uint(size) <= job.indexCount;
+    bool valid = size >= 3 && first + uint(size) <= job.indexCount && p.holes[face] == 0;
     uint covered = 0;
     for (uint at = first; valid && at < first + uint(size); ++at) {
         const int point = job.indices[at];

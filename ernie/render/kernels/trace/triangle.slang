@@ -17,6 +17,7 @@ struct TriangleTest : IDifferentiable {
     float t;
     float2 barycentrics;
     bool inside;
+    bool counterclockwise;
 }
 
 [Differentiable]
@@ -33,6 +34,7 @@ TriangleTest IntersectTriangle(Ray ray, float3 a, float3 edgeB, float3 edgeC) {
     test.barycentrics = float2(u, v);
     test.inside = abs(detach(determinant)) >= 1e-12f && detach(u) >= 0 && detach(v) >= 0 &&
                   detach(u) + detach(v) <= 1;
+    test.counterclockwise = detach(determinant) > 0;
     return test;
 }
 

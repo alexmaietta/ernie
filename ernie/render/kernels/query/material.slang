@@ -23,10 +23,6 @@ struct MaterialQuery {
         return MaterialQuery(hit, record.textureLodBias, record.maxAnisotropy);
     }
 
-    uint BoundMaterial(uint prim) {
-        return PrimImageable(hit.tables, prim).material;
-    }
-
     MaterialRecord Record(uint material) {
         if (material == kNoPrim) {
             MaterialRecord diffuse;

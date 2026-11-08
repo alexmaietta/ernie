@@ -49,7 +49,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         MaterialQuery materials = MaterialQuery(query, 0, 1);
         materials.minimal = true;
         ShadeContext context =
-            ShadeContext(materials, materials.BoundMaterial(point.prim), point, -direction);
+            ShadeContext(materials, point.material, point, -direction);
         OpticalClosure<MonoSpectrum> closure = OpticalClosure<MonoSpectrum>();
         ShadeDefinition<MonoSpectrum>(context, closure);
         RadioClosure radio = closure.radio;
@@ -80,7 +80,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         intensity = Backscatter(point, ray.ray.direction);
         radialVelocity = dot(velocity - sensorVelocity, ray.ray.direction);
         normal = point.shadingNormal;
-        prim = point.prim;
+        prim = point.part;
         instance = HitInstanceId(tables, point);
     }
 

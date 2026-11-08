@@ -19,6 +19,8 @@ struct Ray : IDifferentiable {
 }
 
 static const uint kNoHit = 0xFFFFFFFF;
+static const uint kTraceCullBackFaces = 0x100u;
+static const uint kTraceInstanceMask = 0xFFu;
 
 struct Hit : IDifferentiable {
     float t;

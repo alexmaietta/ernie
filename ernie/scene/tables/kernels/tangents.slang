@@ -27,6 +27,7 @@ void GroupTangents(uniform TangentParams p) {
     float3 tangent = float3(0);
     float3 bitangent = float3(0);
     uint first = kNoRow;
+    float3 facet = float3(0, 0, 1);
     for (uint at = p.groupStarts[group]; at < p.groupStarts[group + 1]; ++at) {
         const uint entry = p.groupCorners[at];
         const uint triangle = entry / 3;
@@ -34,9 +35,12 @@ void GroupTangents(uniform TangentParams p) {
         const uint a = p.triangles[triangle * 3 + k];
         const uint b = p.triangles[triangle * 3 + (k + 1) % 3];
         const uint c = p.triangles[triangle * 3 + (k + 2) % 3];
-        first = first == kNoRow ? a : first;
         const float3 e1 = CornerPoint(p, b) - CornerPoint(p, a);
         const float3 e2 = CornerPoint(p, c) - CornerPoint(p, a);
+        if (first == kNoRow) {
+            first = a;
+            facet = cross(e1, e2);
+        }
         const float2 d1 = p.cornerSt[b].Vector() - p.cornerSt[a].Vector();
         const float2 d2 = p.cornerSt[c].Vector() - p.cornerSt[a].Vector();
         const float det = d1.x * d2.y - d2.x * d1.y;
@@ -58,7 +62,7 @@ void GroupTangents(uniform TangentParams p) {
     }
     float4 result = float4(1, 0, 0, 1);
     if (first != kNoRow) {
-        const float3 n = normalize(CornerNormal(p, first));
+        const float3 n = normalize(p.faceted != 0 ? facet : CornerNormal(p, first));
         const float3 projected = tangent - n * dot(n, tangent);
         const float size = length(projected);
         if (size > 0) {

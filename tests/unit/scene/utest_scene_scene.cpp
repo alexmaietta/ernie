@@ -348,6 +348,71 @@ TEST(SceneTest, TargetsTokensAndPrimvarsAreSetByValue) {
     });
 }
 
+std::vector<uint32_t> SubsetFaces(Scene& scene, const Prim& mesh, ArrayRef SubsetRecord::* map) {
+    SceneImpl& impl = SceneImpl::Get(scene);
+    const uint32_t row = impl.GetStructure().GetPrims().Row(mesh.Index(), SchemaId::Mesh);
+    const ArrayRef faces = impl.GetSubsets().Record(row).*map;
+    if (faces.count == 0) {
+        return {};
+    }
+    return Items<uint32_t>(impl.GetColumnStore().Arrays(ColumnType::IntArray).Read(faces));
+}
+
+TEST(SceneTest, GeomSubsetsMapFacesToMaterialsAndLabeledParts) {
+    ForEachScene([](Scene& scene) {
+        const Prim red = scene.Define<Material>("/Red");
+        const Prim green = scene.Define<Material>("/Green");
+        const Prim box =
+            scene.Define<Mesh>("/Box", {.materialBinding = {"/Red"},
+                                        .points = std::vector<Float3>(4),
+                                        .faceVertexIndices = {0, 1, 2, 0, 2, 3, 1, 2, 3},
+                                        .faceVertexCounts = {3, 3, 3}});
+        const Prim top = scene.Define<GeomSubset>(
+            "/Box/Top",
+            {.materialBinding = {"/Green"}, .indices = {1, 9}, .familyName = "materialBind"});
+        scene.Define<GeomSubset>("/Box/Unbound", {.indices = {2}, .familyName = "materialBind"});
+        const Prim wheel = scene.Define<GeomSubset>(
+            "/Box/Wheel",
+            {.indices = {0, 2}, .familyName = "parts", .semanticsLabels = {{"class", {"wheel"}}}});
+        scene.Define<GeomSubset>(
+            "/Box/Other", {.materialBinding = {"/Red"}, .indices = {0}, .familyName = "other"});
+        scene.Define<GeomSubset>(
+            "/Box/Late",
+            {.materialBinding = {"/Red"}, .indices = {1}, .familyName = "materialBind"});
+        scene.Define<GeomSubset>(
+            "/Box/Points",
+            {.elementType = ElementType::Point, .indices = {0}, .familyName = "materialBind"});
+        scene.Publish().Wait();
+        const uint32_t none = kNoPrim;
+        EXPECT_EQ(SubsetFaces(scene, box, &SubsetRecord::materials),
+                  (std::vector<uint32_t>{none, green.Index(), none}));
+        EXPECT_EQ(SubsetFaces(scene, box, &SubsetRecord::parts),
+                  (std::vector<uint32_t>{wheel.Index(), none, wheel.Index()}));
+
+        top.Set(GeomSubset::kMaterialBinding, std::vector<std::string>{"/Red"});
+        scene.Publish().Wait();
+        EXPECT_EQ(SubsetFaces(scene, box, &SubsetRecord::materials),
+                  (std::vector<uint32_t>{none, red.Index(), none}));
+
+        scene.Remove(wheel);
+        scene.Publish().Wait();
+        EXPECT_TRUE(SubsetFaces(scene, box, &SubsetRecord::parts).empty());
+        EXPECT_EQ(SceneImpl::Get(scene).GetSubsets().Stats().meshes, 1u);
+    });
+}
+
+TEST(SceneTest, DoublePrimvarsNarrowToFloat) {
+    const Primvar scalar =
+        Primvar::Create("weight", Interpolation::Vertex, std::vector<double>{1.5, -2});
+    EXPECT_EQ(scalar.type, PrimvarType::Float);
+    EXPECT_EQ(scalar.Values<float>(), (std::vector<float>{1.5f, -2}));
+    const Primvar vector =
+        Primvar::Create("offset", Interpolation::Vertex, std::vector<Double3>{{1, 2, 3}});
+    EXPECT_EQ(vector.type, PrimvarType::Float3);
+    EXPECT_EQ(vector.Values<float>(), (std::vector<float>{1, 2, 3}));
+    EXPECT_EQ(vector.ValueCount(), 1u);
+}
+
 TEST(SceneTest, DeformedMeshesRecomputeTangentsOnTheDevice) {
     ForEachScene([](Scene& scene) {
         constexpr uint32_t kSide = 5;
@@ -398,7 +463,7 @@ TEST(SceneTest, DeformedMeshesRecomputeTangentsOnTheDevice) {
         deformed.points = points;
         deformed.indices = indices;
         deformed.counts = counts;
-        deformed.normals = SmoothCornerNormals(points, indices, counts);
+        deformed.normals = FacetedCornerNormals(points, indices, counts);
         deformed.st = *CornerValues<Float2>(st, {}, Interpolation::Vertex, indices, counts);
         const std::vector<Float4> expected = MikkTangents(deformed);
         SceneImpl& impl = SceneImpl::Get(scene);

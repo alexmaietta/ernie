@@ -103,7 +103,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
 
     PathResult<RgbSpectrum> Trace(Ray ray, float spread, inout Rng rng) {
         PathResult<RgbSpectrum> result = PathResult<RgbSpectrum>.Miss();
-        const PrimHit primHit = query.Intersect(ray);
+        const PrimHit primHit = query.Intersect(ray, kGeometryMask | kTraceCullBackFaces);
         if (!primHit.IsHit()) {
             return result;
         }
@@ -123,7 +123,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             MaterialQuery materials = MaterialQuery.Load(query, product);
             materials.minimal = true;
             materials.maxAnisotropy = min(materials.maxAnisotropy, kMinimalAnisotropy);
-            const uint material = materials.BoundMaterial(point.prim);
+            const uint material = point.material;
             if (Mode == MinimalMode::TextureDiffuse) {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
                 const RgbSpectrum albedo = AlbedoDefinition<RgbSpectrum>(context);

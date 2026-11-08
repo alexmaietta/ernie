@@ -11,6 +11,9 @@ struct SurfacePoint : IDifferentiable {
     no_diff float3 geometricNormal;
     no_diff float distance;
     no_diff uint prim;
+    no_diff uint part;
+    no_diff uint material;
+    no_diff bool frontFacing;
     no_diff uint slot;
     no_diff SurfaceElement element;
     no_diff float footprint;
@@ -24,6 +27,9 @@ struct SurfacePoint : IDifferentiable {
         point.geometricNormal = float3(0);
         point.distance = kInfinity;
         point.prim = kNoPrim;
+        point.part = kNoPrim;
+        point.material = kNoPrim;
+        point.frontFacing = true;
         point.slot = 0;
         point.element = SurfaceElement.Shape(0);
         point.footprint = 0;

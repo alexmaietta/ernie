@@ -73,6 +73,8 @@ class MeshTable : public RenderTable {
         uint32_t indexCount = 0;
         uint64_t counts = 0;
         uint32_t faceCount = 0;
+        uint64_t holes = 0;
+        uint32_t holeCount = 0;
 
         auto operator<=>(const TopologyKey&) const = default;
     };

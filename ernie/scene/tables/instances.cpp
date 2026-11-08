@@ -41,7 +41,9 @@ constexpr ColumnRef kActivation[] = {kSphereRadius,
                                      kLightAPIVisibleInPrimaryRay,
                                      kPointInstancerProtoIndices,
                                      kPointInstancerIds,
-                                     kPointInstancerInvisibleIds};
+                                     kPointInstancerInvisibleIds,
+                                     kGprimDoubleSided,
+                                     kGprimOrientation};
 
 constexpr ColumnRef kPlacement[] = {kPointBasedPoints, kPointInstancerOrientations,
                                     kPointInstancerScales, kRenderProductCamera};

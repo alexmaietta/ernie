@@ -30,11 +30,11 @@ struct HardwareTracer : ITracer {
 
     static Hit Trace<F : IHitFilter, I : IIntersector>(uint64_t tlas, Ray ray, uint mask,
                                                        F filter, I intersector, bool any) {
-        const uint flags = filter.Opaque() ? RAY_FLAG_FORCE_OPAQUE : RAY_FLAG_FORCE_NON_OPAQUE;
+        const uint flags = (filter.Opaque() ? RAY_FLAG_FORCE_OPAQUE : RAY_FLAG_FORCE_NON_OPAQUE) |
+                           (any ? RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH : 0) |
+                           ((mask & kTraceCullBackFaces) != 0 ? RAY_FLAG_CULL_BACK_FACING_TRIANGLES : 0);
         RayQuery<F.kRayFlags> query;
-        query.TraceRayInline(Accel(tlas),
-                             flags | (any ? RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH : 0), mask,
-                             ToRayDesc(ray));
+        query.TraceRayInline(Accel(tlas), flags, mask & kTraceInstanceMask, ToRayDesc(ray));
         float2 attributes = float2(0);
         while (query.Proceed()) {
             Ray local = ray;

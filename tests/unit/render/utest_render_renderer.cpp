@@ -163,8 +163,7 @@ TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
                                        .focalLength = 400});
         scene->Define<Mesh>("/Roof", {.points = Roof(1),
                                       .faceVertexIndices = {0, 1, 4, 3, 1, 2, 5, 4},
-                                      .faceVertexCounts = {4, 4},
-                                      .subdivisionScheme = SubdivisionScheme::None});
+                                      .faceVertexCounts = {4, 4}});
         scene->Define<Scope>("/Render");
         scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
         scene->Define<RenderProduct>(

@@ -67,7 +67,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         MaterialQuery materials = MaterialQuery(query, 0, 1);
         materials.minimal = true;
         ShadeContext context =
-            ShadeContext(materials, materials.BoundMaterial(point.prim), point, -direction);
+            ShadeContext(materials, point.material, point, -direction);
         UseWavelength(wavelength);
         OpticalClosure<MonoSpectrum> closure = OpticalClosure<MonoSpectrum>();
         ShadeDefinition<MonoSpectrum>(context, closure);
@@ -118,7 +118,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         candidate.distance = point.distance;
         candidate.intensity = Intensity(point, ray.ray.direction);
         candidate.normal = point.shadingNormal;
-        candidate.prim = point.prim;
+        candidate.prim = point.part;
         candidate.instance = HitInstanceId(tables, point);
         if (mode == ReturnMode::Mean) {
             ++hits;

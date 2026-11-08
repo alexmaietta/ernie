@@ -39,4 +39,32 @@ ERNIE_SHARED bool PrimvarIsInt(PrimvarType type) {
     return uint(type) >= uint(PrimvarType::Int);
 }
 
+#ifdef __SLANG__
+
+bool FindPrimvarEntry(uint64_t table, uint words, uint name, out PrimvarEntry found) {
+    found = {};
+    if (words == 0) {
+        return false;
+    }
+    const Ptr<PrimvarEntry> entries = Ptr<PrimvarEntry>(table + sizeof(uint));
+    uint low = 0;
+    uint high = Ptr<uint>(table)[0];
+    while (low < high) {
+        const uint middle = (low + high) / 2;
+        const PrimvarEntry entry = entries[middle];
+        if (entry.name == name) {
+            found = entry;
+            return true;
+        }
+        if (entry.name < name) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    return false;
+}
+
+#endif
+
 }

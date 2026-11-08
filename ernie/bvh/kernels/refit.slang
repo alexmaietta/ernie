@@ -38,7 +38,7 @@ uint InternalChild(uint firstChild, uint imask, uint slot) {
 BvhBox RefitLeaf(RefitParams p, uint segment, uint4* at) {
     if (p.kind == kBvhInstances) {
         BvhInstance* record = (BvhInstance*)at;
-        const uint index = record.index;
+        const uint index = record.index & kBvhIndexMask;
         const InstanceRecord instance = p.instances[p.instanceOffsets[segment] + index];
         *record = BvhMakeInstance(instance, index);
         return BvhInstanceWorldBox(instance);

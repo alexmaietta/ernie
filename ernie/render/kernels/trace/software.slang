@@ -140,6 +140,7 @@ Ray ToObject(BvhInstance instance, Ray ray) {
 struct BlasVisitor<F : IHitFilter, I : IIntersector> {
     TraceQuery<F, I> query;
     uint instance;
+    uint facing;
     Hit nearest;
     bool any;
 
@@ -162,6 +163,11 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
         const float3 a = float3(record.a[0], record.a[1], record.a[2]);
         const TriangleTest test = IntersectTriangle(query.ray, a, edgeB, edgeC);
         if (!test.inside || test.t < query.ray.tMin || test.t >= nearest.t) {
+            return false;
+        }
+        const bool front = test.counterclockwise != ((facing & kInstanceFlipFacing) != 0);
+        if (!front && (query.mask & kTraceCullBackFaces) != 0 &&
+            (facing & kInstanceFacingCullDisable) == 0) {
             return false;
         }
         const Hit candidate = Candidate(test.t, test.barycentrics, record.index, false);
@@ -214,7 +220,7 @@ struct SoftwareTracer : ITracer {
                                                        F filter, I intersector, bool any) {
         BvhHeader* bvh = (BvhHeader*)accel;
         const TraceQuery<F, I> query = { ray, mask, filter, intersector };
-        BlasVisitor<F, I> visitor = { query, 0, Miss(query.ray), any };
+        BlasVisitor<F, I> visitor = { query, 0, 0, Miss(query.ray), any };
         if (bvh.primitives == 0 || bvh.nodeCount == 0) {
             return visitor.nearest;
         }
@@ -274,6 +280,7 @@ struct SoftwareTracer : ITracer {
                 continue;
             }
             visitor.instance = instance.custom & 0xFFFFFF;
+            visitor.facing = instance.index >> 24;
             visitor.query.ray = ToObject(instance, query.ray);
             level = BvhLevel(blas, visitor.query.ray);
             floor = depth;

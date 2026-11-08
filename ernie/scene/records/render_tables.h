@@ -26,6 +26,7 @@ struct RenderTables {
     Ptr<ResolvedImageable> imageables;
     Ptr<MotionRecord> motions;
     Ptr<MeshRecord> meshes;
+    Ptr<SubsetRecord> subsets;
     Ptr<PointsRecord> points;
     Ptr<TangentRecord> tangents;
     Ptr<SurfaceRecord> surfaces;
@@ -57,6 +58,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 392);
+ERNIE_CHECK_SIZE(RenderTables, 400);
 
 }

@@ -21,27 +21,7 @@ PrimvarRef FindPrimvar(RenderTables* tables, uint slot, uint name) {
 
 PrimvarRef FindPrimvarIn(ArrayRef table, uint name) {
     PrimvarRef found;
-    found.table = 0;
-    if (table.count == 0) {
-        return found;
-    }
-    const Ptr<PrimvarEntry> entries = Ptr<PrimvarEntry>(table.address + sizeof(uint));
-    uint low = 0;
-    uint high = Ptr<uint>(table.address)[0];
-    while (low < high) {
-        const uint middle = (low + high) / 2;
-        const PrimvarEntry entry = entries[middle];
-        if (entry.name == name) {
-            found.table = table.address;
-            found.entry = entry;
-            return found;
-        }
-        if (entry.name < name) {
-            low = middle + 1;
-        } else {
-            high = middle;
-        }
-    }
+    found.table = FindPrimvarEntry(table.address, table.count, name, found.entry) ? table.address : 0;
     return found;
 }
 

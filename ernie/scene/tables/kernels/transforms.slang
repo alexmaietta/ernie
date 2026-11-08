@@ -93,22 +93,6 @@ bool Changed(uint64_t stamp, uint64_t since, uint64_t until) {
     return stamp > since && stamp <= until;
 }
 
-uint BindingRow(AuthoredData* scene, uint prim) {
-    return ApiRow(scene, prim, kApiMaterialBindingAPI);
-}
-
-uint BoundMaterial(AuthoredData* scene, uint prim, out bool binds) {
-    const ArrayRef binding = scene->schemas.materialBindingAPI.materialBinding[BindingRow(scene, prim)];
-    binds = binding.count > 0;
-    if (!binds) {
-        return kNoPrim;
-    }
-    const uint target = Ptr<uint>(binding.address)[0];
-    const bool bound = target < scene->primCount && (scene->prims.flags[target] & kPrimAlive) != 0 &&
-                       SchemaIsA(scene->prims.schema[target], SchemaId::Material);
-    return bound ? target : kNoPrim;
-}
-
 [shader("compute")]
 [numthreads(kHierarchyGroup, 1, 1)]
 void ResolveRows(uniform ResolveParams p) {

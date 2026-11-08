@@ -20,7 +20,8 @@ namespace {
 
 constexpr uint32_t kPreparedScan = 1024;
 
-constexpr ColumnRef kInputs[] = {kPointBasedPoints, kMeshFaceVertexIndices, kMeshFaceVertexCounts};
+constexpr ColumnRef kInputs[] = {kPointBasedPoints, kMeshFaceVertexIndices, kMeshFaceVertexCounts,
+                                 kMeshHoleIndices};
 
 constexpr TableId kTableOutputs[] = {TableId::Meshes, TableId::MeshPoints};
 
@@ -52,6 +53,7 @@ void MeshTable::Triangulate() {
     std::vector<Topology*> pending;
     std::vector<TopologyJob> jobs;
     uint32_t faces = 0;
+    uint32_t holes = 0;
     for (auto& [key, topology] : m_topologies) {
         if (topology.ready) {
             continue;
@@ -59,10 +61,13 @@ void MeshTable::Triangulate() {
         TopologyJob job{};
         job.indices.address = key.indices;
         job.counts.address = key.counts;
+        job.holes.address = key.holes;
         job.indexCount = key.indexCount;
         job.faceCount = key.faceCount;
+        job.holeCount = key.holeCount;
         job.firstFace = faces;
         faces += key.faceCount;
+        holes = std::max(holes, key.holeCount);
         jobs.push_back(job);
         pending.push_back(&topology);
     }
@@ -93,23 +98,32 @@ void MeshTable::Triangulate() {
     const Ref<device::Buffer> jobBuffer =
         device.CreateBuffer({.label = "topology jobs"}, std::span<const TopologyJob>(jobs));
     const Ref<device::Buffer> work = scratch(faces, "face work");
+    const Ref<device::Buffer> holeFlags = scratch(faces, "face holes");
     const Ref<device::Buffer> faceStarts = scratch(faces, "face starts");
     const Ref<device::Buffer> triangleStarts = scratch(faces, "face triangle starts");
     const Ref<device::Buffer> sizes = scratch(jobs.size() * 2, "topology sizes");
     TriangulateParams params{};
     params.jobs.address = jobBuffer->Address();
     params.work.address = work->Address();
+    params.holes.address = holeFlags->Address();
     params.faceStarts.address = faceStarts->Address();
     params.triangleStarts.address = triangleStarts->Address();
     params.sizes.address = sizes->Address();
     params.jobCount = uint32_t(jobs.size());
     params.faceCount = faces;
+    params.holeCount = holes;
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Geometry/Triangulate");
     {
         device::CommandEncoder encoder = queue.CreateEncoder();
         {
             const device::ZoneScope scope(encoder, zone);
             encoder.Fill(*sizes);
+            encoder.Fill(*holeFlags);
+            if (holes > 0) {
+                encoder.Dispatch(
+                    Kernels().Entry("MarkHoles"), params,
+                    {.x = device::GroupCount(holes, kTopologyGroup), .y = params.jobCount});
+            }
             dispatch(encoder, "FaceSizes", params, faces);
             scan(faces).ExclusiveSum(encoder, *work, *faceStarts, faces);
             dispatch(encoder, "FaceTriangles", params, faces);
@@ -285,9 +299,11 @@ MeshTable::ShapeKey MeshTable::Key(const Mesh& mesh) const {
     const ArrayRef points = store.Array(kPointBasedPoints, mesh.pointsRow);
     const ArrayRef indices = store.Array(kMeshFaceVertexIndices, mesh.meshRow);
     const ArrayRef counts = store.Array(kMeshFaceVertexCounts, mesh.meshRow);
-    return {points.address,
-            points.count,
-            {indices.address, indices.count, counts.address, counts.count}};
+    const ArrayRef holes = store.Array(kMeshHoleIndices, mesh.meshRow);
+    return {
+        points.address,
+        points.count,
+        {indices.address, indices.count, counts.address, counts.count, holes.address, holes.count}};
 }
 
 void MeshTable::Release(Mesh& mesh) {
@@ -380,6 +396,7 @@ void MeshTable::Run(const ChangeSet& changes, TableVersions& versions) {
         collect(kPointBasedPoints, m_byPointsRow, moved);
         collect(kMeshFaceVertexIndices, m_byMeshRow, reshaped);
         collect(kMeshFaceVertexCounts, m_byMeshRow, reshaped);
+        collect(kMeshHoleIndices, m_byMeshRow, reshaped);
         const ColumnStore& store = m_structure.GetColumnStore();
         std::vector<uint32_t> rekeyed;
         for (const uint32_t prim : moved) {
@@ -522,8 +539,9 @@ device::Program& MeshTable::Kernels() {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.tables.kernels.meshes"},
              .library = &kSceneKernels,
-             .entries = {"FaceSizes", "FaceTriangles", "TopologySizes", "EmitTriangles",
-                         "WriteAdjacency", "WriteStarts", "SmoothNormals", "FinishShapeBounds"},
+             .entries = {"MarkHoles", "FaceSizes", "FaceTriangles", "TopologySizes",
+                         "EmitTriangles", "WriteAdjacency", "WriteStarts", "SmoothNormals",
+                         "FinishShapeBounds"},
              .label = "geometry"});
     }
     return *m_program;

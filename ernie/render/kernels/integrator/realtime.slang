@@ -78,7 +78,8 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         float scatteredPdf = 0;
         bool scatteredDelta = true;
         while (true) {
-            const uint mask = kGeometryMask | (bounce == 0 ? kCameraEmitterMask : kEmitterMask);
+            const uint mask =
+                kGeometryMask | (bounce == 0 ? kCameraEmitterMask | kTraceCullBackFaces : kEmitterMask);
             const PrimHit primHit = query.Intersect(ray, mask);
             if (!primHit.IsHit()) {
                 radiance = radiance + throughput * Sky(origin, ray.direction, originPrim,
@@ -94,7 +95,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
                                                            scatteredPdf, scatteredDelta);
                 break;
             }
-            const uint material = materials.BoundMaterial(point.prim);
+            const uint material = point.material;
             const float3 u = float3(rng.Next2(), rng.Next());
             const PathVertex<Spectrum> vertex = Shade(ray, material, point, u, bounce, rng);
             if (rng.Next() >= vertex.opacity && passes < kMaxPassThroughs) {

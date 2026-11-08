@@ -70,9 +70,10 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_points(m_structure, *m_builder, desc.maxRefits, desc.pointsPerBox),
       m_bounds(m_structure, m_header.Tables(), m_instances), m_tangents(m_structure, m_meshes),
       m_textures(m_structure, desc.textureThreads), m_semantics(m_structure),
-      m_sensors(m_structure), m_pipelines(m_structure), m_products(scene, m_structure, m_pipelines),
-      m_plans(scene, m_products), m_captures(scene, m_clock, m_products),
-      m_materials(m_structure, m_textures), m_spectra(m_structure),
+      m_subsets(m_structure), m_sensors(m_structure), m_pipelines(m_structure),
+      m_products(scene, m_structure, m_pipelines), m_plans(scene, m_products),
+      m_captures(scene, m_clock, m_products), m_materials(m_structure, m_textures),
+      m_spectra(m_structure),
       m_instances(m_structure, m_header.Tables(), *m_builder, desc.maxRefits),
       m_surfaces(m_structure, m_header.Tables(), m_instances),
       m_lights(m_structure, m_header.Tables(), m_instances) {
@@ -82,6 +83,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
     m_publisher.Add(m_tangents);
     m_publisher.Add(m_textures);
     m_publisher.Add(m_semantics);
+    m_publisher.Add(m_subsets);
     m_publisher.Add(m_sensors);
     m_publisher.Add(m_pipelines);
     m_publisher.Add(m_products);
@@ -95,7 +97,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
     m_builder->Prepare();
     for (Table* system : std::initializer_list<Table*>{
              &m_transforms, &m_meshes, &m_points, &m_bounds, &m_tangents, &m_textures, &m_semantics,
-             &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights}) {
+             &m_subsets, &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights}) {
         system->Prepare();
     }
     if (desc.waitForKernels) {

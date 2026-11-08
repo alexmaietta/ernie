@@ -20,6 +20,10 @@ static const uint kBvhTriangles = 0;
 static const uint kBvhInstances = 1;
 static const uint kBvhBoxes = 2;
 
+static const uint kBvhIndexMask = 0xFFFFFF;
+static const uint kInstanceFacingCullDisable = 1u;
+static const uint kInstanceFlipFacing = 2u;
+
 struct BvhHeader {
     float lower[3];
     uint primitives;
@@ -210,7 +214,7 @@ ERNIE_SHARED BvhInstance BvhMakeInstance(InstanceRecord instance, uint index) {
     BvhInstance record;
     record.blas = instance.blas;
     record.custom = instance.custom;
-    record.index = index;
+    record.index = index | (instance.flags >> 24 << 24);
     float m[12];
     for (uint i = 0; i < 12; ++i) {
         m[i] = instance.transform[i];

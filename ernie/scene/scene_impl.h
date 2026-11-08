@@ -28,6 +28,7 @@
 #include "ernie/scene/tables/semantics.h"
 #include "ernie/scene/tables/sensors.h"
 #include "ernie/scene/tables/spectra.h"
+#include "ernie/scene/tables/subsets.h"
 #include "ernie/scene/tables/surfaces.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/tangents.h"
@@ -143,6 +144,10 @@ class SceneImpl {
         return m_waitForKernels;
     }
 
+    const SubsetTable& GetSubsets() const {
+        return m_subsets;
+    }
+
     SemanticTable& GetSemantics() {
         return m_semantics;
     }
@@ -207,6 +212,7 @@ class SceneImpl {
     TangentTable m_tangents;
     TextureTable m_textures;
     SemanticTable m_semantics;
+    SubsetTable m_subsets;
     SensorTable m_sensors;
     SimulationClock m_clock;
     PipelineTable m_pipelines;

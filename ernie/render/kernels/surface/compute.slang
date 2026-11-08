@@ -12,15 +12,25 @@ float3 Interpolate(Ptr<Float3> values, uint3 indices, float3 weights) {
            values[indices.z].Vector() * weights.z;
 }
 
-float3 MeshShadingNormal(SurfaceRecord surface, ObjectSpace space, SurfaceElement element) {
-    if (surface.normals != 0) {
-        const uint3 at = InterpolationIndices(element, Interpolation(surface.normalsInterpolation));
-        if (all(at < surface.normalsCount)) {
-            return space.NormalToWorld(
-                Interpolate(Ptr<Float3>(surface.normals), at, element.weights));
+float3 MeshShadingNormal(SurfaceRecord surface, ObjectSpace space, SurfaceElement element,
+                         float3 geometric) {
+    uint3 at = InterpolationIndices(element, Interpolation(surface.normalsInterpolation));
+    if (surface.normalIndexCount > 0) {
+        if (all(at < surface.normalIndexCount)) {
+            const Ptr<uint> indices = Ptr<uint>(surface.normalIndices);
+            at = uint3(indices[at.x], indices[at.y], indices[at.z]);
+        } else {
+            at = uint3(surface.normalsCount);
         }
     }
-    return space.NormalToWorld(Interpolate(Ptr<Float3>(surface.smooth), element.points, element.weights));
+    if (surface.normals != 0 && all(at < surface.normalsCount)) {
+        return space.NormalToWorld(Interpolate(Ptr<Float3>(surface.normals), at, element.weights));
+    }
+    if (surface.smooth != 0) {
+        return space.NormalToWorld(
+            Interpolate(Ptr<Float3>(surface.smooth), element.points, element.weights));
+    }
+    return geometric;
 }
 
 SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float spread) {
@@ -28,6 +38,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     const ObjectSpace space = query.LoadObjectSpace(primHit);
     SurfacePoint point;
     point.prim = prim;
+    point.part = prim;
+    point.material = PrimImageable(query.tables, prim).material;
     point.slot = primHit.slot;
     point.distance = primHit.hit.t;
     const SurfaceRecord surface = query.tables->surfaces[primHit.slot];
@@ -36,6 +48,23 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
     point.element = cloud ? SurfaceElement.Point(index)
                           : FindSurfaceElement(surface, primHit.hit);
     float3 error;
+
+    if (point.element.mesh) {
+        const SubsetRecord subsets = query.tables->subsets[surface.meshRow];
+        const uint face = point.element.face;
+        if (face < subsets.materials.count) {
+            const uint material = Ptr<uint>(subsets.materials.address)[face];
+            if (material != kNoPrim) {
+                point.material = material;
+            }
+        }
+        if (face < subsets.parts.count) {
+            const uint part = Ptr<uint>(subsets.parts.address)[face];
+            if (part != kNoPrim) {
+                point.part = part;
+            }
+        }
+    }
 
     if (point.element.mesh) {
         const Ptr<Float3> positions = Ptr<Float3>(surface.points);
@@ -49,7 +78,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
         const float3 largest = max(max(abs(a), abs(b)), abs(c));
         error = space.ErrorToWorld(local, Gamma(7) * max(largest.x, max(largest.y, largest.z)));
         point.geometricNormal = space.NormalToWorld(cross(b - a, c - a));
-        point.shadingNormal = MeshShadingNormal(surface, space, point.element);
+        point.shadingNormal =
+            MeshShadingNormal(surface, space, point.element, point.geometricNormal);
     } else {
         const Ray local = space.ToObject(ray);
         const ShapeHit hit =
@@ -61,6 +91,8 @@ SurfacePoint ComputeSurfacePoint(HitQuery query, Ray ray, PrimHit primHit, float
         point.geometricNormal = space.NormalToWorld(hit.normal);
         point.shadingNormal = point.geometricNormal;
     }
+    const bool leftHanded = Orientation(surface.orientation) == Orientation::LeftHanded;
+    point.frontFacing = (dot(point.geometricNormal, ray.direction) < 0) != leftHanded;
     if (dot(point.geometricNormal, ray.direction) > 0) {
         point.geometricNormal = -point.geometricNormal;
     }
