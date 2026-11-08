@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "ernie/material/uplift.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/util/log.h"
@@ -136,6 +137,11 @@ void SpectralTable::Run(const ChangeSet&, TableVersions&) {
     if (samples.empty()) {
         samples.push_back({});
     }
+    if (!m_sigmoids) {
+        const SigmoidTable& sigmoids = Sigmoids();
+        m_sigmoids = device.CreateBuffer({.label = "sigmoid uplift"}, sigmoids.coefficients);
+        m_sigmoidScales = device.CreateBuffer({.label = "sigmoid scales"}, sigmoids.scales);
+    }
     m_rgb = device.CreateBuffer({.label = "spectra rgb"}, rgb);
     m_bands = device.CreateBuffer({.label = "spectra bands"}, bands);
     m_ranges = device.CreateBuffer({.label = "spectra ranges"}, spans);
@@ -149,6 +155,9 @@ void SpectralTable::Describe(RenderTables& tables) const {
     tables.spectra.bands.address = m_bands ? m_bands->Address() : 0;
     tables.spectra.ranges.address = m_ranges ? m_ranges->Address() : 0;
     tables.spectra.samples.address = m_samples ? m_samples->Address() : 0;
+    tables.spectra.sigmoids.address = m_sigmoids ? m_sigmoids->Address() : 0;
+    tables.spectra.sigmoidScales.address = m_sigmoidScales ? m_sigmoidScales->Address() : 0;
+    tables.spectra.sigmoidResolution = m_sigmoids ? kSigmoidResolution : 0;
     tables.spectra.count = m_count;
     tables.spectra.detectors = m_detectors;
 }

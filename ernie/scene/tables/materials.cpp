@@ -36,6 +36,9 @@ constexpr std::string_view kPreviewInputNames[kPreviewInputs] = {
     "detailNormal", "detailAlbedo",       "displacement",
 };
 
+constexpr float kVisibleFirstNm = 380;
+constexpr float kVisibleLastNm = 780;
+
 constexpr bool Spectral(PreviewInput input) {
     return input == PreviewInput::DiffuseColor || input == PreviewInput::EmissiveColor ||
            input == PreviewInput::SpecularColor;
@@ -68,7 +71,7 @@ bool Channel(std::string_view output, bool color, TextureChannel& channel) {
 }
 
 std::vector<ColumnRef> MaterialInputs() {
-    std::vector<ColumnRef> inputs = {kPlaneAxis};
+    std::vector<ColumnRef> inputs = {kPlaneAxis, kDetectorAPIDetectorSpectralRange};
     for (const SchemaId schema :
          {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
           SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
@@ -274,6 +277,7 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
         uint32_t spectrum = kNoSpectrum;
         if (spectral && Spectral(PreviewInput(input))) {
             spectrum = prims.Row(found->source, SchemaId::SampledSpectrum);
+            m_spectral.insert(material);
         } else if (spectral) {
             Log(LogLevel::Warning,
                 "{}'s {} connects to the spectrum {}, but only diffuseColor, emissiveColor and "
@@ -507,6 +511,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                         connection.source != kNoPrim &&
                         prims.Record(connection.source).schema == SchemaId::SampledSpectrum) {
                         spectrum = prims.Row(connection.source, SchemaId::SampledSpectrum);
+                        m_spectral.insert(material);
                     }
                 }
                 m_literals.push_back({base + Word(layout.cells[n][i] + 12), spectrum});
@@ -582,6 +587,7 @@ void MaterialTable::Resolve() {
     m_copies.clear();
     m_literals.clear();
     m_bindings.clear();
+    m_spectral.clear();
     m_wordCount = 0;
     std::vector<MaterialRecord> before;
     for (uint32_t prim = 0; prim < m_generations.size(); ++prim) {
@@ -696,6 +702,38 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
     }
 }
 
+void MaterialTable::WarnOutsideVisible() {
+    const Prims& prims = m_structure.GetPrims();
+    ColumnStore& store = m_structure.GetColumnStore();
+    ColumnTable& detectors = store.Schema(SchemaId::DetectorAPI);
+    const std::vector<Float2> ranges =
+        Items<Float2>(detectors.Read(kDetectorAPIDetectorSpectralRange.index, 0, detectors.Rows()));
+    const std::vector<uint32_t> owners = Items<uint32_t>(
+        detectors.Read(store.PrimsColumn(SchemaId::DetectorAPI), 0, detectors.Rows()));
+    for (uint32_t row = 0; row < ranges.size(); ++row) {
+        const uint32_t sensor = owners[row];
+        if (sensor == kNoPrim || !prims.Alive(sensor) ||
+            (ranges[row].x >= kVisibleFirstNm && ranges[row].y <= kVisibleLastNm)) {
+            continue;
+        }
+        for (uint32_t material = 0; material < prims.Size(); ++material) {
+            if (!prims.Alive(material) || !IsA(prims.Record(material).schema, SchemaId::Material) ||
+                m_spectral.contains(material) ||
+                !m_warned
+                     .emplace(m_structure.GetPaths().Path(material),
+                              m_structure.GetPaths().Path(sensor))
+                     .second) {
+                continue;
+            }
+            Log(LogLevel::Warning,
+                "{} has only RGB colours, but {} sees {} to {} nm, so it sees them extended by a "
+                "smooth spectrum; connect a SampledSpectrum for measured values",
+                m_structure.GetPaths().Path(material), m_structure.GetPaths().Path(sensor),
+                ranges[row].x, ranges[row].y);
+        }
+    }
+}
+
 void MaterialTable::Pack() {
     ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
@@ -763,6 +801,7 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     }
     m_records.Upload(device);
     Pack();
+    WarnOutsideVisible();
     m_nonVisuals.Reserve(device, store.Schema(SchemaId::NonVisualMaterialAPI).Capacity());
     m_checkers.Reserve(device, store.Schema(SchemaId::CheckerboardAPI).Capacity());
     const uint32_t prims = m_structure.GetPrims().Size();

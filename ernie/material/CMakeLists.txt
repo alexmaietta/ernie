@@ -4,6 +4,7 @@ ernie_object_library(
     codegen.cpp
     definition.cpp
     node.cpp
+    uplift.cpp
 )
 target_link_libraries(ernie_material PUBLIC ernie_util)
 

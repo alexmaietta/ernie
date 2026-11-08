@@ -26,7 +26,7 @@ class SpectralTable : public Table {
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        HoldBuffers(held, {m_rgb, m_bands, m_ranges, m_samples});
+        HoldBuffers(held, {m_rgb, m_bands, m_ranges, m_samples, m_sigmoids, m_sigmoidScales});
     }
 
   private:
@@ -35,6 +35,8 @@ class SpectralTable : public Table {
     Ref<device::Buffer> m_bands;
     Ref<device::Buffer> m_ranges;
     Ref<device::Buffer> m_samples;
+    Ref<device::Buffer> m_sigmoids;
+    Ref<device::Buffer> m_sigmoidScales;
     uint32_t m_count = 0;
     uint32_t m_detectors = 0;
 };

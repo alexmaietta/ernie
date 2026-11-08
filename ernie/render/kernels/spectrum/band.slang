@@ -11,8 +11,9 @@ static Ptr<DetectorRecord> gBandDetector;
 static uint gBandRow;
 static Ptr<RenderTables> gSpectra;
 
-void UseBands(Ptr<DetectorRecord> detector, uint row) {
-    gBandDetector = detector;
+void UseBands(Ptr<RenderTables> tables, uint row) {
+    gSpectra = tables;
+    gBandDetector = tables->detectors + row;
     gBandRow = row;
 }
 
@@ -53,10 +54,12 @@ struct BandSpectrum : ISpectrum {
 
     [Differentiable]
     static BandSpectrum FromRgb(float3 rgb) {
-        return BandSpectrum(rgb.x * no_diff FromRgbBands(0) + rgb.y * no_diff FromRgbBands(2) +
-                                rgb.z * no_diff FromRgbBands(4),
-                            rgb.x * no_diff FromRgbBands(1) + rgb.y * no_diff FromRgbBands(3) +
-                                rgb.z * no_diff FromRgbBands(5));
+        return BandSpectrum(max(rgb.x * no_diff FromRgbBands(0) + rgb.y * no_diff FromRgbBands(2) +
+                                    rgb.z * no_diff FromRgbBands(4),
+                                float4(0)),
+                            max(rgb.x * no_diff FromRgbBands(1) + rgb.y * no_diff FromRgbBands(3) +
+                                    rgb.z * no_diff FromRgbBands(5),
+                                float4(0)));
     }
 
     [Differentiable]

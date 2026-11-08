@@ -126,6 +126,29 @@ TEST(SpectraTest, SpectraColourTheImageAndFollowEachCamerasBands) {
     });
 }
 
+TEST(SpectraTest, RgbColoursGetASmoothTailBeyondTheVisibleAndWarnOnce) {
+    ForEachDevice([](Device& device) {
+        Wall wall = SpectralWall(device);
+        wall.product.Set(RenderProduct::kSpectralMode, SpectralMode::Bands);
+        wall.camera.Set(Camera::kDetectorSpectralRange, Float2{700, 1000});
+        Renderer renderer(wall.scene);
+        const test::CapturedLog log(LogLevel::Warning);
+        wall.surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0.5f, 0.5f, 0.5f});
+        const Float3 grey = Center(renderer);
+        wall.spectrum.Set(SampledSpectrum::kWavelengths, std::vector<float>{300, 1000});
+        wall.spectrum.Set(SampledSpectrum::kValues, std::vector<float>{0.5f, 0.5f});
+        wall.surface.Connect("diffuseColor", wall.spectrum, "spectrum");
+        EXPECT_NEAR(Center(renderer).x, grey.x, 0.02f * grey.x);
+        wall.surface.Disconnect("diffuseColor");
+        Center(renderer);
+        size_t warnings = 0;
+        for (const auto& [level, message] : log.Messages()) {
+            warnings += message.find("has only RGB colours") != std::string::npos ? 1 : 0;
+        }
+        EXPECT_EQ(warnings, 1u);
+    });
+}
+
 TEST(SpectraTest, NodeSpectralInputsTakeValuesAndSpectra) {
     const std::filesystem::path file = Scratch() / "ernie_render_spectra_node.slang";
     std::ofstream(file) << R"(

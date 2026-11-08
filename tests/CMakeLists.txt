@@ -62,6 +62,7 @@ ernie_test(
         ernie_material_internal
     SOURCES
         unit/material/utest_material_codegen.cpp
+        unit/material/utest_material_uplift.cpp
 )
 
 ernie_test(

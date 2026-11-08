@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 import ernie.device.kernels.device;
+import ernie.scene.tables.kernels.uplift;
 
 #include "ernie/scene/tables/kernels/sensors.h"
 
@@ -135,8 +136,12 @@ BandSet WriteBandSet(float first, float width) {
         float4 from[2];
         float4 to[2];
         for (uint band = 0; band < kDetectorBands; ++band) {
+            const float center = first + (float(band) + 0.5f) * width;
             const float sum = dot(basis[band], float3(1));
-            from[band / 4][band % 4] = sum > 0 ? basis[band][color] / sum : 1.0f / 3;
+            from[band / 4][band % 4] = center < kVisibleFirstNm || center > kVisibleLastNm
+                                           ? LinearUplift(center)[color]
+                                       : sum > 0 ? basis[band][color] / sum
+                                                 : 1.0f / 3;
             to[band / 4][band % 4] = totals[color] > 0 ? basis[band][color] / totals[color] : 0;
         }
         bands.fromRgb[2 * color] = Float4(from[0]);

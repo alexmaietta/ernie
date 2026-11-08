@@ -54,6 +54,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 352);
+ERNIE_CHECK_SIZE(RenderTables, 376);
 
 }
