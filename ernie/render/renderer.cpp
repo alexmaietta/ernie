@@ -107,52 +107,18 @@ bool Semantic(RenderVarSource source) {
            source == RenderVarSource::StableIdMap;
 }
 
-struct SensorShape {
-    Uint2 resolution;
-    uint32_t returns = 0;
-
-    bool operator==(const SensorShape&) const = default;
-};
-
-SensorShape LidarShape(const Prim& lidar, Uint2) {
-    const SensorShape shape{
-        {lidar.Get(Lidar::kFiringsPerScan), uint32_t(lidar.Get(Lidar::kEmitterElevations).size())},
-        lidar.Get(Lidar::kMaxReturns)};
-    if (shape.returns == 0 || shape.returns > kMostLidarReturns) {
-        throw Error("{} reports {} returns per beam, and lidars report 1 to {}", lidar.Path(),
-                    shape.returns, kMostLidarReturns);
-    }
-    if (shape.resolution.y == 0) {
-        throw Error("{} has no emitters", lidar.Path());
-    }
-    return shape;
-}
-
-constexpr ColumnRef kLidarInputs[] = {kLidarFiringsPerScan, kLidarEmitterElevations,
-                                      kLidarMaxReturns};
-constexpr ColumnRef kRadarInputs[] = {kRadarRays};
-
 struct SensorKind {
     SchemaId schema;
     std::optional<RenderEntry> entry;
     bool shades;
     bool returns;
     bool measuresVelocity;
-    SensorShape (*shape)(const Prim& sensor, Uint2 resolution);
-    std::span<const ColumnRef> inputs;
 };
 
 const SensorKind kSensorKinds[] = {
-    {SchemaId::Camera,
-     std::nullopt,
-     true,
-     false,
-     false,
-     [](const Prim&, Uint2 resolution) { return SensorShape{resolution}; },
-     {}},
-    {SchemaId::Lidar, RenderEntry::Lidar, false, true, false, LidarShape, kLidarInputs},
-    {SchemaId::Radar, RenderEntry::Radar, false, true, true,
-     [](const Prim& radar, Uint2) { return SensorShape{radar.Get(Radar::kRays)}; }, kRadarInputs},
+    {SchemaId::Camera, std::nullopt, true, false, false},
+    {SchemaId::Lidar, RenderEntry::Lidar, false, true, false},
+    {SchemaId::Radar, RenderEntry::Radar, false, true, true},
 };
 
 const SensorKind& FindSensorKind(SchemaId schema) {
@@ -221,13 +187,6 @@ RenderEntry SelectEntry(std::span<const RendererImpl::ProductVar> vars, RenderMo
     }
 }
 
-constexpr ColumnRef kProductInputs[] = {
-    kRenderProductCamera,      kRenderProductResolution,       kRenderProductOrderedVars,
-    kRenderVarSourceName,      kRenderProductSemanticTaxonomy, kRenderProductMissDistance,
-    kRenderProductRenderMode,  kRenderProductSpectralMode,     kMinimalAPIMode,
-    kSensorAPISensorFrameRate, kSensorAPISensorStartTime,      kRenderVarChannels,
-    kRenderVarFrameOfReference};
-
 constexpr const char* kRenderEntries[kRenderEntryCount] = {"RenderMinimalData",
                                                            "RenderMinimalDisplayColor",
                                                            "RenderMinimalTextureDiffuse",
@@ -270,9 +229,12 @@ RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
 RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt, Stream stream) {
     ERNIE_ZONE("Render/Step");
     const std::lock_guard stepping(m_stepMutex);
-    if (ProductsChanged()) {
-        ClearProducts();
+    device::Operation published;
+    const bool edited = m_scene->Pending();
+    if (edited) {
+        published = m_scene->Publish({}, stream);
     }
+    DropStaleProducts();
     std::map<std::string, std::vector<std::string>, std::less<>> shown;
     {
         const std::lock_guard lock(m_overlayMutex);
@@ -315,7 +277,9 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
     if (!plan.taxonomies.empty()) {
         m_scene->Require(plan.taxonomies);
     }
-    const device::Operation published = m_scene->Publish({}, stream);
+    if (!edited || m_scene->Pending()) {
+        published = m_scene->Publish({}, stream);
+    }
     const Snapshot snapshot = m_scene->Acquire();
     if (!plan.taxonomies.empty()) {
         UpdateMaps();
@@ -384,26 +348,25 @@ bool RendererImpl::Due(const std::string& path, const Product& product, double d
     return true;
 }
 
-bool RendererImpl::ProductsChanged() {
-    SceneImpl& impl = SceneImpl::Get(*m_scene);
-    std::vector<uint64_t> writes;
-    for (const ColumnRef column : kProductInputs) {
-        writes.push_back(impl.GetStore().LastWrite(column));
-    }
-    for (const SensorKind& kind : kSensorKinds) {
-        for (const ColumnRef column : kind.inputs) {
-            writes.push_back(impl.GetStore().LastWrite(column));
+void RendererImpl::DropStaleProducts() {
+    const Products& resolved = SceneImpl::Get(*m_scene).GetProducts();
+    std::vector<std::string> stale;
+    for (const auto& [path, product] : m_products) {
+        const ResolvedProduct* current = resolved.Find(product.prim);
+        if (current == nullptr || current->version != product.version) {
+            stale.push_back(path);
         }
     }
-    const uint64_t epoch = impl.GetCatalog().Epoch();
-    const bool changed = epoch != m_epoch || writes != m_productWrites;
-    if (changed && m_epoch != ~uint64_t(0)) {
-        Log(LogLevel::Debug, "the scene's structure or a render product changed, so products are "
-                             "prepared again");
+    if (stale.empty()) {
+        return;
     }
-    m_epoch = epoch;
-    m_productWrites = std::move(writes);
-    return changed;
+    Log(LogLevel::Debug, "{} changed, so {} prepared again", Counted(stale.size(), "product"),
+        stale.size() == 1 ? "it's" : "they're");
+    for (const std::string& path : stale) {
+        m_products.erase(path);
+        std::erase_if(m_plans, [&](const StepPlan& plan) { return plan.products.contains(path); });
+    }
+    m_plan = nullptr;
 }
 
 RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> products) {
@@ -483,64 +446,34 @@ RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
         return found->second;
     }
     ERNIE_ZONE("Render/PrepareProduct");
-    Scene& scene = *m_scene;
-    const Prims& prims = SceneImpl::Get(scene).GetCatalog().GetPrims();
-    const std::optional<Prim> prim = scene.Find(path);
+    const std::optional<Prim> prim = m_scene->Find(path);
     if (!prim || !prim->IsA<RenderProduct>()) {
         throw Error("\"{}\" isn't a RenderProduct", path);
     }
-    const View view = scene.Select(*prim);
-    const auto targets = [&](ColumnRef column, SchemaId schema) {
-        const std::vector<uint32_t> found = view.GetArray<uint32_t>(column).Get(0);
-        for (const uint32_t target : found) {
-            if (!prims.Alive(target) || !IsA(prims.At(target).schema, schema)) {
-                throw Error("{}'s {} targets prim {}, which isn't a {}", path, column.column->field,
-                            target, Info(schema).name);
-            }
-        }
-        return found;
-    };
+    const ResolvedProduct* resolved = SceneImpl::Get(*m_scene).GetProducts().Find(prim->Index());
+    if (resolved == nullptr) {
+        throw Error("{} isn't published yet", path);
+    }
+    if (!resolved->error.empty()) {
+        throw Error("{}", resolved->error);
+    }
+    const ProductRecord& record = resolved->record;
+    const SensorKind& kind = FindSensorKind(SchemaId(record.sensorSchema));
 
     Product product;
-    product.prim = prim->Index();
-    product.sensors = targets(kRenderProductCamera, SchemaId::Sensor);
-    if (product.sensors.empty()) {
-        throw Error("{} renders no sensor", path);
-    }
-    const Prim lead = scene.At(product.sensors.front());
-    const SensorKind& kind = FindSensorKind(prims.At(lead.Index()).schema);
+    product.prim = resolved->prim;
+    product.version = resolved->version;
+    product.sensors = resolved->sensors;
     product.sensor = kind.schema;
-    const Uint2 resolution = prim->Get(RenderProduct::kResolution);
-    const SensorShape shape = kind.shape(lead, resolution);
-    product.frameRate = lead.Get(SensorAPI::kSensorFrameRate);
-    product.startTime = lead.Get(SensorAPI::kSensorStartTime);
-    for (const uint32_t sensor : product.sensors) {
-        const Prim each = scene.At(sensor);
-        if (prims.At(sensor).schema != prims.At(lead.Index()).schema) {
-            throw Error("{} stacks {} and {}, which are different kinds of sensor", path,
-                        lead.Path(), each.Path());
-        }
-        if (each.Get(SensorAPI::kSensorFrameRate) != product.frameRate ||
-            each.Get(SensorAPI::kSensorStartTime) != product.startTime) {
-            throw Error("{} stacks {} and {}, which capture at different times", path, lead.Path(),
-                        each.Path());
-        }
-        if (kind.shape(each, resolution) != shape) {
-            throw Error("{} stacks {} and {}, which have different shapes", path, lead.Path(),
-                        each.Path());
-        }
-    }
-    product.resolution = shape.resolution;
-    product.returns = shape.returns;
-    if (product.resolution.x == 0 || product.resolution.y == 0) {
-        throw Error("{} has a resolution of {} x {}", path, product.resolution.x,
-                    product.resolution.y);
-    }
-    product.taxonomy = view.Get<Token>(kRenderProductSemanticTaxonomy).Get().front();
-    product.missDistance = prim->Get(RenderProduct::kMissDistance);
+    product.resolution = {record.width, record.height};
+    product.returns = record.returns;
+    product.frameRate = record.frameRate;
+    product.startTime = record.startTime;
+    product.taxonomy = resolved->taxonomy;
+    product.missDistance = record.missDistance;
 
     std::string sources;
-    for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
+    for (const ResolvedVar& var : resolved->vars) {
         const ProductVar& added = product.vars.emplace_back(PrepareVar(var, product));
         sources += (sources.empty() ? "" : ", ") + added.output.sourceName;
         product.semantic |= Semantic(added.source);
@@ -556,9 +489,9 @@ RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
         }
     }
     product.entry = kind.entry ? *kind.entry
-                               : SelectEntry(product.vars, prim->Get(RenderProduct::kRenderMode),
-                                             prim->Get(RenderProduct::kMode),
-                                             prim->Get(RenderProduct::kSpectralMode));
+                               : SelectEntry(product.vars, RenderMode(record.renderMode),
+                                             MinimalMode(record.minimalMode),
+                                             SpectralMode(record.spectralMode));
 
     Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
         Counted(product.sensors.size(), "sensor"), product.resolution.x, product.resolution.y,
@@ -567,25 +500,19 @@ RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
     return m_products.emplace(path, std::move(product)).first->second;
 }
 
-RendererImpl::ProductVar RendererImpl::PrepareVar(uint32_t var, const Product& product) {
-    Scene& scene = *m_scene;
-    const Prim prim = scene.At(var);
-    const RenderVarSource source = prim.Get(RenderVar::kSourceName);
-    RenderVarOutput output{prim.Path(), std::string(kRenderVarSourceTokens[uint32_t(source)]), {}};
+RendererImpl::ProductVar RendererImpl::PrepareVar(const ResolvedVar& var, const Product& product) {
+    const RenderVarSource source = var.source;
+    RenderVarOutput output{var.path, std::string(kRenderVarSourceTokens[uint32_t(source)]), {}};
     if (source == RenderVarSource::PointCloud) {
-        std::vector<std::string> channels = prim.Get(RenderVar::kChannels);
+        std::vector<std::string> channels = var.channels;
         if (channels.empty()) {
             channels = {"Coordinates", "Intensity"};
         }
         for (const std::string& channel : channels) {
             FindPointChannel(channel);
         }
-        return {source,
-                std::move(output),
-                device::DType::UInt8,
-                {},
-                std::move(channels),
-                prim.Get(RenderVar::kFrameOfReference) == FrameOfReference::World};
+        return {source, std::move(output),   device::DType::UInt8,
+                {},     std::move(channels), var.frame == FrameOfReference::World};
     }
     if (!PerPixel(source)) {
         return {source, std::move(output)};
@@ -601,12 +528,6 @@ RendererImpl::ProductVar RendererImpl::PrepareVar(uint32_t var, const Product& p
         shape.push_back(format.channels);
     }
     return {source, std::move(output), format.type, std::move(shape)};
-}
-
-void RendererImpl::ClearProducts() {
-    m_products.clear();
-    m_plans.clear();
-    m_plan = nullptr;
 }
 
 void RendererImpl::UpdateMaps() {

@@ -31,15 +31,13 @@ struct MinimalLighting {
     bool hemispheric;
 
     static MinimalLighting Load(HitQuery query, uint row, LightLayout* lights) {
-        SceneData* scene = query.scene;
-        MinimalAPIData* minimal = &scene->schemas.minimalAPI;
+        ProductRecord* product = &query.tables->products[row];
         MinimalLighting lighting;
-        lighting.castShadows = minimal.castShadows[row] != 0;
-        lighting.shadowVisibility = minimal.shadowVisibility[row];
-        const float intensity = minimal.ambientLightIntensity[row];
-        lighting.ambient = minimal.ambientLightColor[row].Vector() * intensity;
-        lighting.ground = minimal.ambientGroundColor[row].Vector() * intensity;
-        lighting.hemispheric = minimal.ambientHemispheric[row] != 0;
+        lighting.castShadows = product.castShadows != 0;
+        lighting.shadowVisibility = product.shadowVisibility;
+        lighting.ambient = product.ambient.Vector();
+        lighting.ground = product.ground.Vector();
+        lighting.hemispheric = product.hemispheric != 0;
         lighting.headlight = true;
         lighting.light = DistantLight<RgbSpectrum>(
             float3(0, 0, 1), RgbSpectrum.Constant(kHeadlightIrradiance), 1, 1);
@@ -49,7 +47,7 @@ struct MinimalLighting {
             const LightRecord record = lights->records[i];
             if (LightType(record.type) == LightType::Distant) {
                 const DistantLight<RgbSpectrum> sun = DistantLight<RgbSpectrum>.Load(
-                    LightContext(scene, lights, query.tlas), record);
+                    LightContext(query.scene, lights, query.tlas), record);
                 const float spread = sun.spread > 0 ? sun.SolidAngle() : 1;
                 lighting.light = DistantLight<RgbSpectrum>(
                     sun.direction, sun.radiance.Scale(spread), sun.diffuse, sun.specular);
@@ -97,7 +95,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
         const uint product = context.capture->product;
         MinimalIntegrator<Mode> integrator;
         integrator.query = context.query;
-        integrator.row = ApiRow(context.query.scene, product, kApiMinimalAPI);
+        integrator.row = PrimRow(context.query.tables, product, kSlotRenderProduct);
         integrator.product = product;
         integrator.lights = context.params.tables->lights;
         return integrator;

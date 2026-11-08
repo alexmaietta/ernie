@@ -20,10 +20,8 @@ struct MaterialQuery {
     }
 
     static MaterialQuery Load(HitQuery hit, uint product) {
-        RenderProductData* products = &hit.scene->schemas.renderProduct;
-        const uint row = PrimRow(hit.scene, product, kSlotRenderProduct);
-        return MaterialQuery(hit, products.textureLodBias[row],
-                             uint(max(products.maxAnisotropy[row], 1)));
+        ProductRecord* record = &hit.tables->products[PrimRow(hit.tables, product, kSlotRenderProduct)];
+        return MaterialQuery(hit, record.textureLodBias, record.maxAnisotropy);
     }
 
     uint BoundMaterial(uint prim) {

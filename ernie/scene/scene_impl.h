@@ -19,6 +19,7 @@
 #include "ernie/scene/systems/hierarchy.h"
 #include "ernie/scene/systems/instances.h"
 #include "ernie/scene/systems/lights.h"
+#include "ernie/scene/systems/products.h"
 #include "ernie/scene/systems/readback.h"
 #include "ernie/scene/systems/semantics.h"
 #include "ernie/scene/systems/sensors.h"
@@ -142,6 +143,10 @@ class SceneImpl {
         return m_surfaces;
     }
 
+    Products& GetProducts() {
+        return m_products;
+    }
+
     Readback& GetReadback() {
         return m_readback;
     }
@@ -172,6 +177,7 @@ class SceneImpl {
     Textures m_textures;
     Semantics m_semantics;
     Sensors m_sensors;
+    Products m_products;
     Instances m_instances;
     Surfaces m_surfaces;
     Lights m_lights;

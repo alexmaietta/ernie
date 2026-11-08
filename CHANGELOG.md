@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Normal` render var is the surface normal from the geometry, interpolated from its normals before materials and normal maps, in every render mode. Real-time products used to report the normal-mapped normal, and products without color outputs didn't.
 - The `Normal` render var has three float channels instead of four. Misses write a zero normal in place of the old fourth channel, and `ColorizeNormals` shows them as transparent.
 - Every TLAS is placed relative to a render origin that follows the first sensor a render product points at, so geometry near a camera stays precise up to solar system distances.
+- Render products are resolved by the scene when it publishes. Editing prims that a product doesn't read, or adding and removing them, no longer prepares every product again or reallocates their outputs. Only products whose settings, vars or sensors changed are prepared again.
 - Editing display colors, primvars or authored normals no longer rewrites instance records, and only rewrites the surfaces of the worlds that show the edited prims.
 
 ### Removed

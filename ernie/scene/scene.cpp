@@ -150,7 +150,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_builder(bvh::Builder::Create(device, desc.traversal)), m_hierarchy(m_catalog),
       m_geometry(m_catalog, *m_builder), m_bounds(m_catalog, m_instances),
       m_tangents(m_catalog, m_geometry), m_textures(m_catalog, desc.textureThreads),
-      m_semantics(m_catalog), m_sensors(m_catalog),
+      m_semantics(m_catalog), m_sensors(m_catalog), m_products(scene, m_catalog),
       m_instances(m_catalog, *m_builder, desc.maxRefits), m_surfaces(m_catalog, m_instances),
       m_lights(m_catalog, m_instances), m_readback(device) {
     m_timeline.Add(m_hierarchy);
@@ -159,6 +159,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
     m_timeline.Add(m_textures);
     m_timeline.Add(m_semantics);
     m_timeline.Add(m_sensors);
+    m_timeline.Add(m_products);
     m_timeline.Add(m_instances);
     m_timeline.Add(m_surfaces);
     m_timeline.Add(m_bounds);

@@ -12,22 +12,15 @@ struct Background {
     float3 fallback;
 
     static Background Load(SceneData* scene, RenderTables* tables, uint product) {
-        BackgroundAPIData* data = &scene->schemas.backgroundAPI;
-        const uint row = ApiRow(scene, product, kApiBackgroundAPI);
-        const ArrayRef targets = data.background[row];
-
+        ProductRecord* record = &tables->products[PrimRow(tables, product, kSlotRenderProduct)];
         Background background;
         background.scene = scene;
         background.prim = kNoPrim;
         background.kind = SchemaId::None;
-        background.fallback = data.backgroundColor[row].Vector();
-
-        if (targets.count > 0) {
-            const uint prim = Ptr<uint>(targets.address)[0];
-            if (PrimAlive(tables, prim)) {
-                background.prim = prim;
-                background.kind = PrimSchema(tables, prim);
-            }
+        background.fallback = record.backgroundColor.Vector();
+        if (PrimAlive(tables, record.background)) {
+            background.prim = record.background;
+            background.kind = PrimSchema(tables, record.background);
         }
         return background;
     }

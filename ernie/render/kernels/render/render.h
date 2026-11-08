@@ -29,8 +29,6 @@ struct Capture {
 
 ERNIE_CHECK_SIZE(Capture, 184);
 
-static const uint kMostLidarReturns = 4;
-
 struct PointRecord {
     float x;
     float y;

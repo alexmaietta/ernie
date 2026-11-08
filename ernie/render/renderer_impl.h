@@ -21,6 +21,7 @@
 #include "ernie/render/overlay/overlay_impl.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/systems/products.h"
 
 namespace ernie {
 
@@ -71,6 +72,7 @@ class RendererImpl {
         float startTime = 0;
         bool semantic = false;
         uint32_t mapVersion = ~0u;
+        uint64_t version = 0;
         RenderEntry entry = RenderEntry::MinimalData;
         std::vector<ProductVar> vars;
     };
@@ -129,11 +131,10 @@ class RendererImpl {
         std::vector<OutputSet> sets;
     };
 
-    bool ProductsChanged();
+    void DropStaleProducts();
     StepPlan& PlanProducts(std::span<const std::string> products);
     Product& PrepareProduct(const std::string& path);
-    ProductVar PrepareVar(uint32_t var, const Product& product);
-    void ClearProducts();
+    ProductVar PrepareVar(const ResolvedVar& var, const Product& product);
     void UpdateMaps();
     bool Due(const std::string& path, const Product& product, double dt);
 
@@ -157,8 +158,6 @@ class RendererImpl {
     Ref<device::Program> m_renderProgram;
 
     double m_time = 0;
-    uint64_t m_epoch = ~uint64_t(0);
-    std::vector<uint64_t> m_productWrites;
     std::map<std::string, Product> m_products;
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;

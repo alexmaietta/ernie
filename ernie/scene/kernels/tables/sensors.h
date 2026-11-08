@@ -5,6 +5,8 @@
 
 namespace ernie {
 
+static const uint kMostLidarReturns = 4;
+
 struct CameraRecord {
     Float2 aperture;
     Float2 offset;

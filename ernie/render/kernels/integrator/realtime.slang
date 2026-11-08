@@ -71,13 +71,13 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
     LightLayout* lights;
 
     static RealTimeIntegrator<S> Load(SensorContext context) {
-        SceneData* scene = context.query.scene;
+        RenderTables* tables = context.query.tables;
         const uint product = context.capture->product;
-        const uint row = ApiRow(scene, product, kApiRealTimeAPI);
+        const uint row = PrimRow(tables, product, kSlotRenderProduct);
         RealTimeIntegrator<S> integrator;
         integrator.query = context.query;
         integrator.materials = MaterialQuery.Load(context.query, product);
-        integrator.bounces = uint(max(scene->schemas.realTimeAPI.maxBounces[row], 0));
+        integrator.bounces = tables->products[row].maxBounces;
         integrator.lights = context.params.tables->lights;
         return integrator;
     }
