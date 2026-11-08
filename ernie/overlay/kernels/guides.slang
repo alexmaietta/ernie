@@ -4,6 +4,17 @@ __exported import ernie.overlay.kernels.shapes;
 
 using namespace ernie;
 
+bool WorldShown(InstanceLayout* layout, uint view, uint world) {
+    if (world == view || world == kGlobalWorld) {
+        return true;
+    }
+    if (view >= layout->worldCount || world >= layout->worldCount) {
+        return false;
+    }
+    const uint base = layout->offsetBases[view];
+    return base != kNoRow && !isnan(layout->offsets[base + world].x);
+}
+
 struct Lens {
     float2 aperture;
     float2 offset;

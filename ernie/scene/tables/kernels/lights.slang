@@ -8,6 +8,31 @@ import ernie.texture.kernels.texture;
 
 using namespace ernie;
 
+float3 TemperatureRgb(Ptr<Float3> spectra, float kelvin, bool daylight) {
+    const float at =
+        clamp(1e6f / max(kelvin, 1.0f) / kMaxMired, 0.0f, 1.0f) * (kTemperatureRows - 1);
+    const uint row =
+        (daylight ? kDaylightRow : kBlackbodyRow) + min(uint(at), kTemperatureRows - 2);
+    return lerp(spectra[row].Vector(), spectra[row + 1].Vector(), at - floor(at));
+}
+
+float3 XyzToLinearSrgb(float3 xyz) {
+    return float3(3.2404542f * xyz.x - 1.5371385f * xyz.y - 0.4985314f * xyz.z,
+                  -0.9692660f * xyz.x + 1.8760108f * xyz.y + 0.0415560f * xyz.z,
+                  0.0556434f * xyz.x - 0.2040259f * xyz.y + 1.0572252f * xyz.z);
+}
+
+float LinearSrgbLuminance(float3 rgb) {
+    return dot(rgb, float3(0.2126729f, 0.7151522f, 0.0721750f));
+}
+
+float3 EmissionDirection(LightRecord light, float polar, float around) {
+    const float3 forward = ForwardAxis(light);
+    const float3 across = EmissionAcross(light);
+    const float3 third = cross(forward, across);
+    return cos(polar) * forward + sin(polar) * (cos(around) * across + sin(around) * third);
+}
+
 static const uint kShapingSteps = 64;
 static const uint kIesSteps = 32;
 

@@ -12,6 +12,30 @@ import ernie.render.kernels.basis;
 
 using namespace ernie;
 
+struct ChosenLight {
+    uint index;
+    float probability;
+};
+
+ChosenLight ChooseLight(LightLayout* lights, uint tlas, float u) {
+    const uint first = lights->firstLights[tlas];
+    const uint last = lights->firstLights[tlas + 1];
+    uint low = first;
+    uint high = last - 1;
+    while (low < high) {
+        const uint middle = (low + high) / 2;
+        if (lights->cdf[middle] < u) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    ChosenLight chosen;
+    chosen.index = low;
+    chosen.probability = lights->cdf[low] - (low > first ? lights->cdf[low - 1] : 0.0f);
+    return chosen;
+}
+
 static const uint kMaxPassThroughs = 16;
 
 struct PathVertex<Spectrum : ISpectrum> {

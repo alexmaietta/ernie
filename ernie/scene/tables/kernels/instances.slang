@@ -6,6 +6,15 @@ import ernie.device.kernels.device;
 
 using namespace ernie;
 
+RenderOrigin SnapOrigin(WorldTransform w) {
+    const float3 high = round(w.high.Vector() / kRenderOriginCell) * kRenderOriginCell;
+    const float3 rest = (w.high.Vector() - high) + w.low.Vector();
+    RenderOrigin origin;
+    origin.high = Float3(high);
+    origin.low = Float3(round(rest / kRenderOriginCell) * kRenderOriginCell);
+    return origin;
+}
+
 InstanceRecord Inactive(uint local) {
     InstanceRecord instance;
     instance.transform = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };

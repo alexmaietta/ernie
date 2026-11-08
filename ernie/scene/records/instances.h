@@ -173,28 +173,8 @@ float3 ShownOffset(InstanceLayout* layout, uint view, uint world) {
     return isnan(offset.x) ? float3(0) : offset;
 }
 
-bool WorldShown(InstanceLayout* layout, uint view, uint world) {
-    if (world == view || world == kGlobalWorld) {
-        return true;
-    }
-    if (view >= layout->worldCount || world >= layout->worldCount) {
-        return false;
-    }
-    const uint base = layout->offsetBases[view];
-    return base != kNoRow && !isnan(layout->offsets[base + world].x);
-}
-
 float3 RelativeTranslation(RenderOrigin origin, WorldTransform w) {
     return (w.high.Vector() - origin.high.Vector()) + (w.low.Vector() - origin.low.Vector());
-}
-
-RenderOrigin SnapOrigin(WorldTransform w) {
-    const float3 high = round(w.high.Vector() / kRenderOriginCell) * kRenderOriginCell;
-    const float3 rest = (w.high.Vector() - high) + w.low.Vector();
-    RenderOrigin origin;
-    origin.high = Float3(high);
-    origin.low = Float3(round(rest / kRenderOriginCell) * kRenderOriginCell);
-    return origin;
 }
 
 #endif

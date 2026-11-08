@@ -7,6 +7,80 @@ import ernie.texture.kernels.texture;
 
 using namespace ernie;
 
+float3 DomeNative(LightRecord light, float3 direction) {
+    return float3(dot(direction, light.axisX.Vector()), dot(direction, light.axisY.Vector()),
+                  dot(direction, light.axisZ.Vector()));
+}
+
+float3 DomeWorld(LightRecord light, float3 native) {
+    return native.x * light.axisX.Vector() + native.y * light.axisY.Vector() +
+           native.z * light.axisZ.Vector();
+}
+
+float2 DomeMapUv(float3 n) {
+    const float u = atan2(n.z, n.x) / (2 * kPi);
+    return float2(u - floor(u), acos(clamp(n.y, -1.0f, 1.0f)) / kPi);
+}
+
+uint SearchCdf(Ptr<float> cdf, uint count, float u) {
+    uint low = 0;
+    uint high = count - 1;
+    while (low < high) {
+        const uint middle = (low + high) / 2;
+        if (cdf[middle] < u) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+
+struct DomeMapSample {
+    float3 direction;
+    float pdf;
+
+}
+
+float DomeMapDensity(float rowProbability, float columnProbability, float v) {
+
+    const float sine = sin(kPi * v);
+    if (sine <= 0) {
+        return 0;
+    }
+    return rowProbability * columnProbability * kDomeMapCells / (2 * kPi * kPi * sine);
+}
+
+DomeMapSample SampleDomeMap(Ptr<float> map, float2 u) {
+    Ptr<float> marginal = map + kDomeMapCells;
+    const uint row = SearchCdf(marginal, kDomeMapHeight, u.x);
+    const float rowLow = row > 0 ? marginal[row - 1] : 0.0f;
+    const float rowProbability = marginal[row] - rowLow;
+    Ptr<float> conditional = map + row * kDomeMapWidth;
+    const uint column = SearchCdf(conditional, kDomeMapWidth, u.y);
+    const float columnLow = column > 0 ? conditional[column - 1] : 0.0f;
+    const float columnProbability = conditional[column] - columnLow;
+    const float y = rowProbability > 0 ? saturate((u.x - rowLow) / rowProbability) : 0.5f;
+    const float x = columnProbability > 0 ? saturate((u.y - columnLow) / columnProbability) : 0.5f;
+    const float2 uv = float2((column + x) / kDomeMapWidth, (row + y) / kDomeMapHeight);
+    DomeMapSample sample;
+    sample.direction = DomeMapDirection(uv);
+    sample.pdf = DomeMapDensity(rowProbability, columnProbability, uv.y);
+    return sample;
+}
+
+float DomeMapPdf(Ptr<float> map, float3 n) {
+    const float2 uv = DomeMapUv(n);
+    const uint column = min(uint(uv.x * kDomeMapWidth), kDomeMapWidth - 1);
+    const uint row = min(uint(uv.y * kDomeMapHeight), kDomeMapHeight - 1);
+    Ptr<float> marginal = map + kDomeMapCells;
+    Ptr<float> conditional = map + row * kDomeMapWidth;
+    const float rowProbability = marginal[row] - (row > 0 ? marginal[row - 1] : 0.0f);
+    const float columnProbability =
+        conditional[column] - (column > 0 ? conditional[column - 1] : 0.0f);
+    return DomeMapDensity(rowProbability, columnProbability, uv.y);
+}
+
 struct DomeLight<Spectrum : ISpectrum> : ILight<Spectrum> {
     no_diff LightRecord record;
     no_diff LightContext context;
