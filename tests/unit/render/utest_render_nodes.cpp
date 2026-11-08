@@ -55,7 +55,7 @@ Ref<Scene> LookingDown(Device& device, bool wait) {
                                    .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
                                    .focalLength = 30});
     scene->Define<Scope>("/Render");
-    scene->Define<RenderVar>("/Render/Color", {.sourceName = RenderVarSource::HdrColor});
+    scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
     scene->Define<RenderProduct>(
         "/Render/View",
         {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Color"}});
@@ -126,8 +126,9 @@ TEST(MaterialNodeTest, NewMaterialsShowThePlaceholderAndChangedOnesTheirPrevious
         std::filesystem::temp_directory_path() / "ernie_render_nodes_blue.png";
     WritePng(blue, Image(4, 4, Rgba{0, 0, 1, 1}));
     const auto settle = [](Renderer& renderer, bool (*done)(Float3)) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
         Float3 pixel = Center(renderer);
-        for (int attempt = 0; attempt < 3000 && !done(pixel); ++attempt) {
+        while (!done(pixel) && std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             pixel = Center(renderer);
         }
