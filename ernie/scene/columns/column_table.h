@@ -12,7 +12,7 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/device_heap.h"
 
 namespace ernie {
 
@@ -23,7 +23,7 @@ struct TableColumn {
 
 class ColumnTable {
   public:
-    ColumnTable(Heap& heap, std::string label, std::vector<TableColumn> columns);
+    ColumnTable(DeviceHeap& heap, std::string label, std::vector<TableColumn> columns);
 
     const std::string& Label() const {
         return m_label;
@@ -93,7 +93,7 @@ class ColumnTable {
     void Grow(uint32_t count);
     void WritePages(uint32_t firstPage, uint32_t pageCount);
 
-    Heap& m_heap;
+    DeviceHeap& m_heap;
     std::string m_label;
     std::vector<TableColumn> m_columns;
     std::vector<Span> m_spans;

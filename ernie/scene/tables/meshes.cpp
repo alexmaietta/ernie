@@ -127,7 +127,7 @@ void MeshTable::Triangulate() {
     std::vector<uint32_t> counted(jobs.size() * 2);
     queue.Read(sizes->Slice(0, counted.size() * 4), counted.data());
 
-    ArrayHeap& ints = store.Arrays(ColumnType::IntArray);
+    ArrayPool& ints = store.Arrays(ColumnType::IntArray);
     std::vector<TopologyJob> emitted;
     uint32_t corners = 0;
     uint32_t points = 0;
@@ -203,7 +203,7 @@ void MeshTable::Prune() {
     }
     m_stale = false;
     ColumnStore& store = m_structure.GetColumnStore();
-    ArrayHeap& ints = store.Arrays(ColumnType::IntArray);
+    ArrayPool& ints = store.Arrays(ColumnType::IntArray);
     std::erase_if(m_shapes, [&](const auto& entry) {
         if (entry.second.users > 0) {
             return false;
@@ -240,7 +240,7 @@ void MeshTable::Settle() {
             Shape& shape = entry->second;
             if (fresh) {
                 const ArrayRef points = store.Array(kPointBasedPoints, mesh.pointsRow);
-                ArrayHeap& float3s = store.Arrays(ColumnType::Float3Array);
+                ArrayPool& float3s = store.Arrays(ColumnType::Float3Array);
                 shape.pointCount = points.count;
                 shape.normals = float3s.Allocate(points.count);
                 shape.bounds = float3s.Allocate(2);

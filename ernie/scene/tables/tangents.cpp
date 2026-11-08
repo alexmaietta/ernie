@@ -199,8 +199,8 @@ void TangentTable::Compute(const Mesh& mesh, const Key& key, Set& set) {
     if (points.count == 0 || indices.count == 0 || counts.count == 0 || table.count == 0) {
         return;
     }
-    ArrayHeap& ints = store.Arrays(ColumnType::IntArray);
-    ArrayHeap& float3s = store.Arrays(ColumnType::Float3Array);
+    ArrayPool& ints = store.Arrays(ColumnType::IntArray);
+    ArrayPool& float3s = store.Arrays(ColumnType::Float3Array);
     const std::vector<Primvar> primvars =
         UnpackPrimvars(m_structure.GetTokens(), Items<int32_t>(ints.Read(table)));
     const auto st = std::ranges::find_if(primvars, [](const Primvar& primvar) {
@@ -233,7 +233,7 @@ void TangentTable::Compute(const Mesh& mesh, const Key& key, Set& set) {
         return;
     }
     device::Device& device = store.GetDevice();
-    ArrayHeap& words = store.Arrays(ColumnType::IntArray);
+    ArrayPool& words = store.Arrays(ColumnType::IntArray);
     set.words = uint32_t(tangents.size() * 4);
     set.tangents = words.Allocate(set.words);
     words.Write(set.tangents, std::as_bytes(std::span(tangents)));
@@ -359,7 +359,7 @@ void TangentTable::Prune() {
         return;
     }
     m_stale = false;
-    ArrayHeap& words = m_structure.GetColumnStore().Arrays(ColumnType::IntArray);
+    ArrayPool& words = m_structure.GetColumnStore().Arrays(ColumnType::IntArray);
     std::erase_if(m_sets, [&](const auto& entry) {
         if (entry.second.users > 0) {
             return false;

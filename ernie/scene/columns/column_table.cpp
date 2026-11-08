@@ -23,7 +23,7 @@ constexpr uint64_t kSpanAlignment = 256;
 
 }
 
-ColumnTable::ColumnTable(Heap& heap, std::string label, std::vector<TableColumn> columns)
+ColumnTable::ColumnTable(DeviceHeap& heap, std::string label, std::vector<TableColumn> columns)
     : m_heap(heap), m_label(std::move(label)), m_columns(std::move(columns)),
       m_pages(m_columns.size()), m_staged(m_columns.size()), m_redirections(m_columns.size()) {
     for (const TableColumn& column : m_columns) {

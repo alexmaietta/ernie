@@ -189,7 +189,7 @@ TEST(InstancesTest, ANewBlasMarksOnlyItsWorld) {
         const uint32_t clone = s.structure.Find("/Env2/Quad");
         EXPECT_EQ(s.Record(clone, 2).blas, s.Record(quad, 0).blas);
 
-        ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
+        ArrayPool& float3s = s.store.Arrays(ColumnType::Float3Array);
         const ArrayRef own = float3s.Allocate(4);
         float3s.Write(own, std::as_bytes(std::span(kQuad)));
         s.store.SetArray(kPointBasedPoints, s.structure.GetPrims().Row(clone, SchemaId::PointBased),

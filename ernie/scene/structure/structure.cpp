@@ -59,7 +59,7 @@ void RowWriter::SetArray(ColumnRef column, std::span<const std::byte> bytes, uin
         return;
     }
     ColumnStore& store = m_structure.m_store;
-    ArrayHeap& arrays = store.Arrays(column.column->type);
+    ArrayPool& arrays = store.Arrays(column.column->type);
     if (bytes.size() != size_t(count) * arrays.ItemBytes()) {
         throw Error("{} bytes for {} items of {}'s {}, whose items are {} bytes", bytes.size(),
                     count, Info(column.schema).name, column.column->field, arrays.ItemBytes());
@@ -495,7 +495,7 @@ void Structure::SetTargets(uint32_t prim, uint32_t row, ColumnRef column,
     });
     const std::vector<uint32_t> targets = ResolveTargets(paths);
     MarkTargets(targets);
-    ArrayHeap& arrays = m_store.Arrays(column.column->type);
+    ArrayPool& arrays = m_store.Arrays(column.column->type);
     const ArrayRef array = arrays.Allocate(uint32_t(targets.size()));
     arrays.Write(array, std::as_bytes(std::span(targets)));
     m_store.SetArray(column, row, array);
@@ -528,7 +528,7 @@ void Structure::ResolvePending(std::span<const std::string> defined) {
         }
         const std::vector<uint32_t> targets = ResolveTargets(pending.paths);
         MarkTargets(targets);
-        ArrayHeap& arrays = m_store.Arrays(pending.column.column->type);
+        ArrayPool& arrays = m_store.Arrays(pending.column.column->type);
         const ArrayRef array = arrays.Allocate(uint32_t(targets.size()));
         arrays.Write(array, std::as_bytes(std::span(targets)));
         m_store.SetArray(pending.column, pending.row, array);
@@ -672,7 +672,7 @@ void Structure::CloneTableArrays(SchemaId table, std::span<const uint32_t> rows,
         if (!IsArray(column.column->type)) {
             continue;
         }
-        ArrayHeap& arrays = m_store.Arrays(column.column->type);
+        ArrayPool& arrays = m_store.Arrays(column.column->type);
         for (uint32_t j = 0; j < rows.size(); ++j) {
             const ArrayRef array = m_store.Array(column, rows[j]);
             if (array.address == 0) {

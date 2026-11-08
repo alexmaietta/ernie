@@ -11,10 +11,10 @@
 #include "ernie/device/device.h"
 #include "ernie/device/program.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/columns/array_heap.h"
+#include "ernie/scene/columns/array_pool.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/columns/column_table.h"
-#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/device_heap.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/schema/columns.h"
@@ -70,9 +70,9 @@ std::vector<uint32_t> Gather(device::Device& device, uint64_t pages, std::span<c
     return out;
 }
 
-TEST(HeapTest, FreedBlocksComeBackOnlyWhenAligned) {
+TEST(DeviceHeapTest, FreedBlocksComeBackOnlyWhenAligned) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         const HeapBlock first = heap.Allocate(16, 16);
         const HeapBlock odd = heap.Allocate(256, 16);
         ASSERT_NE(odd.offset % 256, 0u);
@@ -87,9 +87,9 @@ TEST(HeapTest, FreedBlocksComeBackOnlyWhenAligned) {
     });
 }
 
-TEST(HeapTest, ZeroBytesAllocateNothing) {
+TEST(DeviceHeapTest, ZeroBytesAllocateNothing) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         EXPECT_FALSE(heap.Allocate(0, 16));
         EXPECT_EQ(heap.Bytes(), 0u);
     });
@@ -97,7 +97,7 @@ TEST(HeapTest, ZeroBytesAllocateNothing) {
 
 TEST(TableTest, FreshRowsHoldTheirColumnsFill) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}, {4, 0xFFFFFFFF}, {8, 0}});
         table.Allocate(3);
         EXPECT_EQ(Cells<uint32_t>(table.Read(0, 0, 3)), (std::vector<uint32_t>{0, 0, 0}));
@@ -109,7 +109,7 @@ TEST(TableTest, FreshRowsHoldTheirColumnsFill) {
 
 TEST(TableTest, StagedWritesLandOnFlushAndTheLastOneWins) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(4);
         table.Stage(0, 0, Bytes(std::vector<uint32_t>{1, 2, 3, 4}));
@@ -123,7 +123,7 @@ TEST(TableTest, StagedWritesLandOnFlushAndTheLastOneWins) {
 
 TEST(TableTest, GrowthNeverMovesRowsAlreadyThere) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}, {12, 0}});
         table.Allocate(10);
         table.Stage(0, 0, Bytes(Sequence(10, 100)));
@@ -140,7 +140,7 @@ TEST(TableTest, GrowthNeverMovesRowsAlreadyThere) {
 
 TEST(TableTest, ABatchIsContiguousEvenWhenItStartsANewSpan) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(200);
         const uint32_t first = table.Allocate(1000);
@@ -153,7 +153,7 @@ TEST(TableTest, ABatchIsContiguousEvenWhenItStartsANewSpan) {
 
 TEST(TableTest, TailRowsLeftBehindByGrowthAreReused) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(250);
         const uint32_t batch = table.Allocate(10);
@@ -166,7 +166,7 @@ TEST(TableTest, TailRowsLeftBehindByGrowthAreReused) {
 
 TEST(TableTest, ReleasedRowsAreAcquiredAgain) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(4);
         table.Release(2);
@@ -177,7 +177,7 @@ TEST(TableTest, ReleasedRowsAreAcquiredAgain) {
 
 TEST(TableTest, WritesAcrossSpansSplitAtTheBoundary) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(300);
         table.Allocate(300);
@@ -190,7 +190,7 @@ TEST(TableTest, WritesAcrossSpansSplitAtTheBoundary) {
 
 TEST(TableTest, KernelsFindEveryRowThroughThePageTable) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}, {12, 0}});
         table.Allocate(100);
         table.Allocate(700);
@@ -221,7 +221,7 @@ TEST(TableTest, KernelsFindEveryRowThroughThePageTable) {
 
 TEST(TableTest, AlignedBatchesStartAPageAndKeepTheirTail) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(10);
         const uint32_t first = table.Allocate(300, true);
@@ -238,7 +238,7 @@ TEST(TableTest, AlignedBatchesStartAPageAndKeepTheirTail) {
 
 TEST(TableTest, RedirectedRowsAreReadAndWrittenThroughTheirBuffer) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(5);
         const uint32_t first = table.Allocate(300, true);
@@ -273,7 +273,7 @@ TEST(TableTest, RedirectedRowsAreReadAndWrittenThroughTheirBuffer) {
 
 TEST(TableTest, PageTablesKeepTheirAddressUntilTheyOutgrowIt) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
+        DeviceHeap heap(device, "test");
         ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(1);
         const uint64_t layout = table.Layout();
@@ -288,10 +288,10 @@ TEST(TableTest, PageTablesKeepTheirAddressUntilTheyOutgrowIt) {
     });
 }
 
-TEST(ArrayHeapTest, ARunPacksItsArraysBackToBack) {
+TEST(ArrayPoolTest, ARunPacksItsArraysBackToBack) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
-        ArrayHeap arrays(heap, "test", 12);
+        DeviceHeap heap(device, "test");
+        ArrayPool arrays(heap, "test", 12);
         const std::vector<ArrayRef> run = arrays.AllocateRun(std::vector<uint32_t>{5, 2, 0, 3});
         ASSERT_EQ(run.size(), 4u);
         EXPECT_EQ(run[1].address, run[0].address + 60);
@@ -302,10 +302,10 @@ TEST(ArrayHeapTest, ARunPacksItsArraysBackToBack) {
     });
 }
 
-TEST(ArrayHeapTest, ARunIsFreedOnlyAfterItsLastArray) {
+TEST(ArrayPoolTest, ARunIsFreedOnlyAfterItsLastArray) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
-        ArrayHeap arrays(heap, "test", 4);
+        DeviceHeap heap(device, "test");
+        ArrayPool arrays(heap, "test", 4);
         const std::vector<ArrayRef> run = arrays.AllocateRun(std::vector<uint32_t>{64, 64});
         arrays.Write(run[1], Bytes(Sequence(64, 9)));
         arrays.Free(run[0]);
@@ -318,10 +318,10 @@ TEST(ArrayHeapTest, ARunIsFreedOnlyAfterItsLastArray) {
     });
 }
 
-TEST(ArrayHeapTest, SharedArraysLiveUntilTheirLastReference) {
+TEST(ArrayPoolTest, SharedArraysLiveUntilTheirLastReference) {
     test::ForEachDevice([](device::Device& device) {
-        Heap heap(device, "test");
-        ArrayHeap arrays(heap, "test", 4);
+        DeviceHeap heap(device, "test");
+        ArrayPool arrays(heap, "test", 4);
         const ArrayRef array = arrays.Allocate(3);
         arrays.Share(array);
         EXPECT_EQ(arrays.References(array), 2u);

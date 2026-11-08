@@ -47,7 +47,7 @@ struct Scene {
 
     void Relabel(uint32_t prim, const std::string& label) {
         const uint32_t id = structure.GetTokens().Intern(label).id;
-        ArrayHeap& arrays = store.Arrays(ColumnType::TokenArray);
+        ArrayPool& arrays = store.Arrays(ColumnType::TokenArray);
         const ArrayRef array = arrays.Allocate(1);
         arrays.Write(array, std::as_bytes(std::span(&id, 1)));
         store.SetArray(kSemanticsLabelsAPISemanticsLabels,

@@ -19,9 +19,9 @@
 #include "ernie/device/program.h"
 #include "ernie/device/queue.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/columns/array_heap.h"
+#include "ernie/scene/columns/array_pool.h"
 #include "ernie/scene/columns/column_table.h"
-#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/device_heap.h"
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/changes.h"
@@ -61,7 +61,7 @@ class ColumnStore {
         return m_device;
     }
 
-    Heap& GetHeap() {
+    DeviceHeap& GetDeviceHeap() {
         return m_heap;
     }
 
@@ -84,7 +84,7 @@ class ColumnStore {
         return m_worlds;
     }
 
-    ArrayHeap& Arrays(ColumnType type);
+    ArrayPool& Arrays(ColumnType type);
 
     void Attach(Attachment attachment);
     const Attachment* FindAttachment(ColumnRef column, std::span<const uint32_t> rows) const;
@@ -222,12 +222,12 @@ class ColumnStore {
     static uint64_t ArrayKey(ColumnRef column, uint32_t row);
 
     device::Device& m_device;
-    Heap m_heap;
+    DeviceHeap m_heap;
     std::vector<Entry> m_entries;
     ColumnTable m_prims;
     ColumnTable m_slots;
     ColumnTable m_worlds;
-    std::map<uint32_t, std::unique_ptr<ArrayHeap>> m_arrayHeaps;
+    std::map<uint32_t, std::unique_ptr<ArrayPool>> m_arrayHeaps;
     std::vector<std::byte> m_payload;
     std::unordered_map<uint64_t, ArrayRef> m_arrays;
     std::map<uint64_t, std::vector<ArrayWrite>> m_arrayWrites;

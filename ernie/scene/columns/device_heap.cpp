@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/device_heap.h"
 
 #include <algorithm>
 #include <utility>
@@ -17,10 +17,10 @@ constexpr uint64_t kLargestChunk = uint64_t(64) << 20;
 
 }
 
-Heap::Heap(device::Device& device, std::string label)
+DeviceHeap::DeviceHeap(device::Device& device, std::string label)
     : m_device(device), m_label(std::move(label)), m_nextChunk(kFirstChunk) {}
 
-uint64_t Heap::Bytes() const {
+uint64_t DeviceHeap::Bytes() const {
     uint64_t bytes = 0;
     for (const Chunk& chunk : m_chunks) {
         bytes += chunk.buffer->Bytes();
@@ -28,7 +28,7 @@ uint64_t Heap::Bytes() const {
     return bytes;
 }
 
-HeapBlock Heap::Allocate(uint64_t bytes, uint64_t alignment) {
+HeapBlock DeviceHeap::Allocate(uint64_t bytes, uint64_t alignment) {
     if (bytes == 0) {
         return {};
     }
@@ -60,7 +60,7 @@ HeapBlock Heap::Allocate(uint64_t bytes, uint64_t alignment) {
     return {chunk.buffer.Get(), offset, bytes};
 }
 
-void Heap::Free(const HeapBlock& block) {
+void DeviceHeap::Free(const HeapBlock& block) {
     if (block) {
         m_free[block.bytes].push_back(block);
     }

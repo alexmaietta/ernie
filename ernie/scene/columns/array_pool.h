@@ -8,12 +8,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/device_heap.h"
 #include "ernie/scene/schema/types.h"
 
 namespace ernie {
 
-class ArrayHeap {
+class ArrayPool {
   public:
     struct StagedCopy {
         uint64_t dst;
@@ -21,7 +21,7 @@ class ArrayHeap {
         uint32_t words;
     };
 
-    ArrayHeap(Heap& heap, std::string label, uint32_t itemBytes);
+    ArrayPool(DeviceHeap& heap, std::string label, uint32_t itemBytes);
 
     uint32_t ItemBytes() const {
         return m_itemBytes;
@@ -71,7 +71,7 @@ class ArrayHeap {
     const Entry& Lookup(const ArrayRef& array) const;
     uint32_t AddRun(HeapBlock block, uint32_t live);
 
-    Heap& m_heap;
+    DeviceHeap& m_heap;
     std::string m_label;
     uint32_t m_itemBytes;
     std::vector<Run> m_runs;

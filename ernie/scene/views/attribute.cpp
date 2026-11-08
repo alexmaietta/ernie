@@ -381,7 +381,7 @@ device::Operation UntypedAttribute::AttachArrays(const Attachment& attachment,
     }
     ColumnStore& store = GetColumnStore();
     store.Flush();
-    ArrayHeap& heap = store.Arrays(column.type);
+    ArrayPool& heap = store.Arrays(column.type);
     device::Device& device = store.GetDevice();
     device::Queue& queue = device.GetQueue();
     const uint64_t bytes = uint64_t(count) * heap.ItemBytes();
@@ -440,7 +440,7 @@ device::Operation UntypedAttribute::CopyArrays(const DLTensor& source, Stream pr
                                                const DLTensor* mask) {
     ColumnStore& store = GetColumnStore();
     store.Flush();
-    ArrayHeap& heap = store.Arrays(m_column.column->type);
+    ArrayPool& heap = store.Arrays(m_column.column->type);
     const ArrayRef first = store.Array(m_column, Rows().rows.front());
     const device::BufferRange range = heap.Range(first);
     const device::BufferRange run =
@@ -457,7 +457,7 @@ device::Operation UntypedAttribute::CopyArrays(const DLTensor& source, Stream pr
 void UntypedAttribute::ReleaseArrays() {
     ColumnStore& store = GetColumnStore();
     store.Flush();
-    ArrayHeap& heap = store.Arrays(m_column.column->type);
+    ArrayPool& heap = store.Arrays(m_column.column->type);
     const std::vector<uint32_t>& rows = Rows().rows;
     const ArrayRef first = store.Array(m_column, rows.front());
     const std::vector<ArrayRef> fresh =
@@ -696,7 +696,7 @@ void UntypedAttribute::SetArray(uint32_t index, Span<const std::byte> items) {
         throw Error("Prim {} of the view was removed", index);
     }
     ColumnStore& store = GetColumnStore();
-    ArrayHeap& arrays = store.Arrays(m_column.column->type);
+    ArrayPool& arrays = store.Arrays(m_column.column->type);
     if (items.size() % arrays.ItemBytes() != 0) {
         throw Error("{} bytes for items of {} bytes", items.size(), arrays.ItemBytes());
     }
@@ -797,7 +797,7 @@ void UntypedAttribute::MapArray(Mapping& mapping) {
     const ViewRows& rows = Rows();
     ColumnStore& store = GetColumnStore();
     store.Flush();
-    ArrayHeap& heap = store.Arrays(m_column.column->type);
+    ArrayPool& heap = store.Arrays(m_column.column->type);
     const ColumnLayout layout = Layout(m_column.column->type);
     const bool writes = mapping.m_access != MapAccess::Read;
     if (writes && m_column.column->type == ColumnType::PrimArray) {

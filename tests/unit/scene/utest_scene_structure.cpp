@@ -141,7 +141,7 @@ TEST(StructureTest, ArraysAreSharedAcrossABatchAndFreedWithTheLastPrim) {
         EXPECT_NE(arrays[0].address, 0u);
         EXPECT_EQ(arrays[1].address, arrays[0].address);
         EXPECT_EQ(arrays[0].count, 3u);
-        ArrayHeap& heap = store.Arrays(ColumnType::Float3Array);
+        ArrayPool& heap = store.Arrays(ColumnType::Float3Array);
         EXPECT_EQ(heap.References(arrays[0]), 3u);
         structure.Remove(block.Prim(0, 0));
         EXPECT_EQ(heap.References(arrays[0]), 2u);
@@ -272,7 +272,7 @@ TEST(StructureTest, ClonesShareArraysUntilTheLastCopyIsRemoved) {
             store.Array(kPointBasedPoints, structure.GetPrims().Row(prim, SchemaId::PointBased));
         const std::vector<std::string> targets = Paths("/Copy", 2);
         const PrimBlock block = structure.Clone(prim, targets);
-        ArrayHeap& heap = store.Arrays(ColumnType::Float3Array);
+        ArrayPool& heap = store.Arrays(ColumnType::Float3Array);
         EXPECT_EQ(heap.References(points), 3u);
         structure.Remove(prim);
         EXPECT_EQ(heap.References(points), 2u);
@@ -290,7 +290,7 @@ TEST(StructureTest, TargetsToPrimsDefinedLaterResolveWhenTheyAppear) {
         const uint32_t prim =
             structure.Define<Sphere>(ball, {.materialBinding = {"/Look"}}).firstPrim;
         const uint32_t row = structure.GetPrims().Row(prim, SchemaId::MaterialBindingAPI);
-        ArrayHeap& heap = store.Arrays(ColumnType::PrimArray);
+        ArrayPool& heap = store.Arrays(ColumnType::PrimArray);
         const ArrayRef before = store.Array(kMaterialBindingAPIMaterialBinding, row);
         EXPECT_EQ(Items<uint32_t>(heap.Read(before)), std::vector<uint32_t>{kNoPrim});
         const std::vector<std::string> look = {"/Look"};

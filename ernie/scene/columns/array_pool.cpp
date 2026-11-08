@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/columns/array_heap.h"
+#include "ernie/scene/columns/array_pool.h"
 
 #include <algorithm>
 #include <numeric>
@@ -17,14 +17,14 @@ constexpr uint64_t kArrayAlignment = 16;
 
 }
 
-ArrayHeap::ArrayHeap(Heap& heap, std::string label, uint32_t itemBytes)
+ArrayPool::ArrayPool(DeviceHeap& heap, std::string label, uint32_t itemBytes)
     : m_heap(heap), m_label(std::move(label)), m_itemBytes(itemBytes) {
     if (itemBytes == 0 || itemBytes % 4 != 0) {
         throw Error("{} holds items of {} bytes; items are whole words", m_label, itemBytes);
     }
 }
 
-uint32_t ArrayHeap::AddRun(HeapBlock block, uint32_t live) {
+uint32_t ArrayPool::AddRun(HeapBlock block, uint32_t live) {
     if (!m_freeRuns.empty()) {
         const uint32_t run = m_freeRuns.back();
         m_freeRuns.pop_back();
@@ -35,7 +35,7 @@ uint32_t ArrayHeap::AddRun(HeapBlock block, uint32_t live) {
     return uint32_t(m_runs.size() - 1);
 }
 
-ArrayRef ArrayHeap::Allocate(uint32_t count, uint32_t capacity) {
+ArrayRef ArrayPool::Allocate(uint32_t count, uint32_t capacity) {
     capacity = std::max(capacity, count);
     if (capacity == 0) {
         return {};
@@ -47,7 +47,7 @@ ArrayRef ArrayHeap::Allocate(uint32_t count, uint32_t capacity) {
     return {block.Address(), count, capacity};
 }
 
-std::vector<ArrayRef> ArrayHeap::AllocateRun(std::span<const uint32_t> counts) {
+std::vector<ArrayRef> ArrayPool::AllocateRun(std::span<const uint32_t> counts) {
     std::vector<ArrayRef> refs(counts.size());
     uint64_t items = 0;
     uint32_t live = 0;
@@ -73,7 +73,7 @@ std::vector<ArrayRef> ArrayHeap::AllocateRun(std::span<const uint32_t> counts) {
     return refs;
 }
 
-std::vector<ArrayRef> ArrayHeap::Borrow(Ref<device::Buffer> buffer, uint32_t arrays,
+std::vector<ArrayRef> ArrayPool::Borrow(Ref<device::Buffer> buffer, uint32_t arrays,
                                         uint32_t count) {
     const uint64_t stride = uint64_t(count) * m_itemBytes;
     if (arrays == 0 || count == 0 || buffer->Bytes() < stride * arrays) {
@@ -93,11 +93,11 @@ std::vector<ArrayRef> ArrayHeap::Borrow(Ref<device::Buffer> buffer, uint32_t arr
     return refs;
 }
 
-bool ArrayHeap::Borrowed(const ArrayRef& array) const {
+bool ArrayPool::Borrowed(const ArrayRef& array) const {
     return array.address != 0 && m_runs[Lookup(array).run].borrowed;
 }
 
-const ArrayHeap::Entry& ArrayHeap::Lookup(const ArrayRef& array) const {
+const ArrayPool::Entry& ArrayPool::Lookup(const ArrayRef& array) const {
     const auto found = m_arrays.find(array.address);
     if (found == m_arrays.end()) {
         throw Error("{} holds no array at {:#x}", m_label, array.address);
@@ -105,7 +105,7 @@ const ArrayHeap::Entry& ArrayHeap::Lookup(const ArrayRef& array) const {
     return found->second;
 }
 
-ArrayRef ArrayHeap::Share(const ArrayRef& array) {
+ArrayRef ArrayPool::Share(const ArrayRef& array) {
     if (array.address != 0) {
         Lookup(array);
         ++m_arrays.at(array.address).references;
@@ -113,11 +113,11 @@ ArrayRef ArrayHeap::Share(const ArrayRef& array) {
     return array;
 }
 
-uint32_t ArrayHeap::References(const ArrayRef& array) const {
+uint32_t ArrayPool::References(const ArrayRef& array) const {
     return array.address == 0 ? 0 : Lookup(array).references;
 }
 
-void ArrayHeap::Free(const ArrayRef& array) {
+void ArrayPool::Free(const ArrayRef& array) {
     if (array.address == 0) {
         return;
     }
@@ -142,13 +142,13 @@ void ArrayHeap::Free(const ArrayRef& array) {
     m_arrays.erase(array.address);
 }
 
-device::BufferRange ArrayHeap::Range(const ArrayRef& array) const {
+device::BufferRange ArrayPool::Range(const ArrayRef& array) const {
     const Run& run = m_runs[Lookup(array).run];
     return run.block.buffer->Slice(array.address - run.block.buffer->Address(),
                                    uint64_t(array.capacity) * m_itemBytes);
 }
 
-void ArrayHeap::Write(const ArrayRef& array, std::span<const std::byte> bytes) {
+void ArrayPool::Write(const ArrayRef& array, std::span<const std::byte> bytes) {
     if (bytes.empty()) {
         return;
     }
@@ -159,7 +159,7 @@ void ArrayHeap::Write(const ArrayRef& array, std::span<const std::byte> bytes) {
     m_heap.GetDevice().GetQueue().Write(Range(array).Slice(0, bytes.size()), bytes.data());
 }
 
-void ArrayHeap::Stage(const ArrayRef& array, std::span<const std::byte> bytes) {
+void ArrayPool::Stage(const ArrayRef& array, std::span<const std::byte> bytes) {
     if (bytes.size() % sizeof(uint32_t) != 0) {
         Write(array, bytes);
         return;
@@ -176,7 +176,7 @@ void ArrayHeap::Stage(const ArrayRef& array, std::span<const std::byte> bytes) {
     m_stagedBytes.insert(m_stagedBytes.end(), bytes.begin(), bytes.end());
 }
 
-std::vector<ArrayHeap::StagedCopy> ArrayHeap::TakeStaged(uint64_t base) {
+std::vector<ArrayPool::StagedCopy> ArrayPool::TakeStaged(uint64_t base) {
     std::vector<StagedCopy> copies;
     for (const Staged& staged : m_staged) {
         if (staged.bytes > 0) {
@@ -190,7 +190,7 @@ std::vector<ArrayHeap::StagedCopy> ArrayHeap::TakeStaged(uint64_t base) {
     return copies;
 }
 
-std::vector<std::byte> ArrayHeap::Read(const ArrayRef& array) {
+std::vector<std::byte> ArrayPool::Read(const ArrayRef& array) {
     for (const Staged& staged : m_staged) {
         if (staged.bytes > 0) {
             Write(staged.array, std::span(m_stagedBytes).subspan(staged.offset, staged.bytes));

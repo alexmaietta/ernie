@@ -30,9 +30,9 @@ struct HeapBlock {
     }
 };
 
-class Heap {
+class DeviceHeap {
   public:
-    Heap(device::Device& device, std::string label);
+    DeviceHeap(device::Device& device, std::string label);
 
     device::Device& GetDevice() const {
         return m_device;

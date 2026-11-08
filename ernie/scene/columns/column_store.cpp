@@ -167,14 +167,14 @@ bool ColumnStore::Pinned(SchemaId schema) const {
     return Lookup(schema).pins > 0;
 }
 
-ArrayHeap& ColumnStore::Arrays(ColumnType type) {
+ArrayPool& ColumnStore::Arrays(ColumnType type) {
     const uint32_t item = ItemBytes(type);
     if (item == 0) {
         throw Error("Column type {} holds no arrays", uint32_t(type));
     }
-    std::unique_ptr<ArrayHeap>& arrays = m_arrayHeaps[item];
+    std::unique_ptr<ArrayPool>& arrays = m_arrayHeaps[item];
     if (!arrays) {
-        arrays = std::make_unique<ArrayHeap>(m_heap, fmt::format("{}-byte arrays", item), item);
+        arrays = std::make_unique<ArrayPool>(m_heap, fmt::format("{}-byte arrays", item), item);
     }
     return *arrays;
 }
@@ -591,7 +591,7 @@ void ColumnStore::Flush() {
             continue;
         }
         const uint64_t base = queue.Upload(staged.data(), staged.size()).Address();
-        for (const ArrayHeap::StagedCopy& copy : heap->TakeStaged(base)) {
+        for (const ArrayPool::StagedCopy& copy : heap->TakeStaged(base)) {
             runs.push_back({copy.dst, copy.source, total, 0});
             total += copy.words;
         }

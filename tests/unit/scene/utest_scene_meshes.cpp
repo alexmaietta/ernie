@@ -203,7 +203,7 @@ TEST(MeshesTest, AClonesOwnPointsGiveItItsOwnShape) {
         const uint32_t quad = s.Quad("/Quad");
         const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         s.Publish();
-        ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
+        ArrayPool& float3s = s.store.Arrays(ColumnType::Float3Array);
         const ArrayRef own = float3s.Allocate(4);
         float3s.Write(own, std::as_bytes(std::span(kQuad)));
         s.store.SetArray(kPointBasedPoints, s.PointsRow(copies.Prim(0, 0)), own);
@@ -223,7 +223,7 @@ TEST(MeshesTest, PointsReusingAFreedAddressGetTheirOwnShape) {
         const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         const uint32_t a = copies.Prim(0, 0);
         const uint32_t b = copies.Prim(1, 0);
-        ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
+        ArrayPool& float3s = s.store.Arrays(ColumnType::Float3Array);
         const auto give = [&](uint32_t prim, const ArrayRef& array,
                               const std::vector<Float3>& points) {
             float3s.Write(array, std::as_bytes(std::span(points)));
@@ -266,7 +266,7 @@ TEST(MeshesTest, NewTopologyRebuilds) {
     ForEachScene([](Scene& s) {
         const uint32_t prim = s.Quad("/Quad");
         s.Publish();
-        ArrayHeap& ints = s.store.Arrays(ColumnType::IntArray);
+        ArrayPool& ints = s.store.Arrays(ColumnType::IntArray);
         const std::vector<int32_t> counts = {3, 3};
         const std::vector<int32_t> indices = {0, 1, 2, 0, 2, 3};
         const ArrayRef faces = ints.Allocate(2);

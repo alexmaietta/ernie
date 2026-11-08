@@ -481,7 +481,7 @@ TEST(ArrayAttachmentTest, DevicePointsAreTheArraysInPlace) {
         ArrayAttribute<Float3> points = view.GetArray<Float3>(kPointBasedPoints);
         points.Set(0, kTriangle);
         points.Set(1, kTriangle);
-        ArrayHeap& heap = store.Arrays(ColumnType::Float3Array);
+        ArrayPool& heap = store.Arrays(ColumnType::Float3Array);
 
         int deletions = 0;
         OwnedPoints* owned = new OwnedPoints;

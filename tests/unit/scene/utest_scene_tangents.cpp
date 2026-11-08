@@ -101,7 +101,7 @@ struct Scene {
     }
 
     ArrayRef Reuse(const ArrayRef& freed) {
-        ArrayHeap& float3s = store.Arrays(ColumnType::Float3Array);
+        ArrayPool& float3s = store.Arrays(ColumnType::Float3Array);
         std::vector<ArrayRef> spare;
         ArrayRef reused = float3s.Allocate(freed.count);
         while (reused.address != freed.address && spare.size() < 64) {
@@ -175,7 +175,7 @@ TEST(TangentTest, PointsReusingAFreedAddressGetTheirOwnTangents) {
         const PrimBlock copies = s.structure.Clone(quad, std::vector<std::string>{"/A", "/B"});
         const uint32_t first = copies.Prim(0, 0);
         const uint32_t second = copies.Prim(1, 0);
-        ArrayHeap& float3s = s.store.Arrays(ColumnType::Float3Array);
+        ArrayPool& float3s = s.store.Arrays(ColumnType::Float3Array);
         const ArrayRef old = float3s.Allocate(4);
         s.GivePoints(second, old, kFlat);
         s.GivePoints(first, float3s.Allocate(4), kFlat);

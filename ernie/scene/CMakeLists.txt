@@ -1,6 +1,20 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_scene
+    columns/array_pool.cpp
+    columns/column_store.cpp
+    columns/column_table.cpp
+    columns/device_heap.cpp
+    prim.cpp
+    publish/change_set.cpp
+    publish/publisher.cpp
+    rotation.cpp
+    scene.cpp
+    structure/packing.cpp
+    structure/paths.cpp
+    structure/prims.cpp
+    structure/structure.cpp
+    structure/tokens.cpp
     tables/bounds.cpp
     tables/instance_layout.cpp
     tables/instances.cpp
@@ -15,20 +29,6 @@ ernie_object_library(
     tables/tangents.cpp
     tables/textures.cpp
     tables/transforms.cpp
-    columns/array_heap.cpp
-    columns/column_store.cpp
-    columns/heap.cpp
-    columns/column_table.cpp
-    prim.cpp
-    publish/change_set.cpp
-    publish/publisher.cpp
-    rotation.cpp
-    scene.cpp
-    structure/packing.cpp
-    structure/paths.cpp
-    structure/prims.cpp
-    structure/structure.cpp
-    structure/tokens.cpp
     views/attribute.cpp
     views/layout.cpp
     views/mapping.cpp

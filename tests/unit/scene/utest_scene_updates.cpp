@@ -49,7 +49,7 @@ struct Fixture {
     }
 
     ArrayRef NewArray(ColumnType type, std::span<const std::byte> bytes, uint32_t count) {
-        ArrayHeap& arrays = store.Arrays(type);
+        ArrayPool& arrays = store.Arrays(type);
         const ArrayRef array = arrays.Allocate(count);
         arrays.Write(array, bytes);
         return array;

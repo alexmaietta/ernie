@@ -423,7 +423,7 @@ TEST(ArrayAttributeTest, AWriteMappingUnsharesClonesIntoOneRun) {
             prims.push_back(copies.Prim(copy, 0));
         }
         const View view(structure, SchemaId::Mesh, prims);
-        ArrayHeap& heap = store.Arrays(ColumnType::Float3Array);
+        ArrayPool& heap = store.Arrays(ColumnType::Float3Array);
         const ArrayRef shared =
             store.Array(kPointBasedPoints, structure.GetPrims().Row(mesh, SchemaId::PointBased));
         ASSERT_EQ(heap.References(shared), 4u);
