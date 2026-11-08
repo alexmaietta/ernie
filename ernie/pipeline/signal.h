@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include <cstdint>
+#include <string_view>
+
+namespace ernie::pipeline {
+
+enum class SignalType : uint8_t {
+    ElectronRate,
+    Electrons,
+    Digital,
+    LinearColor,
+    DisplayColor,
+    Radiance,
+    Returns,
+    PointCloud,
+    RadarCube,
+    CaptureStat,
+};
+
+inline constexpr std::string_view kSignalNames[] = {
+    "ElectronRate", "Electrons", "Digital",    "LinearColor", "DisplayColor",
+    "Radiance",     "Returns",   "PointCloud", "RadarCube",   "CaptureStat",
+};
+
+enum class ElementType : uint8_t {
+    F32,
+    F16,
+    U16,
+    U8,
+};
+
+inline constexpr uint32_t kElementBytes[] = {4, 2, 2, 1};
+
+struct SignalLayout {
+    uint32_t channels = 1;
+    uint32_t pattern = 0;
+    bool mosaic = false;
+    ElementType element = ElementType::F32;
+
+    bool operator==(const SignalLayout&) const = default;
+};
+
+}
