@@ -16,3 +16,4 @@ target_compile_definitions(
         ERNIE_FMT
         FMT_HEADER_ONLY
 )
+target_compile_options(ernie_fmt INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
