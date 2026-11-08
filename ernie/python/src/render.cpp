@@ -144,6 +144,7 @@ void RegisterRenderer(nb::module_& module) {
             nb::call_guard<nb::gil_scoped_release>())
         .def("set_overlay", &Renderer::SetOverlay, nb::arg("name"), nb::arg("overlay"),
              nb::call_guard<nb::gil_scoped_release>())
+        .def("overlay_names", &Renderer::OverlayNames)
         .def("remove_overlay", &Renderer::RemoveOverlay, nb::arg("name"),
              nb::call_guard<nb::gil_scoped_release>())
         .def(
@@ -238,8 +239,14 @@ void RegisterOverlays(nb::module_& module) {
             [](OverlayStyle* style, nb::handle color, float width, float size, MarkerShape marker,
                OverlayDepth depth, std::optional<uint32_t> world, std::optional<uint32_t> anchor,
                nb::handle background, nb::handle halo, nb::handle align, float dash, float gap,
-               OverlayUnits units, bool screenSized, bool facing, bool pickable, uint32_t id) {
+               OverlayUnits units, bool screenSized, bool facing, bool pickable, uint32_t id,
+               nb::handle screen) {
                 new (style) OverlayStyle{};
+                if (!screen.is_none()) {
+                    Float2 at;
+                    Assign(at, screen);
+                    style->screen = at;
+                }
                 if (!color.is_none()) {
                     Assign(style->color, color);
                 }
@@ -273,7 +280,7 @@ void RegisterOverlays(nb::module_& module) {
             nb::arg("halo") = nb::none(), nb::arg("align") = nb::none(), nb::arg("dash") = 0.0f,
             nb::arg("gap") = 0.0f, nb::arg("units") = OverlayUnits::Pixels,
             nb::arg("screen_sized") = false, nb::arg("facing") = false, nb::arg("pickable") = true,
-            nb::arg("id") = 0)
+            nb::arg("id") = 0, nb::arg("screen") = nb::none())
         .def_prop_ro("color",
                      [](const OverlayStyle& style) {
                          return nb::make_tuple(style.color.x, style.color.y, style.color.z,
@@ -302,8 +309,14 @@ void RegisterOverlays(nb::module_& module) {
                          return nb::make_tuple(style.halo.x, style.halo.y, style.halo.z,
                                                style.halo.w);
                      })
-        .def_prop_ro("align", [](const OverlayStyle& style) {
-            return nb::make_tuple(style.align.x, style.align.y);
+        .def_prop_ro(
+            "align",
+            [](const OverlayStyle& style) { return nb::make_tuple(style.align.x, style.align.y); })
+        .def_prop_ro("screen", [](const OverlayStyle& style) -> nb::object {
+            if (!style.screen) {
+                return nb::none();
+            }
+            return nb::make_tuple(style.screen->x, style.screen->y);
         });
 
     nb::class_<OverlayHit>(module, "OverlayHit")
@@ -814,11 +827,17 @@ void RegisterOverlays(nb::module_& module) {
             .def(
                 "prims",
                 [](Overlay& overlay, std::vector<uint32_t> prims, OverlayPrimShape shape,
-                   std::optional<OverlayStyle> style, float length, std::vector<uint32_t> groups) {
-                    overlay.Prims(prims, shape, Style(style), length, groups);
+                   std::optional<OverlayStyle> style, float length, std::vector<uint32_t> groups,
+                   nb::handle colors) {
+                    std::vector<Float4> tints;
+                    if (!colors.is_none()) {
+                        Assign(tints, colors);
+                    }
+                    overlay.Prims(prims, shape, Style(style), length, groups, tints);
                 },
                 nb::arg("prims"), nb::arg("shape"), nb::kw_only(), nb::arg("style") = nb::none(),
-                nb::arg("length") = 1.0f, nb::arg("groups") = std::vector<uint32_t>())
+                nb::arg("length") = 1.0f, nb::arg("groups") = std::vector<uint32_t>(),
+                nb::arg("colors") = nb::none())
             .def(
                 "outline",
                 [](Overlay& overlay, std::vector<uint32_t> prims,

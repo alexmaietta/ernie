@@ -772,9 +772,7 @@ ViewerImpl::ViewerImpl(Ref<device::Device> device, Ref<Scene> scene, const Viewe
                  .hud = m_desc.hud,
                  .hudItems = m_desc.hudItems,
                  .toolbar = m_desc.toolbar,
-                 .targetRenderFps = m_desc.targetRenderFps,
-                 .eco = m_desc.eco,
-                 .ecoFrames = m_desc.ecoFrames});
+                 .targetRenderFps = m_desc.targetRenderFps});
     if (m_desc.ui && m_desc.builtinPanels) {
         std::vector<Panel> builtins = {
             CreateInfoPanel(m_scene, m_device, m_viewports.front()->Delegate()),
@@ -900,10 +898,9 @@ void ViewerImpl::Frame() {
         deferred();
     }
     Lead();
-    const bool changed = m_scene && m_scene->Pending();
     for (const auto& viewport : m_viewports) {
         if (viewport->visible) {
-            viewport->Advance(m_lastDraw, changed);
+            viewport->Advance(m_lastDraw);
         }
     }
     if (!presenter->Begin()) {
@@ -1647,26 +1644,6 @@ void Viewer::SetAovExposure(float stops, std::string_view viewport) {
 
 void Viewer::SetTargetRenderFps(double fps, std::string_view viewport) {
     m_impl->GetViewport(viewport).targetRenderFps = std::max(0.0, fps);
-}
-
-void Viewer::EnableEco(bool eco, std::string_view viewport) {
-    m_impl->GetViewport(viewport).eco = eco;
-}
-
-bool Viewer::Eco(std::string_view viewport) const {
-    return m_impl->GetViewport(viewport).eco;
-}
-
-void Viewer::SetEcoFrames(uint32_t frames, std::string_view viewport) {
-    m_impl->GetViewport(viewport).ecoFrames = std::max(frames, 1u);
-}
-
-uint32_t Viewer::EcoFrames(std::string_view viewport) const {
-    return m_impl->GetViewport(viewport).ecoFrames;
-}
-
-bool Viewer::EcoPaused(std::string_view viewport) const {
-    return m_impl->GetViewport(viewport).EcoPaused();
 }
 
 uint32_t Viewer::Width(std::string_view viewport) const {

@@ -35,6 +35,7 @@ struct ERNIE_API OverlayStyle {
     bool facing = false;
     bool pickable = true;
     uint32_t id = 0;
+    std::optional<Float2> screen;
 };
 
 struct ERNIE_API ScreenPlacement {
@@ -296,7 +297,7 @@ class ERNIE_API Overlay {
                    const OverlayStyle& style = {});
     Overlay& Prims(Span<const uint32_t> prims, OverlayPrimShape shape,
                    const OverlayStyle& style = {}, float length = 1,
-                   Span<const uint32_t> groups = {});
+                   Span<const uint32_t> groups = {}, Span<const Float4> colors = {});
     Overlay& Outline(Span<const uint32_t> prims, const OverlayStyle& style = {});
     Overlay& Add(OverlayLines lines);
     Overlay& Add(OverlayMarkers markers);

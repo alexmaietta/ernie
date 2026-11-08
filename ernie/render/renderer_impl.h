@@ -137,6 +137,7 @@ class RendererImpl {
 
     void SetOverlay(std::string_view name, Overlay overlay);
     void RemoveOverlay(std::string_view name);
+    std::vector<std::string> OverlayNames() const;
     void ShowOverlays(std::string_view product, std::span<const std::string> names);
     void HideOverlays(std::string_view product);
     OverlayPick PickOverlay(std::string_view product, Float2 pixel, float radius, uint32_t layer);
@@ -152,7 +153,7 @@ class RendererImpl {
     StepPlan* m_plan = nullptr;
 
     std::mutex m_stepMutex;
-    std::mutex m_overlayMutex;
+    mutable std::mutex m_overlayMutex;
     std::map<std::string, OverlayContents, std::less<>> m_overlays;
     std::map<std::string, std::vector<std::string>, std::less<>> m_shownOverlays;
     std::optional<OverlayPass> m_overlayPass;

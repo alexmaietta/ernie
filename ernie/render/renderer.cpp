@@ -907,6 +907,15 @@ void RendererImpl::RemoveOverlay(std::string_view name) {
     SetOverlay(name, Overlay());
 }
 
+std::vector<std::string> RendererImpl::OverlayNames() const {
+    const std::lock_guard lock(m_overlayMutex);
+    std::vector<std::string> names;
+    for (const auto& [name, contents] : m_overlays) {
+        names.push_back(name);
+    }
+    return names;
+}
+
 void RendererImpl::ShowOverlays(std::string_view product, std::span<const std::string> names) {
     const std::lock_guard lock(m_overlayMutex);
     m_shownOverlays.insert_or_assign(std::string(product),
@@ -937,6 +946,10 @@ void Renderer::SetOverlay(std::string_view name, Overlay overlay) {
 
 void Renderer::RemoveOverlay(std::string_view name) {
     m_impl->RemoveOverlay(name);
+}
+
+std::vector<std::string> Renderer::OverlayNames() const {
+    return m_impl->OverlayNames();
 }
 
 void Renderer::ShowOverlays(std::string_view product, Span<const std::string> names) {

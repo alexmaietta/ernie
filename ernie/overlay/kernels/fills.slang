@@ -78,16 +78,23 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, OverlayCamer
         uvs = piece == 0 ? 0x34u : 0x2Cu;
     }
 
+    const bool screen = (batch.flags & kOverlayScreenPoints) != 0;
+    const float2 anchor = float2(batch.atX, batch.atY) * float2(view.width, view.height);
     float2 pixels[3];
     for (uint corner = 0; corner < 3; ++corner) {
         if (any(isnan(corners[corner])) || any(isinf(corners[corner]))) {
             return false;
         }
-        const float depth = camera.model.ImagePlaneDistance(corners[corner]);
-        if (!(depth >= camera.near)) {
-            return false;
+        float depth = 0;
+        if (screen) {
+            pixels[corner] = anchor + corners[corner].xy;
+        } else {
+            depth = camera.model.ImagePlaneDistance(corners[corner]);
+            if (!(depth >= camera.near)) {
+                return false;
+            }
+            pixels[corner] = Pixel(camera.model.Project(corners[corner]).film, view);
         }
-        pixels[corner] = Pixel(camera.model.Project(corners[corner]).film, view);
         fill.x[corner] = pixels[corner].x;
         fill.y[corner] = pixels[corner].y;
         fill.depth[corner] = depth;
@@ -107,7 +114,7 @@ bool ProjectFill(OverlayParams p, ShapeRow shape, OverlayView view, OverlayCamer
     record.by = max(pixels[0].y, max(pixels[1].y, pixels[2].y));
     record.depthA = asfloat(slot);
     record.color = EncodeOverlayColor(color);
-    record.flags = batch.depth | (camera.perspective ? kOverlayPerspective : 0) |
+    record.flags = batch.depth | (camera.perspective && !screen ? kOverlayPerspective : 0) |
                    (uint(OverlayPiece::Triangle) << kOverlayKindShift) |
                    (edges << kOverlayEdgeShift) | (fill.pixels != 0 ? kOverlayTextured : 0) |
                    (uvs << kOverlayUvShift);

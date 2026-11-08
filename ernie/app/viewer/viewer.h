@@ -191,8 +191,6 @@ struct ViewportDesc {
                                      HudItem::Resolution,   HudItem::Camera};
     bool toolbar = true;
     double targetRenderFps = 0;
-    bool eco = true;
-    uint32_t ecoFrames = 500;
 };
 
 struct ViewerDesc {
@@ -213,8 +211,6 @@ struct ViewerDesc {
     int screen = -1;
     bool fullscreen = false;
     double targetRenderFps = 0;
-    bool eco = true;
-    uint32_t ecoFrames = 500;
     float fontSize = 0;
     std::vector<HudItem> hudItems = {HudItem::Fps,          HudItem::UiFps,
                                      HudItem::DeviceMemory, HudItem::HostMemory,
@@ -290,11 +286,6 @@ class ERNIE_VIEWER_API Viewer {
     double RenderFps(std::string_view viewport = {}) const;
     double UiFps() const;
     void SetTargetRenderFps(double fps, std::string_view viewport = {});
-    void EnableEco(bool eco, std::string_view viewport = {});
-    bool Eco(std::string_view viewport = {}) const;
-    void SetEcoFrames(uint32_t frames, std::string_view viewport = {});
-    uint32_t EcoFrames(std::string_view viewport = {}) const;
-    bool EcoPaused(std::string_view viewport = {}) const;
 
     uint32_t Width(std::string_view viewport = {}) const;
     uint32_t Height(std::string_view viewport = {}) const;

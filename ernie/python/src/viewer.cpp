@@ -293,7 +293,7 @@ NB_MODULE(_viewer, module) {
             [](ViewportDesc* desc, std::string name, std::string product, std::string aov,
                std::shared_ptr<RenderDelegate> delegate, std::shared_ptr<Renderer> renderer,
                bool hud, std::optional<std::vector<HudItem>> hudItems, bool toolbar,
-               double targetRenderFps, bool eco, uint32_t ecoFrames) {
+               double targetRenderFps) {
                 new (desc) ViewportDesc{};
                 desc->name = std::move(name);
                 desc->product = std::move(product);
@@ -306,17 +306,13 @@ NB_MODULE(_viewer, module) {
                 }
                 desc->toolbar = toolbar;
                 desc->targetRenderFps = targetRenderFps;
-                desc->eco = eco;
-                desc->ecoFrames = ecoFrames;
             },
             nb::arg("name"), nb::kw_only(), nb::arg("product") = "", nb::arg("aov") = "LdrColor",
             nb::arg("delegate") = nb::none(), nb::arg("renderer") = nb::none(),
             nb::arg("hud") = true, nb::arg("hud_items") = nb::none(), nb::arg("toolbar") = true,
-            nb::arg("target_render_fps") = 0.0, nb::arg("eco") = true, nb::arg("eco_frames") = 500)
+            nb::arg("target_render_fps") = 0.0)
         .def_ro("name", &ViewportDesc::name)
-        .def_ro("product", &ViewportDesc::product)
-        .def_ro("eco", &ViewportDesc::eco)
-        .def_ro("eco_frames", &ViewportDesc::ecoFrames);
+        .def_ro("product", &ViewportDesc::product);
 
     nb::class_<Viewer>(module, "Viewer")
         .def(
@@ -328,8 +324,8 @@ NB_MODULE(_viewer, module) {
                std::shared_ptr<Renderer> renderer, bool hud,
                std::optional<std::vector<HudItem>> hudItems, bool toolbar, bool menuBar,
                std::optional<std::pair<int, int>> position, int screen, bool fullscreen,
-               double targetRenderFps, bool eco, uint32_t ecoFrames, float fontSize,
-               bool builtinPanels, std::optional<std::filesystem::path> layout) {
+               double targetRenderFps, float fontSize, bool builtinPanels,
+               std::optional<std::filesystem::path> layout) {
                 ViewerDesc desc;
                 desc.product = std::move(product);
                 desc.aov = std::move(aov);
@@ -353,8 +349,6 @@ NB_MODULE(_viewer, module) {
                 desc.screen = screen;
                 desc.fullscreen = fullscreen;
                 desc.targetRenderFps = targetRenderFps;
-                desc.eco = eco;
-                desc.ecoFrames = ecoFrames;
                 desc.fontSize = fontSize;
                 desc.builtinPanels = builtinPanels;
                 if (layout) {
@@ -376,8 +370,8 @@ NB_MODULE(_viewer, module) {
             nb::arg("hud_items") = nb::none(), nb::arg("toolbar") = true,
             nb::arg("menu_bar") = true, nb::arg("position") = nb::none(), nb::arg("screen") = -1,
             nb::arg("fullscreen") = false, nb::arg("target_render_fps") = 0.0,
-            nb::arg("eco") = true, nb::arg("eco_frames") = 500, nb::arg("font_size") = 0.0f,
-            nb::arg("builtin_panels") = true, nb::arg("layout") = nb::none())
+            nb::arg("font_size") = 0.0f, nb::arg("builtin_panels") = true,
+            nb::arg("layout") = nb::none())
         .def_prop_ro("screens", &Viewer::Screens)
         .def("renderer", &Viewer::GetRenderer, nb::arg("viewport") = "")
         .def(
@@ -432,11 +426,6 @@ NB_MODULE(_viewer, module) {
         .def_prop_ro("ui_fps", &Viewer::UiFps)
         .def("set_target_render_fps", &Viewer::SetTargetRenderFps, nb::arg("fps"),
              nb::arg("viewport") = "")
-        .def("enable_eco", &Viewer::EnableEco, nb::arg("eco") = true, nb::arg("viewport") = "")
-        .def("eco", &Viewer::Eco, nb::arg("viewport") = "")
-        .def("set_eco_frames", &Viewer::SetEcoFrames, nb::arg("frames"), nb::arg("viewport") = "")
-        .def("eco_frames", &Viewer::EcoFrames, nb::arg("viewport") = "")
-        .def("eco_paused", &Viewer::EcoPaused, nb::arg("viewport") = "")
         .def("add_colorbar", &Viewer::AddColorbar, nb::arg("desc") = ColorbarDesc{},
              nb::arg("viewport") = "")
         .def("set_colorbar", &Viewer::SetColorbar, nb::arg("id"), nb::arg("desc"))

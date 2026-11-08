@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ernie/device/ref.h"
 #include "ernie/device/stream.h"
@@ -33,6 +34,7 @@ class ERNIE_API Renderer {
 
     void SetOverlay(std::string_view name, Overlay overlay);
     void RemoveOverlay(std::string_view name);
+    std::vector<std::string> OverlayNames() const;
     void ShowOverlays(std::string_view product, Span<const std::string> names = {});
     void HideOverlays(std::string_view product);
     OverlayPick PickOverlay(std::string_view product, Float2 pixel, float radius = 6,

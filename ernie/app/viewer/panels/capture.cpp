@@ -114,7 +114,7 @@ void DrawCapture(Capture& capture) {
 }
 
 Panel CreateCapturePanel(Capture& capture) {
-    return {"Capture", Dock::Bottom, [&capture] { DrawCapture(capture); }, false};
+    return {"Capture", Dock::Bottom, [&capture] { DrawCapture(capture); }};
 }
 
 }

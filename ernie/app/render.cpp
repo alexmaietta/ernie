@@ -94,8 +94,8 @@ Ref<Scene> DefaultScene(device::Device& device, uint32_t worlds, bool waitForKer
     scene->Define<DistantLight>("/World/Sun", {.orient = FromAzimuthElevation(146, 44)});
 
     const double halfFov = std::numbers::pi / 8;
-    const double yaw = 0.6;
-    const double pitch = 0.45;
+    const double yaw = 0;
+    const double pitch = 0.15;
     const double distance = 1.1 * 5.5 / std::sin(halfFov);
     const Double3 target{0, 0, 1};
     const double across = std::cos(pitch) * distance;

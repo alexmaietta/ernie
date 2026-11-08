@@ -132,7 +132,7 @@ bool SameKey(const Batch& batch, OverlayKind kind, const OverlayStyle& style) {
            key.depth == style.depth && key.anchor == style.anchor && key.dash == style.dash &&
            key.gap == style.gap && key.units == style.units &&
            key.screenSized == style.screenSized && key.facing == style.facing &&
-           key.pickable == style.pickable &&
+           key.pickable == style.pickable && key.screen == style.screen &&
            (kind != OverlayKind::Markers || key.marker == style.marker) &&
            (!Textual(kind) || (key.background == style.background && key.halo == style.halo &&
                                key.align == style.align && key.width == style.width));
@@ -163,7 +163,29 @@ void PackAffix(std::string_view text, uint32_t (&words)[4], uint32_t& length,
     length = uint32_t(codes.size());
 }
 
+void CheckScreen(OverlayKind kind, const OverlayStyle& style, bool placed) {
+    if (!style.screen) {
+        return;
+    }
+    if (kind == OverlayKind::Prims || kind == OverlayKind::Outlines || kind == OverlayKind::Texts) {
+        throw Error("Overlay {} have no screen anchor; only shapes, labels, numbers and images "
+                    "take one",
+                    KindName(kind));
+    }
+    if (placed) {
+        throw Error("Overlay {} take a screen placement or a screen anchor, not both",
+                    KindName(kind));
+    }
+    if (style.anchor != kNoPrim || style.units == OverlayUnits::Meters || style.screenSized ||
+        style.facing) {
+        throw Error("Overlay {} on the screen are in pixels, so they take no anchor prim, meters, "
+                    "screen sizing or facing",
+                    KindName(kind));
+    }
+}
+
 Batch& HostBatch(OverlayData& contents, OverlayKind kind, const OverlayStyle& style) {
+    CheckScreen(kind, style, false);
     if (contents.batches.empty() || !SameKey(contents.batches.back(), kind, style)) {
         contents.batches.push_back({.kind = kind, .style = style});
     }
@@ -421,6 +443,7 @@ void CheckText(const Batch& batch) {
 }
 
 void CheckBatch(const Batch& batch) {
+    CheckScreen(batch.kind, batch.style, batch.placement.has_value());
     if (Textual(batch.kind)) {
         CheckText(batch);
         return;
@@ -770,6 +793,7 @@ Overlay& Overlay::Image(Float3 topLeft, Float3 right, Float3 down, device::Tenso
     if (pixels.Empty()) {
         throw Error("An overlay image needs pixels");
     }
+    CheckScreen(OverlayKind::Images, style, false);
     CheckImage(pixels, 1);
     if (pixels.Shape().size() != 3) {
         throw Error("An overlay image is a [height, width, 4] uint8 tensor");
@@ -782,7 +806,9 @@ Overlay& Overlay::Image(Float3 topLeft, Float3 right, Float3 down, device::Tenso
 }
 
 Overlay& Overlay::Prims(Span<const uint32_t> prims, OverlayPrimShape shape,
-                        const OverlayStyle& style, float length, Span<const uint32_t> groups) {
+                        const OverlayStyle& style, float length, Span<const uint32_t> groups,
+                        Span<const Float4> colors) {
+    CheckScreen(OverlayKind::Prims, style, false);
     if (!groups.empty() && groups.size() != prims.size()) {
         throw Error("{} overlay prim groups for {} prims", groups.size(), prims.size());
     }
@@ -798,7 +824,17 @@ Overlay& Overlay::Prims(Span<const uint32_t> prims, OverlayPrimShape shape,
     batch.groupCount =
         groups.empty() ? 0 : *std::ranges::max_element(groups.begin(), groups.end()) + 1;
     const size_t rows = groups.empty() ? prims.size() : batch.groupCount;
-    batch.hostColors.assign(rows, PackColor(style.color));
+    if (!colors.empty() && colors.size() != rows) {
+        throw Error("{} colors for {} overlay prim {}", colors.size(), rows,
+                    groups.empty() ? "rows" : "groups");
+    }
+    if (colors.empty()) {
+        batch.hostColors.assign(rows, PackColor(style.color));
+    } else {
+        for (const Float4 color : colors) {
+            batch.hostColors.push_back(PackColor(color));
+        }
+    }
     batch.hostSizes.assign(rows, style.width);
     batch.hostIds.assign(rows, style.id);
     Edit().batches.push_back(std::move(batch));
@@ -806,6 +842,7 @@ Overlay& Overlay::Prims(Span<const uint32_t> prims, OverlayPrimShape shape,
 }
 
 Overlay& Overlay::Outline(Span<const uint32_t> prims, const OverlayStyle& style) {
+    CheckScreen(OverlayKind::Outlines, style, false);
     if (prims.empty()) {
         return *this;
     }
@@ -1270,6 +1307,12 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
                     (style.facing ? kOverlayFacing : 0) | (style.pickable ? kOverlayPickable : 0);
         gpu.id = style.id;
         gpu.ids = {unused};
+        if (style.screen) {
+            gpu.flags |= kOverlayScreenPoints;
+            gpu.depth = uint32_t(OverlayDepth::Always);
+            gpu.atX = style.screen->x;
+            gpu.atY = style.screen->y;
+        }
         gpu.color = PackColor(style.color);
         gpu.size =
             batch.kind == OverlayKind::Markers || Textual(batch.kind) ? style.size : style.width;

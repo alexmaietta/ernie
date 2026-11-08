@@ -92,12 +92,28 @@ struct AovDisplay {
 
 void CheckPixels(const device::Tensor& pixels);
 
+struct GridGuide {
+    bool shown = false;
+    bool fixed = false;
+    float spacing = 1;
+    uint32_t divisions = 10;
+    float reach = 40;
+    float minorBrightness = 0.22f;
+    float majorBrightness = 0.5f;
+    float height = 0;
+
+    bool operator==(const GridGuide&) const = default;
+};
+
 struct ViewportGuides {
-    bool grid = false;
+    GridGuide grid;
     bool cameras = true;
-    bool lights = true;
+    bool lights = false;
     bool outline = true;
     bool bounds = false;
+    bool allBounds = false;
+    bool frames = false;
+    bool axes = true;
     Float4 outlineColor = {1.0f, 0.6f, 0.1f, 1.0f};
 
     bool operator==(const ViewportGuides&) const = default;
@@ -161,7 +177,9 @@ class Viewport {
         return m_sceneOverlays;
     }
 
-    void Advance(const device::Operation& lastDraw, bool changed);
+    std::vector<std::string> SceneOverlayNames() const;
+
+    void Advance(const device::Operation& lastDraw);
     void Show(const device::Tensor& image, const device::Operation& ready,
               const device::Tensor& overlay = {});
     void Draw(Presenter& presenter, std::optional<ViewportRect> fixed, bool base);
@@ -210,10 +228,6 @@ class Viewport {
 
     double RenderFps() const {
         return m_leader ? m_leader->RenderFps() : m_renderFps;
-    }
-
-    bool EcoPaused() const {
-        return m_leader ? m_leader->EcoPaused() : m_ecoPaused;
     }
 
     void BlockInput(bool blocked) {
@@ -282,9 +296,8 @@ class Viewport {
     bool hudShown = true;
     bool toolbarShown = true;
     double targetRenderFps = 0;
-    bool eco = true;
-    uint32_t ecoFrames = 500;
     std::array<bool, std::size(kHudItemNames)> hudItems{};
+    std::set<std::string, std::less<>> hiddenOverlays;
 
   private:
     struct CameraView {
@@ -343,6 +356,7 @@ class Viewport {
         std::vector<std::string> selection;
         ViewportGuides guides;
         double gridStep = 0;
+        double gridFade = 0;
         Double3 gridCentre;
 
         bool operator==(const GuideKey&) const = default;
@@ -361,6 +375,7 @@ class Viewport {
     void StartPick(double u, double v, bool toggle);
     void LandPick();
     void LandFraming();
+    void SyncOverlays();
     void UpdateGuides();
     std::optional<GizmoCamera> GizmoView(ImVec2 min, ImVec2 size) const;
     void TrackGestures(ImVec2 imageMin, ImVec2 imageSize, bool pressed);
@@ -368,6 +383,7 @@ class Viewport {
                      ImVec2 imageSize);
     void DrawItems(Presenter& presenter, ImDrawList& list, ImVec2 min, ImVec2 max);
     void DrawColorbar(ImDrawList& list, ImVec2 min, ImVec2 max, const ColorbarDesc& desc);
+    void DrawAxes(ImDrawList& list, ImVec2 min, ImVec2 max) const;
     std::vector<std::string> HudLines() const;
 
     ViewportDesc m_desc;
@@ -378,6 +394,7 @@ class Viewport {
     std::shared_ptr<RenderDelegate> m_delegate;
     std::shared_ptr<Renderer> m_renderer;
     bool m_sceneOverlays = true;
+    std::vector<std::string> m_shownOverlays;
     std::optional<GuideKey> m_guideKey;
     std::function<void(const std::string&)> m_inspect;
     SessionWorlds* m_sessions = nullptr;
@@ -410,9 +427,6 @@ class Viewport {
     double m_renderFps = 0;
     double m_stepMs = 0;
     Extent m_renderSize;
-    uint32_t m_stillFrames = 0;
-    AovDisplay m_ecoDisplay;
-    bool m_ecoPaused = false;
 
     std::unique_ptr<RayCaster> m_caster;
     uint64_t m_structure = ~uint64_t(0);

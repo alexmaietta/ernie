@@ -11,6 +11,7 @@
 #include "ernie/render/renderer.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
+#include "ernie/util/error.h"
 #include "support/devices.h"
 
 namespace ernie {
@@ -64,6 +65,10 @@ Overlay EveryShape() {
     return overlay;
 }
 
+size_t At(uint32_t x, uint32_t y) {
+    return (size_t(y) * kWidth + x) * 4;
+}
+
 std::vector<uint8_t> Drawn(Renderer& renderer) {
     RenderOutput output = renderer.Step(kProducts, 1.0 / 30);
     output.Wait();
@@ -102,6 +107,70 @@ TEST(OverlayTest, DrawsPicksAndHidesOverlays) {
         renderer.RemoveOverlay("shapes");
         const std::vector<uint8_t> removed = Drawn(renderer);
         EXPECT_TRUE(removed.empty() || removed[center + 3] == 0);
+    });
+}
+
+TEST(OverlayTest, AnchorsShapesOnTheScreen) {
+    ForEachDevice([](Device& device) {
+        Renderer renderer(Empty(device));
+        const OverlayStyle corner{.color = {1, 0, 0, 1}, .screen = Float2{1, 1}};
+        const OverlayStyle top{.color = {0, 1, 0, 1}, .size = 4, .screen = Float2{0, 0}};
+        Overlay overlay;
+        overlay.Rectangle({-5, -5, 0}, {3, 0, 0}, {0, 3, 0}, corner, true)
+            .Marker({4, 4, 0}, top)
+            .Line({0, 12, 0}, {10, 12, 0}, {.color = {0, 0, 1, 1}, .screen = Float2{0, 0}});
+        renderer.SetOverlay("screen", overlay);
+        renderer.ShowOverlays("/Render/View");
+        const std::vector<uint8_t> drawn = Drawn(renderer);
+        ASSERT_EQ(drawn.size(), size_t(kWidth) * kHeight * 4);
+        const size_t red = At(kWidth - 5, kHeight - 5);
+        EXPECT_GT(drawn[red], 200);
+        EXPECT_GT(drawn[red + 3], 200);
+        const size_t green = At(4, 4);
+        EXPECT_GT(drawn[green + 1], 200);
+        const size_t blue = At(5, 12);
+        EXPECT_GT(drawn[blue + 2], 200);
+        EXPECT_EQ(drawn[At(kWidth / 2, 4) + 3], 0);
+
+        OverlayPick pick = renderer.PickOverlay("/Render/View", {kWidth - 5.0f, kHeight - 5.0f});
+        Drawn(renderer);
+        pick.Wait();
+        ASSERT_TRUE(pick.Hit());
+        EXPECT_EQ(pick.Hit()->overlay, "screen");
+    });
+}
+
+TEST(OverlayTest, RejectsScreenAnchorsThatNeedTheScene) {
+    const OverlayStyle screen{.screen = Float2{0, 0}};
+    const std::vector<uint32_t> prims = {0};
+    Overlay overlay;
+    EXPECT_THROW(overlay.Prims(prims, OverlayPrimShape::Bounds, screen), Error);
+    EXPECT_THROW(overlay.Outline(prims, screen), Error);
+    EXPECT_THROW(overlay.Text({.at = {0, 0}}, "text", screen), Error);
+    OverlayStyle meters = screen;
+    meters.units = OverlayUnits::Meters;
+    EXPECT_THROW(overlay.Line({0, 0, 0}, {1, 0, 0}, meters), Error);
+    const std::vector<Float4> colors = {{1, 0, 0, 1}, {0, 1, 0, 1}};
+    EXPECT_THROW(overlay.Prims(prims, OverlayPrimShape::Bounds, {}, 1, {}, colors), Error);
+}
+
+TEST(OverlayTest, SizesPrimFramesInPixels) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Empty(device);
+        scene->Define<Xform>("/Thing");
+        const std::vector<uint32_t> prims = {scene->Find("/Thing")->Index()};
+        Renderer renderer(scene);
+        Overlay overlay;
+        overlay.Prims(prims, OverlayPrimShape::Frames,
+                      {.width = 2, .depth = OverlayDepth::Always, .screenSized = true}, 8);
+        renderer.SetOverlay("frames", overlay);
+        renderer.ShowOverlays("/Render/View");
+        const std::vector<uint8_t> drawn = Drawn(renderer);
+        ASSERT_EQ(drawn.size(), size_t(kWidth) * kHeight * 4);
+        const size_t inside = At(kWidth / 2 + 5, kHeight / 2);
+        EXPECT_GT(drawn[inside], 150);
+        EXPECT_GT(drawn[inside + 3], 150);
+        EXPECT_EQ(drawn[At(kWidth / 2 + 12, kHeight / 2) + 3], 0);
     });
 }
 

@@ -121,8 +121,9 @@ bool LightPiece(RenderTables* tables, uint prim, uint piece, float length, out f
     }
 }
 
-bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view, uint viewWorld,
-                  out float3 a, out float3 b, inout float4 color) {
+bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
+                  OverlayCamera camera, uint viewWorld, out float3 a, out float3 b,
+                  inout float4 color) {
     a = float3(0);
     b = float3(0);
     RenderTables* tables = p.tables;
@@ -195,8 +196,17 @@ bool GeneratePrim(OverlayParams p, ShapeRow shape, uint piece, OverlayView view,
         if (!(span > 0)) {
             return false;
         }
+        float reach = batch.length;
+        if ((batch.flags & kOverlayScreenSized) != 0) {
+            const float3 right = normalize(PrimWorld(tables, view.camera).x.Vector());
+            const float pixels = PixelsPerMeter(camera, view, origin, right);
+            if (!(pixels > 0)) {
+                return false;
+            }
+            reach /= pixels;
+        }
         a = origin;
-        b = origin + direction / span * batch.length;
+        b = origin + direction / span * reach;
         color = float4(AxisTint(piece), color.w);
         return true;
     }

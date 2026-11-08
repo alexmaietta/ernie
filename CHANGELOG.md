@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Scene::WorldTransforms`, `Scene::ReadWorldTransformsAsync` and Python's `scene.world_transforms(paths)` read world transforms as of the latest publish.
 - `Scene::PrimBounds`, `Scene::ReadPrimBoundsAsync` and Python's `scene.prim_bounds(paths)` read each prim's world box, relative to its world's origin, as of the latest publish.
 - Snapshots carry `tables`, the device address of the render tables header, and keep every table it points to alive until they're destroyed.
+- `OverlayStyle::screen` anchors any overlay shape, label, number or image to a point of the image, from `{0, 0}` at the top left to `{1, 1}` at the bottom right, and reads its points as pixel offsets from there. Screen shapes draw over everything and can still be picked, so logos, credits, plots and debug readouts land in rendered frames. Python's `OverlayStyle(screen=(x, y))` does the same.
+- `Overlay::Prims` takes a color per prim or group, and Python's `overlay.prims(..., colors=)` does the same.
+- `OverlayStyle::screenSized` on prim frames gives their length in pixels, so joint and prim axes keep their size on screen.
+- `Renderer::OverlayNames` and Python's `renderer.overlay_names()` list the overlays a renderer holds.
+- The viewer draws the world's axes as the camera sees them in the viewport's bottom left corner, and its eye menu adds selection axes, every geometry prim's bounds in a color each, and a checkbox for each scene overlay.
+- The viewer's grid has two levels of lines that fade between zoom levels and toward its edge, and its settings set a fixed spacing, the lines to each major line, its extent, its height and the brightness of its minor and major lines.
 
 ### Changed
 
@@ -25,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Scene::At` is now `Scene::ByIndex`, and `Image::At` is now `Image::Pixel`.
 - Public scene headers moved to match the module's layout. `ernie/scene/access/` is now `ernie/scene/views/`, `ernie/scene/catalog/tokens.h` is now `ernie/scene/structure/tokens.h`, `ernie/scene/kernels/schema/` is now `ernie/scene/schema/`, and `semantics.h` and `primvars.h` moved from `ernie/scene/kernels/` to `ernie/scene/records/`.
 - The overlay is its own module. `ernie/render/overlay/overlay.h` is now `ernie/overlay/overlay.h` and `ernie/render/kernels/overlay/style.h` is now `ernie/overlay/kernels/style.h`, and `ernie/ernie.h` still includes the overlay.
+- The viewer's settings menu groups render resolution, selection, gizmo and grid settings into submenus.
+- The viewer shows the memory, capture and profiler panels beside info and log by default, and hides light guides by default.
+- The viewer's perspective view starts from the scene's first camera when no render product is given, and the default scene's camera looks straight at the middle of its shapes from lower down.
 
 ### Removed
 
@@ -34,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The derived attributes `ernie:worldTransform`, `ernie:computedVisibility`, `ernie:computedPurpose` and `ernie:computedMaterial`. The hierarchy system keeps them in its own tables, and world transforms are read through `WorldTransforms` instead.
 - The derived mesh attributes `ernie:blas`, `ernie:triangleCorners`, `ernie:triangleFaces`, `ernie:pointTriangleStarts`, `ernie:pointTriangles`, `ernie:pointBounds`, `ernie:smoothNormals`, `ernie:tangents` and `ernie:tangentPrimvar`. The geometry and tangents systems keep them in mesh and tangent records.
 - The derived attributes `ernie:worldMin` and `ernie:worldMax` on boundable prims, and `ernie:textures` and `ernie:textureSize` on materials and lights. The bounds and textures systems keep them in their own tables, and prim boxes are read through `PrimBounds`. No derived attributes remain in the schemas, and the `derived` schema keyword is gone, so a schema that uses it fails to build. The catalog's `instance` and `next` columns on multiple-apply APIs are flagged `Internal` and no longer show in the viewer's properties panel.
+- The viewer's eco mode, with `ViewportDesc::eco`, `ViewportDesc::ecoFrames`, `ViewerDesc::eco`, `ViewerDesc::ecoFrames`, `Viewer::EnableEco`, `Viewer::Eco`, `Viewer::SetEcoFrames`, `Viewer::EcoFrames`, `Viewer::EcoPaused` and their Python counterparts. Viewports render every frame, so overlay and guide changes show at once.
 
 ### Fixed
 

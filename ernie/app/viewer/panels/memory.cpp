@@ -126,7 +126,7 @@ class Memory {
 
 Panel CreateMemoryPanel(Ref<device::Device> device) {
     auto memory = std::make_shared<Memory>(std::move(device));
-    return {"Memory", Dock::Bottom, [memory] { memory->Draw(); }, false};
+    return {"Memory", Dock::Bottom, [memory] { memory->Draw(); }};
 }
 
 }

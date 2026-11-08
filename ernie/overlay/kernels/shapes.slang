@@ -163,7 +163,16 @@ bool Generate(ShapeRow shape, uint piece, out float3 a, out float3 b, inout floa
     }
 }
 
+float PixelsPerMeter(OverlayCamera camera, OverlayView view, float3 centre, float3 right) {
+    const float depth = camera.model.ImagePlaneDistance(centre);
+    const float probe = 1e-2f * max(depth, max(camera.near, 1e-4f));
+    const float2 from = Pixel(camera.model.Project(centre).film, view);
+    const float2 to = Pixel(camera.model.Project(centre + right * probe).film, view);
+    return depth > 0 ? length(to - from) / probe : 0;
+}
+
 struct Sizing {
+    bool screen;
     bool active;
     bool facing;
     float3 localCentre;
@@ -176,9 +185,10 @@ struct Sizing {
     __init(OverlayParams p, OverlayBatch batch, OverlayView view, OverlayCamera camera,
            uint viewWorld, float3 localCentre) {
         this.localCentre = localCentre;
-        active = (batch.flags & (kOverlayScreenSized | kOverlayFacing)) != 0;
+        screen = (batch.flags & kOverlayScreenPoints) != 0;
+        active = !screen && (batch.flags & (kOverlayScreenSized | kOverlayFacing)) != 0;
         facing = (batch.flags & kOverlayFacing) != 0;
-        centre = RenderSpace(p, batch, viewWorld, localCentre);
+        centre = screen ? localCentre : RenderSpace(p, batch, viewWorld, localCentre);
         scale = 1;
         right = float3(1, 0, 0);
         up = float3(0, 1, 0);
@@ -193,16 +203,14 @@ struct Sizing {
         if ((batch.flags & kOverlayScreenSized) == 0) {
             return;
         }
-        const float near = max(camera.near, 1e-4f);
-        const float depth = camera.model.ImagePlaneDistance(centre);
-        const float probe = 1e-2f * max(depth, near);
-        const float2 from = Pixel(camera.model.Project(centre).film, view);
-        const float2 to = Pixel(camera.model.Project(centre + right * probe).film, view);
-        const float pixels = length(to - from) / probe;
-        scale = depth > 0 && pixels > 0 ? 1 / pixels : 0;
+        const float pixels = PixelsPerMeter(camera, view, centre, right);
+        scale = pixels > 0 ? 1 / pixels : 0;
     }
 
     float3 Place(OverlayParams p, OverlayBatch batch, uint viewWorld, float3 local) {
+        if (screen) {
+            return local;
+        }
         if (!active) {
             return RenderSpace(p, batch, viewWorld, local);
         }

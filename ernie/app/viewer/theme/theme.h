@@ -24,7 +24,6 @@ struct Theme {
     ImVec4 outline{1.0f, 0.62f, 0.16f, 1.0f};
     ImVec4 warning{0.910f, 0.698f, 0.235f, 1.0f};
     ImVec4 error{0.886f, 0.341f, 0.318f, 1.0f};
-    ImVec4 eco{0.196f, 0.557f, 0.235f, 1.0f};
     ImVec4 overlay{0.831f, 0.843f, 0.816f, 0.92f};
     ImVec4 overlayBorder{0.553f, 0.565f, 0.537f, 1.0f};
     ImVec4 checkBox{1.0f, 1.0f, 1.0f, 1.0f};
@@ -92,7 +91,6 @@ inline constexpr const char* kStepBack = "\xee\x8f\xa9";
 inline constexpr const char* kStepForward = "\xee\x8f\xaa";
 inline constexpr const char* kRepeat = "\xee\x85\x86";
 inline constexpr const char* kVideo = "\xee\x86\xa5";
-inline constexpr const char* kLeaf = "\xee\x8b\x9e";
 inline constexpr const char* kDownload = "\xee\x82\xb2";
 
 inline constexpr ImWchar kFirst = 0xE000;

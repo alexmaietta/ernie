@@ -30,37 +30,95 @@ constexpr float kClickSlop = 4.0f;
 constexpr float kNearClip = 0.01f;
 constexpr float kFarClip = 1e6f;
 constexpr double kOrthographicUnits = 0.1;
-constexpr int kGridLines = 20;
-constexpr Float4 kGridColor = {0.5f, 0.5f, 0.5f, 0.45f};
+constexpr int kGridPieces = 16;
+constexpr double kGridFadeSteps = 16;
+constexpr Float3 kGridColor = {0.5f, 0.5f, 0.5f};
+constexpr Float4 kGridXColor = {0.80f, 0.32f, 0.30f, 0.85f};
+constexpr Float4 kGridYColor = {0.42f, 0.72f, 0.34f, 0.85f};
+constexpr float kSelectionAxisPixels = 60;
 constexpr Float4 kCameraGuideColor = {0.55f, 0.75f, 0.95f, 0.8f};
 constexpr Float4 kLightGuideColor = {0.95f, 0.85f, 0.45f, 0.8f};
+constexpr std::string_view kViewerOverlays = "viewer/";
 constexpr std::string_view kGuidesOverlay = "viewer/guides";
 constexpr std::string_view kSelectionOverlay = "viewer/selection";
 
-void AddGrid(Overlay& overlay, double step, const Double3& centre) {
-    const double half = kGridLines * step;
+struct GridLines {
     std::vector<Float3> endpoints;
-    for (int k = -kGridLines; k <= kGridLines; ++k) {
-        const double x = centre.x + k * step;
-        const double y = centre.y + k * step;
-        if (std::abs(x) > 0.5 * step) {
-            endpoints.push_back({float(x), float(centre.y - half), 0});
-            endpoints.push_back({float(x), float(centre.y + half), 0});
+    std::vector<Float4> colors;
+
+    void Add(Float3 from, Float3 to, Float4 color, const Double3& centre, double reach) {
+        for (int piece = 0; piece < kGridPieces; ++piece) {
+            const float t0 = float(piece) / kGridPieces;
+            const float t1 = float(piece + 1) / kGridPieces;
+            const Float3 a{from.x + (to.x - from.x) * t0, from.y + (to.y - from.y) * t0, from.z};
+            const Float3 b{from.x + (to.x - from.x) * t1, from.y + (to.y - from.y) * t1, from.z};
+            const double r = std::hypot(0.5 * (a.x + b.x) - centre.x, 0.5 * (a.y + b.y) - centre.y);
+            const double falloff = std::clamp(1 - r / reach, 0.0, 1.0);
+            const float alpha = color.w * float(falloff * falloff);
+            if (alpha > 0.004f) {
+                endpoints.push_back(a);
+                endpoints.push_back(b);
+                colors.push_back({color.x, color.y, color.z, alpha});
+            }
         }
-        if (std::abs(y) > 0.5 * step) {
-            endpoints.push_back({float(centre.x - half), float(y), 0});
-            endpoints.push_back({float(centre.x + half), float(y), 0});
+    }
+};
+
+void AddGrid(Overlay& overlay, const GridGuide& grid, double minor, double fade,
+             const Double3& centre) {
+    const int64_t divisions = std::max<int64_t>(grid.divisions, 2);
+    const double major = double(divisions) * minor;
+    const double minorReach = std::max(double(grid.reach), 1.0) * minor;
+    const double reach = minorReach * std::pow(double(divisions), fade);
+    const auto z = float(centre.z);
+    const Float4 minorColor = {kGridColor.x, kGridColor.y, kGridColor.z,
+                               grid.minorBrightness * float(1 - fade)};
+    const Float4 majorColor = {kGridColor.x, kGridColor.y, kGridColor.z, grid.majorBrightness};
+    GridLines lines;
+    const auto family = [&](double step, double extent, Float4 color, int64_t skip) {
+        if (!(color.w > 0)) {
+            return;
         }
+        const auto count = int64_t(std::ceil(extent / step));
+        const int64_t middleX = std::llround(centre.x / step);
+        const int64_t middleY = std::llround(centre.y / step);
+        for (int64_t k = -count; k <= count; ++k) {
+            const int64_t across = middleX + k;
+            const int64_t along = middleY + k;
+            const double x = double(across) * step;
+            const double y = double(along) * step;
+            if (across != 0 && (skip == 0 || across % skip != 0)) {
+                lines.Add({float(x), float(centre.y - extent), z},
+                          {float(x), float(centre.y + extent), z}, color, centre, extent);
+            }
+            if (along != 0 && (skip == 0 || along % skip != 0)) {
+                lines.Add({float(centre.x - extent), float(y), z},
+                          {float(centre.x + extent), float(y), z}, color, centre, extent);
+            }
+        }
+    };
+    family(minor, minorReach, minorColor, divisions);
+    family(major, reach, majorColor, 0);
+    if (std::abs(centre.y) <= reach) {
+        lines.Add({float(centre.x - reach), 0, z}, {float(centre.x + reach), 0, z}, kGridXColor,
+                  centre, reach);
     }
-    overlay.Lines(endpoints, {.color = kGridColor, .width = 1, .pickable = false});
-    if (std::abs(centre.y) <= half) {
-        overlay.Line({float(centre.x - half), 0, 0}, {float(centre.x + half), 0, 0},
-                     {.color = {0.80f, 0.32f, 0.30f, 0.8f}, .width = 1.5f, .pickable = false});
+    if (std::abs(centre.x) <= reach) {
+        lines.Add({0, float(centre.y - reach), z}, {0, float(centre.y + reach), z}, kGridYColor,
+                  centre, reach);
     }
-    if (std::abs(centre.x) <= half) {
-        overlay.Line({0, float(centre.y - half), 0}, {0, float(centre.y + half), 0},
-                     {.color = {0.42f, 0.72f, 0.34f, 0.8f}, .width = 1.5f, .pickable = false});
-    }
+    overlay.Lines(lines.endpoints, {.width = 1, .pickable = false}, lines.colors);
+}
+
+Float4 BoundsTint(uint32_t prim) {
+    const float hue = std::fmod(float(prim) * 0.618034f, 1.0f) * 6;
+    const float fall = 1 - std::abs(std::fmod(hue, 2.0f) - 1);
+    const std::array<Float3, 6> sides = {Float3{1, fall, 0}, Float3{fall, 1, 0},
+                                         Float3{0, 1, fall}, Float3{0, fall, 1},
+                                         Float3{fall, 0, 1}, Float3{1, 0, fall}};
+    const Float3 rgb = sides[size_t(hue) % 6];
+    const auto lift = [](float c) { return 0.35f + 0.65f * c; };
+    return {lift(rgb.x), lift(rgb.y), lift(rgb.z), 0.9f};
 }
 
 bool IsLight(const Prim& prim) {
@@ -182,8 +240,6 @@ Viewport::Viewport(ViewportDesc desc, Ref<Scene> scene, Ref<device::Device> devi
     hudShown = m_desc.hud;
     toolbarShown = m_desc.toolbar;
     targetRenderFps = m_desc.targetRenderFps;
-    eco = m_desc.eco;
-    ecoFrames = m_desc.ecoFrames;
     for (const HudItem item : m_desc.hudItems) {
         hudItems[size_t(item)] = true;
     }
@@ -284,11 +340,40 @@ void Viewport::DefineSession() {
     if (camera && camera->IsA(SchemaId::Camera)) {
         m_scene->Paste(m_scene->Copy(*camera), m_views[0]);
     } else {
-        const OrbitCamera orbit{.yaw = 0.6, .pitch = 0.45, .distance = 10};
-        m_scene->Define<Camera>(m_views[0], {.translate = orbit.Eye(),
-                                             .orient = orbit.Orient(),
-                                             .clippingRange = {kNearClip, kFarClip}});
-        m_unframed.insert(m_views[0]);
+        std::optional<Prim> shot;
+        std::vector<Prim> stack;
+        const View tops = m_scene->Select("/*");
+        for (const uint32_t top : tops.Prims()) {
+            const Prim prim = m_scene->ByIndex(top);
+            if (!prim.IsSession()) {
+                stack.push_back(prim);
+            }
+        }
+        while (!stack.empty() && !shot) {
+            const Prim prim = stack.back();
+            stack.pop_back();
+            if (prim.IsA(SchemaId::Camera)) {
+                shot = prim;
+            }
+            for (const Prim& child : prim.Children()) {
+                stack.push_back(child);
+            }
+        }
+        if (shot) {
+            const View pose = m_scene->Select(shot->Path());
+            const Double3 eye = pose.Get<Double3>("translate").Get().front();
+            const Quatd orient = pose.Get<Quatd>("orient").Get().front();
+            m_scene->Define<Camera>(
+                m_views[0],
+                {.translate = eye, .orient = orient, .clippingRange = {kNearClip, kFarClip}});
+            m_orbit.LookFrom(eye, orient, Double3{});
+        } else {
+            const OrbitCamera orbit{.yaw = 0.6, .pitch = 0.45, .distance = 10};
+            m_scene->Define<Camera>(m_views[0], {.translate = orbit.Eye(),
+                                                 .orient = orbit.Orient(),
+                                                 .clippingRange = {kNearClip, kFarClip}});
+            m_unframed.insert(m_views[0]);
+        }
     }
     const Quatd orients[] = {LookAlong({0, 0, -1}, {0, 1, 0}), LookAlong({0, 1, 0}),
                              LookAlong({-1, 0, 0})};
@@ -306,7 +391,7 @@ void Viewport::DefineSession() {
     }
 }
 
-void Viewport::Advance(const device::Operation& lastDraw, bool changed) {
+void Viewport::Advance(const device::Operation& lastDraw) {
     if (!m_shown && m_renderer) {
         m_builds = device::CurrentBuilds();
     } else {
@@ -351,9 +436,6 @@ void Viewport::Advance(const device::Operation& lastDraw, bool changed) {
         ++m_shownFrame;
         m_pending.reset();
     }
-    if (changed) {
-        m_stillFrames = 0;
-    }
     if (m_leader || !m_delegate || m_rendering || m_pending || m_size.width == 0) {
         return;
     }
@@ -372,18 +454,6 @@ void Viewport::Advance(const device::Operation& lastDraw, bool changed) {
     if (m_builds && !m_builds->Done()) {
         return;
     }
-    if (m_renderer) {
-        const AovDisplay& display = Display();
-        if (m_scene->Pending() || display != m_ecoDisplay) {
-            m_ecoDisplay = display;
-            m_stillFrames = 0;
-        }
-        m_ecoPaused = eco && m_stillFrames >= std::max(ecoFrames, 1u);
-        if (m_ecoPaused) {
-            return;
-        }
-        ++m_stillFrames;
-    }
     m_rendering = m_delegate->Render({m_product, size.width, size.height});
     m_stepStarted = Clock::now();
 }
@@ -395,13 +465,36 @@ void Viewport::Show(const device::Tensor& image, const device::Operation& ready,
 
 void Viewport::ShowSceneOverlays(bool shown) {
     m_sceneOverlays = shown;
-    m_stillFrames = 0;
+    SyncOverlays();
+}
+
+std::vector<std::string> Viewport::SceneOverlayNames() const {
+    std::vector<std::string> names =
+        m_renderer ? m_renderer->OverlayNames() : std::vector<std::string>();
+    std::erase_if(names, [](const std::string& name) { return name.starts_with(kViewerOverlays); });
+    return names;
+}
+
+void Viewport::SyncOverlays() {
     if (!m_renderer) {
         return;
     }
-    const std::vector<std::string> hidden = {"viewer/*"};
-    m_renderer->ShowOverlays(m_product,
-                             shown ? Span<const std::string>() : Span<const std::string>(hidden));
+    std::vector<std::string> shown;
+    if (!m_sceneOverlays || !hiddenOverlays.empty()) {
+        shown.push_back(std::string(kViewerOverlays) + "*");
+    }
+    if (m_sceneOverlays && !hiddenOverlays.empty()) {
+        for (std::string& name : SceneOverlayNames()) {
+            if (!hiddenOverlays.contains(name)) {
+                shown.push_back(std::move(name));
+            }
+        }
+    }
+    if (shown == m_shownOverlays) {
+        return;
+    }
+    m_renderer->ShowOverlays(m_product, shown);
+    m_shownOverlays = std::move(shown);
 }
 
 Viewport::Pending Viewport::Receive(const device::Tensor& pixels, const device::Operation& ready,
@@ -542,6 +635,9 @@ void Viewport::Draw(Presenter& presenter, std::optional<ViewportRect> fixed, boo
             m_inputClaimed = false;
         }
         DrawItems(presenter, list, origin, max);
+        if (base && guides.axes) {
+            DrawAxes(list, origin, max);
+        }
         if (m_builds && !m_shown) {
             const device::BuildProgress& builds = *m_builds;
             const float width = std::min(28.0f * ImGui::GetFontSize(), 0.8f * (max.x - origin.x));
@@ -588,22 +684,6 @@ void Viewport::Draw(Presenter& presenter, std::optional<ViewportRect> fixed, boo
                 m_hud.Draw(list, {right, origin.y + pad}, m_theme, [&] { return HudLines(); });
             right = left < right ? left - pad : right;
         }
-        if (base && EcoPaused()) {
-            const std::string label = std::string(icons::kLeaf) + "  Eco";
-            const float inset = 6.0f * dpi;
-            const ImVec2 text = ImGui::CalcTextSize(label.c_str());
-            const ImVec2 corner{right - text.x - 2 * inset, origin.y + pad};
-            const ImVec2 far{right, corner.y + text.y + 2 * inset};
-            list.AddRectFilled(
-                corner, far,
-                ImGui::GetColorU32(WithAlpha(m_theme.overlay, m_theme.overlay.w * 0.85f)),
-                4.0f * dpi);
-            list.AddText({corner.x + inset, corner.y + inset}, ImGui::GetColorU32(m_theme.eco),
-                         label.c_str());
-            if (ImGui::IsMouseHoveringRect(corner, far)) {
-                ImGui::SetTooltip("Eco mode paused rendering until something changes");
-            }
-        }
         for (const auto& overlay : m_overlays) {
             overlay(m_rect);
         }
@@ -615,12 +695,21 @@ void Viewport::UpdateGuides() {
     if (!m_renderer || !m_scene) {
         return;
     }
-    const double step =
-        std::pow(10.0, std::floor(std::log10(std::max(0.25 * m_orbit.distance, 1e-3))));
+    SyncOverlays();
+    const GridGuide& grid = guides.grid;
+    double step = std::max(double(grid.spacing), 1e-6);
+    double fade = 0;
+    if (!grid.fixed) {
+        const double base = std::max(double(grid.divisions), 2.0);
+        const double level = std::log(std::max(0.25 * m_orbit.distance, 1e-3)) / std::log(base);
+        step = std::pow(base, std::floor(level));
+        fade = std::round((level - std::floor(level)) * kGridFadeSteps) / kGridFadeSteps;
+    }
     const Double3 centre{std::round(m_orbit.target.x / step) * step,
-                         std::round(m_orbit.target.y / step) * step, 0};
-    GuideKey key{m_scene->StructureVersion(), m_selection.paths, guides, guides.grid ? step : 0,
-                 guides.grid ? centre : Double3{}};
+                         std::round(m_orbit.target.y / step) * step, grid.height};
+    GuideKey key{
+        m_scene->StructureVersion(), m_selection.paths,     guides,
+        grid.shown ? step : 0,       grid.shown ? fade : 0, grid.shown ? centre : Double3{}};
     if (m_guideKey == key) {
         return;
     }
@@ -628,6 +717,7 @@ void Viewport::UpdateGuides() {
 
     std::vector<uint32_t> cameras;
     std::vector<uint32_t> lights;
+    std::vector<uint32_t> bounded;
     std::vector<Prim> stack;
     const View roots = m_scene->Select("/*");
     for (const uint32_t root : roots.Prims()) {
@@ -643,12 +733,15 @@ void Viewport::UpdateGuides() {
             cameras.push_back(prim.Index());
         } else if (IsLight(prim)) {
             lights.push_back(prim.Index());
+        } else if (guides.allBounds && prim.IsA(SchemaId::Gprim)) {
+            bounded.push_back(prim.Index());
         }
         for (const Prim& child : prim.Children()) {
             stack.push_back(child);
         }
     }
 
+    std::vector<uint32_t> framed;
     std::vector<uint32_t> outlined;
     std::vector<uint32_t> groups;
     std::vector<uint32_t> chosenCameras;
@@ -658,6 +751,7 @@ void Viewport::UpdateGuides() {
         if (!selected) {
             continue;
         }
+        framed.push_back(selected->Index());
         stack.assign(1, *selected);
         while (!stack.empty()) {
             const Prim prim = stack.back();
@@ -682,8 +776,16 @@ void Viewport::UpdateGuides() {
     };
 
     Overlay shown;
-    if (guides.grid) {
-        AddGrid(shown, step, centre);
+    if (grid.shown) {
+        AddGrid(shown, grid, step, fade, centre);
+    }
+    if (!bounded.empty()) {
+        std::vector<Float4> tints;
+        for (const uint32_t prim : bounded) {
+            tints.push_back(BoundsTint(prim));
+        }
+        shown.Prims(bounded, OverlayPrimShape::Bounds, {.width = 1, .pickable = false}, 1, {},
+                    tints);
     }
     if (guides.cameras) {
         shown.Prims(unchosen(cameras, chosenCameras), OverlayPrimShape::Frustums,
@@ -703,6 +805,11 @@ void Viewport::UpdateGuides() {
     }
     if (guides.bounds) {
         selection.Prims(outlined, OverlayPrimShape::Bounds, chosen, 1, groups);
+    }
+    if (guides.frames) {
+        selection.Prims(framed, OverlayPrimShape::Frames,
+                        {.width = 2, .depth = OverlayDepth::XRay, .screenSized = true},
+                        kSelectionAxisPixels);
     }
     selection.Prims(chosenCameras, OverlayPrimShape::Frustums, chosen);
     selection.Prims(chosenLights, OverlayPrimShape::Lights, chosen);
@@ -820,6 +927,47 @@ void Viewport::DrawItems(Presenter& presenter, ImDrawList& list, ImVec2 min, ImV
             font, size, at,
             ImGui::GetColorU32({style.color.x, style.color.y, style.color.z, style.color.w}),
             item.text.c_str());
+    }
+}
+
+void Viewport::DrawAxes(ImDrawList& list, ImVec2 min, ImVec2 max) const {
+    if (!m_view) {
+        return;
+    }
+    const auto unit = [](Float3 v) {
+        const double length = std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z);
+        return length > 0 ? Double3{v.x / length, v.y / length, v.z / length} : Double3{};
+    };
+    const Double3 right = unit(m_view->frame.x);
+    const Double3 up = unit(m_view->frame.y);
+    const Double3 back = unit(m_view->frame.z);
+
+    struct Axis {
+        double x;
+        double y;
+        double z;
+        ImU32 color;
+        const char* label;
+    };
+
+    std::array<Axis, 3> axes{{{right.x, up.x, back.x, kAxisColors[0], "X"},
+                              {right.y, up.y, back.y, kAxisColors[1], "Y"},
+                              {right.z, up.z, back.z, kAxisColors[2], "Z"}}};
+    std::ranges::sort(axes, {}, &Axis::z);
+    const float dpi = ImGui::GetStyle().FontScaleDpi;
+    const float radius = 28.0f * dpi;
+    const ImVec2 centre{min.x + 8.0f * dpi + radius, max.y - 8.0f * dpi - radius};
+    list.AddCircleFilled(centre, radius + 4.0f * dpi,
+                         ImGui::GetColorU32(WithAlpha(m_theme.overlay, 0.6f)));
+    const float reach = 0.68f * radius;
+    for (const Axis& axis : axes) {
+        const ImVec2 tip{centre.x + float(axis.x) * reach, centre.y - float(axis.y) * reach};
+        const ImU32 color =
+            axis.z < 0 ? (axis.color & ~IM_COL32_A_MASK) | (0x73u << IM_COL32_A_SHIFT) : axis.color;
+        list.AddLine(centre, tip, color, 2.0f * dpi);
+        list.AddCircleFilled(tip, 7.0f * dpi, color);
+        const ImVec2 text = ImGui::CalcTextSize(axis.label);
+        list.AddText({tip.x - 0.5f * text.x, tip.y - 0.5f * text.y}, IM_COL32_WHITE, axis.label);
     }
 }
 

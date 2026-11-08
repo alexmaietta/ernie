@@ -151,13 +151,17 @@ bool ProjectText(OverlayParams p, ShapeRow shape, OverlayView view, OverlayCamer
     float depth = 0;
     uint mode = batch.depth;
     float2 align = float2(batch.alignX, batch.alignY);
-    if (batch.kind == uint(OverlayKind::Texts) || (batch.flags & kOverlayScreen) != 0) {
+    const bool screenPoints = (batch.flags & kOverlayScreenPoints) != 0;
+    if (batch.kind == uint(OverlayKind::Texts) || (batch.flags & kOverlayScreen) != 0 ||
+        screenPoints) {
         float2 at = float2(batch.atX, batch.atY);
         float2 offset = float2(batch.offsetX, batch.offsetY + float(item) * 1.25f * size);
         if (batch.kind == uint(OverlayKind::Texts)) {
             at = shape.Point().xy;
             offset = shape.End().xy;
             align = shape.Rotation().xy;
+        } else if (screenPoints) {
+            offset = shape.Point().xy;
         }
         const float2 anchor = at * float2(view.width, view.height) + offset;
         corner = anchor - align * (blockPixels + 2 * pad) + pad;

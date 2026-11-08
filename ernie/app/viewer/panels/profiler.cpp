@@ -460,7 +460,7 @@ class Profiler {
 
 Panel CreateProfilerPanel() {
     auto profiler = std::make_shared<Profiler>();
-    return {"Profiler", Dock::Bottom, [profiler] { profiler->Draw(); }, false,
+    return {"Profiler", Dock::Bottom, [profiler] { profiler->Draw(); }, true,
             [profiler] { profiler->Hidden(); }};
 }
 

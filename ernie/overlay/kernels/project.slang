@@ -51,7 +51,7 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     float3 a;
     float3 b;
     if (batch.kind == uint(OverlayKind::Prims)) {
-        if (!GeneratePrim(p, shape, piece, view, viewWorld, a, b, color)) {
+        if (!GeneratePrim(p, shape, piece, view, camera, viewWorld, a, b, color)) {
             return false;
         }
     } else {
@@ -65,23 +65,33 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     if (any(isnan(a)) || any(isnan(b)) || any(isinf(a)) || any(isinf(b))) {
         return false;
     }
-    float depthA = camera.model.ImagePlaneDistance(a);
-    float depthB = camera.model.ImagePlaneDistance(b);
-    if (depthA < camera.near && depthB < camera.near) {
-        return false;
+    const bool screen = (batch.flags & kOverlayScreenPoints) != 0;
+    float depthA = 0;
+    float depthB = 0;
+    float2 pixelA;
+    float2 pixelB;
+    if (screen) {
+        const float2 anchor = float2(batch.atX, batch.atY) * float2(view.width, view.height);
+        pixelA = anchor + a.xy;
+        pixelB = anchor + b.xy;
+    } else {
+        depthA = camera.model.ImagePlaneDistance(a);
+        depthB = camera.model.ImagePlaneDistance(b);
+        if (depthA < camera.near && depthB < camera.near) {
+            return false;
+        }
+        if (depthA < camera.near) {
+            a = lerp(a, b, (camera.near - depthA) / (depthB - depthA));
+            depthA = camera.near;
+        } else if (depthB < camera.near) {
+            b = lerp(b, a, (camera.near - depthB) / (depthA - depthB));
+            depthB = camera.near;
+        }
+        pixelA = Pixel(camera.model.Project(a).film, view);
+        pixelB = Pixel(camera.model.Project(b).film, view);
     }
-    if (depthA < camera.near) {
-        a = lerp(a, b, (camera.near - depthA) / (depthB - depthA));
-        depthA = camera.near;
-    } else if (depthB < camera.near) {
-        b = lerp(b, a, (camera.near - depthB) / (depthA - depthB));
-        depthB = camera.near;
-    }
-
-    const float2 pixelA = Pixel(camera.model.Project(a).film, view);
-    const float2 pixelB = Pixel(camera.model.Project(b).film, view);
     float pixelRadius = 0.5f * size;
-    if ((batch.flags & kOverlayMeters) != 0) {
+    if (!screen && (batch.flags & kOverlayMeters) != 0) {
         const float3 middle = 0.5f * (a + b);
         const float3 right = normalize(PrimWorld(tables, view.camera).x.Vector());
         const float2 centre = Pixel(camera.model.Project(middle).film, view);
@@ -106,7 +116,8 @@ bool Project(OverlayParams p, uint work, out OverlayRecord record) {
     record.color = EncodeOverlayColor(color);
     record.flags = batch.depth | pattern |
                    (uint(marker ? OverlayPiece::Marker : OverlayPiece::Segment) << kOverlayKindShift) |
-                   (camera.perspective ? kOverlayPerspective : 0) | (radius << kOverlayRadiusShift);
+                   (camera.perspective && !screen ? kOverlayPerspective : 0) |
+                   (radius << kOverlayRadiusShift);
     return true;
 }
 

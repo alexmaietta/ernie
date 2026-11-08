@@ -208,7 +208,6 @@ void Toolbar::Draw(ImVec2 min) {
 }
 
 void Toolbar::DrawSettingsMenu() {
-    ImGui::SeparatorText("Navigation");
     if (ImGui::Selectable("Frame Selection")) {
         m_viewport.Frame(true);
     }
@@ -218,33 +217,30 @@ void Toolbar::DrawSettingsMenu() {
         m_viewport.Frame(false);
     }
     ImGui::SetItemTooltip("Fit the whole scene in view (Shift+F)");
-    ImGui::SeparatorText("Render Resolution");
-    int percent = int(std::round(m_scale * 100));
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::SliderInt("##resolution", &percent, 25, 100, "%d%% of the viewport")) {
-        m_scale = float(percent) / 100;
+    ImGui::Separator();
+    ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
+    const float field = 10 * ImGui::GetFontSize();
+    if (ImGui::BeginMenu("Render Resolution")) {
+        int percent = int(std::round(m_scale * 100));
+        ImGui::SetNextItemWidth(field);
+        if (ImGui::SliderInt("##resolution", &percent, 25, 100, "%d%% of the viewport")) {
+            m_scale = float(percent) / 100;
+        }
+        ImGui::SetItemTooltip("Render fewer pixels and scale them up, for speed on slower GPUs");
+        ImGui::EndMenu();
     }
-    ImGui::SetItemTooltip("Render fewer pixels and scale them up, for speed on slower GPUs");
-    ImGui::SeparatorText("Eco Mode");
-    ImGui::Checkbox("Pause Rendering When Still", &m_viewport.eco);
-    ImGui::SetItemTooltip("Stop rendering once nothing has changed for a while, to save power");
-    ImGui::BeginDisabled(!m_viewport.eco);
-    int frames = int(m_viewport.ecoFrames);
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::SliderInt("##ecoFrames", &frames, 1, 10000, "%d frames without change",
-                         ImGuiSliderFlags_Logarithmic)) {
-        m_viewport.ecoFrames = uint32_t(std::max(frames, 1));
-    }
-    ImGui::EndDisabled();
     ViewportGuides& guides = m_viewport.guides;
-    ImGui::SeparatorText("Selection");
-    ImGui::Checkbox("Outline", &guides.outline);
-    ImGui::SetItemTooltip("Trace the selected prims' edges in the image");
-    ImGui::ColorEdit3("Outline Color", &guides.outlineColor.x, ImGuiColorEditFlags_NoInputs);
-    ImGui::Checkbox("Bounds", &guides.bounds);
-    ImGui::SetItemTooltip("Box each selected prim's world bounds");
-    if (Gizmo* gizmo = m_viewport.GetGizmo()) {
-        ImGui::SeparatorText("Gizmo");
+    if (ImGui::BeginMenu("Selection")) {
+        ImGui::Checkbox("Outline", &guides.outline);
+        ImGui::SetItemTooltip("Trace the selected prims' edges in the image");
+        ImGui::ColorEdit3("Outline Color", &guides.outlineColor.x, ImGuiColorEditFlags_NoInputs);
+        ImGui::Checkbox("Bounds", &guides.bounds);
+        ImGui::SetItemTooltip("Box each selected prim's world bounds");
+        ImGui::Checkbox("Axes", &guides.frames);
+        ImGui::SetItemTooltip("Each selected prim's x, y and z axes at its origin");
+        ImGui::EndMenu();
+    }
+    if (Gizmo* gizmo = m_viewport.GetGizmo(); gizmo && ImGui::BeginMenu("Gizmo")) {
         constexpr std::pair<GizmoMode, const char*> kModes[] = {{GizmoMode::None, "None (Q)"},
                                                                 {GizmoMode::Translate, "Move (W)"},
                                                                 {GizmoMode::Rotate, "Rotate (E)"},
@@ -254,6 +250,7 @@ void Toolbar::DrawSettingsMenu() {
                 gizmo->mode = mode;
             }
         }
+        ImGui::Separator();
         ImGui::Checkbox("Local Axes", &gizmo->local);
         ImGui::SetItemTooltip("Move and rotate along the prim's own axes rather than the world's");
         ImGui::Checkbox("Snap", &gizmo->snap);
@@ -266,10 +263,49 @@ void Toolbar::DrawSettingsMenu() {
         ImGui::SetNextItemWidth(6 * ImGui::GetFontSize());
         ImGui::DragFloat("Scale Step", &gizmo->scaleStep, 0.01f, 0.01f, 10, "%.2f");
         ImGui::EndDisabled();
+        ImGui::EndMenu();
     }
-    ImGui::SeparatorText("Grid");
-    ImGui::Checkbox("Show Grid", &guides.grid);
-    ImGui::SetItemTooltip("A ground grid on z = 0 around the orbit target, a power of ten apart");
+    if (ImGui::BeginMenu("Grid")) {
+        GridGuide& grid = guides.grid;
+        ImGui::Checkbox("Show Grid", &grid.shown);
+        ImGui::SetItemTooltip("A ground grid around the orbit target");
+        ImGui::BeginDisabled(!grid.shown);
+        ImGui::SeparatorText("Spacing");
+        if (ImGui::RadioButton("Follow Zoom", !grid.fixed)) {
+            grid.fixed = false;
+        }
+        ImGui::SetItemTooltip("Pick the line spacing from the camera's distance, fading between "
+                              "levels");
+        if (ImGui::RadioButton("Fixed", grid.fixed)) {
+            grid.fixed = true;
+        }
+        ImGui::SetItemTooltip("Keep the minor lines a set distance apart");
+        ImGui::BeginDisabled(!grid.fixed);
+        ImGui::SetNextItemWidth(field);
+        ImGui::DragFloat("Minor Spacing", &grid.spacing, 0.01f, 0.001f, 10000, "%.3f m",
+                         ImGuiSliderFlags_Logarithmic);
+        ImGui::EndDisabled();
+        int divisions = int(grid.divisions);
+        ImGui::SetNextItemWidth(field);
+        if (ImGui::SliderInt("Divisions", &divisions, 2, 20)) {
+            grid.divisions = uint32_t(divisions);
+        }
+        ImGui::SetItemTooltip("Minor lines to each major line");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Extent", &grid.reach, 10, 200, "%.0f minor lines");
+        ImGui::SetItemTooltip("How far the grid reaches from its centre before it fades out");
+        ImGui::SetNextItemWidth(field);
+        ImGui::DragFloat("Height", &grid.height, 0.01f, -1e6f, 1e6f, "%.3f m");
+        ImGui::SetItemTooltip("The grid's z");
+        ImGui::SeparatorText("Brightness");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Minor Lines", &grid.minorBrightness, 0, 1, "%.2f");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Major Lines", &grid.majorBrightness, 0, 1, "%.2f");
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
+    ImGui::PopItemFlag();
 }
 
 void Toolbar::DrawRendererMenu() {
@@ -533,7 +569,13 @@ void Toolbar::DrawHudMenu() {
     ImGui::SeparatorText("Guides");
     ImGui::MenuItem("Selection Outline", nullptr, &guides.outline);
     ImGui::MenuItem("Selection Bounds", nullptr, &guides.bounds);
-    ImGui::MenuItem("Grid", nullptr, &guides.grid);
+    ImGui::MenuItem("Selection Axes", nullptr, &guides.frames);
+    ImGui::SetItemTooltip("Each selected prim's x, y and z axes at its origin");
+    ImGui::MenuItem("All Bounds", nullptr, &guides.allBounds);
+    ImGui::SetItemTooltip("Every geometry prim's bounding box, a color a prim");
+    ImGui::MenuItem("Grid", nullptr, &guides.grid.shown);
+    ImGui::MenuItem("Axis Indicator", nullptr, &guides.axes);
+    ImGui::SetItemTooltip("The world's axes as the camera sees them, in the bottom left corner");
     ImGui::SeparatorText("Overlays");
     bool overlays = m_viewport.SceneOverlaysShown();
     if (ImGui::MenuItem("Scene Overlays", nullptr, &overlays)) {
@@ -541,6 +583,20 @@ void Toolbar::DrawHudMenu() {
     }
     ImGui::SetItemTooltip("Draw the renderer's overlays from the scene or a simulation over the "
                           "image, beside the guides above");
+    ImGui::BeginDisabled(!overlays);
+    ImGui::Indent();
+    for (const std::string& name : m_viewport.SceneOverlayNames()) {
+        bool shown = !m_viewport.hiddenOverlays.contains(name);
+        if (ImGui::MenuItem(name.c_str(), nullptr, &shown)) {
+            if (shown) {
+                m_viewport.hiddenOverlays.erase(name);
+            } else {
+                m_viewport.hiddenOverlays.insert(name);
+            }
+        }
+    }
+    ImGui::Unindent();
+    ImGui::EndDisabled();
     ImGui::PopItemFlag();
 }
 
