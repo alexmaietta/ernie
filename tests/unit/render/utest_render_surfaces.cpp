@@ -56,6 +56,35 @@ TEST(SurfaceTest, RadarSeesTheMotionOfTheNearestMovingAncestor) {
     });
 }
 
+TEST(SurfaceTest, RadarSeesAMovingCloudOfPoints) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Radar>("/Radar", {.fieldOfView = {2, 2}, .rays = {kSide, kSide}});
+        const Prim plume = scene->Define<Xform>("/Plume", {.translate = {0, 0, -10}});
+        std::vector<Float3> grains;
+        for (int y = -4; y <= 4; ++y) {
+            for (int x = -4; x <= 4; ++x) {
+                grains.push_back({0.25f * float(x), 0.25f * float(y), 0});
+            }
+        }
+        const Prim cloud =
+            scene->Define<Points>("/Plume/Grains", {.points = grains, .widths = {0.3f}});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Velocity",
+                                 {.sourceName = RenderVarSource::RadialVelocity});
+        scene->Define<RenderProduct>("/Render/Scan",
+                                     {.camera = {"/Radar"}, .orderedVars = {"/Render/Velocity"}});
+        Renderer renderer(scene);
+        EXPECT_NEAR(CenterVelocity(renderer), 0, 1e-4f);
+
+        scene->Apply<MotionAPI>(plume, {.motionVelocity = {0, 0, -3}});
+        EXPECT_NEAR(CenterVelocity(renderer), 3, 1e-3f);
+
+        scene->Apply<MotionAPI>(cloud, {.motionVelocity = {0, 0, 2}});
+        EXPECT_NEAR(CenterVelocity(renderer), -2, 1e-3f);
+    });
+}
+
 struct Colors {
     Float3 first;
     Float3 second;

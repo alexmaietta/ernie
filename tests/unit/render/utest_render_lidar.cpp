@@ -58,5 +58,32 @@ TEST(LidarTest, DivergentBeamsCenterOnTheirEmitter) {
     });
 }
 
+TEST(LidarTest, DustPointsReturnWhereTheBeamMeetsThem) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = BeamAtWall(device, {0, 0});
+        const Prim dust =
+            scene->Define<Points>("/Dust", {.points = {{0, 0, -2}, {3, 0, -2}}, .widths = {0.5f}});
+        Renderer renderer(scene);
+        const auto range = [&] {
+            const std::vector<float> point = ScanPoint(renderer);
+            return point.size() >= 3 ? point[2] : 0.0f;
+        };
+        EXPECT_NEAR(range(), -1.75f, 1e-3f);
+
+        dust.Set(Points::kPoints, std::vector<Float3>{{0, 0, -3}, {3, 0, -2}});
+        EXPECT_NEAR(range(), -2.75f, 1e-3f);
+
+        dust.Set(Points::kNormals, std::vector<Float3>{{0, 0, 1}});
+        EXPECT_NEAR(range(), -3, 1e-3f);
+
+        dust.Set(Points::kDisplayOpacity, 0.0f);
+        EXPECT_NEAR(range(), -kWallDistance, 1e-3f);
+
+        dust.Set(Points::kDisplayOpacity, 1.0f);
+        dust.Set(Points::kPoints, std::vector<Float3>{{3, 0, -2}});
+        EXPECT_NEAR(range(), -kWallDistance, 1e-3f);
+    });
+}
+
 }
 }

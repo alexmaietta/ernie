@@ -65,12 +65,18 @@ The first numbers on an RTX 5070 Laptop GPU with hardware traversal set the targ
 
 So a moving cloud is bound by the BLAS rebuild, many small clouds are bound by per-cloud CPU work in `PointsTable` and by per-BLAS build overhead, and Points beat the instancer on moving particles while using a sixth of the memory.
 
-### 3. Shading and sensors
+### 3. Shading and sensors (done)
 
-- Disks from `normals`, facing each point's normal, following USD.
-- Per-point colour and opacity as device arrays a simulation can write every step. The packed primvars table is built on the host, so it doesn't suit per-step particle data. Opacity goes through the non-opaque procedural path.
-- `ids` on Points for instance id and segmentation outputs.
-- Lidar and radar coverage tests, for dust, ejecta and rain.
+- Disks from `normals`. One normal applies to every point, a normal per point applies to each, and each disk is as wide as its point. The sphere box still bounds it, so boxes don't change.
+- Per-point colour from a vertex `displayColor` primvar, which every gprim now honours, with instancer primvars still taking precedence.
+- Stochastic opacity from `displayOpacity`, constant or as a vertex primvar. Each candidate hit is kept with probability equal to its opacity, from a hash of the object-space ray and the point index, inside the shape intersector, so camera, shadow, lidar and radar rays all see it in both tracers without non-opaque ray flags. The same ray always makes the same choice, so a still camera without jitter sees a fixed pattern that pixel samples average out.
+- `ids` on Points, reported per point by the `InstanceId` output, with each point's index when ids are empty, and the Points prim's stable id as `InstancerStableId`.
+- Lidar tests for dust spheres, dust disks, transparent dust and a moved point, and a radar test for a moving plume.
+
+Still open from this milestone.
+
+- Colour and opacity as primvars are packed on the host, so a simulation can't write them every step through `Map`. Device-writable per-point colour and opacity arrays belong with milestone 5.
+- Point clouds from lidar don't carry an instance id channel, only the prim's stable id.
 
 ### 4. Efficiency
 
