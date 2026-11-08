@@ -2,9 +2,10 @@
 #include "ernie/device/compute/runtime_compiler.h"
 
 #include <deque>
-#include <format>
 #include <optional>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/util/disk_cache.h"
 #include "ernie/util/error.h"
@@ -24,7 +25,7 @@ void Check(const RuntimeCompiler& compiler, int result, const char* call) {
         return;
     }
     const char* text = compiler.getErrorString(result);
-    throw ApiError(std::format("{}: {}", compiler.name, call), text != nullptr ? text : "unknown",
+    throw ApiError(fmt::format("{}: {}", compiler.name, call), text != nullptr ? text : "unknown",
                    result);
 }
 
@@ -92,10 +93,10 @@ RuntimeCompiler::Compiled RuntimeCompiler::CompileCached(std::string_view source
                                                          std::span<const std::string> options,
                                                          std::string_view what,
                                                          const DiskCache& cache) const {
-    std::string key = std::format("{} {} {}", name, version.ToString(),
+    std::string key = fmt::format("{} {} {}", name, version.ToString(),
                                   Join({options.begin(), options.end()}, " "));
     for (const SourceHeader& header : headers) {
-        key += std::format(" {} {}", header.name, Digest(header.text));
+        key += fmt::format(" {} {}", header.name, Digest(header.text));
     }
     key += " source " + Digest(source);
 
@@ -115,7 +116,7 @@ Loaded<RuntimeCompiler> LoadRuntimeCompiler(std::string_view name, std::string_v
                                             Version minimum, const std::filesystem::path& beside) {
     const Library library = Library::Load(names, paths, beside);
     if (!library) {
-        return std::format("no {} was found", name);
+        return fmt::format("no {} was found", name);
     }
 
     RuntimeCompiler compiler;
@@ -124,7 +125,7 @@ Loaded<RuntimeCompiler> LoadRuntimeCompiler(std::string_view name, std::string_v
     SymbolResolver resolve(library);
     std::deque<std::string> symbols;
     const auto call = [&](std::string_view suffix, auto& function) {
-        resolve(symbols.emplace_back(std::format("{}{}", prefix, suffix)).c_str(), function);
+        resolve(symbols.emplace_back(fmt::format("{}{}", prefix, suffix)).c_str(), function);
     };
     call("Version", compiler.getVersion);
     call("GetErrorString", compiler.getErrorString);
@@ -133,10 +134,10 @@ Loaded<RuntimeCompiler> LoadRuntimeCompiler(std::string_view name, std::string_v
     call("CompileProgram", compiler.compileProgram);
     call("GetProgramLogSize", compiler.getLogSize);
     call("GetProgramLog", compiler.getLog);
-    call(std::format("Get{}Size", code), compiler.getCodeSize);
-    call(std::format("Get{}", code), compiler.getCode);
+    call(fmt::format("Get{}Size", code), compiler.getCodeSize);
+    call(fmt::format("Get{}", code), compiler.getCode);
     if (resolve.Missing() != nullptr) {
-        return std::format("{} lacks {}", compiler.library, resolve.Missing());
+        return fmt::format("{} lacks {}", compiler.library, resolve.Missing());
     }
 
     int major = 0;

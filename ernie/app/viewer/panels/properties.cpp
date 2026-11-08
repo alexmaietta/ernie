@@ -5,7 +5,6 @@
 #include <cmath>
 #include <cstring>
 #include <exception>
-#include <format>
 #include <map>
 #include <memory>
 #include <optional>
@@ -13,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
@@ -71,7 +71,7 @@ template <class T> T Cell(const std::byte* bytes) {
 std::string Floats(const float* values, size_t count, Unit unit) {
     std::string text;
     for (size_t i = 0; i < count; ++i) {
-        text += std::format("{}{:.4g}", i > 0 ? ", " : "", values[i]);
+        text += fmt::format("{}{:.4g}", i > 0 ? ", " : "", values[i]);
     }
     return text + UnitSuffix(unit);
 }
@@ -79,7 +79,7 @@ std::string Floats(const float* values, size_t count, Unit unit) {
 std::string Doubles(const double* values, size_t count, Unit unit) {
     std::string text;
     for (size_t i = 0; i < count; ++i) {
-        text += std::format("{}{:.6g}", i > 0 ? ", " : "", values[i]);
+        text += fmt::format("{}{:.6g}", i > 0 ? ", " : "", values[i]);
     }
     return text + UnitSuffix(unit);
 }
@@ -208,7 +208,7 @@ class Properties {
                                   view,
                                   instance.empty() || section == kComputed
                                       ? std::string(section)
-                                      : std::format("{}:{}", section, instance),
+                                      : fmt::format("{}:{}", section, instance),
                                   std::string(label),
                                   {}});
             }
@@ -569,7 +569,7 @@ class Properties {
     void DrawText(size_t index, const std::byte* bytes) {
         const Row& row = m_rows[index];
         const ColumnInfo* info = row.column.column;
-        std::string& text = m_texts[std::format("{}:{}", info->field, row.instance)];
+        std::string& text = m_texts[fmt::format("{}:{}", info->field, row.instance)];
         if (!ImGui::IsAnyItemActive()) {
             text = std::string(m_scene->Text(Token{Cell<uint32_t>(bytes)}));
         }
@@ -607,7 +607,7 @@ class Properties {
             DrawReadOnly(row, row.cells.data());
             return;
         }
-        const std::string key = std::format("{}:{}", row.column.column->field, row.instance);
+        const std::string key = fmt::format("{}:{}", row.column.column->field, row.instance);
         auto found = m_items.find(key);
         if (found == m_items.end() || found->second.size() != count) {
             found = m_items.insert_or_assign(key, row.view.Get(row.column).GetTargets(0)).first;
@@ -659,17 +659,17 @@ class Properties {
             Text(Cell<uint32_t>(bytes) != 0 ? "true" : "false");
             return;
         case ColumnType::Int:
-            Text(std::format("{}{}", Cell<int32_t>(bytes), UnitSuffix(info.unit)));
+            Text(fmt::format("{}{}", Cell<int32_t>(bytes), UnitSuffix(info.unit)));
             return;
         case ColumnType::Uint:
-            Text(std::format("{}{}", Cell<uint32_t>(bytes), UnitSuffix(info.unit)));
+            Text(fmt::format("{}{}", Cell<uint32_t>(bytes), UnitSuffix(info.unit)));
             return;
         case ColumnType::Uint64:
-            Text(std::format("{}", Cell<uint64_t>(bytes)));
+            Text(fmt::format("{}", Cell<uint64_t>(bytes)));
             return;
         case ColumnType::Uint2: {
             const Uint2 value = Cell<Uint2>(bytes);
-            Text(std::format("{}, {}", value.x, value.y));
+            Text(fmt::format("{}, {}", value.x, value.y));
             return;
         }
         case ColumnType::Float:
@@ -729,7 +729,7 @@ class Properties {
             ImGui::TextDisabled("no %ss", noun);
             return;
         }
-        const std::string key = std::format("{}:{}", info.field, row.instance);
+        const std::string key = fmt::format("{}:{}", info.field, row.instance);
         const auto found = m_items.find(key);
         if (found == m_items.end()) {
             ImGui::Text("%u %s%s", count, noun, count == 1 ? "" : "s");
@@ -773,7 +773,7 @@ class Properties {
                     Floats(reinterpret_cast<const float*>(bytes.data() + at), width, info.unit));
             }
         } else {
-            lines.push_back(std::format("{} items", count));
+            lines.push_back(fmt::format("{} items", count));
         }
         if (lines.size() > kShownItems) {
             lines.resize(kShownItems);

@@ -3,7 +3,8 @@
 
 #include <bit>
 #include <cstring>
-#include <format>
+
+#include <fmt/format.h>
 
 #include "ernie/device/kernels/device.h"
 #include "ernie/util/log.h"
@@ -23,7 +24,7 @@ std::string Value(uint32_t bits, uint32_t type) {
     case kPrintedInt:
         return std::to_string(int32_t(bits));
     case kPrintedFloat:
-        return std::format("{}", std::bit_cast<float>(bits));
+        return fmt::format("{}", std::bit_cast<float>(bits));
     case kPrintedBool:
         return bits != 0 ? "true" : "false";
     default:
@@ -81,13 +82,13 @@ void DebugRecords::Report(const uint32_t* record, uint64_t finished) {
     const std::string message = Format(record);
     const uint32_t* grid = record + kThreadWord;
     const std::string thread =
-        std::format("thread {} ({}, {}, {})", record[kLinearWord], grid[0], grid[1], grid[2]);
+        fmt::format("thread {} ({}, {}, {})", record[kLinearWord], grid[0], grid[1], grid[2]);
 
     if ((record[kKindWord] & 0xff) == kAssertRecord) {
         const uint64_t submission = (finished & ~uint64_t(0xffffffff)) | record[kStampWord];
         m_failures.emplace(
             submission > finished ? submission - (uint64_t(1) << 32) : submission,
-            std::format("Assert failed in kernel {} at {}: {}", kernel, thread, message));
+            fmt::format("Assert failed in kernel {} at {}: {}", kernel, thread, message));
     } else if ((record[kKindWord] & 0xff) == kPrintRecord) {
         Log(LogLevel::Info, "kernel {}, {}: {}", kernel, thread, message);
     }
@@ -134,7 +135,7 @@ std::optional<std::string> DebugRecords::TakeFailures(uint64_t submission) {
         }
     }
     if (count > kShownFailures) {
-        messages.push_back(std::format("and {} more failed asserts", count - kShownFailures));
+        messages.push_back(fmt::format("and {} more failed asserts", count - kShownFailures));
     }
     m_failures.erase(m_failures.begin(), end);
     return Join(messages, "\n");

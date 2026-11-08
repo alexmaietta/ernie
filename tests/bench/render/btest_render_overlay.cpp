@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -10,6 +9,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/queue.h"
@@ -98,7 +99,7 @@ Overlay Draw(device::Device& device, Source source, uint32_t count,
                                                       .background = {0, 0, 0, 0},
                                                       .halo = {0, 0, 0, 0.8f}};
         for (uint32_t at = 0; at < count; ++at) {
-            overlay.Label(endpoints[2 * at], std::format("body {}", at), style);
+            overlay.Label(endpoints[2 * at], fmt::format("body {}", at), style);
         }
         return overlay;
     }
@@ -276,7 +277,7 @@ Setup Prepare(Source source, uint32_t count, const Shape& shape) {
     if (source == Source::PrimBounds) {
         const std::vector<Float3> centers = Endpoints(count);
         for (uint32_t at = 0; at < count; ++at) {
-            const std::string path = std::format("/Cube_{}", at);
+            const std::string path = fmt::format("/Cube_{}", at);
             const Float3 center = centers[2 * at];
             setup.scene->Define<Cube>(path,
                                       {.translate = {center.x, center.y, center.z}, .size = 0.1});
@@ -286,7 +287,7 @@ Setup Prepare(Source source, uint32_t count, const Shape& shape) {
     for (uint32_t view = 0; view < shape.views; ++view) {
         std::string path = "/Cam";
         if (shape.views > 1) {
-            const std::string world = std::format("/env_{}", view);
+            const std::string world = fmt::format("/env_{}", view);
             setup.scene->Define<World>(world, {});
             path = world + "/Cam";
         }
@@ -341,7 +342,7 @@ void DrawOverlays(benchmark::State& state, Source source) {
     const auto count = uint32_t(state.range(0));
     const Shape& shape = kShapes[state.range(1)];
     Setup& setup =
-        bench::Cached<Setup>(std::format("{}/{}/{}", int64_t(source), count, state.range(1)),
+        bench::Cached<Setup>(fmt::format("{}/{}/{}", int64_t(source), count, state.range(1)),
                              [&] { return Prepare(source, count, shape); });
     bench::TimeGpu(state, [&](device::CommandEncoder& encoder) {
         setup.pass->Record(encoder, setup.snapshot, setup.scene->WorldCount(), setup.targets,
@@ -391,7 +392,7 @@ void Composite(benchmark::State& state) {
         device::Tensor overlay;
     };
 
-    Images& images = bench::Cached<Images>(std::format("{}x{}", width, height), [&] {
+    Images& images = bench::Cached<Images>(fmt::format("{}x{}", width, height), [&] {
         const std::vector<int64_t> shape = {1, height, width, 4};
         std::vector<uint32_t> covered(uint64_t(width) * height);
         for (size_t at = 0; at < covered.size(); ++at) {

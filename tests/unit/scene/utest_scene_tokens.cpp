@@ -2,11 +2,11 @@
 #include "ernie/scene/catalog/tokens.h"
 
 #include <cstdint>
-#include <format>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 namespace ernie {
@@ -30,7 +30,7 @@ TEST(TokensTest, TextsStayValidAsTokensGrowAndMove) {
     const Token first = tokens.Intern("first");
     const std::string_view text = tokens.Text(first);
     for (uint32_t i = 0; i < 10000; ++i) {
-        tokens.Intern(std::format("name{}", i));
+        tokens.Intern(fmt::format("name{}", i));
     }
     EXPECT_EQ(text, "first");
     Tokens moved = std::move(tokens);

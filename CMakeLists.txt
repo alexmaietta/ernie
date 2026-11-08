@@ -55,6 +55,7 @@ if(ERNIE_DEBIAN_LIBDIR)
 endif()
 include(GNUInstallDirs)
 
+include(cmake/third_party/fmt.cmake)
 include(cmake/third_party/vulkan_headers.cmake)
 include(cmake/third_party/volk.cmake)
 include(cmake/third_party/vma.cmake)

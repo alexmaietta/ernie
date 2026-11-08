@@ -6,11 +6,8 @@
 #include <string_view>
 #include <utility>
 
-#if __has_include(<version>)
-#include <version>
-#endif
-#ifdef __cpp_lib_format
-#include <format>
+#ifdef ERNIE_FMT
+#include <fmt/format.h>
 #endif
 
 #include "ernie/export.h"
@@ -21,11 +18,11 @@ class ERNIE_API Error : public std::runtime_error {
   public:
     explicit Error(const std::string& message);
 
-#ifdef __cpp_lib_format
+#ifdef ERNIE_FMT
     template <class... Args>
         requires(sizeof...(Args) > 0)
-    explicit Error(std::format_string<Args...> format, Args&&... args)
-        : Error(std::format(format, std::forward<Args>(args)...)) {}
+    explicit Error(fmt::format_string<Args...> format, Args&&... args)
+        : Error(fmt::format(format, std::forward<Args>(args)...)) {}
 #endif
 
     ~Error() override;

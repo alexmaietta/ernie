@@ -5,10 +5,10 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
-#include <format>
 #include <system_error>
 #include <utility>
 
+#include <fmt/chrono.h>
 #include <imgui.h>
 #include <imgui_stdlib.h>
 
@@ -42,7 +42,7 @@ std::string TimeText(fs::file_time_type time) {
         std::chrono::system_clock::now() +
         std::chrono::duration_cast<std::chrono::system_clock::duration>(
             time - fs::file_time_type::clock::now()));
-    return std::format("{:%Y-%m-%d %H:%M}", system);
+    return fmt::format("{:%Y-%m-%d %H:%M}", system);
 }
 
 std::string Labelled(const char* icon, const std::string& text) {

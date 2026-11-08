@@ -3,8 +3,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <format>
 
+#include <fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -18,8 +18,8 @@ std::string FormatBytes(uint64_t bytes) {
         value /= 1024.0;
         ++unit;
     }
-    return unit == 0 ? std::format("{:.0f} {}", value, units[unit])
-                     : std::format("{:.1f} {}", value, units[unit]);
+    return unit == 0 ? fmt::format("{:.0f} {}", value, units[unit])
+                     : fmt::format("{:.1f} {}", value, units[unit]);
 }
 
 std::string Lowercase(std::string_view text) {

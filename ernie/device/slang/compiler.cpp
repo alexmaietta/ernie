@@ -4,12 +4,12 @@
 #include <algorithm>
 #include <charconv>
 #include <cstddef>
-#include <format>
 #include <iterator>
 #include <optional>
 #include <regex>
 #include <vector>
 
+#include <fmt/format.h>
 #include <slang-com-ptr.h>
 #include <slang.h>
 
@@ -44,7 +44,7 @@ slang::IGlobalSession& GlobalSession() {
         if (SLANG_FAILED(slang::createGlobalSession(created.writeRef()))) {
             throw Error("Slang failed to start");
         }
-        const std::string prelude = std::format("#include \"{}\"\n", kPreludeHeader);
+        const std::string prelude = fmt::format("#include \"{}\"\n", kPreludeHeader);
         created->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.c_str());
         return created;
     }();
@@ -299,7 +299,7 @@ KernelParts LoadParts(slang::ISession& session, std::span<const std::string> mod
     for (const std::string& name : modules) {
         slang::IModule* module = session.loadModule(name.c_str(), diagnostics.writeRef());
         if (module == nullptr) {
-            Fail(std::format("Compiling module {}", name), label, diagnostics);
+            Fail(fmt::format("Compiling module {}", name), label, diagnostics);
         }
         loaded.components.push_back(module);
         if (!loaded.entryPoint) {
@@ -312,7 +312,7 @@ KernelParts LoadParts(slang::ISession& session, std::span<const std::string> mod
     loaded.components.push_back(loaded.entryPoint);
 
     const std::string named =
-        std::format("export static const uint kKernelHash = {};", SlangStringHash(entry));
+        fmt::format("export static const uint kKernelHash = {};", SlangStringHash(entry));
     slang::IModule* kernelHash = session.loadModuleFromSourceString(
         "ernie_kernel_hash", "ernie_kernel_hash.slang", named.c_str(), diagnostics.writeRef());
     if (kernelHash == nullptr) {
@@ -332,7 +332,7 @@ LinkedKernel Link(slang::ISession& session, std::span<slang::IComponentType* con
                   std::string_view entry, std::string_view label,
                   ComPtr<slang::IBlob>& diagnostics) {
     LinkedKernel kernel;
-    const std::string what = std::format("Compiling kernel {}", entry);
+    const std::string what = fmt::format("Compiling kernel {}", entry);
     if (SLANG_FAILED(session.createCompositeComponentType(
             components.data(), SlangInt(components.size()), kernel.composite.writeRef(),
             diagnostics.writeRef())) ||
@@ -380,7 +380,7 @@ KernelCode CompileWithSlang(Backend backend, Traversal traversal, Sampling sampl
 namespace {
 
 void AppendField(std::string& entry, std::string_view text) {
-    entry += std::format("{} ", text.size());
+    entry += fmt::format("{} ", text.size());
     entry += text;
     entry += '\n';
 }
@@ -416,7 +416,7 @@ bool Unchanged(const KernelLibrary* library, const SourceFiles& sources,
 }
 
 std::string KernelCode::Encode() const {
-    std::string entry = std::format("{} {} {} {} {} {} {}\n", shape.groupSize.x, shape.groupSize.y,
+    std::string entry = fmt::format("{} {} {} {} {} {} {}\n", shape.groupSize.x, shape.groupSize.y,
                                     shape.groupSize.z, shape.paramBytes, shape.foldable ? 1 : 0,
                                     strings.size(), files.size());
     for (const std::string& text : strings) {
@@ -475,7 +475,7 @@ KernelCode Compile(Backend backend, Traversal traversal, Sampling sampling, bool
                    const KernelLibrary* library, const SourceFiles& sources,
                    std::span<const std::string> modules, std::string_view entry,
                    std::string_view label, const DiskCache& cache, bool narrowWaves) {
-    const std::string key = std::format(
+    const std::string key = fmt::format(
         "slang {} entry {} {}{}{}{}{} {} of {}", spGetBuildTagString(), kEntryFormat,
         BackendName(backend), traversal == Traversal::Hardware ? " with hardware traversal" : "",
         sampling == Sampling::Hardware ? " with hardware textures" : "",

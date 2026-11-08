@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"

@@ -161,7 +161,7 @@ docker run --rm -it -v "$PWD:/app" -w /app ghcr.io/alexmaietta/ernie \
 
 ## Building from source
 
-Ernie needs CMake 3.25 or later and a C++20 compiler, such as GCC 13, Clang 18 or Visual Studio 2022. Its other dependencies are downloaded while it configures.
+Ernie needs CMake 3.25 or later and a C++20 compiler, such as GCC 12, Clang 18 or Visual Studio 2022. Its other dependencies are downloaded while it configures.
 
 ```bash
 git clone https://github.com/alexmaietta/ernie.git

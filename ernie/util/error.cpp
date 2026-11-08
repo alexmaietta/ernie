@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/error.h"
 
-#include <format>
+#include <fmt/format.h>
 
 namespace ernie {
 namespace {
@@ -9,9 +9,9 @@ namespace {
 std::string ApiMessage(std::string_view call, std::string_view errorName, long code,
                        std::string_view description) {
     if (description.empty()) {
-        return std::format("{} failed: {} ({})", call, errorName, code);
+        return fmt::format("{} failed: {} ({})", call, errorName, code);
     }
-    return std::format("{} failed: {} ({}): {}", call, errorName, code, description);
+    return fmt::format("{} failed: {} ({}): {}", call, errorName, code, description);
 }
 
 }

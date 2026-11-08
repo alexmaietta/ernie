@@ -6,13 +6,14 @@
 #include <cstring>
 #include <deque>
 #include <exception>
-#include <format>
 #include <fstream>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/queue.h"
@@ -79,7 +80,7 @@ void WriteLabels(const std::filesystem::path& path, const IdMap& map, bool singl
                 result += '\\';
                 result += c;
             } else if (uint8_t(c) < 0x20) {
-                result += std::format("\\u{:04x}", int(c));
+                result += fmt::format("\\u{:04x}", int(c));
             } else {
                 result += c;
             }
@@ -93,22 +94,22 @@ void WriteLabels(const std::filesystem::path& path, const IdMap& map, bool singl
             IdColor(Span<const uint32_t>(id.data(), single ? 1 : id.size()));
         const std::string key = single
                                     ? std::to_string(id[0])
-                                    : std::format("({}, {}, {}, {})", id[0], id[1], id[2], id[3]);
+                                    : fmt::format("({}, {}, {}, {})", id[0], id[1], id[2], id[3]);
         std::string fields;
         if (!label.path.empty()) {
-            fields += std::format("\"path\": \"{}\", ", escaped(label.path));
+            fields += fmt::format("\"path\": \"{}\", ", escaped(label.path));
         }
         fields += "\"labels\": {";
         const char* comma = "";
         for (const auto& [taxonomy, names] : label.labels) {
-            fields += std::format("{}\"{}\": [", comma, escaped(taxonomy));
+            fields += fmt::format("{}\"{}\": [", comma, escaped(taxonomy));
             for (size_t i = 0; i < names.size(); ++i) {
-                fields += std::format("{}\"{}\"", i > 0 ? ", " : "", escaped(names[i]));
+                fields += fmt::format("{}\"{}\"", i > 0 ? ", " : "", escaped(names[i]));
             }
             fields += "]";
             comma = ", ";
         }
-        text += std::format("{}    \"{}\": {{{}}}, \"color\": [{}, {}, {}, {}]}}", separator, key,
+        text += fmt::format("{}    \"{}\": {{{}}}, \"color\": [{}, {}, {}, {}]}}", separator, key,
                             fields, color[0], color[1], color[2], color[3]);
         separator = ",\n";
     }
@@ -201,7 +202,7 @@ std::vector<std::filesystem::path> WriteVars(const std::filesystem::path& direct
         const bool exr = raw && renderVar.tensor.Type() != device::DType::UInt8;
         for (int64_t camera = 0; camera < shape[0]; ++camera) {
             const std::filesystem::path file =
-                directory / std::format("{}_{}{}", name, camera, exr ? ".exr" : ".png");
+                directory / fmt::format("{}_{}{}", name, camera, exr ? ".exr" : ".png");
             write(file, renderVar, camera);
             written.push_back(file);
         }
@@ -209,7 +210,7 @@ std::vector<std::filesystem::path> WriteVars(const std::filesystem::path& direct
     if (!frame.overlay.Empty()) {
         const RenderVarOutput overlay{"overlay", "Overlay", frame.overlay, nullptr};
         for (int64_t camera = 0; camera < frame.overlay.Shape()[0]; ++camera) {
-            const std::filesystem::path file = directory / std::format("overlay_{}.png", camera);
+            const std::filesystem::path file = directory / fmt::format("overlay_{}.png", camera);
             write(file, overlay, camera);
             written.push_back(file);
         }

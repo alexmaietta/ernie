@@ -5,13 +5,14 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <format>
 #include <fstream>
 #include <functional>
 #include <iterator>
 #include <system_error>
 #include <thread>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/util/environment.h"
 #include "ernie/util/log.h"
@@ -22,13 +23,13 @@ namespace ernie {
 namespace {
 
 std::string Preamble(std::string_view key) {
-    return std::format("ernie cache 1\n{}\n", key);
+    return fmt::format("ernie cache 1\n{}\n", key);
 }
 
 std::string UniqueSuffix() {
     static std::atomic<uint64_t> counter{0};
     const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-    return std::format(".{:x}.{:x}.{:x}.tmp",
+    return fmt::format(".{:x}.{:x}.{:x}.tmp",
                        std::hash<std::thread::id>{}(std::this_thread::get_id()), uint64_t(now),
                        counter++);
 }
@@ -107,7 +108,7 @@ std::filesystem::path UserCacheDirectory() {
 
 std::filesystem::path KernelCacheDirectory(const std::filesystem::path& root) {
     const Version version = GetBuildInfo().version;
-    return root / "kernels" / std::format("{}.{}.{}", version.major, version.minor, version.patch);
+    return root / "kernels" / fmt::format("{}.{}.{}", version.major, version.minor, version.patch);
 }
 
 void TrimKernelCache(const std::filesystem::path& root, uint64_t limit) {

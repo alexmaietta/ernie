@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
@@ -126,8 +126,8 @@ TEST(HierarchyTest, OnlyDirtyWorldsAreDispatched) {
     ForEachWorld([](World& w) {
         std::vector<uint32_t> balls;
         for (uint32_t i = 0; i < 3; ++i) {
-            w.Define(SchemaId::World, std::format("/Env{}", i));
-            balls.push_back(w.Define(SchemaId::Sphere, std::format("/Env{}/Ball", i)));
+            w.Define(SchemaId::World, fmt::format("/Env{}", i));
+            balls.push_back(w.Define(SchemaId::Sphere, fmt::format("/Env{}/Ball", i)));
         }
         w.Define(SchemaId::Sphere, "/Sun");
         w.Publish();

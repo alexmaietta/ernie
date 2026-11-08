@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
-#include <format>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/bvh/builder.h"
@@ -69,7 +69,7 @@ struct Work {
 };
 
 void PrintTo(const Work& work, std::ostream* out) {
-    *out << std::format("{{hierarchy rows {}, BLAS built {} refit {}, TLAS built {} refit {}, "
+    *out << fmt::format("{{hierarchy rows {}, BLAS built {} refit {}, TLAS built {} refit {}, "
                         "instances written {}, hierarchy rebuilt {}, instances relaid {}}}",
                         work.hierarchyRows, work.blasBuilt, work.blasRefit, work.tlasBuilt,
                         work.tlasRefit, work.instancesWritten, work.hierarchyRebuilt,

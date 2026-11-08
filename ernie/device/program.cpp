@@ -5,7 +5,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <exception>
-#include <format>
 #include <functional>
 #include <future>
 #include <map>
@@ -15,6 +14,8 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/device.h"
 #include "ernie/device/slang/compiler.h"
@@ -81,10 +82,10 @@ void FinishBuild(const std::string& name = {}, bool cached = false) {
 std::string ResourceUsage(const KernelStats& stats) {
     std::string usage;
     if (stats.registers) {
-        usage += std::format(", {} registers", *stats.registers);
+        usage += fmt::format(", {} registers", *stats.registers);
     }
     if (stats.spillBytes) {
-        usage += std::format(", {} bytes of scratch memory", *stats.spillBytes);
+        usage += fmt::format(", {} bytes of scratch memory", *stats.spillBytes);
     }
     return usage;
 }

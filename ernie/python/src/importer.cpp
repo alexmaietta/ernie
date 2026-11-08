@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <filesystem>
-#include <format>
 #include <map>
 #include <memory>
 #include <optional>
@@ -9,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/map.h>
@@ -152,7 +152,7 @@ void BindImport(nb::module_& module) {
         .def_ro("done", &ImportProgress::done)
         .def_ro("total", &ImportProgress::total)
         .def("__repr__", [](const ImportProgress& progress) {
-            return std::format("ImportProgress({}, {}/{})", progress.stage, progress.done,
+            return fmt::format("ImportProgress({}, {}/{})", progress.stage, progress.done,
                                progress.total);
         });
 

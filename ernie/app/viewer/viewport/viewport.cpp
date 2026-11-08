@@ -7,7 +7,6 @@
 #include <cfloat>
 #include <cmath>
 #include <cstring>
-#include <format>
 #include <iterator>
 #include <optional>
 #include <random>
@@ -15,6 +14,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/app/viewer/overlays/toolbar.h"
 #include "ernie/app/viewer/widgets/widgets.h"
@@ -206,7 +207,7 @@ void Viewport::DefineSession() {
     std::string root;
     std::optional<ComposedWorld> claimed;
     for (uint32_t copy = 1;; ++copy) {
-        root = std::string(kSessionRoot) + "/" + key + (copy > 1 ? std::format("_{}", copy) : "");
+        root = std::string(kSessionRoot) + "/" + key + (copy > 1 ? fmt::format("_{}", copy) : "");
         if (m_sessions != nullptr) {
             if (const auto found = m_sessions->find(root);
                 found != m_sessions->end() && !found->second.expired()) {
@@ -563,12 +564,12 @@ void Viewport::Draw(Presenter& presenter, std::optional<ViewportRect> fixed, boo
                 builds.queued > 0 ? float(builds.finished) / float(builds.queued) : 0;
             ImGui::ProgressBar(
                 done, {width, 0},
-                std::format("{} of {} kernels", builds.finished, builds.queued).c_str());
+                fmt::format("{} of {} kernels", builds.finished, builds.queued).c_str());
             ImGui::PushStyleColor(ImGuiCol_Text, m_theme.textMuted);
             ImGui::TextUnformatted(
                 builds.building.empty()
                     ? (builds.Done() ? "Rendering the first frame" : "Waiting for kernels")
-                    : std::format("Compiling {}", builds.building.front()).c_str());
+                    : fmt::format("Compiling {}", builds.building.front()).c_str());
             if (builds.cached > 0) {
                 ImGui::Text("%llu loaded from the shader cache",
                             static_cast<unsigned long long>(builds.cached));
@@ -860,7 +861,7 @@ void Viewport::DrawColorbar(ImDrawList& list, ImVec2 min, ImVec2 max, const Colo
                                 ? std::exp(std::log(desc.minimum) +
                                            t * (std::log(desc.maximum) - std::log(desc.minimum)))
                                 : desc.minimum + t * (desc.maximum - desc.minimum);
-        const std::string number = std::format("{:.3g}", value);
+        const std::string number = fmt::format("{:.3g}", value);
         const ImVec2 extent = ImGui::CalcTextSize(number.c_str());
         if (vertical) {
             const float y = corner.y + size.y * (1 - t);
@@ -890,7 +891,7 @@ std::vector<std::string> Viewport::HudLines() const {
         const device::BuildProgress builds = device::CurrentBuilds();
         if (!builds.Done()) {
             lines.push_back(
-                std::format("Compiling kernels: {} left", builds.queued - builds.finished));
+                fmt::format("Compiling kernels: {} left", builds.queued - builds.finished));
         }
     }
     const auto shown = [&](HudItem item) { return hudItems[size_t(item)]; };
@@ -898,11 +899,11 @@ std::vector<std::string> Viewport::HudLines() const {
     if (shown(HudItem::Fps)) {
         lines.push_back(
             m_renderFps > 0
-                ? std::format("FPS: {:.1f}, Step time: {:.2f} ms", m_renderFps, m_stepMs)
-                : std::format("FPS: {:.1f}, Frame time: {:.2f} ms", ui, 1000 / ui));
+                ? fmt::format("FPS: {:.1f}, Step time: {:.2f} ms", m_renderFps, m_stepMs)
+                : fmt::format("FPS: {:.1f}, Frame time: {:.2f} ms", ui, 1000 / ui));
     }
     if (shown(HudItem::UiFps) && m_renderFps > 0) {
-        lines.push_back(std::format("UI FPS: {:.1f}", ui));
+        lines.push_back(fmt::format("UI FPS: {:.1f}", ui));
     }
     if (shown(HudItem::DeviceMemory)) {
         lines.push_back("Device Memory: " + FormatBytes(m_device->MemoryUsage().deviceBytes) +
@@ -914,13 +915,13 @@ std::vector<std::string> Viewport::HudLines() const {
     }
     if (shown(HudItem::Resolution)) {
         const Extent size = m_renderSize.width > 0 ? m_renderSize : m_size;
-        lines.push_back(std::format("Resolution: {} x {}", size.width, size.height));
+        lines.push_back(fmt::format("Resolution: {} x {}", size.width, size.height));
     }
     if (shown(HudItem::Camera) && !m_camera.empty()) {
         const std::string& path = m_camera;
         std::string line = "Camera: " + path.substr(path.rfind('/') + 1);
         if (const std::optional<float> focal = FocalLength()) {
-            line += std::format(", {:.0f} mm", *focal);
+            line += fmt::format(", {:.0f} mm", *focal);
         }
         lines.push_back(std::move(line));
     }
@@ -932,7 +933,7 @@ std::vector<std::string> Viewport::HudLines() const {
         lines.push_back("Selection: " + (selected.empty() ? std::string("none")
                                          : selected.size() == 1
                                              ? selected.front()
-                                             : std::format("{} prims", selected.size())));
+                                             : fmt::format("{} prims", selected.size())));
     }
     for (const HudEntry& entry : m_hudEntries) {
         lines.push_back(entry.label + ": " + entry.value());

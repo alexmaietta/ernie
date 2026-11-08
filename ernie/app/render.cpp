@@ -6,11 +6,12 @@
 #include <cmath>
 #include <cstdio>
 #include <deque>
-#include <format>
 #include <iterator>
 #include <numbers>
 #include <string_view>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/ernie.h"
 
@@ -20,7 +21,7 @@ namespace {
 constexpr double kStep = 1.0 / 60;
 
 std::string WorldPath(uint32_t world) {
-    return world == 0 ? std::string("/World") : std::format("/World_{}", world);
+    return world == 0 ? std::string("/World") : fmt::format("/World_{}", world);
 }
 
 RenderVarSource ParseSource(std::string_view name) {
@@ -72,7 +73,7 @@ Ref<Scene> DefaultScene(device::Device& device, uint32_t worlds, bool waitForKer
                                                     {"Yellow", {0.9f, 0.7f, 0.2f}},
                                                     {"Purple", {0.6f, 0.4f, 0.8f}}};
     for (const auto& [name, color] : looks) {
-        scene->Define<Material>(std::format("/World/Looks/{}", name),
+        scene->Define<Material>(fmt::format("/World/Looks/{}", name),
                                 {.id = "UsdPreviewSurface", .inputs = {{"diffuseColor", color}}});
     }
     scene->Define<Plane>("/World/Ground", {.checkerboard = true,

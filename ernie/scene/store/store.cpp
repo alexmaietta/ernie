@@ -3,8 +3,9 @@
 
 #include <algorithm>
 #include <cstring>
-#include <format>
 #include <span>
+
+#include <fmt/format.h>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
@@ -62,7 +63,7 @@ Store::Store(device::Device& device)
         Entry entry;
         std::vector<TableColumn> columns = SchemaColumns(schema, entry.stamps);
         entry.table =
-            std::make_unique<Table>(m_heap, std::format("{} data", Info(schema).name), columns);
+            std::make_unique<Table>(m_heap, fmt::format("{} data", Info(schema).name), columns);
         entry.writes.assign(Info(schema).columnCount, 0);
         m_entries.push_back(std::move(entry));
     }
@@ -172,7 +173,7 @@ ArrayHeap& Store::Arrays(ColumnType type) {
     }
     std::unique_ptr<ArrayHeap>& arrays = m_arrayHeaps[item];
     if (!arrays) {
-        arrays = std::make_unique<ArrayHeap>(m_heap, std::format("{}-byte arrays", item), item);
+        arrays = std::make_unique<ArrayHeap>(m_heap, fmt::format("{}-byte arrays", item), item);
     }
     return *arrays;
 }

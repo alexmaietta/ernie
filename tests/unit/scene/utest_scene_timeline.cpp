@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <algorithm>
 #include <cstdint>
-#include <format>
 #include <span>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
@@ -25,7 +25,7 @@ namespace {
 std::vector<std::string> Paths(std::string_view prefix, uint32_t count) {
     std::vector<std::string> paths;
     for (uint32_t i = 0; i < count; ++i) {
-        paths.push_back(std::format("{}{}", prefix, i));
+        paths.push_back(fmt::format("{}{}", prefix, i));
     }
     return paths;
 }
@@ -146,7 +146,7 @@ TEST(TimelineTest, ChangesHoldExactlyTheRowsWrittenBetweenOrdinals) {
 TEST(TimelineTest, ChangesNameOnlyTheWorldsThatChanged) {
     ForEachTimeline([](device::Device&, Catalog& catalog, Timeline& timeline) {
         for (uint32_t world = 0; world < 3; ++world) {
-            catalog.Define(SchemaId::World, std::vector<std::string>{std::format("/Env{}", world)});
+            catalog.Define(SchemaId::World, std::vector<std::string>{fmt::format("/Env{}", world)});
         }
         const PrimBlock balls = catalog.Define(SchemaId::Sphere, Paths("/Env1/Ball", 2));
         timeline.Publish(1);

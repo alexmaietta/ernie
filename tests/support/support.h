@@ -5,13 +5,13 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
-#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/util/log.h"
@@ -57,7 +57,7 @@ class TemporaryDirectory {
         static std::atomic<int> counter{0};
         const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
         m_path = std::filesystem::temp_directory_path() /
-                 std::format("ernie-test-{:x}-{}", now, counter++);
+                 fmt::format("ernie-test-{:x}-{}", now, counter++);
         std::filesystem::create_directories(m_path);
     }
 

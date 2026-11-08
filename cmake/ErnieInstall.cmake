@@ -310,6 +310,7 @@ set(ernie_notices
     "openjph|${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE"
     "mikktspace|${mikktspace_SOURCE_DIR}/mikktspace.h"
     "tinyobjloader|${tinyobjloader_SOURCE_DIR}/LICENSE"
+    "fmt|${fmt_SOURCE_DIR}/LICENSE"
 )
 if(ernie_dlpack_bundled)
     list(APPEND ernie_notices "dlpack|${dlpack_SOURCE_DIR}/LICENSE")

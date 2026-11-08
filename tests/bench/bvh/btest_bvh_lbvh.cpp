@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
-#include <format>
 #include <optional>
 #include <span>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/bvh/builder.h"
@@ -24,7 +25,7 @@ struct Meshes {
 
 void BuildBlas(benchmark::State& state) {
     const auto count = uint32_t(state.range(0));
-    Meshes& meshes = bench::Cached<Meshes>(std::format("{}", count), [&] {
+    Meshes& meshes = bench::Cached<Meshes>(fmt::format("{}", count), [&] {
         device::Device& device = bench::BenchDevice();
         return Meshes{LbvhBuilder(device, count), test::Upload(device, test::Soup(count, 1)),
                       device.CreateBuffer({.bytes = StorageBytes(count, kBvhTriangles)})};
@@ -56,7 +57,7 @@ struct Worlds {
 
 void BuildTlas(benchmark::State& state) {
     const auto count = uint32_t(state.range(0));
-    Worlds& worlds = bench::Cached<Worlds>(std::format("{}", count), [&] {
+    Worlds& worlds = bench::Cached<Worlds>(fmt::format("{}", count), [&] {
         device::Device& device = bench::BenchDevice();
         Worlds made{LbvhBuilder(device, count),
                     {},

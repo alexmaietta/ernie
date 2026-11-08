@@ -4,11 +4,12 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
-#include <format>
 #include <functional>
 #include <set>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/io/image.h"
@@ -68,7 +69,7 @@ void Props(Scene& scene, const std::string& world) {
     for (uint32_t i = 0; i < 8; ++i) {
         const double angle = kTau * i / 8;
         scene.Define<Sphere>(
-            std::format("{}/Ball_{}", world, i),
+            fmt::format("{}/Ball_{}", world, i),
             {.translate = {3 * std::cos(angle), 3 * std::sin(angle), 0.6},
              .displayColor = {0.2f + 0.1f * float(i), 0.4f, 0.8f - 0.1f * float(i)},
              .radius = 0.5f});
@@ -93,7 +94,7 @@ void Vars(Scene& scene) {
 void Replicate(Scene& scene, uint32_t worlds) {
     std::vector<std::string> targets;
     for (uint32_t w = 1; w < worlds; ++w) {
-        targets.push_back(std::format("/env_{}", w));
+        targets.push_back(fmt::format("/env_{}", w));
     }
     if (!targets.empty()) {
         scene.Clone(*scene.Find("/env_0"), targets);
@@ -199,13 +200,13 @@ void Cameras(benchmark::State& state) {
     const auto cameras = uint32_t(state.range(0));
     const auto side = uint32_t(state.range(1));
     const device::Traversal traversal = TraversalOf(state.range(2));
-    Run(state, std::format("cameras/{}/{}/{}", cameras, side, int(traversal)), [&] {
+    Run(state, fmt::format("cameras/{}/{}/{}", cameras, side, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
         Props(*scene, "/env_0");
         std::vector<std::string> views;
         for (uint32_t c = 0; c < cameras; ++c) {
-            views.push_back(std::format("/env_0/Cam_{}", c));
+            views.push_back(fmt::format("/env_0/Cam_{}", c));
             Look(*scene, views.back(), kTau * c / cameras, 6 + 2 * double(c % 3),
                  2 + double(c % 5));
         }
@@ -250,7 +251,7 @@ const Mix kMixes[] = {
 void Mixed(benchmark::State& state, const Mix& mix) {
     const auto worlds = uint32_t(state.range(0));
     const device::Traversal traversal = TraversalOf(state.range(1));
-    Run(state, std::format("mixed/{}/{}/{}", mix.name, worlds, int(traversal)), [&] {
+    Run(state, fmt::format("mixed/{}/{}/{}", mix.name, worlds, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
         Props(*scene, "/env_0");
@@ -259,7 +260,7 @@ void Mixed(benchmark::State& state, const Mix& mix) {
             cameras += group.cameras;
         }
         for (uint32_t c = 0; c < cameras; ++c) {
-            Look(*scene, std::format("/env_0/Cam_{}", c), kTau * c / cameras, 7, 4);
+            Look(*scene, fmt::format("/env_0/Cam_{}", c), kTau * c / cameras, 7, 4);
         }
         Replicate(*scene, worlds);
         scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
@@ -271,11 +272,11 @@ void Mixed(benchmark::State& state, const Mix& mix) {
             std::vector<std::string> views;
             for (uint32_t w = 0; w < worlds; ++w) {
                 for (uint32_t c = first; c < first + group.cameras; ++c) {
-                    views.push_back(std::format("/env_{}/Cam_{}", w, c));
+                    views.push_back(fmt::format("/env_{}/Cam_{}", w, c));
                 }
             }
             first += group.cameras;
-            products.push_back(std::format("/Render/Product_{}", products.size()));
+            products.push_back(fmt::format("/Render/Product_{}", products.size()));
             scene->Define<RenderProduct>(products.back(),
                                          {.mode = group.mode,
                                           .camera = views,
@@ -290,14 +291,14 @@ void Mixed(benchmark::State& state, const Mix& mix) {
 void Lights(benchmark::State& state) {
     const auto lights = uint32_t(state.range(0));
     const device::Traversal traversal = TraversalOf(state.range(1));
-    Run(state, std::format("lights/{}/{}", lights, int(traversal)), [&] {
+    Run(state, fmt::format("lights/{}/{}", lights, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
         Props(*scene, "/env_0");
         Look(*scene, "/env_0/Cam", 0.3, 7, 4);
         for (uint32_t i = 0; i < lights; ++i) {
             scene->Define<DistantLight>(
-                std::format("/Sun_{}", i),
+                fmt::format("/Sun_{}", i),
                 {.orient = FromAzimuthElevation(360.0 * i / lights, 30 + 30 * double(i % 2)),
                  .intensity = 1.0f / float(lights)});
         }
@@ -318,14 +319,14 @@ void SceneSize(benchmark::State& state) {
     const device::Traversal traversal = TraversalOf(state.range(2));
     const auto cells = uint32_t(std::lround(std::sqrt(double(triangles) / (kTiles * kTiles * 2))));
     state.counters["triangles"] = double(kTiles * kTiles) * cells * cells * 2;
-    Run(state, std::format("size/{}/{}/{}", triangles, instanced, int(traversal)), [&] {
+    Run(state, fmt::format("size/{}/{}/{}", triangles, instanced, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<World>("/env_0");
         std::vector<std::string> tiles;
         std::vector<Double3> offsets;
         for (uint32_t y = 0; y < kTiles; ++y) {
             for (uint32_t x = 0; x < kTiles; ++x) {
-                tiles.push_back(std::format("/env_0/Tile_{}", tiles.size()));
+                tiles.push_back(fmt::format("/env_0/Tile_{}", tiles.size()));
                 offsets.push_back({(double(x) - 1.5) * 10, (double(y) - 1.5) * 10, 0});
             }
         }
@@ -359,7 +360,7 @@ const std::filesystem::path& TextureDirectory() {
 }
 
 std::string TextureFile(uint32_t index) {
-    const std::filesystem::path path = TextureDirectory() / std::format("albedo_{}.png", index);
+    const std::filesystem::path path = TextureDirectory() / fmt::format("albedo_{}.png", index);
     if (!std::filesystem::exists(path)) {
         std::filesystem::create_directories(TextureDirectory());
         const float hue = float(index % 97) / 97;
@@ -379,7 +380,7 @@ void Materials(benchmark::State& state) {
     const auto materials = uint32_t(state.range(0));
     const bool textured = state.range(1) != 0;
     const device::Traversal traversal = TraversalOf(state.range(2));
-    Run(state, std::format("materials/{}/{}/{}", materials, textured, int(traversal)), [&] {
+    Run(state, fmt::format("materials/{}/{}/{}", materials, textured, int(traversal)), [&] {
         const Ref<Scene> scene = Primed(traversal);
         scene->Define<Scope>("/Looks");
         for (uint32_t m = 0; m < materials; ++m) {
@@ -390,14 +391,14 @@ void Materials(benchmark::State& state) {
             } else {
                 inputs.push_back({"diffuseColor", Float3{hue, 0.4f, 1 - hue}});
             }
-            scene->Define<Material>(std::format("/Looks/Look_{}", m),
+            scene->Define<Material>(fmt::format("/Looks/Look_{}", m),
                                     {.id = "UsdPreviewSurface", .inputs = inputs});
         }
         scene->Define<World>("/env_0");
         scene->Define<Mesh>("/env_0/Ground", Tile(32, 40, 0, true));
         for (uint32_t i = 0; i < kObjects * kObjects; ++i) {
-            scene->Define<Cube>(std::format("/env_0/Box_{}", i),
-                                {.materialBinding = {std::format("/Looks/Look_{}", i % materials)},
+            scene->Define<Cube>(fmt::format("/env_0/Box_{}", i),
+                                {.materialBinding = {fmt::format("/Looks/Look_{}", i % materials)},
                                  .translate = {(double(i % kObjects) - 15.5) * 1.1,
                                                (double(i / kObjects) - 15.5) * 1.1, 0.5},
                                  .size = 0.8});
@@ -423,7 +424,7 @@ void ColdStart(benchmark::State& state) {
     double frameMs = 0;
     uint32_t runs = 0;
     for (auto _ : state) {
-        const std::filesystem::path cache = root / (warm ? "warm" : std::format("cold_{}", runs));
+        const std::filesystem::path cache = root / (warm ? "warm" : fmt::format("cold_{}", runs));
         std::filesystem::remove_all(cache);
         if (warm) {
             device::DeviceDesc desc = bench::BenchDesc();
@@ -476,7 +477,7 @@ const bool kRegistered = [] {
         ->UseRealTime()
         ->Unit(benchmark::kMillisecond);
     for (const Mix& mix : kMixes) {
-        benchmark::RegisterBenchmark(std::format("Render/Mixed/{}", mix.name), Mixed, mix)
+        benchmark::RegisterBenchmark(fmt::format("Render/Mixed/{}", mix.name), Mixed, mix)
             ->ArgNames({"worlds", "hardware"})
             ->ArgsProduct({{64, 256, 1024}, {0, 1}})
             ->UseRealTime()

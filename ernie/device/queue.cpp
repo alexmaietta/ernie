@@ -6,7 +6,6 @@
 #include <bit>
 #include <cstddef>
 #include <cstring>
-#include <format>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -16,6 +15,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/device.h"
 #include "ernie/device/kernels/shared.h"
@@ -158,26 +159,26 @@ std::string Describe(const Command& command) {
     return std::visit(
         Overloaded{
             [](const CopyCommand& c) {
-                return std::format("a copy of {} bytes from buffer \"{}\" to buffer \"{}\"",
+                return fmt::format("a copy of {} bytes from buffer \"{}\" to buffer \"{}\"",
                                    c.bytes, c.src->Label(), c.dst->Label());
             },
             [](const TextureCopyCommand& c) {
-                return std::format("a copy from buffer \"{}\" to level {} of texture \"{}\"",
+                return fmt::format("a copy from buffer \"{}\" to level {} of texture \"{}\"",
                                    c.src->Label(), c.level, c.dst->Label());
             },
             [](const FillCommand& c) {
-                return std::format("a fill of buffer \"{}\"", c.dst->Label());
+                return fmt::format("a fill of buffer \"{}\"", c.dst->Label());
             },
             [](const UpdateCommand& c) {
-                return std::format("an update of buffer \"{}\"", c.dst->Label());
+                return fmt::format("an update of buffer \"{}\"", c.dst->Label());
             },
             [](const DispatchCommand& c) {
-                return std::format("{}kernel {} of program \"{}\"",
+                return fmt::format("{}kernel {} of program \"{}\"",
                                    c.counts != nullptr ? "an indirect dispatch of " : "",
                                    c.kernel->Name(), c.kernel->GetProgram().Label());
             },
             [](const BuildAccelCommand& c) {
-                return std::format("a build of acceleration structure \"{}\"", c.dst->Label());
+                return fmt::format("a build of acceleration structure \"{}\"", c.dst->Label());
             },
             [](const BarrierCommand&) { return std::string("a barrier"); },
             [](const ZoneCommand&) { return std::string("a zone"); },

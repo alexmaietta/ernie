@@ -2,9 +2,10 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
-#include <format>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/render/renderer.h"
@@ -53,7 +54,7 @@ Setup Prepare(uint32_t width, uint32_t height, RenderMode mode) {
     for (int i = 0; i < 8; ++i) {
         const double angle = i * 0.785;
         scene->Define<Sphere>(
-            std::format("/env_0/Ball_{}", i),
+            fmt::format("/env_0/Ball_{}", i),
             {.translate = {3 * std::cos(angle), 3 * std::sin(angle), 0.6},
              .displayColor = {0.2f + 0.1f * float(i), 0.4f, 0.8f - 0.1f * float(i)},
              .radius = 0.5f});
@@ -98,7 +99,7 @@ void Steps(benchmark::State& state, Setup& setup, size_t inflight) {
 void View(benchmark::State& state) {
     const auto height = uint32_t(state.range(1));
     const auto mode = state.range(2) != 0 ? RenderMode::RealTime : RenderMode::Minimal;
-    Setup& setup = bench::Cached<Setup>(std::format("view/{}/{}", height, int(mode)),
+    Setup& setup = bench::Cached<Setup>(fmt::format("view/{}/{}", height, int(mode)),
                                         [&] { return Prepare(height * 16 / 9, height, mode); });
     Steps(state, setup, size_t(state.range(0)));
 }

@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <format>
 #include <functional>
 #include <memory>
 #include <numeric>
@@ -14,6 +13,8 @@
 #include <span>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/commands.h"
 #include "ernie/render/kernels.h"
@@ -241,7 +242,7 @@ constexpr size_t kHeldOutputsWarning = 8;
 constexpr double kCaptureTolerance = 1e-6;
 
 std::string Counted(uint64_t count, std::string_view noun) {
-    return std::format("{} {}{}", count, noun, count == 1 ? "" : "s");
+    return fmt::format("{} {}{}", count, noun, count == 1 ? "" : "s");
 }
 
 }
@@ -562,7 +563,7 @@ RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path) {
     Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
         Counted(product.sensors.size(), "sensor"), product.resolution.x, product.resolution.y,
         sources.empty() ? "nothing" : sources, kRenderEntries[uint32_t(product.entry)],
-        product.frameRate > 0 ? std::format(", capturing at {} Hz", product.frameRate) : "");
+        product.frameRate > 0 ? fmt::format(", capturing at {} Hz", product.frameRate) : "");
     return m_products.emplace(path, std::move(product)).first->second;
 }
 

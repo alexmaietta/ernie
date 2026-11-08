@@ -6,9 +6,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <format>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 namespace ernie::bvh {
 
@@ -32,19 +33,19 @@ class Walker {
 
     void Run() {
         if (m_bytes.size() < sizeof(BvhHeader)) {
-            Fail(std::format("it has {} bytes, fewer than its header's {}", m_bytes.size(),
+            Fail(fmt::format("it has {} bytes, fewer than its header's {}", m_bytes.size(),
                              sizeof(BvhHeader)));
             return;
         }
         std::memcpy(&m_header, m_bytes.data(), sizeof(m_header));
         if (m_header.version != kBvhVersion) {
-            Fail(std::format("its format is version {}; Ernie reads version {}", m_header.version,
+            Fail(fmt::format("its format is version {}; Ernie reads version {}", m_header.version,
                              kBvhVersion));
             return;
         }
         if (m_header.kind != kBvhTriangles && m_header.kind != kBvhInstances &&
             m_header.kind != kBvhBoxes) {
-            Fail(std::format("its leaf records are of kind {}: not triangles, instances or boxes",
+            Fail(fmt::format("its leaf records are of kind {}: not triangles, instances or boxes",
                              m_header.kind));
             return;
         }
@@ -57,14 +58,14 @@ class Walker {
         const uint64_t leavesEnd = m_header.leaves + uint64_t(m_header.leafCount) * m_words * 16;
         if (m_header.nodes < sizeof(BvhHeader) || m_header.leaves < sizeof(BvhHeader) ||
             (m_header.nodes < leavesEnd && m_header.leaves < nodesEnd)) {
-            Fail(std::format("its nodes, bytes {} to {}, and leaf records, bytes {} to {}, overlap "
+            Fail(fmt::format("its nodes, bytes {} to {}, and leaf records, bytes {} to {}, overlap "
                              "each other or its header",
                              m_header.nodes, nodesEnd, m_header.leaves, leavesEnd));
             return;
         }
         if (m_header.kind == kBvhInstances && !m_boxes.empty() &&
             m_boxes.size() != m_header.primitives) {
-            Fail(std::format("it has {} instances, but {} boxes were given", m_header.primitives,
+            Fail(fmt::format("it has {} instances, but {} boxes were given", m_header.primitives,
                              m_boxes.size()));
             return;
         }
@@ -73,7 +74,7 @@ class Walker {
         m_visited.assign(m_header.nodeCount, false);
         if (m_header.primitives > 0) {
             if (m_header.nodeCount == 0) {
-                Fail(std::format("it has {} primitives but no nodes", m_header.primitives));
+                Fail(fmt::format("it has {} primitives but no nodes", m_header.primitives));
                 return;
             }
             BvhBox bounds;
@@ -100,16 +101,16 @@ class Walker {
         const uint32_t least = m_header.kind == kBvhInstances ? 0 : 1;
         for (uint32_t i = 0; i < m_header.primitives; ++i) {
             if (m_reached[i] < least || m_reached[i] > 1) {
-                Fail(std::format("primitive {} is in {} leaf records, not one", i, m_reached[i]));
+                Fail(fmt::format("primitive {} is in {} leaf records, not one", i, m_reached[i]));
             }
         }
         if (m_found.records != m_header.leafCount) {
-            Fail(std::format("it has {} leaf records, but its leaves hold {}", m_header.leafCount,
+            Fail(fmt::format("it has {} leaf records, but its leaves hold {}", m_header.leafCount,
                              m_found.records));
         }
         for (uint32_t i = 0; i < m_header.nodeCount; ++i) {
             if (!m_visited[i]) {
-                Fail(std::format("node {} is never reached from the root", i));
+                Fail(fmt::format("node {} is never reached from the root", i));
             }
         }
 
@@ -120,7 +121,7 @@ class Walker {
             m_found.recordsPerLeaf = double(m_found.records) / m_found.leaves;
         }
         if (m_dropped > 0) {
-            m_found.errors.push_back(std::format("and {} more faults", m_dropped));
+            m_found.errors.push_back(fmt::format("and {} more faults", m_dropped));
         }
     }
 
@@ -136,7 +137,7 @@ class Walker {
     bool Fits(const char* what, uint64_t offset, uint64_t count, uint64_t bytes) {
         if (offset % 16 != 0 || offset > m_bytes.size() ||
             count > (m_bytes.size() - offset) / bytes) {
-            Fail(std::format("its {} at byte {}, {} of {} bytes, run past its {} bytes", what,
+            Fail(fmt::format("its {} at byte {}, {} of {} bytes, run past its {} bytes", what,
                              offset, count, bytes, m_bytes.size()));
             return false;
         }
@@ -151,12 +152,12 @@ class Walker {
 
     void Visit(uint32_t index, const BvhBox& within, uint32_t depth) {
         if (index >= m_header.nodeCount) {
-            Fail(std::format("a node's child is node {}, past its {} nodes", index,
+            Fail(fmt::format("a node's child is node {}, past its {} nodes", index,
                              m_header.nodeCount));
             return;
         }
         if (m_visited[index]) {
-            Fail(std::format("node {} is reached more than once", index));
+            Fail(fmt::format("node {} is reached more than once", index));
             return;
         }
 
@@ -172,7 +173,7 @@ class Walker {
             const bool isInternal = (imask >> slot & 1) != 0;
             if (meta == 0) {
                 if (isInternal) {
-                    Fail(std::format("node {}'s slot {} is empty but in its imask", index, slot));
+                    Fail(fmt::format("node {}'s slot {} is empty but in its imask", index, slot));
                 }
                 continue;
             }
@@ -183,7 +184,7 @@ class Walker {
             if (isInternal) {
                 if (meta != BvhInternalMeta(slot)) {
                     Fail(
-                        std::format("node {}'s slot {} is in its imask, but its meta byte is {:#x}",
+                        fmt::format("node {}'s slot {} is in its imask, but its meta byte is {:#x}",
                                     index, slot, meta));
                     continue;
                 }
@@ -193,14 +194,14 @@ class Walker {
             }
             if (meta == BvhInternalMeta(slot)) {
                 Fail(
-                    std::format("node {}'s slot {} has an internal child's meta byte, but isn't in "
+                    fmt::format("node {}'s slot {} has an internal child's meta byte, but isn't in "
                                 "its imask",
                                 index, slot));
                 continue;
             }
             const uint32_t count = std::popcount(meta >> 5);
             if ((meta >> 5) != (1u << count) - 1) {
-                Fail(std::format("node {}'s slot {} has meta byte {:#x}: neither empty, internal "
+                Fail(fmt::format("node {}'s slot {} has meta byte {:#x}: neither empty, internal "
                                  "nor a leaf's",
                                  index, slot, meta));
                 continue;
@@ -215,7 +216,7 @@ class Walker {
 
     void VisitRecord(uint32_t node, uint32_t word, const BvhBox& within) {
         if (word % m_words != 0 || word / m_words >= m_header.leafCount) {
-            Fail(std::format("node {} has a leaf record at word {}, not one of its {} records",
+            Fail(fmt::format("node {} has a leaf record at word {}, not one of its {} records",
                              node, word, m_header.leafCount));
             return;
         }
@@ -249,7 +250,7 @@ class Walker {
         }
 
         if (primitive >= m_header.primitives) {
-            Fail(std::format("node {} has primitive {}, past its {} primitives", node, primitive,
+            Fail(fmt::format("node {} has primitive {}, past its {} primitives", node, primitive,
                              m_header.primitives));
             return;
         }
@@ -257,7 +258,7 @@ class Walker {
         for (int i = 0; i < 3; ++i) {
             if (box.lower[i] < within.lower[i] - m_slack ||
                 box.upper[i] > within.upper[i] + m_slack) {
-                Fail(std::format("primitive {} of node {} lies outside the boxes above it",
+                Fail(fmt::format("primitive {} of node {} lies outside the boxes above it",
                                  primitive, node));
                 return;
             }

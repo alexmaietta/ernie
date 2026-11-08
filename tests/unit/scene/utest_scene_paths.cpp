@@ -2,12 +2,12 @@
 #include "ernie/scene/catalog/paths.h"
 
 #include <cstdint>
-#include <format>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 namespace ernie {
@@ -133,10 +133,10 @@ TEST(PathsTest, ManyPrimsAreFoundByPath) {
     paths.Insert("/envs", 0);
     uint32_t prim = 1;
     for (uint32_t env = 0; env < 1000; ++env) {
-        const std::string root = std::format("/envs/env_{}", env);
+        const std::string root = fmt::format("/envs/env_{}", env);
         paths.Insert(root, prim++);
         for (uint32_t link = 0; link < 9; ++link) {
-            paths.Insert(std::format("{}/link_{}", root, link), prim++);
+            paths.Insert(fmt::format("{}/link_{}", root, link), prim++);
         }
     }
     EXPECT_EQ(paths.Size(), 10001u);
@@ -155,7 +155,7 @@ TEST(PathsTest, ClonesAreFoundWithoutANodePerPrim) {
     paths.Insert("/envs/env_0/Lamp", 4);
     std::vector<std::string> targets;
     for (uint32_t i = 1; i <= 1000; ++i) {
-        targets.push_back(std::format("/envs/env_{}", i));
+        targets.push_back(fmt::format("/envs/env_{}", i));
     }
     paths.InsertClones(paths.Shape(1), targets, 100);
     EXPECT_EQ(paths.Size(), 5u + 4000u);

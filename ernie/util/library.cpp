@@ -2,7 +2,6 @@
 #include "ernie/util/library.h"
 
 #include <algorithm>
-#include <format>
 #include <string_view>
 
 #ifdef _WIN32
@@ -13,6 +12,8 @@
 #ifdef __linux__
 #include <link.h>
 #endif
+
+#include <fmt/format.h>
 
 namespace ernie {
 namespace {
@@ -114,7 +115,7 @@ void* Library::Symbol(const char* symbol) const {
 }
 
 std::string TooOld(std::string_view what, Version found, Version needed) {
-    return std::format("{} is version {}; Ernie needs {} or later", what, found.ToString(),
+    return fmt::format("{} is version {}; Ernie needs {} or later", what, found.ToString(),
                        needed.ToString());
 }
 

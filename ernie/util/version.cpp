@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/version.h"
 
-#include <format>
+#include <fmt/format.h>
 
 #include "build_info.h"
 
@@ -9,9 +9,9 @@ namespace ernie {
 
 std::string Version::ToString() const {
     if (patch != 0) {
-        return std::format("{}.{}.{}", major, minor, patch);
+        return fmt::format("{}.{}.{}", major, minor, patch);
     }
-    return std::format("{}.{}", major, minor);
+    return fmt::format("{}.{}", major, minor);
 }
 
 const BuildInfo& GetBuildInfo() {

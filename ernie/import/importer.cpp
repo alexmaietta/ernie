@@ -6,7 +6,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <exception>
-#include <format>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -15,6 +14,8 @@
 #include <span>
 #include <thread>
 #include <utility>
+
+#include <fmt/format.h>
 
 #include "ernie/import/obj.h"
 #include "ernie/scene/scene.h"
@@ -251,7 +252,7 @@ std::string ImportPlan::AddFile(std::string_view name, FileBytes bytes) {
     if (m_id == 0) {
         m_id = ++plans;
     }
-    std::string path = std::format("memory://{}/{}", m_id, name);
+    std::string path = fmt::format("memory://{}/{}", m_id, name);
     m_files.emplace_back(path, std::move(bytes));
     return path;
 }
@@ -408,17 +409,17 @@ ImportJob Scene::Import(std::string_view path, const ImportSource& source, const
     }
     return StartImport(
         path,
-        ImportReader{.name = std::format("the {} importer", importer->Name()),
+        ImportReader{.name = fmt::format("the {} importer", importer->Name()),
                      .read =
                          [importer, root = std::string(path), source](ImportContext& context) {
                              return importer->Read(root, source, context);
                          }},
-        desc, std::format("\"{}\"", source.file.string()));
+        desc, fmt::format("\"{}\"", source.file.string()));
 }
 
 ImportJob Scene::Import(std::string_view path, const ImportReader& reader, const ImportDesc& desc) {
     Log(LogLevel::Info, "importing from {} at \"{}\"", reader.name, path);
-    return StartImport(path, reader, desc, std::format("from {}", reader.name));
+    return StartImport(path, reader, desc, fmt::format("from {}", reader.name));
 }
 
 ImportJob Scene::StartImport(std::string_view path, const ImportReader& reader,

@@ -2,12 +2,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <format>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
@@ -39,7 +39,7 @@ std::vector<uint64_t> Stamps(Store& store, ColumnRef column, uint32_t first, uin
 std::vector<std::string> Paths(std::string_view prefix, uint32_t count) {
     std::vector<std::string> paths;
     for (uint32_t i = 0; i < count; ++i) {
-        paths.push_back(std::format("{}{}", prefix, i));
+        paths.push_back(fmt::format("{}{}", prefix, i));
     }
     return paths;
 }
@@ -92,7 +92,7 @@ TEST(CatalogTest, ABatchGetsContiguousRowsInEveryTable) {
 TEST(CatalogTest, BroadcastValuesLandOnEveryPrimWhetherStagedOrFilled) {
     ForEachCatalog([](Store& store, Catalog& catalog) {
         for (const uint32_t count : {4u, 12000u}) {
-            const std::vector<std::string> paths = Paths(std::format("/Batch{}_", count), count);
+            const std::vector<std::string> paths = Paths(fmt::format("/Batch{}_", count), count);
             const PrimBlock block =
                 catalog.Define<Sphere>(paths, {.translate = {1.0, 2.0, 3.0}, .radius = 2.5f});
             const uint32_t sphere = catalog.GetPrims().Row(block.Prim(0, 0), SchemaId::Sphere);
@@ -217,7 +217,7 @@ TEST(CatalogTest, ClonesCopyValuesIntoNewWorlds) {
         EXPECT_EQ(block.firstWorld, 1u);
         EXPECT_EQ(catalog.GetPrims().WorldCount(), 4u);
         for (uint32_t copy = 0; copy < 3; ++copy) {
-            const uint32_t prim = catalog.Find(std::format("/Env{}/Ball", copy + 1));
+            const uint32_t prim = catalog.Find(fmt::format("/Env{}/Ball", copy + 1));
             ASSERT_EQ(prim, block.Prim(copy, 1));
             EXPECT_EQ(catalog.GetPrims().At(prim).world, copy + 1);
             const uint32_t row = catalog.GetPrims().Row(prim, SchemaId::Sphere);
@@ -239,7 +239,7 @@ TEST(CatalogTest, MovingTheSourceKeepsItsWorldNumbers) {
         EXPECT_EQ(block.firstWorld, 0u);
         EXPECT_EQ(catalog.GetPrims().WorldCount(), 3u);
         for (uint32_t world = 0; world < 3; ++world) {
-            EXPECT_EQ(catalog.GetPrims().At(catalog.Find(std::format("/Env{}", world))).world,
+            EXPECT_EQ(catalog.GetPrims().At(catalog.Find(fmt::format("/Env{}", world))).world,
                       world);
         }
         EXPECT_EQ(catalog.GetPrims().LiveCount(), 3u);

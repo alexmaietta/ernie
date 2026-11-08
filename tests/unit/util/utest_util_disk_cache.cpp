@@ -3,11 +3,11 @@
 
 #include <chrono>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <optional>
 #include <string>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/util/text.h"
@@ -95,7 +95,7 @@ TEST(DiskCacheTest, KernelsLiveUnderTheirErnieVersion) {
     const Version version = GetBuildInfo().version;
     EXPECT_EQ(KernelCacheDirectory("/cache"),
               std::filesystem::path("/cache") / "kernels" /
-                  std::format("{}.{}.{}", version.major, version.minor, version.patch));
+                  fmt::format("{}.{}.{}", version.major, version.minor, version.patch));
 }
 
 TEST(DiskCacheTest, TrimmingDropsOnlyTheLeastRecentlyUsedKernels) {
