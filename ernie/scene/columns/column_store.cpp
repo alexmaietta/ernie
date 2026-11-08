@@ -240,10 +240,28 @@ device::Program& ColumnStore::Kernels() {
             {.modules = {"ernie.scene.kernels.attributes", "ernie.scene.kernels.changes"},
              .library = &kSceneKernels,
              .entries = {"CopyWords", "ScatterCells", "StampRows", "GatherCells", "FillCells",
-                         "CloneRows", "WritePoses", "ReadPoses", "CompactChanged"},
+                         "CloneRows", "WritePoses", "ReadPoses", "CompactChanged", "GatherRows"},
              .label = "scene store"});
     }
     return *m_program;
+}
+
+device::Download ColumnStore::ReadRowsAsync(const Ref<device::Buffer>& source, uint32_t stride,
+                                            std::span<const uint32_t> rows) {
+    if (rows.empty() || !source) {
+        return {};
+    }
+    const uint64_t bytes = uint64_t(rows.size()) * stride;
+    const Ref<device::Buffer> out = m_device.CreateBuffer({.bytes = bytes, .label = "read rows"});
+    const Ref<device::Buffer> list = m_device.CreateBuffer({.label = "read row list"}, rows);
+    GatherRowsParams params{};
+    params.source.address = source->Address();
+    params.rows.address = list->Address();
+    params.out.address = out->Address();
+    params.words = stride / uint32_t(sizeof(uint32_t));
+    params.count = uint32_t(rows.size());
+    Dispatch("GatherRows", params, params.count);
+    return m_device.GetQueue().ReadAsync(out->Slice(0, bytes));
 }
 
 void ColumnStore::FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,

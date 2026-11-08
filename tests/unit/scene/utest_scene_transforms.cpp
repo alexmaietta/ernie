@@ -14,7 +14,6 @@
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/views/attribute.h"
-#include "ernie/scene/views/readback.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
 
@@ -26,7 +25,6 @@ struct World {
     Structure& structure;
     Publisher& publisher;
     TransformBuilder& hierarchy;
-    Readback readback{store.GetDevice()};
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
@@ -47,9 +45,9 @@ struct World {
 
     WorldTransform Transform(uint32_t prim) {
         const std::vector<uint32_t> prims = {prim};
-        return readback
-            .Read<WorldTransform>(hierarchy.Transforms(),
-                                  TableRows(structure.GetPrims(), prims, SchemaId::Xformable))
+        return store
+            .ReadRows<WorldTransform>(hierarchy.Transforms(),
+                                      structure.GetPrims().Rows(prims, SchemaId::Xformable))
             .front();
     }
 
@@ -62,9 +60,9 @@ struct World {
 
     ResolvedImageable Resolved(uint32_t prim) {
         const std::vector<uint32_t> prims = {prim};
-        return readback
-            .Read<ResolvedImageable>(hierarchy.Imageables(),
-                                     TableRows(structure.GetPrims(), prims, SchemaId::Imageable))
+        return store
+            .ReadRows<ResolvedImageable>(hierarchy.Imageables(),
+                                         structure.GetPrims().Rows(prims, SchemaId::Imageable))
             .front();
     }
 };

@@ -22,7 +22,6 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/structure/structure.h"
-#include "ernie/scene/views/readback.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
 
@@ -107,12 +106,10 @@ struct Fixture {
     Publisher publisher;
     TransformBuilder hierarchy;
     Probe probe;
-    Readback readback;
     Ordinal ordinal = 0;
 
     explicit Fixture(device::Device& device)
-        : store(device), structure(store), publisher(structure), hierarchy(structure),
-          readback(device) {
+        : store(device), structure(store), publisher(structure), hierarchy(structure) {
         publisher.Add(hierarchy);
         publisher.Add(probe);
     }
@@ -126,8 +123,8 @@ struct Fixture {
     }
 
     std::vector<WorldTransform> Transforms(const std::vector<uint32_t>& prims) {
-        return readback.Read<WorldTransform>(
-            hierarchy.Transforms(), TableRows(structure.GetPrims(), prims, SchemaId::Xformable));
+        return store.ReadRows<WorldTransform>(
+            hierarchy.Transforms(), structure.GetPrims().Rows(prims, SchemaId::Xformable));
     }
 };
 

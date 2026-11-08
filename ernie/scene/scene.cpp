@@ -153,7 +153,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_textures(m_structure, desc.textureThreads), m_semantics(m_structure),
       m_sensors(m_structure), m_products(scene, m_structure), m_materials(m_structure),
       m_instances(m_structure, *m_builder, desc.maxRefits), m_surfaces(m_structure, m_instances),
-      m_lights(m_structure, m_instances), m_readback(device) {
+      m_lights(m_structure, m_instances) {
     m_publisher.Add(m_transforms);
     m_publisher.Add(m_meshes);
     m_publisher.Add(m_tangents);
@@ -593,16 +593,16 @@ std::vector<uint32_t> BoundableRows(const Prims& prims, std::vector<uint32_t> in
 
 device::Download Scene::ReadWorldTransformsAsync(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        TableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
-    return m_impl->GetReadback().ReadAsync(m_impl->GetTransforms().Transforms(),
-                                           sizeof(ernie::WorldTransform), rows);
+        m_impl->GetStructure().GetPrims().Rows(PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetColumnStore().ReadRowsAsync(m_impl->GetTransforms().Transforms(),
+                                                  sizeof(ernie::WorldTransform), rows);
 }
 
 std::vector<ernie::WorldTransform> Scene::WorldTransforms(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
-        TableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths), SchemaId::Xformable);
-    return m_impl->GetReadback().Read<ernie::WorldTransform>(m_impl->GetTransforms().Transforms(),
-                                                             rows);
+        m_impl->GetStructure().GetPrims().Rows(PathPrims(*this, paths), SchemaId::Xformable);
+    return m_impl->GetColumnStore().ReadRows<ernie::WorldTransform>(
+        m_impl->GetTransforms().Transforms(), rows);
 }
 
 static_assert(sizeof(Box) == sizeof(BoundableBox));
@@ -610,14 +610,14 @@ static_assert(sizeof(Box) == sizeof(BoundableBox));
 device::Download Scene::ReadPrimBoundsAsync(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
         BoundableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths));
-    return m_impl->GetReadback().ReadAsync(m_impl->GetBounds().PrimBounds(), sizeof(BoundableBox),
-                                           rows);
+    return m_impl->GetColumnStore().ReadRowsAsync(m_impl->GetBounds().PrimBounds(),
+                                                  sizeof(BoundableBox), rows);
 }
 
 std::vector<Box> Scene::PrimBounds(Span<const std::string> paths) const {
     const std::vector<uint32_t> rows =
         BoundableRows(m_impl->GetStructure().GetPrims(), PathPrims(*this, paths));
-    return m_impl->GetReadback().Read<Box>(m_impl->GetBounds().PrimBounds(), rows);
+    return m_impl->GetColumnStore().ReadRows<Box>(m_impl->GetBounds().PrimBounds(), rows);
 }
 
 std::optional<Box> Scene::Bounds(uint32_t world) const {

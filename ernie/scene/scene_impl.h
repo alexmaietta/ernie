@@ -27,7 +27,6 @@
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/structure/structure.h"
-#include "ernie/scene/views/readback.h"
 
 namespace ernie {
 
@@ -148,10 +147,6 @@ class SceneImpl {
         return m_products;
     }
 
-    Readback& GetReadback() {
-        return m_readback;
-    }
-
     void AddCommitStep(std::function<bool()> step) {
         m_commitSteps.push_back(std::move(step));
     }
@@ -183,7 +178,6 @@ class SceneImpl {
     InstanceBuilder m_instances;
     SurfaceBuilder m_surfaces;
     LightBuilder m_lights;
-    Readback m_readback;
     std::vector<std::function<bool()>> m_commitSteps;
 };
 

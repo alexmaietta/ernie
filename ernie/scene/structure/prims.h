@@ -81,6 +81,7 @@ class Prims {
     const PrimRecord& At(uint32_t prim) const;
     uint32_t Row(uint32_t prim, SchemaId table) const;
     uint32_t FindRow(uint32_t prim, SchemaId table) const;
+    std::vector<uint32_t> Rows(std::span<const uint32_t> prims, SchemaId table) const;
     bool HasApi(uint32_t prim, SchemaId api) const;
     std::span<const ApiInstance> Instances(uint32_t prim, SchemaId api) const;
     uint32_t InstanceRow(uint32_t prim, SchemaId api, uint32_t instance) const;

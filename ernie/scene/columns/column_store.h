@@ -151,6 +151,21 @@ class ColumnStore {
         Kernels();
     }
 
+    device::Download ReadRowsAsync(const Ref<device::Buffer>& source, uint32_t stride,
+                                   std::span<const uint32_t> rows);
+
+    template <class T>
+    std::vector<T> ReadRows(const Ref<device::Buffer>& source, std::span<const uint32_t> rows) {
+        static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+        std::vector<T> values(rows.size());
+        const device::Download download = ReadRowsAsync(source, sizeof(T), rows);
+        download.Wait();
+        if (!values.empty() && download.Bytes().size() == values.size() * sizeof(T)) {
+            std::memcpy(values.data(), download.Bytes().data(), values.size() * sizeof(T));
+        }
+        return values;
+    }
+
     template <class Params>
     device::Operation Dispatch(const char* entry, const Params& params, uint64_t threads) {
         device::Queue& queue = m_device.GetQueue();

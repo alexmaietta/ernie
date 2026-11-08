@@ -49,6 +49,15 @@ uint32_t Prims::FindRow(uint32_t prim, SchemaId table) const {
     return slot == kNoSlot ? kNoRow : m_slotRows[record.slots + slot];
 }
 
+std::vector<uint32_t> Prims::Rows(std::span<const uint32_t> prims, SchemaId table) const {
+    std::vector<uint32_t> rows;
+    rows.reserve(prims.size());
+    for (const uint32_t prim : prims) {
+        rows.push_back(Alive(prim) ? FindRow(prim, table) : kNoRow);
+    }
+    return rows;
+}
+
 uint32_t Prims::Row(uint32_t prim, SchemaId table) const {
     const uint32_t row = FindRow(prim, table);
     if (row == kNoRow) {

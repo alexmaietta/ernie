@@ -34,7 +34,6 @@ ernie_object_library(
     views/layout.cpp
     views/mapping.cpp
     views/poses.cpp
-    views/readback.cpp
     views/view.cpp
     "${ernie_scene_defines}"
 )

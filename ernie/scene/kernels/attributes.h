@@ -19,6 +19,16 @@ struct CellsParams {
 
 ERNIE_CHECK_SIZE(CellsParams, 80);
 
+struct GatherRowsParams {
+    Ptr<uint> source;
+    Ptr<uint> rows;
+    Ptr<uint> out;
+    uint words;
+    uint count;
+};
+
+ERNIE_CHECK_SIZE(GatherRowsParams, 32);
+
 struct CopyRun {
     uint64_t dst;
     uint64_t src;
