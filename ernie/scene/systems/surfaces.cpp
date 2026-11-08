@@ -19,7 +19,8 @@ namespace {
 
 constexpr ColumnRef kInputs[] = {kGprimPrimvars,         kGprimDisplayColor,
                                  kPointBasedNormals,     kPointBasedNormalsInterpolation,
-                                 kMeshSubdivisionScheme, kPointInstancerPrimvars};
+                                 kMeshSubdivisionScheme, kPointInstancerPrimvars,
+                                 kPointInstancerIds};
 
 }
 

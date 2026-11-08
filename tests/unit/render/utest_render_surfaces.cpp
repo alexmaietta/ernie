@@ -120,5 +120,38 @@ TEST(SurfaceTest, DisplayColorsFollowThePrimAndEachInstancerCopy) {
     });
 }
 
+TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Camera>("/Cam", {.translate = {0, 0, 5},
+                                       .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                       .focalLength = 20});
+        const Prim inst =
+            scene->Define<PointInstancer>("/Inst", {.prototypes = {"/Inst/Protos/Tile"},
+                                                    .protoIndices = {0, 0},
+                                                    .positions = {{-1.5, 0, 0}, {1.5, 0, 0}},
+                                                    .ids = {7, 9}});
+        scene->Define<Scope>("/Inst/Protos");
+        scene->Define<Mesh>("/Inst/Protos/Tile", kTile);
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Ids", {.sourceName = RenderVarSource::InstanceId});
+        scene->Define<RenderProduct>(
+            "/Render/View",
+            {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
+        Renderer renderer(scene);
+        const auto ids = [&] {
+            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            output.Wait();
+            const std::vector<int64_t> values =
+                output["/Render/View"].frames.at(0).Source("InstanceId").tensor.ToHost<int64_t>();
+            const uint32_t row = kSide / 2;
+            return std::pair{values[row * kSide], values[row * kSide + kSide - 1]};
+        };
+        EXPECT_EQ(ids(), (std::pair<int64_t, int64_t>{7, 9}));
+        inst.Set(PointInstancer::kIds, std::vector<int64_t>{3, 4});
+        EXPECT_EQ(ids(), (std::pair<int64_t, int64_t>{3, 4}));
+    });
+}
+
 }
 }

@@ -20,9 +20,10 @@ struct SurfaceRecord {
     ArrayRef instancerPrimvars;
     Float3 displayColor;
     uint padding1;
+    int64_t instanceId;
 };
 
-ERNIE_CHECK_SIZE(SurfaceRecord, 112);
+ERNIE_CHECK_SIZE(SurfaceRecord, 120);
 
 static const float kRenderOriginCell = 64;
 

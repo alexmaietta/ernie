@@ -40,8 +40,11 @@ SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
     }
     if (hit.instancer != kNoPrim &&
         SchemaId(scene->prims.schema[hit.instancer]) == SchemaId::PointInstancer) {
-        surface.instancerPrimvars =
-            scene->schemas.pointInstancer.primvars[PrimRow(scene, hit.instancer, kSlotPointInstancer)];
+        const uint row = PrimRow(scene, hit.instancer, kSlotPointInstancer);
+        surface.instancerPrimvars = scene->schemas.pointInstancer.primvars[row];
+        const ArrayRef ids = scene->schemas.pointInstancer.ids[row];
+        surface.instanceId = hit.instance < ids.count ? Ptr<int64_t>(ids.address)[hit.instance]
+                                                      : int64_t(hit.instance);
     }
     return surface;
 }

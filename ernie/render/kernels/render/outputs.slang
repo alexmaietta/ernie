@@ -86,15 +86,7 @@ void WriteInstance(RenderParams params, CapturePixel pixel, uint slot, bool hit)
         Write(pixel, RenderVarSource::InstancerStableId, uint4(0));
         return;
     }
-    SceneData* scene = params.scene;
-    int64_t id = 0;
-    if (PrimSchema(params.tables, drawn.instancer) == SchemaId::PointInstancer) {
-        const ArrayRef ids =
-            scene->schemas.pointInstancer.ids[PrimRow(scene, drawn.instancer, kSlotPointInstancer)];
-        id = drawn.instance < ids.count ? Ptr<int64_t>(ids.address)[drawn.instance]
-                                        : int64_t(drawn.instance);
-    }
-    Write(pixel, RenderVarSource::InstanceId, id);
+    Write(pixel, RenderVarSource::InstanceId, params.tables->surfaces[slot].instanceId);
     Write(pixel, RenderVarSource::InstancerStableId,
           StableWords(params.tables->semantics.stableIds[drawn.instancer]));
 }
