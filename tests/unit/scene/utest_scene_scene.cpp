@@ -11,9 +11,11 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
+#include "ernie/scene/primvar.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/tables/tangents.h"
+#include "ernie/util/error.h"
 #include "support/devices.h"
 
 namespace ernie {
@@ -523,6 +525,77 @@ TEST(SceneTest, SessionPrimsMarkTheirSubtree) {
         EXPECT_TRUE(root.IsSession());
         EXPECT_TRUE(child.IsSession());
         EXPECT_FALSE(user.IsSession());
+    });
+}
+
+TEST(SceneTest, MappedPrimvarsWriteEachPrimsValuesInPlace) {
+    ForEachScene([](Scene& scene) {
+        const std::vector<Float3> colors = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        const std::vector<float> opacities = {0.25f, 0.5f, 0.75f};
+        scene.Define<World>("/env_0");
+        scene.Define<Points>(
+            "/env_0/Cloud",
+            {.primvars = {Primvar::Create("displayColor", Interpolation::Vertex, colors),
+                          Primvar::Create("displayOpacity", Interpolation::Vertex, opacities)},
+             .points = {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}});
+        scene.Clone(*scene.Find("/env_0"), std::vector<std::string>{"/env_1", "/env_2"});
+        const View clouds =
+            scene.Select(std::vector<std::string>{"/env_0/Cloud", "/env_1/Cloud", "/env_2/Cloud"});
+        UntypedAttribute primvars = clouds.Get("primvars");
+        const auto write = [&](float base) {
+            Mapping mapping = primvars.MapPrimvar("displayColor", MapAccess::Write);
+            const device::Tensor& values = mapping.Values();
+            EXPECT_EQ(std::vector<int64_t>(values.Shape().begin(), values.Shape().end()),
+                      (std::vector<int64_t>{3, 3, 3}));
+            for (uint32_t w = 0; w < 3; ++w) {
+                const std::vector<Float3> tint(3, Float3{base + float(w), 0, 0});
+                scene.GetDevice().GetQueue().Write(
+                    values.GetBuffer().Slice(values.Offset() +
+                                                 uint64_t(w) * values.Strides()[0] * sizeof(float),
+                                             sizeof(Float3) * 3),
+                    tint.data());
+            }
+            mapping.Close();
+            scene.Publish().Wait();
+            for (uint32_t w = 0; w < 3; ++w) {
+                const std::vector<Primvar> found = primvars.GetPrimvars(w);
+                ASSERT_EQ(found.size(), 2u);
+                for (const Primvar& primvar : found) {
+                    if (primvar.name == "displayColor") {
+                        EXPECT_EQ(primvar.Values<Float3>(),
+                                  std::vector<Float3>(3, Float3{base + float(w), 0, 0}));
+                    } else {
+                        EXPECT_EQ(primvar.Values<float>(), opacities);
+                    }
+                }
+            }
+        };
+        write(10);
+        write(20);
+
+        Mapping opacity = primvars.MapPrimvar("displayOpacity", MapAccess::Read);
+        EXPECT_EQ(
+            std::vector<int64_t>(opacity.Values().Shape().begin(), opacity.Values().Shape().end()),
+            (std::vector<int64_t>{3, 3}));
+        opacity.Close();
+        EXPECT_THROW(primvars.MapPrimvar("rest", MapAccess::Write), Error);
+        EXPECT_THROW(clouds.Get("points").MapPrimvar("displayColor", MapAccess::Write), Error);
+
+        scene.Define<Points>(
+            "/Other",
+            {.primvars = {Primvar::Create("rest", Interpolation::Vertex, colors),
+                          Primvar::Create("displayOpacity", Interpolation::Vertex, opacities)}});
+        scene.Define<Points>(
+            "/Short",
+            {.primvars = {Primvar::Create("displayColor", Interpolation::Vertex, colors)}});
+        EXPECT_THROW(scene.Select(std::vector<std::string>{"/env_0/Cloud", "/Other"})
+                         .Get("primvars")
+                         .MapPrimvar("displayColor", MapAccess::Write),
+                     Error);
+        EXPECT_THROW(scene.Select(std::vector<std::string>{"/env_0/Cloud", "/Short"})
+                         .Get("primvars")
+                         .MapPrimvar("displayColor", MapAccess::Write),
+                     Error);
     });
 }
 

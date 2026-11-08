@@ -453,6 +453,17 @@ TEST(RayCastTest, TranslucentPointsBlockRaysInProportionToTheirOpacity) {
                      std::vector<Primvar>{Primvar::Create("displayOpacity", Interpolation::Vertex,
                                                           std::vector<float>{0, 1})});
             EXPECT_EQ(blocked(), (std::pair<uint32_t, uint32_t>{0, kRays / 2}));
+
+            Mapping mapping = scene->Select("/Veil")
+                                  .Get("primvars")
+                                  .MapPrimvar("displayOpacity", MapAccess::Write);
+            const std::vector<float> simulated = {1, 0};
+            const Tensor& values = mapping.Values();
+            device.GetQueue().Write(
+                values.GetBuffer().Slice(values.Offset(), sizeof(float) * simulated.size()),
+                simulated.data());
+            mapping.Close();
+            EXPECT_EQ(blocked(), (std::pair<uint32_t, uint32_t>{kRays / 2, 0}));
         }
     });
 }

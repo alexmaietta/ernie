@@ -4,10 +4,13 @@
 #include <cstdint>
 #include <map>
 #include <span>
+#include <string>
+#include <tuple>
 #include <vector>
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
+#include "ernie/scene/records/primvars.h"
 #include "ernie/scene/schema/schema.h"
 #include "ernie/scene/structure/structure.h"
 
@@ -35,6 +38,11 @@ struct ViewRows {
 struct RowSource {
     uint64_t rows = 0;
     uint32_t firstRow = 0;
+};
+
+struct PrimvarLayout {
+    std::vector<ArrayRef> tables;
+    PrimvarEntry entry{};
 };
 
 class ViewState {
@@ -73,6 +81,10 @@ class ViewState {
     const Ref<device::Buffer>& DeviceRows(SchemaId table);
     RowSource Source(SchemaId table);
 
+    PrimvarLayout& Layout(ColumnRef column, std::string_view name) {
+        return m_primvarLayouts[{column.schema, column.index, std::string(name)}];
+    }
+
   private:
     Structure& m_structure;
     SchemaId m_schema;
@@ -80,6 +92,7 @@ class ViewState {
     std::vector<uint32_t> m_prims;
     std::vector<uint32_t> m_generations;
     std::map<SchemaId, ViewRows> m_rows;
+    std::map<std::tuple<SchemaId, uint32_t, std::string>, PrimvarLayout> m_primvarLayouts;
 };
 
 }

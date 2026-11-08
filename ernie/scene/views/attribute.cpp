@@ -1009,4 +1009,93 @@ Mapping UntypedAttribute::Map(MapAccess access, Stream consumer) {
     return mapping;
 }
 
+Mapping UntypedAttribute::MapPrimvar(std::string_view name, MapAccess access, Stream consumer) {
+    if (m_column.column->field != "primvars") {
+        throw Error("{}'s {} holds no primvars", Info(m_column.schema).name,
+                    m_column.column->field);
+    }
+    Mapping mapping = Map(access);
+    const device::Tensor tables = mapping.Values();
+    if (tables.Shape().size() != 2) {
+        mapping.Close();
+        throw Error("The primvars of the mapped prims differ in size, so {} doesn't map as one "
+                    "tensor",
+                    name);
+    }
+    ColumnStore& store = GetColumnStore();
+    std::vector<ArrayRef> arrays;
+    for (const uint32_t row : Rows().rows) {
+        arrays.push_back(store.Array(m_column, row));
+    }
+    PrimvarLayout& layout = m_view->Layout(m_column, name);
+    const bool cached =
+        layout.tables.size() == arrays.size() &&
+        std::ranges::equal(layout.tables, arrays, [](const ArrayRef& a, const ArrayRef& b) {
+            return a.address == b.address && a.count == b.count;
+        });
+    if (!cached) {
+        const uint32_t words = arrays.front().count;
+        const uint32_t stride = uint32_t(tables.Strides()[0]);
+        device::Queue& queue = store.GetDevice().GetQueue();
+        uint32_t count = 0;
+        queue.Read(tables.GetBuffer().Slice(tables.Offset(), sizeof(uint32_t)), &count);
+        const uint32_t header = std::min(words, 1 + count * kPrimvarEntryWords);
+        const Ref<device::Buffer> staging = store.GetDevice().CreateBuffer(
+            {.bytes = uint64_t(header) * sizeof(uint32_t) * arrays.size(),
+             .label = "primvar headers"});
+        device::CommandEncoder encoder = queue.CreateEncoder();
+        for (uint32_t i = 0; i < arrays.size(); ++i) {
+            encoder.Copy(
+                tables.GetBuffer().Slice(tables.Offset() + uint64_t(i) * stride * sizeof(uint32_t),
+                                         uint64_t(header) * sizeof(uint32_t)),
+                staging->Slice(uint64_t(i) * header * sizeof(uint32_t),
+                               uint64_t(header) * sizeof(uint32_t)));
+        }
+        queue.Submit(encoder.Finish());
+        std::vector<uint32_t> headers(size_t(header) * arrays.size());
+        queue.Read(staging->Slice(0), headers.data());
+        for (uint32_t i = 1; i < arrays.size(); ++i) {
+            if (!std::equal(headers.begin(), headers.begin() + header,
+                            headers.begin() + size_t(i) * header)) {
+                mapping.Close();
+                throw Error("The mapped prims lay out their primvars differently, so {} doesn't "
+                            "map as one tensor",
+                            name);
+            }
+        }
+        const uint32_t token = m_view->GetStructure().GetTokens().Find(name).id;
+        bool found = false;
+        for (uint32_t slot = 0; slot < count && token != 0; ++slot) {
+            PrimvarEntry entry;
+            std::memcpy(&entry, headers.data() + 1 + slot * kPrimvarEntryWords, sizeof(entry));
+            if (entry.name == token) {
+                layout.entry = entry;
+                found = true;
+            }
+        }
+        if (!found) {
+            mapping.Close();
+            throw Error("{} has no primvar {}", Info(m_column.schema).name, name);
+        }
+        layout.tables = arrays;
+    }
+    const PrimvarEntry& entry = layout.entry;
+    const auto lanes = int64_t(PrimvarComponents(PrimvarType(entry.type)) * entry.elementSize);
+    std::vector<int64_t> shape = {int64_t(arrays.size()), int64_t(entry.valueCount)};
+    std::vector<int64_t> strides = {tables.Strides()[0], lanes};
+    if (lanes > 1) {
+        shape.push_back(lanes);
+        strides.push_back(1);
+    }
+    mapping.m_values = device::Tensor(
+        Ref<device::Buffer>(&tables.GetBuffer()),
+        tables.Offset() + uint64_t(entry.values) * sizeof(uint32_t),
+        PrimvarIsInt(PrimvarType(entry.type)) ? device::DType::Int32 : device::DType::Float32,
+        std::move(shape), std::move(strides));
+    if (consumer.IsCompute()) {
+        mapping.m_ready.Wait(consumer);
+    }
+    return mapping;
+}
+
 }

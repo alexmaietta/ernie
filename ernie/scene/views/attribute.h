@@ -62,6 +62,7 @@ class ERNIE_API UntypedAttribute {
     device::Tensor Read(Stream consumer = Stream::Host()) const;
 
     Mapping Map(MapAccess access, Stream consumer = Stream::None());
+    Mapping MapPrimvar(std::string_view name, MapAccess access, Stream consumer = Stream::None());
     device::Operation MarkChanged(Stream producer = Stream::None(), const DLTensor* mask = nullptr);
 
     device::Operation Attach(DLManagedTensor* tensor, Stream producer = Stream::None(),

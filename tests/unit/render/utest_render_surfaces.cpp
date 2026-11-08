@@ -174,6 +174,35 @@ TEST(SurfaceTest, EachPointTakesItsOwnDisplayColor) {
     });
 }
 
+TEST(SurfaceTest, MappedDisplayColorsRecolourEachPoint) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = TwoTiles(device);
+        scene->Define<Points>(
+            "/Cloud", {.primvars = {Primvar::Create("displayColor", Interpolation::Vertex,
+                                                    std::vector<Float3>{{1, 0, 0}, {0, 0, 1}})},
+                       .points = {{0, 0, 0}, {10, 0, 0}},
+                       .widths = {2}});
+        Renderer renderer(scene);
+        Colors colors = CenterColors(renderer);
+        ASSERT_GT(colors.first.x, 0);
+        ASSERT_GT(colors.second.z, 0);
+
+        Mapping mapping =
+            scene->Select("/Cloud").Get("primvars").MapPrimvar("displayColor", MapAccess::Write);
+        const std::vector<Float3> simulated = {{0, 1, 0}, {1, 0, 0}};
+        const device::Tensor& values = mapping.Values();
+        device.GetQueue().Write(
+            values.GetBuffer().Slice(values.Offset(), sizeof(Float3) * simulated.size()),
+            simulated.data());
+        mapping.Close();
+        colors = CenterColors(renderer);
+        EXPECT_GT(colors.first.y, 0);
+        EXPECT_EQ(colors.first.x, 0);
+        EXPECT_GT(colors.second.x, 0);
+        EXPECT_EQ(colors.second.z, 0);
+    });
+}
+
 TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);
