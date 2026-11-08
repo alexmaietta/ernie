@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The overlay is its own module. `ernie/render/overlay/overlay.h` is now `ernie/overlay/overlay.h` and `ernie/render/kernels/overlay/style.h` is now `ernie/overlay/kernels/style.h`, and `ernie/ernie.h` still includes the overlay.
 - The viewer's settings menu groups render resolution, selection, gizmo and grid settings into submenus.
 - The viewer shows the memory, capture and profiler panels beside info and log by default, and hides light guides by default.
-- The viewer's perspective view starts from the scene's first camera when no render product is given, and the default scene's camera looks straight at the middle of its shapes from lower down.
+- The viewer's perspective view starts a little further out from the scene, and the default scene's camera looks straight at the middle of its shapes from lower down.
 
 ### Removed
 

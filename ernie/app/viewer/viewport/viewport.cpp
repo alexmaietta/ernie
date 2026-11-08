@@ -36,6 +36,8 @@ constexpr Float3 kGridColor = {0.5f, 0.5f, 0.5f};
 constexpr Float4 kGridXColor = {0.80f, 0.32f, 0.30f, 0.85f};
 constexpr Float4 kGridYColor = {0.42f, 0.72f, 0.34f, 0.85f};
 constexpr float kSelectionAxisPixels = 60;
+constexpr double kFraming = 1.1;
+constexpr double kStartFraming = 1.6;
 constexpr Float4 kCameraGuideColor = {0.55f, 0.75f, 0.95f, 0.8f};
 constexpr Float4 kLightGuideColor = {0.95f, 0.85f, 0.45f, 0.8f};
 constexpr std::string_view kViewerOverlays = "viewer/";
@@ -340,40 +342,11 @@ void Viewport::DefineSession() {
     if (camera && camera->IsA(SchemaId::Camera)) {
         m_scene->Paste(m_scene->Copy(*camera), m_views[0]);
     } else {
-        std::optional<Prim> shot;
-        std::vector<Prim> stack;
-        const View tops = m_scene->Select("/*");
-        for (const uint32_t top : tops.Prims()) {
-            const Prim prim = m_scene->ByIndex(top);
-            if (!prim.IsSession()) {
-                stack.push_back(prim);
-            }
-        }
-        while (!stack.empty() && !shot) {
-            const Prim prim = stack.back();
-            stack.pop_back();
-            if (prim.IsA(SchemaId::Camera)) {
-                shot = prim;
-            }
-            for (const Prim& child : prim.Children()) {
-                stack.push_back(child);
-            }
-        }
-        if (shot) {
-            const View pose = m_scene->Select(shot->Path());
-            const Double3 eye = pose.Get<Double3>("translate").Get().front();
-            const Quatd orient = pose.Get<Quatd>("orient").Get().front();
-            m_scene->Define<Camera>(
-                m_views[0],
-                {.translate = eye, .orient = orient, .clippingRange = {kNearClip, kFarClip}});
-            m_orbit.LookFrom(eye, orient, Double3{});
-        } else {
-            const OrbitCamera orbit{.yaw = 0.6, .pitch = 0.45, .distance = 10};
-            m_scene->Define<Camera>(m_views[0], {.translate = orbit.Eye(),
-                                                 .orient = orbit.Orient(),
-                                                 .clippingRange = {kNearClip, kFarClip}});
-            m_unframed.insert(m_views[0]);
-        }
+        const OrbitCamera orbit{.yaw = 0.6, .pitch = 0.45, .distance = 10};
+        m_scene->Define<Camera>(m_views[0], {.translate = orbit.Eye(),
+                                             .orient = orbit.Orient(),
+                                             .clippingRange = {kNearClip, kFarClip}});
+        m_unframed.insert(m_views[0]);
     }
     const Quatd orients[] = {LookAlong({0, 0, -1}, {0, 1, 0}), LookAlong({0, 1, 0}),
                              LookAlong({-1, 0, 0})};
@@ -388,6 +361,7 @@ void Viewport::DefineSession() {
     product.Get(RenderProduct::kOrderedVars.Column()).SetTargets(0, {m_shownVar});
     if (m_unframed.erase(lookThrough) > 0) {
         m_framing.push_back(m_scene->ReadBoundsAsync());
+        m_framingMargin = kStartFraming;
     }
 }
 
@@ -1280,6 +1254,7 @@ void Viewport::LandFraming() {
         grow(whole.lower, whole.upper);
     }
     m_framing.clear();
+    const double margin = std::exchange(m_framingMargin, kFraming);
     if (box.lower.x > box.upper.x) {
         return;
     }
@@ -1293,7 +1268,7 @@ void Viewport::LandFraming() {
     if (m_view->orthographic) {
         const Float3 back = m_view->frame.z;
         const double away = 4 * radius + 1;
-        const float height = float(2.2 * radius / kOrthographicUnits);
+        const float height = float(2 * margin * radius / kOrthographicUnits);
         const float width = height * m_view->width / std::max(m_view->height, 1e-6f);
         const View camera = m_scene->Select(m_camera);
         camera.Get<Double3>("translate")
@@ -1308,7 +1283,7 @@ void Viewport::LandFraming() {
     const double aperture = std::max(std::min(m_view->width, m_view->height), 1e-3f);
     const double half = std::atan(0.5 * aperture / std::max(m_view->focal, 1e-3f));
     m_orbit.target = center;
-    m_orbit.distance = 1.1 * radius / std::sin(std::max(half, 1e-3));
+    m_orbit.distance = margin * radius / std::sin(std::max(half, 1e-3));
     const View camera = m_scene->Select(m_camera);
     camera.Get<Double3>("translate").Set(m_orbit.Eye());
     camera.Get<Quatd>("orient").Set(m_orbit.Orient());

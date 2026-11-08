@@ -405,6 +405,7 @@ class Viewport {
     std::map<std::string, AovDisplay, std::less<>> m_displays;
     bool m_framingWorlds = false;
     bool m_framingPrims = false;
+    double m_framingMargin = 1.1;
     std::optional<device::BuildProgress> m_builds;
     std::optional<device::Download> m_bounds;
     std::optional<std::array<float, 2>> m_range;
