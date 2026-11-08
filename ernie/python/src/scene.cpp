@@ -17,7 +17,7 @@
 #include <nanobind/stl/vector.h>
 
 #include "ernie/device/queue.h"
-#include "ernie/scene/access/poses.h"
+#include "ernie/scene/views/poses.h"
 #include "values.h"
 
 namespace nb = nanobind;

@@ -11,13 +11,13 @@
 #include "ernie/device/device.h"
 #include "ernie/device/program.h"
 #include "ernie/device/queue.h"
+#include "ernie/scene/columns/array_heap.h"
+#include "ernie/scene/columns/column_store.h"
+#include "ernie/scene/columns/heap.h"
+#include "ernie/scene/columns/table.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/kernels/schema/columns.h"
-#include "ernie/scene/store/arrays.h"
-#include "ernie/scene/store/heap.h"
-#include "ernie/scene/store/store.h"
-#include "ernie/scene/store/table.h"
 #include "support/devices.h"
 
 namespace ernie {

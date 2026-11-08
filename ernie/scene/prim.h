@@ -9,10 +9,10 @@
 #include <vector>
 
 #include "ernie/export.h"
-#include "ernie/scene/access/attribute.h"
-#include "ernie/scene/access/view.h"
 #include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/kernels/schema/schema.h"
+#include "ernie/scene/views/attribute.h"
+#include "ernie/scene/views/view.h"
 #include "ernie/util/span.h"
 
 namespace ernie {

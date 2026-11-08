@@ -1,41 +1,41 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_scene
-    access/attribute.cpp
-    access/layout.cpp
-    access/mapping.cpp
-    access/poses.cpp
-    access/view.cpp
-    catalog/catalog.cpp
-    catalog/packing.cpp
-    catalog/paths.cpp
-    catalog/prims.cpp
-    catalog/tokens.cpp
+    builders/bounds_builder.cpp
+    builders/instance_builder.cpp
+    builders/instance_layout.cpp
+    builders/light_builder.cpp
+    builders/material_builder.cpp
+    builders/mesh_builder.cpp
+    builders/product_builder.cpp
+    builders/regions.cpp
+    builders/semantic_builder.cpp
+    builders/sensor_builder.cpp
+    builders/surface_builder.cpp
+    builders/tangent_builder.cpp
+    builders/texture_builder.cpp
+    builders/transform_builder.cpp
+    columns/array_heap.cpp
+    columns/column_store.cpp
+    columns/heap.cpp
+    columns/table.cpp
     prim.cpp
+    publish/change_set.cpp
+    publish/publisher.cpp
+    publish/table_versions.cpp
     rotation.cpp
     scene.cpp
-    store/arrays.cpp
-    store/heap.cpp
-    store/store.cpp
-    store/table.cpp
-    systems/bounds.cpp
-    systems/geometry.cpp
-    systems/hierarchy.cpp
-    systems/instance_layout.cpp
-    systems/instances.cpp
-    systems/lights.cpp
-    systems/materials.cpp
-    systems/products.cpp
-    systems/readback.cpp
-    systems/regions.cpp
-    systems/semantics.cpp
-    systems/sensors.cpp
-    systems/surfaces.cpp
-    systems/tangents.cpp
-    systems/textures.cpp
-    timeline/changes.cpp
-    timeline/table_log.cpp
-    timeline/timeline.cpp
+    structure/packing.cpp
+    structure/paths.cpp
+    structure/prims.cpp
+    structure/structure.cpp
+    structure/tokens.cpp
+    views/attribute.cpp
+    views/layout.cpp
+    views/mapping.cpp
+    views/poses.cpp
+    views/readback.cpp
+    views/view.cpp
     "${ernie_scene_defines}"
 )
 target_link_libraries(
@@ -59,6 +59,7 @@ ernie_embed(
     ROOTS
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tables|ernie/scene/tables/|*.h"
         "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels|ernie/scene/kernels/|*.h"
 )
 
@@ -71,24 +72,24 @@ ernie_static_library(
 )
 
 ernie_public_files(
-    access/attribute.h
-    access/layout.h
-    access/mapping.h
-    access/poses.h
-    access/view.h
-    catalog/tokens.h
+    kernels/authored.h
     kernels/ids.h
     kernels/paged.h
     kernels/primvars.h
-    kernels/scene.h
     kernels/schema/schema.h
     kernels/schema/types.h
     kernels/semantics.h
-    kernels/tables/hierarchy.h
     kernels/textures.h
     prim.h
     primvar.h
     rotation.h
     scene.h
+    structure/tokens.h
+    tables/transforms.h
     types.h
+    views/attribute.h
+    views/layout.h
+    views/mapping.h
+    views/poses.h
+    views/view.h
 )

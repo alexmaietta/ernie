@@ -2,10 +2,10 @@
 #pragma once
 
 #include "ernie/io/kernels/ies.h"
+#include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/scene.h"
-#include "ernie/scene/kernels/tables/instances.h"
-#include "ernie/scene/kernels/tables/textures.h"
+#include "ernie/scene/tables/instances.h"
+#include "ernie/scene/tables/textures.h"
 
 namespace ernie {
 

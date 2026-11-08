@@ -14,7 +14,7 @@
 
 #include "ernie/device/queue.h"
 #include "ernie/ernie.h"
-#include "ernie/scene/access/layout.h"
+#include "ernie/scene/views/layout.h"
 
 namespace ernie::python {
 

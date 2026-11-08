@@ -20,8 +20,8 @@
 #include "ernie/render/kernels/render/render.h"
 #include "ernie/render/overlay/overlay_impl.h"
 #include "ernie/render/renderer.h"
+#include "ernie/scene/builders/product_builder.h"
 #include "ernie/scene/scene.h"
-#include "ernie/scene/systems/products.h"
 
 namespace ernie {
 

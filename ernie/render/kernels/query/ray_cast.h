@@ -4,9 +4,9 @@
 #include "ernie/device/kernels/shared.h"
 
 #ifndef __SLANG__
+#include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/scene.h"
-#include "ernie/scene/kernels/tables/render_tables.h"
+#include "ernie/scene/tables/render_tables.h"
 #endif
 
 namespace ernie {

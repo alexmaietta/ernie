@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 __exported import ernie.device.kernels.device;
-__exported import ernie.scene.kernels.scene;
+__exported import ernie.scene.kernels.authored;
 __exported import ernie.render.kernels.shapes.intersector;
 __exported import ernie.render.kernels.trace.tracer;
 

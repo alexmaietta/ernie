@@ -15,14 +15,14 @@
 #include "ernie/device/ref.h"
 #include "ernie/device/stream.h"
 #include "ernie/export.h"
-#include "ernie/scene/access/attribute.h"
-#include "ernie/scene/access/poses.h"
-#include "ernie/scene/access/view.h"
-#include "ernie/scene/catalog/tokens.h"
 #include "ernie/scene/defines.h"
 #include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/prim.h"
+#include "ernie/scene/structure/tokens.h"
 #include "ernie/scene/types.h"
+#include "ernie/scene/views/attribute.h"
+#include "ernie/scene/views/poses.h"
+#include "ernie/scene/views/view.h"
 #include "ernie/util/span.h"
 
 namespace ernie {
