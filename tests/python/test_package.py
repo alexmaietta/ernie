@@ -12,7 +12,7 @@ def test_exports_resolve():
 def test_reports_its_version_and_build():
     assert re.match(r"^\d+\.\d+\.\d+", ernie.__version__)
     info = ernie.build_info()
-    assert info.version
+    assert info.version == ernie.__version__
     assert ernie.backend_name(ernie.Backend.VULKAN) == "vulkan"
 
 

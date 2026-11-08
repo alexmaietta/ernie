@@ -32,6 +32,7 @@ TEST(VersionTest, BuildInfoMatchesTheProject) {
     const BuildInfo& build = GetBuildInfo();
     EXPECT_EQ(build.version, (Version{ERNIE_TEST_VERSION_MAJOR, ERNIE_TEST_VERSION_MINOR,
                                       ERNIE_TEST_VERSION_PATCH}));
+    EXPECT_EQ(build.fullVersion, ERNIE_TEST_VERSION_FULL);
     EXPECT_FALSE(build.commit.empty());
     EXPECT_EQ(build.buildDate.size(), 20u);
     EXPECT_EQ(&GetBuildInfo(), &build);

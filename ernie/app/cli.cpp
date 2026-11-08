@@ -249,9 +249,10 @@ int RunCommand(const Command& command) {
         return 0;
     case Command::Kind::Version: {
         const BuildInfo& build = GetBuildInfo();
-        std::printf("ernie %s (%.*s%s, %.*s)\n", build.version.ToString().c_str(),
-                    int(build.commit.size()), build.commit.data(), build.modified ? "+" : "",
-                    int(build.commitDate.size()), build.commitDate.data());
+        std::printf("ernie %.*s (%.*s%s, %.*s)\n", int(build.fullVersion.size()),
+                    build.fullVersion.data(), int(build.commit.size()), build.commit.data(),
+                    build.modified ? "+" : "", int(build.commitDate.size()),
+                    build.commitDate.data());
         return 0;
     }
     case Command::Kind::Devices:

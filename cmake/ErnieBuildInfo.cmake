@@ -46,7 +46,7 @@ string(
 list(GET parts 0 major)
 list(GET parts 1 minor)
 list(GET parts 2 patch)
-set(key "// ${VERSION} ${sha} ${dirty}")
+set(key "// ${VERSION}${PRERELEASE} ${sha} ${dirty}")
 if(EXISTS "${OUTPUT}")
     file(READ "${OUTPUT}" old)
     string(
@@ -62,7 +62,7 @@ string(TIMESTAMP built "%Y-%m-%dT%H:%M:%SZ" UTC)
 file(
     WRITE "${OUTPUT}"
     "${key}\n#define ERNIE_VERSION_MAJOR ${major}\n#define ERNIE_VERSION_MINOR ${minor}\n"
-    "#define ERNIE_VERSION_PATCH ${patch}\n"
+    "#define ERNIE_VERSION_PATCH ${patch}\n#define ERNIE_VERSION_FULL \"${VERSION}${PRERELEASE}\"\n"
     "#define ERNIE_GIT_SHA \"${sha}\"\n#define ERNIE_GIT_DIRTY ${dirty}\n"
     "#define ERNIE_COMMIT_DATE \"${commit_date}\"\n#define ERNIE_BUILD_DATE \"${built}\"\n"
 )

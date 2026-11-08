@@ -47,6 +47,7 @@ struct ERNIE_API BuildInfo {
     bool modified = false;
     std::string_view commitDate;
     std::string_view buildDate;
+    std::string_view fullVersion;
 };
 
 ERNIE_API const BuildInfo& GetBuildInfo();
