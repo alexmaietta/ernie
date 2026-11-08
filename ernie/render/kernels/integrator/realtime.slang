@@ -6,6 +6,7 @@ import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.dome;
 import ernie.render.kernels.light.scatter;
 import ernie.render.kernels.material.dispatch;
+import ernie.render.kernels.material.thermal;
 import ernie.render.kernels.random;
 import ernie.render.kernels.basis;
 
@@ -225,6 +226,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         OpticalClosure<Spectrum> closure = OpticalClosure<Spectrum>();
         ShadeDefinition<Spectrum>(context, closure);
         point = context.point;
+        AddThermalEmission<Spectrum>(query.tables, point, closure);
         PathVertex<Spectrum> vertex;
         vertex.point = point;
         vertex.albedo = closure.albedo.ToRgb();

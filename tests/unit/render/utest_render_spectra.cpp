@@ -187,7 +187,7 @@ struct Returns {
     Prim lidar;
 };
 
-Returns Wall(Device& device, float elevation) {
+Returns ReturnsWall(Device& device, float elevation) {
     Returns wall{.scene = Scene::Create(device)};
     Scene& scene = *wall.scene;
     scene.Define<Scope>("/Looks");
@@ -234,7 +234,7 @@ float RadarIntensity(Renderer& renderer) {
 
 TEST(SpectraTest, LidarReadsMaterialsAtItsLaserWavelength) {
     ForEachDevice([](Device& device) {
-        Returns wall = Wall(device, 0);
+        Returns wall = ReturnsWall(device, 0);
         wall.surface.Connect("diffuseColor", wall.spectrum, "spectrum");
         wall.spectrum.Set(SampledSpectrum::kWavelengths, std::vector<float>{380, 780, 800, 1000});
         Renderer renderer(wall.scene);
@@ -274,7 +274,7 @@ struct TestReturns {
 }
 )";
     ForEachDevice([&](Device& device) {
-        Returns wall = Wall(device, 45);
+        Returns wall = ReturnsWall(device, 45);
         LoadShaders(*wall.scene, file);
         wall.surface.Set(Shader::kId, "TestReturns");
         Renderer renderer(wall.scene);
@@ -287,6 +287,88 @@ struct TestReturns {
         ASSERT_GT(echo, 0);
         wall.surface.Set("backscatter", 0.25f);
         EXPECT_NEAR(RadarIntensity(renderer) / echo, 0.25f, 1e-3f);
+    });
+}
+
+float PlanckSum(float first, float last, float kelvin) {
+    double sum = 0;
+    for (int band = 0; band < 8; ++band) {
+        const double nanometers = first + (band + 0.5) * (last - first) / 8;
+        const double meters = nanometers * 1e-9;
+        sum += 1 / (std::pow(meters, 5) * (std::exp(1.438776877e-2 / (meters * kelvin)) - 1));
+    }
+    return float(sum);
+}
+
+TEST(SpectraTest, ThermalCamerasSeeSurfacesGlowByTemperatureAndEmissivity) {
+    ForEachDevice([](Device& device) {
+        Wall wall = SpectralWall(device);
+        wall.product.Set(RenderProduct::kSpectralMode, SpectralMode::Bands);
+        wall.camera.Set(Camera::kDetectorSpectralRange, Float2{8000, 12000});
+        const Prim plane = *wall.scene->Find("/Wall");
+        wall.scene->Apply<ThermalAPI>(plane, {.thermalTemperature = 0});
+        wall.surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0.1f, 0.1f, 0.1f});
+        Renderer renderer(wall.scene);
+        const auto emitted = [&](float kelvin) {
+            plane.Set(ThermalAPI::kThermalTemperature, 0.0f);
+            const float reflected = Center(renderer).x;
+            plane.Set(ThermalAPI::kThermalTemperature, kelvin);
+            return Center(renderer).x - reflected;
+        };
+        const float warm = emitted(300);
+        ASSERT_GT(warm, 0);
+        EXPECT_NEAR(emitted(350) / warm, PlanckSum(8000, 12000, 350) / PlanckSum(8000, 12000, 300),
+                    0.01f);
+
+        wall.surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0.9f, 0.9f, 0.9f});
+        EXPECT_LT(emitted(300), 0.5f * warm);
+
+        wall.surface.Set(UsdPreviewSurface::kDiffuseColor, Float3{0.1f, 0.1f, 0.1f});
+        plane.Set(Gprim::kPrimvars,
+                  std::vector<Primvar>{Primvar::Create("ernie:temperature", Interpolation::Constant,
+                                                       std::vector<float>{350})});
+        plane.Set(ThermalAPI::kThermalTemperature, 0.0f);
+        const float reflected = Center(renderer).x;
+        plane.Set(ThermalAPI::kThermalTemperature, 300.0f);
+        EXPECT_NEAR((Center(renderer).x - reflected) / warm,
+                    PlanckSum(8000, 12000, 350) / PlanckSum(8000, 12000, 300), 0.01f);
+    });
+}
+
+TEST(SpectraTest, AuthoredEmissivityOverridesKirchhoffAndRgbCamerasDontChange) {
+    const std::filesystem::path file = Scratch() / "ernie_render_spectra_emissivity.slang";
+    std::ofstream(file) << R"(
+import ernie.material;
+
+struct TestEmitter {
+    float emissivity = 1;
+    bool authored = false;
+
+    void Material(inout SurfaceInputs m, ShadeContext c) {
+        m.baseColor = SpectralValue.Constant(0);
+        m.specularWeight = 0;
+        m.emissivity = SpectralValue.Constant(emissivity);
+        m.emissivityAuthored = authored;
+    }
+}
+)";
+    ForEachDevice([&](Device& device) {
+        Wall wall = SpectralWall(device);
+        LoadShaders(*wall.scene, file);
+        wall.surface.Set(Shader::kId, "TestEmitter");
+        const Prim plane = *wall.scene->Find("/Wall");
+        Renderer renderer(wall.scene);
+        const Float3 cold = Center(renderer);
+        wall.scene->Apply<ThermalAPI>(plane, {.thermalTemperature = 300});
+        ExpectNear(Center(renderer), cold);
+
+        wall.product.Set(RenderProduct::kSpectralMode, SpectralMode::Bands);
+        wall.camera.Set(Camera::kDetectorSpectralRange, Float2{8000, 12000});
+        const float black = Center(renderer).x;
+        ASSERT_GT(black, 0);
+        wall.surface.Set("authored", true);
+        wall.surface.Set("emissivity", 0.5f);
+        EXPECT_NEAR(Center(renderer).x / black, 0.5f, 0.01f);
     });
 }
 

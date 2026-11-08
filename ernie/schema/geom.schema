@@ -110,6 +110,20 @@ api class MotionAPI (
     )
 }
 
+api class ThermalAPI (
+    appliesTo = [Gprim]
+    doc = "A gprim's temperature, which makes it glow in thermal cameras by its material's emissivity. A simulation may write it every step, and an ernie:temperature float primvar overrides it per vertex or face. Gprims without it don't emit heat."
+) {
+    float ernie:thermal:temperature = 293.15 (
+        tracked
+        unit = kelvin
+        group = "Thermal"
+        displayName = "Temperature"
+        min = 0
+        doc = "The surface temperature in kelvin."
+    )
+}
+
 api class PrototypeAPI (
     appliesTo = [Xformable]
     doc = "Draws a prototype root's subtree at this prim's transform, as one copy that shares the prototype's geometry. USD's instanceable prims map onto it."

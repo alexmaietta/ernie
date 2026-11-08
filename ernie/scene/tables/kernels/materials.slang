@@ -15,6 +15,10 @@ void WriteMaterials(uniform MaterialParams p) {
         return;
     }
     const SchemaId schema = SchemaId(scene->prims.schema[prim]);
+    p.temperatures[prim] =
+        HasApi(scene, prim, kApiThermalAPI)
+            ? scene->schemas.thermalAPI.thermalTemperature[ApiRow(scene, prim, kApiThermalAPI)]
+            : 0;
     if (HasApi(scene, prim, kApiCheckerboardAPI)) {
         const uint row = ApiRow(scene, prim, kApiCheckerboardAPI);
         CheckerboardAPIData* c = &scene->schemas.checkerboardAPI;

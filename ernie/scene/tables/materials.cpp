@@ -71,7 +71,8 @@ bool Channel(std::string_view output, bool color, TextureChannel& channel) {
 }
 
 std::vector<ColumnRef> MaterialInputs() {
-    std::vector<ColumnRef> inputs = {kPlaneAxis, kDetectorAPIDetectorSpectralRange};
+    std::vector<ColumnRef> inputs = {kPlaneAxis, kDetectorAPIDetectorSpectralRange,
+                                     kThermalAPIThermalTemperature};
     for (const SchemaId schema :
          {SchemaId::Connectable, SchemaId::UsdPreviewSurface, SchemaId::SurfaceDetailAPI,
           SchemaId::UsdUVTexture, SchemaId::UsdPrimvarReader_float2, SchemaId::UsdTransform2d,
@@ -119,6 +120,8 @@ void MaterialTable::Describe(RenderTables& tables) const {
     tables.materials.address = m_records.Buffer() ? m_records.Buffer()->Address() : 0;
     tables.materialWords.address = m_words.Address();
     tables.checkers.address = m_checkers.Address();
+    tables.temperatures.address = m_temperatures.Address();
+    tables.temperaturePrimvar = m_temperaturePrimvar;
 }
 
 std::vector<MaterialTable::Connection> MaterialTable::Connections(uint32_t prim) {
@@ -803,12 +806,15 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     WarnOutsideVisible();
     m_checkers.Reserve(device, store.Schema(SchemaId::CheckerboardAPI).Capacity());
     const uint32_t prims = m_structure.GetPrims().Size();
+    m_temperatures.Reserve(device, std::max(prims, 1u));
+    m_temperaturePrimvar = m_structure.GetTokens().Intern("ernie:temperature").id;
     if (prims == 0) {
         return;
     }
     MaterialParams params{};
     params.scene.address = store.DeviceData();
     params.checkers.address = m_checkers.Address();
+    params.temperatures.address = m_temperatures.Address();
     device::Queue& queue = device.GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Materials/Write");
     device::CommandEncoder encoder = queue.CreateEncoder();

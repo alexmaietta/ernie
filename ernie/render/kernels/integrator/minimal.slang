@@ -4,6 +4,7 @@ __exported import ernie.render.kernels.integrator.iintegrator;
 import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.scatter;
 import ernie.render.kernels.material.dispatch;
+import ernie.render.kernels.material.thermal;
 import ernie.render.kernels.surface.primvars;
 import ernie.render.kernels.random;
 import ernie.render.kernels.basis;
@@ -132,6 +133,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
                 OpticalClosure<RgbSpectrum> closure = OpticalClosure<RgbSpectrum>();
                 ShadeDefinition<RgbSpectrum>(context, closure);
+                AddThermalEmission<RgbSpectrum>(query.tables, context.point, closure);
                 shade = lighting.Shade(ray, context.point, closure);
             }
         }

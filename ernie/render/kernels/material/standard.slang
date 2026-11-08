@@ -40,6 +40,8 @@ void LowerStandardSurface<Spectrum : ISpectrum>(SurfaceInputs inputs, float3 out
     closure.opacity = inputs.opacity;
     closure.retroreflection = no_diff saturate(detach(inputs.retroreflection));
     closure.radarBackscatter = no_diff max(detach(inputs.radarBackscatter), 0.0f);
+    closure.emissivityAuthored = inputs.emissivityAuthored;
+    closure.emissivity = inputs.emissivity.Evaluate<Spectrum>();
 }
 
 interface IStandardMaterial {

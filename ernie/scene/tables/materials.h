@@ -49,7 +49,8 @@ class MaterialTable : public RenderTable {
     void Describe(RenderTables& tables) const override;
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
-        HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_checkers.Buffer()});
+        HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_checkers.Buffer(),
+                           m_temperatures.Buffer()});
     }
 
     const MaterialRecord& Record(uint32_t prim) const {
@@ -135,6 +136,8 @@ class MaterialTable : public RenderTable {
     uint32_t m_resolves = 0;
     DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
+    DeviceTable<float> m_temperatures{"temperatures"};
+    uint32_t m_temperaturePrimvar = 0;
 };
 
 }

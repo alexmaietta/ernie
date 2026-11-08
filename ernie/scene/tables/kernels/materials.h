@@ -10,9 +10,10 @@ namespace ernie {
 struct MaterialParams {
     Ptr<AuthoredData> scene;
     Ptr<CheckerRecord> checkers;
+    Ptr<float> temperatures;
 };
 
-ERNIE_CHECK_SIZE(MaterialParams, 16);
+ERNIE_CHECK_SIZE(MaterialParams, 24);
 
 struct PackParams {
     Ptr<PackEntry> entries;

@@ -15,6 +15,8 @@ struct SurfaceInputs : IDifferentiable {
     float opacity;
     float retroreflection;
     float radarBackscatter;
+    SpectralValue emissivity;
+    bool emissivityAuthored;
 
     [Differentiable]
     __init() {
@@ -30,5 +32,7 @@ struct SurfaceInputs : IDifferentiable {
         opacity = 1;
         retroreflection = 0;
         radarBackscatter = 1;
+        emissivity = SpectralValue.Constant(1);
+        emissivityAuthored = false;
     }
 }

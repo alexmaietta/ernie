@@ -48,11 +48,14 @@ struct RenderTables {
     Ptr<uint> materialWords;
     Ptr<CheckerRecord> checkers;
     SpectraRecord spectra;
+    Ptr<float> temperatures;
+    uint temperaturePrimvar;
+    uint padding0;
     SemanticsData semantics;
     uint worldCount;
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 368);
+ERNIE_CHECK_SIZE(RenderTables, 384);
 
 }

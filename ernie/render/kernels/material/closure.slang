@@ -129,6 +129,8 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
     float opacity;
     no_diff float retroreflection;
     no_diff float radarBackscatter;
+    Spectrum emissivity;
+    no_diff bool emissivityAuthored;
 
     [Differentiable]
     __init() {
@@ -142,6 +144,8 @@ struct OpticalClosure<Spectrum : ISpectrum> : IBsdf<Spectrum> {
         opacity = 1;
         retroreflection = 0;
         radarBackscatter = 1;
+        emissivity = Spectrum.Constant(1);
+        emissivityAuthored = false;
     }
 
     [Differentiable]
