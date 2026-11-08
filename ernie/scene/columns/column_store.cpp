@@ -9,8 +9,8 @@
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
+#include "ernie/scene/columns/kernels/attributes.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/attributes.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/span.h"
@@ -237,7 +237,8 @@ Ordinal ColumnStore::WorldStamp(uint32_t world) const {
 device::Program& ColumnStore::Kernels() {
     if (!m_program) {
         m_program = m_device.CreateProgram(
-            {.modules = {"ernie.scene.kernels.attributes", "ernie.scene.kernels.changes"},
+            {.modules = {"ernie.scene.columns.kernels.attributes",
+                         "ernie.scene.columns.kernels.changes"},
              .library = &kSceneKernels,
              .entries = {"CopyWords", "ScatterCells", "StampRows", "GatherCells", "FillCells",
                          "CloneRows", "WritePoses", "ReadPoses", "CompactChanged", "GatherRows"},

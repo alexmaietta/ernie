@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "ernie/device/queue.h"
-#include "ernie/scene/kernels/changes.h"
+#include "ernie/scene/columns/kernels/changes.h"
 
 namespace ernie {
 

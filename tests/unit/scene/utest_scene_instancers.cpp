@@ -9,10 +9,10 @@
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/lights.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
+#include "ernie/scene/tables/kernels/instance_layout.h"
+#include "ernie/scene/tables/kernels/lights.h"
 #include "support/devices.h"
 
 namespace ernie {

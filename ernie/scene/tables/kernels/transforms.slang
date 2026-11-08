@@ -2,8 +2,8 @@
 
 import ernie.device.kernels.device;
 
-#include "ernie/scene/kernels/doubles.h"
-#include "ernie/scene/kernels/transforms.h"
+#include "ernie/scene/columns/kernels/doubles.h"
+#include "ernie/scene/tables/kernels/transforms.h"
 
 using namespace ernie;
 

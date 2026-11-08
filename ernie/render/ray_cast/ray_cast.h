@@ -11,7 +11,7 @@
 #include "ernie/device/stream.h"
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
-#include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/schema/ids.h"
 
 namespace ernie {
 

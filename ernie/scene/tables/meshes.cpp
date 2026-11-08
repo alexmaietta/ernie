@@ -8,10 +8,10 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/meshes.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/meshes.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
@@ -526,7 +526,7 @@ void MeshTable::Prepare() {
 device::Program& MeshTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.meshes"},
+            {.modules = {"ernie.scene.tables.kernels.meshes"},
              .library = &kSceneKernels,
              .entries = {"FaceSizes", "FaceTriangles", "TopologySizes", "EmitTriangles",
                          "WriteAdjacency", "WriteStarts", "SmoothNormals", "FinishShapeBounds"},

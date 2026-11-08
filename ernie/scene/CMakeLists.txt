@@ -55,8 +55,10 @@ ernie_embed(
         kTextureKernels
     HEADER ernie/scene/kernels.h
     ROOTS
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.slang"
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/columns/kernels|ernie/scene/columns/kernels/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tables/kernels|ernie/scene/tables/kernels/|*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tables/kernels|ernie/scene/tables/kernels/|*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/schema|ernie/scene/schema/|*.h"
@@ -72,14 +74,14 @@ ernie_static_library(
 )
 
 ernie_public_files(
-    kernels/ids.h
-    kernels/paged.h
+    columns/kernels/paged.h
     prim.h
     primvar.h
     records/primvars.h
     records/semantics.h
     rotation.h
     scene.h
+    schema/ids.h
     schema/schema.h
     schema/types.h
     structure/tokens.h

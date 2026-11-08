@@ -6,7 +6,7 @@
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/kernels/changes.h"
+#include "ernie/scene/columns/kernels/changes.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"

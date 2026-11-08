@@ -7,11 +7,11 @@
 #include <iterator>
 
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/lights.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/instance_layout.h"
+#include "ernie/scene/tables/kernels/lights.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
@@ -463,7 +463,7 @@ void LightTable::WriteCollectionsAndShapes() {
 device::Program& LightTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.lights"},
+            {.modules = {"ernie.scene.tables.kernels.lights"},
              .library = &kSceneKernels,
              .entries = {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights",
                          "WriteLightCdf", "WriteCollections", "WriteLightShapes"},

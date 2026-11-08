@@ -2,7 +2,7 @@
 
 import ernie.device.kernels.device;
 
-#include "ernie/scene/kernels/tangents.h"
+#include "ernie/scene/tables/kernels/tangents.h"
 
 using namespace ernie;
 

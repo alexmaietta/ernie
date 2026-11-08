@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "ernie/export.h"
-#include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/schema/ids.h"
 #include "ernie/scene/schema/schema.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"

@@ -9,10 +9,10 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/bounds.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/bounds.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
 
@@ -185,7 +185,7 @@ void BoundsTable::Prepare() {
 device::Program& BoundsTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.bounds"},
+            {.modules = {"ernie.scene.tables.kernels.bounds"},
              .library = &kSceneKernels,
              .entries = {"PrimBounds", "SlotBounds", "InstancerBounds", "FinishBoxes"},
              .label = "bounds"});

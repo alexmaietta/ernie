@@ -7,10 +7,10 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/surfaces.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/surfaces.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
@@ -83,7 +83,7 @@ void SurfaceTable::Prepare() {
 device::Program& SurfaceTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.surfaces"},
+            {.modules = {"ernie.scene.tables.kernels.surfaces"},
              .library = &kSceneKernels,
              .entries = {"WriteSurfaces"},
              .label = "surfaces"});

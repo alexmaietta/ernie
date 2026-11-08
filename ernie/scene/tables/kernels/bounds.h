@@ -2,11 +2,11 @@
 #pragma once
 
 #include "ernie/bvh/kernels/bvh.h"
-#include "ernie/scene/kernels/authored.h"
-#include "ernie/scene/kernels/instance_layout.h"
 #include "ernie/scene/records/bounds.h"
 #include "ernie/scene/records/meshes.h"
 #include "ernie/scene/records/transforms.h"
+#include "ernie/scene/tables/kernels/authored.h"
+#include "ernie/scene/tables/kernels/instance_layout.h"
 
 namespace ernie {
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/records/bounds.h"
 #include "ernie/scene/records/instances.h"
+#include "ernie/scene/tables/kernels/authored.h"
 
 namespace ernie {
 

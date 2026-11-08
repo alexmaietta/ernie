@@ -3,8 +3,8 @@
 import ernie.device.kernels.device;
 import ernie.texture.kernels.texture;
 
-#include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/kernels/lights.h"
+#include "ernie/scene/tables/kernels/instance_layout.h"
+#include "ernie/scene/tables/kernels/lights.h"
 
 using namespace ernie;
 

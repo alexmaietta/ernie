@@ -12,11 +12,11 @@
 #include <mikktspace.h>
 
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/tangents.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/structure/packing.h"
+#include "ernie/scene/tables/kernels/tangents.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/span.h"
 
@@ -567,7 +567,7 @@ void TangentTable::Prepare() {
 device::Program& TangentTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.tangents"},
+            {.modules = {"ernie.scene.tables.kernels.tangents"},
              .library = &kSceneKernels,
              .entries = {"GroupTangents", "CornerTangents"},
              .label = "tangents"});

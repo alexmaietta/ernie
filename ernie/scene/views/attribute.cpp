@@ -13,7 +13,7 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/columns/column_store.h"
-#include "ernie/scene/kernels/attributes.h"
+#include "ernie/scene/columns/kernels/attributes.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/scene/views/layout.h"
 #include "ernie/util/profiler.h"

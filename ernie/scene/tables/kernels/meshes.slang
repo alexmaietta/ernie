@@ -2,8 +2,8 @@
 
 import ernie.device.kernels.device;
 
-#include "ernie/scene/kernels/meshes.h"
-#include "ernie/scene/kernels/shapes.h"
+#include "ernie/scene/tables/kernels/meshes.h"
+#include "ernie/scene/tables/kernels/shapes.h"
 
 using namespace ernie;
 

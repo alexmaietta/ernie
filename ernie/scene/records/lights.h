@@ -2,9 +2,9 @@
 #pragma once
 
 #include "ernie/io/kernels/ies.h"
-#include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/records/instances.h"
 #include "ernie/scene/records/textures.h"
+#include "ernie/scene/schema/ids.h"
 
 namespace ernie {
 

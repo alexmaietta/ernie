@@ -13,7 +13,7 @@
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
 #include "ernie/overlay/kernels/style.h"
-#include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/schema/ids.h"
 #include "ernie/scene/schema/types.h"
 #include "ernie/util/span.h"
 

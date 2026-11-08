@@ -2,7 +2,7 @@
 
 import ernie.device.kernels.device;
 
-#include "ernie/scene/kernels/instances.h"
+#include "ernie/scene/tables/kernels/instances.h"
 
 using namespace ernie;
 

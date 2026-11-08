@@ -9,7 +9,7 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/kernels/shared.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/kernels/paged.h"
+#include "ernie/scene/columns/kernels/paged.h"
 #include "ernie/util/error.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/span.h"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/ids.h"
+#include "ernie/scene/schema/ids.h"
 #include "ernie/scene/schema/schema.h"
 
 namespace ernie {

@@ -4,10 +4,10 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/materials.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/materials.h"
 #include "ernie/util/profiler.h"
 
 namespace ernie {
@@ -74,7 +74,7 @@ void MaterialTable::Prepare() {
 device::Program& MaterialTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.materials"},
+            {.modules = {"ernie.scene.tables.kernels.materials"},
              .library = &kSceneKernels,
              .entries = {"WriteMaterials"},
              .label = "materials"});

@@ -9,10 +9,10 @@
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/scene/kernels.h"
-#include "ernie/scene/kernels/transforms.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/kernels/transforms.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
 
@@ -290,7 +290,7 @@ void TransformTable::Prepare() {
 device::Program& TransformTable::Kernels() {
     if (!m_program) {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
-            {.modules = {"ernie.scene.kernels.transforms"},
+            {.modules = {"ernie.scene.tables.kernels.transforms"},
              .library = &kSceneKernels,
              .entries = {"ResolveRows", "WriteMotions"},
              .label = "hierarchy"});

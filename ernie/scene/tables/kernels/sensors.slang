@@ -2,7 +2,7 @@
 
 import ernie.device.kernels.device;
 
-#include "ernie/scene/kernels/sensors.h"
+#include "ernie/scene/tables/kernels/sensors.h"
 
 using namespace ernie;
 

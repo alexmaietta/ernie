@@ -11,8 +11,8 @@
 
 #include "ernie/device/operation.h"
 #include "ernie/export.h"
-#include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/records/semantics.h"
+#include "ernie/scene/schema/ids.h"
 #include "ernie/scene/schema/types.h"
 
 namespace ernie {
