@@ -21,6 +21,7 @@ ernie_object_library(
     systems/bounds.cpp
     systems/geometry.cpp
     systems/hierarchy.cpp
+    systems/instance_layout.cpp
     systems/instances.cpp
     systems/lights.cpp
     systems/readback.cpp

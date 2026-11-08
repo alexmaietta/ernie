@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Normal` render var is the surface normal from the geometry, interpolated from its normals before materials and normal maps, in every render mode. Real-time products used to report the normal-mapped normal, and products without color outputs didn't.
 - The `Normal` render var has three float channels instead of four. Misses write a zero normal in place of the old fourth channel, and `ColorizeNormals` shows them as transparent.
 - Every TLAS is placed relative to a render origin that follows the first sensor a render product points at, so geometry near a camera stays precise up to solar system distances.
+- Editing display colors, primvars or authored normals no longer rewrites instance records, and only rewrites the surfaces of the worlds that show the edited prims.
 
 ### Removed
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - hipRTC loads from the folder of the HIP runtime Ernie uses, such as the one bundled in PyTorch, instead of from another ROCm install that would pull in a second comgr and HSA runtime. Runtime libraries already in the process are also found under their unversioned names.
 - Minimal mode's `full` shading lights surfaces with their normal maps, which it used to drop because the surface was copied before its material bent the normal.
 - A publish that throws in a system no longer loses the writes made before the next publish, because the store's stamp advances and systems record what they've seen only after they run.
+- Changing how many copies a point instancer draws in the same publish as moving a prim every world holds rebuilds each TLAS instead of refitting it with the old instance counts.
 - Contact shadows and occlusion hold far from a world's origin, because new rays start from the hit's own floating point error bound instead of an offset that grew with distance.
 
 ## [0.1.0] - 2026-11-06

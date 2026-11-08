@@ -123,6 +123,8 @@ class Instances : public System {
     void Relayout();
     void BuildInstancing();
     void WriteLayoutHeader();
+    void WriteRegions(const std::set<uint32_t>& tlases);
+    device::BufferRange LayoutWords(uint64_t address, uint32_t first, uint32_t count) const;
     bool Restack();
     std::optional<std::set<uint32_t>> Apply(const ChangeSet& changes);
     std::vector<uint32_t> RegionItems(uint32_t tlas) const;
@@ -141,6 +143,7 @@ class Instances : public System {
     DeviceTable<InstanceRecord> m_records{"instances", device::BufferUsage::AccelBuildInput};
     DeviceTable<ShapeRecord> m_shapes{"instance shapes"};
     Ref<device::Buffer> m_layout;
+    InstanceLayout m_header{};
     DeviceTable<SlotHit> m_hits{"instance hits"};
     Ref<device::Buffer> m_instancing;
     std::vector<Instancer> m_instancers;
@@ -152,15 +155,6 @@ class Instances : public System {
     std::map<uint32_t, std::vector<uint32_t>> m_nested;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> m_lightCopies;
     std::map<uint32_t, std::set<uint32_t>> m_watch;
-    uint64_t m_firstOffset = 0;
-    uint64_t m_originsOffset = 0;
-    uint64_t m_blocksOffset = 0;
-    uint64_t m_entriesOffset = 0;
-    uint64_t m_piecesOffset = 0;
-    uint64_t m_rangesOffset = 0;
-    uint64_t m_hiddenOffset = 0;
-    uint64_t m_offsetBasesOffset = 0;
-    uint64_t m_offsetsOffset = 0;
     DeviceTable<RenderOrigin> m_renderOrigins{"render origins"};
     Ref<device::Buffer> m_viewers;
     std::vector<uint32_t> m_products;
@@ -173,8 +167,6 @@ class Instances : public System {
     std::set<uint32_t> m_origins;
     Regions m_regions;
     std::vector<uint32_t> m_refits;
-    uint64_t m_countsOffset = 0;
-    uint64_t m_primsOffset = 0;
     uint64_t m_seen = 0;
     uint32_t m_worlds = 0;
     uint32_t m_relayouts = 0;
