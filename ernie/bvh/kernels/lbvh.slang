@@ -34,9 +34,10 @@ void Prepare(uniform LbvhParams p, uint3 thread: SV_GroupThreadID) {
     const uint i = LinearThreadIndex();
     const bool inside = i < p.total;
     const uint segment = inside ? FindSegment(p, i) : 0;
-    const bool active = inside && i - p.offsets[segment] < ActiveCount(p, segment) &&
-                        (p.kind != kBvhInstances || (p.instances[i].custom >> 24) != 0);
-    const BvhBox box = active ? PrimitiveBox(p, segment, i) : BvhEmptyBox();
+    const bool counted = inside && i - p.offsets[segment] < ActiveCount(p, segment) &&
+                         (p.kind != kBvhInstances || (p.instances[i].custom >> 24) != 0);
+    const BvhBox box = counted ? PrimitiveBox(p, segment, i) : BvhEmptyBox();
+    const bool active = counted && (p.kind != kBvhBoxes || box.lower[0] <= box.upper[0]);
     if (inside) {
         p.order[i] = i;
         for (uint axis = 0; axis < 3; ++axis) {

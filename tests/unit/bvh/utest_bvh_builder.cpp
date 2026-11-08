@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/bvh/builder.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -157,6 +159,54 @@ TEST(BuilderTest, SoftwareBlasesBuildAndRefitInPlace) {
         EXPECT_THROW(builder->Refit(encoder, std::span(meshes.blases).last(1)), Error);
         builder->Build(encoder, std::span<const Ref<Blas>>());
         builder->Refit(encoder, std::span<const Ref<Blas>>());
+    });
+}
+
+TEST(BuilderTest, SoftwareBoxBlasesLeaveNanBoxesInactive) {
+    ForEachDevice([](Device& device) {
+        const std::unique_ptr<Builder> builder = Builder::Create(device, Traversal::Software);
+        builder->Prepare();
+        std::vector<BvhBox> boxes = test::Boxes(300, 3);
+        BvhBox bounds = BvhEmptyBox();
+        uint32_t active = 0;
+        for (size_t i = 0; i < boxes.size(); ++i) {
+            if (i % 3 == 1 || i >= 250) {
+                boxes[i].lower[0] = std::numeric_limits<float>::quiet_NaN();
+                boxes[i].upper[0] = std::numeric_limits<float>::quiet_NaN();
+            } else {
+                bounds = BvhUnion(bounds, boxes[i]);
+                ++active;
+            }
+        }
+        const Ref<Buffer> buffer = Upload(device, boxes);
+        const Ref<Blas> blas = builder->CreateBlas(device::AccelBoxes{
+            .boxes = *buffer, .count = uint32_t(boxes.size()), .refittable = true});
+        const std::vector<Ref<Blas>> blases = {blas};
+        Submit(device, [&](CommandEncoder& encoder) { builder->Build(encoder, blases); });
+        const auto expect = [&](const BvhBox& expected) {
+            const std::vector<std::byte> bytes = SoftwareBytes(device, *blas);
+            const Inspection found = Inspect(bytes);
+            ASSERT_TRUE(found.errors.empty()) << found.errors.front();
+            EXPECT_EQ(found.records, active);
+            const BvhBox built = test::Bounds(bytes);
+            for (int axis = 0; axis < 3; ++axis) {
+                EXPECT_EQ(built.lower[axis], expected.lower[axis]) << axis;
+                EXPECT_EQ(built.upper[axis], expected.upper[axis]) << axis;
+            }
+        };
+        expect(bounds);
+
+        BvhBox moved = BvhEmptyBox();
+        for (size_t i = 0; i < boxes.size(); ++i) {
+            if (!std::isnan(boxes[i].lower[0])) {
+                boxes[i].lower[1] += 7;
+                boxes[i].upper[1] += 7;
+                moved = BvhUnion(moved, boxes[i]);
+            }
+        }
+        device.GetQueue().Write(*buffer, boxes.data());
+        Submit(device, [&](CommandEncoder& encoder) { builder->Refit(encoder, blases); });
+        expect(moved);
     });
 }
 

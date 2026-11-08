@@ -77,7 +77,7 @@ So a moving cloud is bound by the BLAS rebuild, many small clouds are bound by p
 - A refit or rebuild policy per Points prim (done). Moved points refit their BLAS and rebuild after `SceneDesc::maxRefits` refits, and a count change rebuilds. On hardware traversal a moving step drops from 6.1 to 1.3 ms at 1M points, 86 to 19 ms at 16M, and 77 to 30 ms for 4096 worlds of 1k, and on software traversal from 1.6 to 0.4 ms at 1k.
 - Per-cloud CPU work in `PointsTable::Run` and `Build` that scales to thousands of worlds, and batched BLAS builds for many small clouds.
 - A lower fixed cost for small software BLAS builds.
-- Capacity that grows geometrically, with inactive boxes for dead slots, so spawning and killing particles doesn't reallocate the BLAS.
+- Capacity with inactive boxes for dead slots (done). Capacity grows by half again when exceeded and shrinks to the count when under a quarter is used, and slots past the count get NaN boxes, which Vulkan treats as inactive and the software LBVH now leaves out of its leaves. A count change within capacity rebuilds the same BLAS instead of reallocating it, since refits can't change which primitives are active. Recounting 4096 worlds of 1k points dropped from 137 to about 87 ms, with what remains mostly host array uploads.
 - Clustered leaves, with 4 to 8 Morton-adjacent points per box and the intersector looping over them, for dense fluids and batched worlds.
 - Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path.
 

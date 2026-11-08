@@ -305,6 +305,62 @@ TEST(RayCastTest, PointsWrittenThroughAMappingHitWhereTheyWereWritten) {
     });
 }
 
+TEST(RayCastTest, RecountedPointsHitOnlyTheLivingAcrossCapacityChanges) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kRays = 96;
+        for (const device::Traversal traversal :
+             {device::Traversal::Auto, device::Traversal::Software}) {
+            SCOPED_TRACE(int(traversal));
+            const Ref<Scene> scene = Scene::Create(device, {.traversal = traversal});
+            const auto line = [](uint32_t count, float x, float z) {
+                std::vector<Float3> points;
+                for (uint32_t i = 0; i < count; ++i) {
+                    points.push_back({x, float(i), z});
+                }
+                return points;
+            };
+            const Prim near =
+                scene->Define<Points>("/Near", {.points = line(64, 3, 0), .widths = {0.5f}});
+            const Prim far =
+                scene->Define<Points>("/Far", {.points = line(32, 3, 2), .widths = {0.5f}});
+            std::vector<float> origins;
+            std::vector<float> directions;
+            for (const float z : {0.0f, 2.0f}) {
+                for (uint32_t i = 0; i < 2 * kRays; ++i) {
+                    origins.insert(origins.end(), {0, 0.5f * float(i), z});
+                    directions.insert(directions.end(), {1, 0, 0});
+                }
+            }
+            RayCaster caster(scene);
+            Rays rays;
+            rays.origins = Floats(device, origins, 3);
+            rays.directions = Floats(device, directions, 3);
+            const std::pair<uint32_t, float> steps[] = {
+                {64, 3}, {40, 3}, {40, 4}, {50, 4}, {64, 3}, {64, 5},
+                {90, 3}, {70, 3}, {70, 4}, {20, 3}, {0, 3},  {33, 6},
+            };
+            for (const auto& [count, x] : steps) {
+                SCOPED_TRACE(count);
+                const uint32_t other = (count * 7) % kRays;
+                near.Set(Points::kPoints, line(count, x, 0));
+                far.Set(Points::kPoints, line(other, x + 1, 2));
+                const std::vector<float> distance = caster.Cast(rays).distance.ToHost<float>();
+                for (uint32_t row = 0; row < 2; ++row) {
+                    const uint32_t living = row == 0 ? count : other;
+                    const float expected = (row == 0 ? x : x + 1) - 0.25f;
+                    uint32_t wrong = 0;
+                    for (uint32_t i = 0; i < 2 * kRays; ++i) {
+                        const float d = distance[row * 2 * kRays + i];
+                        const bool hit = i % 2 == 0 && i / 2 < living;
+                        wrong += hit ? std::abs(d - expected) > 1e-4f : !std::isinf(d);
+                    }
+                    EXPECT_EQ(wrong, 0u) << "row " << row;
+                }
+            }
+        }
+    });
+}
+
 TEST(RayCastTest, InstancedMeshCopiesHitAtTheirOwnPlaces) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

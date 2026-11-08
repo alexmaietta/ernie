@@ -47,6 +47,9 @@ BvhCorners Corners(LbvhGeometry mesh, uint local) {
 
 BvhBox InputBox(LbvhGeometry boxes, uint local) {
     float* at = boxes.data + uint64_t(local) * boxes.stride;
+    if ((asuint(at[0]) & 0x7FFFFFFFu) > 0x7F800000u) {
+        return BvhEmptyBox();
+    }
     BvhBox box;
     for (uint axis = 0; axis < 3; ++axis) {
         box.lower[axis] = at[axis];

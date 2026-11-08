@@ -98,7 +98,7 @@ class Walker {
             }
         }
 
-        const uint32_t least = m_header.kind == kBvhInstances ? 0 : 1;
+        const uint32_t least = m_header.kind == kBvhTriangles ? 1 : 0;
         for (uint32_t i = 0; i < m_header.primitives; ++i) {
             if (m_reached[i] < least || m_reached[i] > 1) {
                 Fail(fmt::format("primitive {} is in {} leaf records, not one", i, m_reached[i]));

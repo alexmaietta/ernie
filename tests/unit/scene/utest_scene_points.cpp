@@ -145,5 +145,101 @@ TEST(PointsTest, PointsWrittenOnTheDeviceMoveTheirBounds) {
     });
 }
 
+std::vector<Float3> Line(uint32_t count, float x) {
+    std::vector<Float3> points;
+    for (uint32_t i = 0; i < count; ++i) {
+        points.push_back({x, float(i), 0});
+    }
+    return points;
+}
+
+TEST(PointsTest, RecountsWithinCapacityKeepTheBlasAndBoundOnlyTheLiving) {
+    ForEachScene([](Scene& s) {
+        const uint32_t a =
+            s.structure.Define<Points>(std::vector<std::string>{"/A"}, {.points = Line(8, 0)})
+                .firstPrim;
+        const uint32_t b =
+            s.structure.Define<Points>(std::vector<std::string>{"/B"}, {.points = Line(5, 20)})
+                .firstPrim;
+        s.Publish();
+        const auto row = [&](uint32_t prim) {
+            return s.structure.GetPrims().Row(prim, SchemaId::Points);
+        };
+        const auto blas = [&](uint32_t prim) { return s.points.Record(row(prim)).blas; };
+        const auto recount = [&](uint32_t prim, const std::vector<Float3>& points) {
+            ArrayPool& float3s = s.store.Arrays(ColumnType::Float3Array);
+            const ArrayRef array = float3s.Allocate(uint32_t(points.size()));
+            if (!points.empty()) {
+                float3s.Write(array, std::as_bytes(std::span(points)));
+            }
+            s.store.SetArray(kPointBasedPoints,
+                             s.structure.GetPrims().Row(prim, SchemaId::PointBased), array);
+        };
+        const float r = kDefaultPointWidth / 2;
+        const uint64_t first = blas(a);
+        const uint64_t other = blas(b);
+
+        recount(a, Line(6, 0));
+        recount(b, Line(3, 20));
+        s.Publish();
+        EXPECT_EQ(blas(a), first);
+        EXPECT_EQ(blas(b), other);
+        EXPECT_EQ(s.points.Stats().built, 2u);
+        EXPECT_EQ(s.points.Stats().points, 9u);
+        EXPECT_EQ(s.points.Stats().capacity, 13u);
+        EXPECT_EQ(s.points.Record(row(a)).pointCount, 6u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 5 + r, r});
+        ExpectBounds(s.Bounds(b), {20 - r, -r, -r}, {20 + r, 2 + r, r});
+
+        s.Move(a, Line(6, 1));
+        s.Publish();
+        EXPECT_EQ(s.points.Stats().refit, 1u);
+        EXPECT_EQ(s.points.Stats().built, 0u);
+        ExpectBounds(s.Bounds(a), {1 - r, -r, -r}, {1 + r, 5 + r, r});
+
+        recount(a, Line(8, 0));
+        s.Publish();
+        EXPECT_EQ(blas(a), first);
+        EXPECT_EQ(s.points.Stats().built, 1u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 7 + r, r});
+
+        recount(a, Line(9, 0));
+        s.Publish();
+        EXPECT_NE(blas(a), first);
+        const uint64_t grown = blas(a);
+        EXPECT_EQ(s.points.Stats().capacity, 12u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 8 + r, r});
+
+        recount(a, Line(12, 0));
+        s.Publish();
+        EXPECT_EQ(blas(a), grown);
+        EXPECT_EQ(s.points.Stats().capacity, 12u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 11 + r, r});
+
+        recount(a, Line(3, 0));
+        s.Publish();
+        EXPECT_EQ(blas(a), grown);
+        EXPECT_EQ(s.points.Stats().capacity, 12u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 2 + r, r});
+
+        recount(a, Line(2, 0));
+        s.Publish();
+        EXPECT_NE(blas(a), grown);
+        EXPECT_EQ(s.points.Stats().capacity, 2u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 1 + r, r});
+
+        recount(a, {});
+        s.Publish();
+        EXPECT_EQ(blas(a), 0u);
+        EXPECT_EQ(s.points.Record(row(a)).pointCount, 0u);
+
+        recount(a, Line(4, 0));
+        s.Publish();
+        EXPECT_NE(blas(a), 0u);
+        ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 3 + r, r});
+        ExpectBounds(s.Bounds(b), {20 - r, -r, -r}, {20 + r, 2 + r, r});
+    });
+}
+
 }
 }

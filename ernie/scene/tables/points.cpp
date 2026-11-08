@@ -61,18 +61,24 @@ void PointsTable::Link(Cloud& cloud) {
     ColumnStore& store = m_structure.GetColumnStore();
     const ArrayRef points = store.Array(kPointBasedPoints, cloud.pointBasedRow);
     const ArrayRef widths = store.Array(kPointsWidths, cloud.row);
-    if (points.count != cloud.capacity) {
-        cloud.capacity = points.count;
+    if (points.count > cloud.capacity || points.count < cloud.capacity / 4) {
+        cloud.capacity = points.count > cloud.capacity
+                             ? std::max(points.count, cloud.capacity + cloud.capacity / 2)
+                             : points.count;
         cloud.blas = nullptr;
         cloud.boxes = nullptr;
-        if (points.count > 0) {
+        if (cloud.capacity > 0) {
             device::Device& device = store.GetDevice();
-            cloud.boxes = device.CreateBuffer({.bytes = uint64_t(points.count) * sizeof(BvhBox),
+            cloud.boxes = device.CreateBuffer({.bytes = uint64_t(cloud.capacity) * sizeof(BvhBox),
                                                .usage = device::BufferUsage::AccelBuildInput,
                                                .label = "point boxes"});
             cloud.blas = m_builder.CreateBlas(device::AccelBoxes{
-                .boxes = cloud.boxes->Slice(0), .count = points.count, .refittable = true});
+                .boxes = cloud.boxes->Slice(0), .count = cloud.capacity, .refittable = true});
         }
+        cloud.fresh = true;
+    }
+    if (points.count != cloud.count) {
+        cloud.count = points.count;
         cloud.fresh = true;
     }
     if (cloud.bounds.count == 0) {
@@ -80,7 +86,7 @@ void PointsTable::Link(Cloud& cloud) {
     }
     cloud.update = points.count > 0;
     PointsRecord record{};
-    if (cloud.blas) {
+    if (cloud.blas && points.count > 0) {
         record.blas = cloud.blas->Handle();
         record.points = points.address;
         record.widths = widths.address;
@@ -158,6 +164,7 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     std::vector<Ref<bvh::Blas>> built;
     std::vector<Ref<bvh::Blas>> refit;
     uint32_t total = 0;
+    uint32_t active = 0;
     const Prims& prims = m_structure.GetPrims();
     for (auto& [prim, cloud] : m_clouds) {
         if (!cloud.update) {
@@ -177,8 +184,10 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
         job.boxes.address = cloud.boxes->Address();
         job.bounds.address = cloud.bounds.address;
         job.first = total;
+        job.capacity = cloud.capacity;
         jobs.push_back(job);
         total += cloud.capacity;
+        active += cloud.count;
         if (prims.Alive(prim)) {
             updated.push_back(prims.Record(prim).world);
         }
@@ -186,7 +195,8 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     m_stats.clouds = uint32_t(m_clouds.size());
     m_stats.built = uint32_t(built.size());
     m_stats.refit = uint32_t(refit.size());
-    m_stats.points = total;
+    m_stats.capacity = total;
+    m_stats.points = active;
     if (jobs.empty()) {
         return;
     }

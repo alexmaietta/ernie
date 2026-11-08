@@ -40,27 +40,30 @@ void WritePointBoxes(uniform PointsParams p, uint thread: SV_GroupIndex) {
         const uint index = FindJob(p, item);
         const PointsJob job = p.jobs[index];
         const uint point = item - job.first;
-        const float3 center = Ptr<Float3>(job.record.points)[point].Vector();
-        const float radius = PointRadius(job.record, point);
-        const float3 lower = center - radius;
-        const float3 upper = center + radius;
         BvhBox box;
-        for (uint axis = 0; axis < 3; ++axis) {
-            box.lower[axis] = lower[axis];
-            box.upper[axis] = upper[axis];
-        }
-        job.boxes[point] = box;
-        for (uint axis = 0; axis < 3; ++axis) {
-            const uint low = OrderedFloat(lower[axis]);
-            const uint high = OrderedFloat(upper[axis]);
-            if (index == s_job) {
-                InterlockedMin(s_extents[axis], low);
-                InterlockedMax(s_extents[3 + axis], high);
-            } else {
-                InterlockedMin(p.extents[index * 3 + axis], low);
-                InterlockedMax(p.extents[(p.jobCount + index) * 3 + axis], high);
+        if (point < job.record.pointCount) {
+            const float3 center = Ptr<Float3>(job.record.points)[point].Vector();
+            const float radius = PointRadius(job.record, point);
+            for (uint axis = 0; axis < 3; ++axis) {
+                box.lower[axis] = center[axis] - radius;
+                box.upper[axis] = center[axis] + radius;
+                const uint low = OrderedFloat(box.lower[axis]);
+                const uint high = OrderedFloat(box.upper[axis]);
+                if (index == s_job) {
+                    InterlockedMin(s_extents[axis], low);
+                    InterlockedMax(s_extents[3 + axis], high);
+                } else {
+                    InterlockedMin(p.extents[index * 3 + axis], low);
+                    InterlockedMax(p.extents[(p.jobCount + index) * 3 + axis], high);
+                }
+            }
+        } else {
+            for (uint axis = 0; axis < 3; ++axis) {
+                box.lower[axis] = asfloat(0x7FC00000u);
+                box.upper[axis] = asfloat(0x7FC00000u);
             }
         }
+        job.boxes[point] = box;
     }
     GroupMemoryBarrierWithGroupSync();
     if (thread < 6 && item - thread < p.total) {

@@ -11,7 +11,7 @@ struct PointsJob {
     Ptr<BvhBox> boxes;
     Ptr<Float3> bounds;
     uint first;
-    uint padding0;
+    uint capacity;
     uint padding1;
     uint padding2;
 };

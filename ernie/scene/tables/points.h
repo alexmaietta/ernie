@@ -23,6 +23,7 @@ struct PointsStats {
     uint32_t built = 0;
     uint32_t refit = 0;
     uint32_t points = 0;
+    uint32_t capacity = 0;
 };
 
 class PointsTable : public Table {
@@ -55,6 +56,7 @@ class PointsTable : public Table {
         uint32_t generation = 0;
         uint32_t pointBasedRow = kNoRow;
         uint32_t row = kNoRow;
+        uint32_t count = 0;
         uint32_t capacity = 0;
         uint32_t refits = 0;
         Ref<bvh::Blas> blas;
