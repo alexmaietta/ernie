@@ -48,7 +48,7 @@ BENCHMARK(SortKeys)
     ->ArgNames({"keys", "bytes", "bits"})
     ->Apply([](benchmark::internal::Benchmark* benchmark) {
         for (const int64_t count : {1 << 16, 1 << 20, 1 << 24}) {
-            for (const auto [bytes, bits] : {std::pair{4, 32}, {4, 30}, {8, 64}, {8, 30}}) {
+            for (const auto& [bytes, bits] : {std::pair{4, 32}, {4, 30}, {8, 64}, {8, 30}}) {
                 benchmark->Args({count, bytes, bits});
             }
         }
