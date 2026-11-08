@@ -1115,7 +1115,9 @@ bool OverlayData::Outlined() const {
 OverlayPass::OverlayPass(device::Device& device)
     : m_device(device),
       m_program(device.CreateProgram(
-          {.modules = {"ernie.overlay.kernels.overlay"},
+          {.modules = {"ernie.overlay.kernels.project", "ernie.overlay.kernels.groups",
+                       "ernie.overlay.kernels.composite", "ernie.overlay.kernels.selection",
+                       "ernie.overlay.kernels.picks"},
            .library = &kOverlayKernels,
            .entries = {"ProjectOverlays", "ScatterOverlays", "FindOverlayTiles", "FoldOverlayTiles",
                        "CompositeOverlays", "KeyOverlayRows", "StartOverlayGroups",
@@ -1920,7 +1922,7 @@ device::Tensor CompositeOverlay(const device::Tensor& color, const device::Tenso
     device::Tensor blended = device.CreateTensor(
         device::DType::UInt8, {color.Shape().begin(), color.Shape().end()}, "composited overlay");
     const Ref<device::Program> program =
-        device.CreateProgram({.modules = {"ernie.overlay.kernels.overlay"},
+        device.CreateProgram({.modules = {"ernie.overlay.kernels.composite"},
                               .library = &kOverlayKernels,
                               .entries = {"BlendOverlay"},
                               .label = "overlays"});
