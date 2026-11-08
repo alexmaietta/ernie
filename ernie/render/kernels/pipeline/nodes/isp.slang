@@ -140,13 +140,63 @@ struct BlackLevelNode {
 }
 
 struct WhiteBalanceNode {
-    static void Evaluate(PointContext context, LinearColor input, out LinearColor output) {
+    static void Evaluate(PointContext context, LinearColor input, CaptureStat stat,
+                         out LinearColor output) {
         Channels channels = input.Get();
+        const bool metered = stat.Weight() > 0;
         [ForceUnroll]
         for (uint c = 0; c < 3; ++c) {
-            channels[c] *= context.Parameter(c);
+            const float world = metered ? stat.values[1] / max(stat.values[c], 1e-12f) : 1;
+            channels[c] *= context.Parameter(c) * world;
         }
         output = LinearColor.Make(channels);
+    }
+}
+
+float CenterRadius2(PointContext context) {
+    const float2 size = float2(context.element.capture->width, context.element.capture->height);
+    const float2 offset = (float2(context.element.coord) + 0.5f) - 0.5f * size;
+    return dot(offset, offset) / max(dot(0.5f * size, 0.5f * size), 1e-6f);
+}
+
+struct MeterNode<let mode : uint> {
+    static float Weight(PointContext context) {
+        const float radius = max(context.Parameter(0), 1e-3f);
+        const float r2 = CenterRadius2(context);
+        if (mode == 1) {
+            return exp(-r2 / (2 * radius * radius));
+        }
+        if (mode == 2) {
+            return r2 <= radius * radius ? 1 : 0;
+        }
+        return 1;
+    }
+
+    static CaptureStat Contribute(PointContext context, LinearColor color) {
+        const float weight = Weight(context);
+        const Channels channels = color.Get();
+        CaptureStat stat = CaptureStat.Zero();
+        [ForceUnroll]
+        for (uint c = 0; c < kMostSignalChannels; ++c) {
+            stat.values[c] = weight * channels[c];
+        }
+        const float luminance =
+            channels.count >= 3
+                ? dot(float3(channels[0], channels[1], channels[2]), float3(0.2126f, 0.7152f, 0.0722f))
+                : channels[0];
+        stat.values[kMostSignalChannels] = weight * luminance;
+        stat.values[kStatWords - 1] = weight;
+        return stat;
+    }
+
+    static CaptureStat Finish(PointContext context, CaptureStat sum) {
+        CaptureStat mean = sum;
+        const float weight = sum.Weight();
+        [ForceUnroll]
+        for (uint word = 0; word <= kMostSignalChannels; ++word) {
+            mean.values[word] = weight > 0 ? sum.values[word] / weight : 0;
+        }
+        return mean;
     }
 }
 

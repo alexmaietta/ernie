@@ -81,7 +81,8 @@ ArenaLayout LayoutArena(const SegmentPlan& plan, std::span<const SignalLayout> l
         const SignalLayout& layout = layouts[stored->value];
         const uint64_t channels =
             layout.element == ElementType::F16 ? (layout.channels + 1) / 2 * 2 : layout.channels;
-        const uint64_t raw = elements * channels * kElementBytes[uint32_t(layout.element)];
+        const uint64_t raw =
+            (layout.perCapture ? 1 : elements) * channels * kElementBytes[uint32_t(layout.element)];
         const uint64_t bytes = (raw + kArenaAlignment - 1) / kArenaAlignment * kArenaAlignment;
         Slot* best = nullptr;
         for (Slot& slot : slots) {

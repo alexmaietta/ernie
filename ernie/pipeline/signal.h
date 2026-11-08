@@ -33,11 +33,16 @@ enum class ElementType : uint8_t {
 
 inline constexpr uint32_t kElementBytes[] = {4, 2, 2, 1};
 
+inline constexpr uint32_t kStatWords = 16;
+inline constexpr uint32_t kReduceGroups = 64;
+inline constexpr uint32_t kStatStorageWords = (1 + kReduceGroups) * kStatWords;
+
 struct SignalLayout {
     uint32_t channels = 1;
     uint32_t pattern = 0;
     bool mosaic = false;
     ElementType element = ElementType::F32;
+    bool perCapture = false;
 
     bool operator==(const SignalLayout&) const = default;
 };

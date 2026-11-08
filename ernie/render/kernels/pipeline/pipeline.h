@@ -9,6 +9,8 @@ static const uint kPipelineGroup = 64;
 static const uint kMostSignalChannels = 8;
 static const uint kSignalHalf = 1;
 static const uint kSignalMosaic = 2;
+static const uint kStatWords = 16;
+static const uint kReduceGroups = 64;
 
 struct PipelineValue {
     uint64_t address;

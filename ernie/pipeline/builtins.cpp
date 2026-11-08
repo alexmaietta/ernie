@@ -83,12 +83,22 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .outputs = {{"digital", SignalType::Digital}},
                   .module = kIspNodes,
                   .type = "BlackLevelNode"});
-    registry.Add({.id = "WhiteBalance",
+    registry.Add(
+        {.id = "WhiteBalance",
+         .inputs = {{"color", SignalType::LinearColor}, {"stat", SignalType::CaptureStat, true}},
+         .outputs = {{"color", SignalType::LinearColor}},
+         .parameters = {{"gains", 3}},
+         .module = kIspNodes,
+         .type = "WhiteBalanceNode"});
+    registry.Add({.id = "Meter",
+                  .kind = NodeKind::Reduce,
                   .inputs = {{"color", SignalType::LinearColor}},
-                  .outputs = {{"color", SignalType::LinearColor}},
-                  .parameters = {{"gains", 3}},
+                  .outputs = {{"stat", SignalType::CaptureStat}},
+                  .parameters = {{"radius"}},
+                  .uniforms = {{"mode", {"average", "centerWeighted", "spot"}, "average"}},
+                  .layout = LayoutRule::Stat,
                   .module = kIspNodes,
-                  .type = "WhiteBalanceNode"});
+                  .type = "MeterNode"});
     registry.Add({.id = "Ccm",
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"color", SignalType::LinearColor}},

@@ -50,6 +50,7 @@ ernie_test(
         unit/pipeline/utest_pipeline_isp.cpp
         unit/pipeline/utest_pipeline_nodes.cpp
         unit/pipeline/utest_pipeline_noise.cpp
+        unit/pipeline/utest_pipeline_reduce.cpp
         unit/pipeline/utest_pipeline_resolve.cpp
         unit/pipeline/utest_pipeline_segments.cpp
 )

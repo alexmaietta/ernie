@@ -66,14 +66,98 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
     }
     source += "\nusing namespace ernie;\n";
 
+    const auto outputSlots = [&](uint32_t value) {
+        std::vector<uint32_t> slots;
+        if (storedSlot[value] != kNoValue) {
+            slots.push_back(storedSlot[value]);
+        }
+        for (uint32_t output = 0; output < pipeline.outputs.size(); ++output) {
+            if (pipeline.outputs[output].value == value) {
+                slots.push_back(storedValues + output);
+            }
+        }
+        return slots;
+    };
+    const auto signalType = [&](uint32_t value) {
+        return kSignalNames[uint32_t(pipeline.values[value].type)];
+    };
+
     for (uint32_t index = 0; index < plan.segments.size(); ++index) {
         const Segment& segment = plan.segments[index];
+        if (segment.kind == NodeKind::Reduce) {
+            const uint32_t node = segment.nodes.front();
+            const ResolvedNode& resolved = pipeline.nodes[node];
+            const NodeDef& def = registry[resolved.def];
+            const uint32_t input = resolved.inputs[0];
+            const uint32_t stat = resolved.outputs[0];
+            if (storedSlot[input] == kNoValue) {
+                throw Error("{} is a reduction, but its {} isn't stored", resolved.path,
+                            def.inputs[0].name);
+            }
+            const std::string type = NodeType(def, resolved);
+            const std::string context = std::format("PointContext(p, element, {}, {})", node,
+                                                    definition.parameterOffsets[node]);
+            const std::vector<uint32_t> slots = outputSlots(stat);
+            std::string writes;
+            for (const uint32_t slot : slots) {
+                writes += std::format("    WriteStat(p, capture, {}, total);\n", slot);
+            }
+            source += std::format(
+                "\ngroupshared float s_stat{0}[kPipelineGroup * kStatWords];\n\n"
+                "[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\n"
+                "void Segment{0}Partial(uniform PipelineParams p) {{\n"
+                "    const uint group = LinearGroupIndex();\n"
+                "    const uint thread = LocalThreadIndex();\n"
+                "    if (group / kReduceGroups >= p.captureCount) {{\n        return;\n    }}\n"
+                "    PipelineCapture* capture = p.captures + group / kReduceGroups;\n"
+                "    CaptureStat sum = CaptureStat.Zero();\n"
+                "    const uint count = capture->width * capture->height;\n"
+                "    for (uint index = (group % kReduceGroups) * kPipelineGroup + thread; index < "
+                "count;\n"
+                "         index += kReduceGroups * kPipelineGroup) {{\n"
+                "        const PipelineElement element = ElementAt(capture, index);\n"
+                "        sum = sum.Add({1}.Contribute({2}, ReadSignal<{3}>(p, element, {4})));\n"
+                "    }}\n"
+                "    [ForceUnroll]\n    for (uint word = 0; word < kStatWords; ++word) {{\n"
+                "        s_stat{0}[thread * kStatWords + word] = sum.values[word];\n    }}\n"
+                "    GroupMemoryBarrierWithGroupSync();\n"
+                "    for (uint stride = kPipelineGroup / 2; stride > 0; stride /= 2) {{\n"
+                "        if (thread < stride) {{\n"
+                "            [ForceUnroll]\n            for (uint word = 0; word < kStatWords; "
+                "++word) {{\n"
+                "                s_stat{0}[thread * kStatWords + word] +=\n"
+                "                    s_stat{0}[(thread + stride) * kStatWords + word];\n           "
+                " }}\n"
+                "        }}\n        GroupMemoryBarrierWithGroupSync();\n    }}\n"
+                "    if (thread == 0) {{\n        CaptureStat partial;\n"
+                "        [ForceUnroll]\n        for (uint word = 0; word < kStatWords; ++word) {{\n"
+                "            partial.values[word] = s_stat{0}[word];\n        }}\n"
+                "        WriteStatPartial(p, capture, {5}, group % kReduceGroups, partial);\n    "
+                "}}\n"
+                "}}\n\n"
+                "[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\n"
+                "void Segment{0}Finish(uniform PipelineParams p) {{\n"
+                "    const uint captureIndex = LinearThreadIndex();\n"
+                "    if (captureIndex >= p.captureCount) {{\n        return;\n    }}\n"
+                "    PipelineCapture* capture = p.captures + captureIndex;\n"
+                "    CaptureStat sum = CaptureStat.Zero();\n"
+                "    for (uint group = 0; group < kReduceGroups; ++group) {{\n"
+                "        sum = sum.Add(ReadStatPartial(p, capture, {5}, group));\n    }}\n"
+                "    const PipelineElement element = ElementAt(capture, 0);\n"
+                "    const CaptureStat total = {1}.Finish({2}, sum);\n{6}}}\n",
+                index, type, context, signalType(input), storedSlot[input], slots.front(), writes);
+            generated.entries.push_back(std::format("Segment{}Partial", index));
+            generated.shapes.push_back(DispatchShape::ReduceGroups);
+            generated.entries.push_back(std::format("Segment{}Finish", index));
+            generated.shapes.push_back(DispatchShape::Captures);
+            continue;
+        }
         if (segment.kind != NodeKind::Point && segment.kind != NodeKind::Stencil) {
-            throw Error("Pipeline passes of reduce, global, compact or host nodes can't be "
-                        "generated yet");
+            throw Error("Pipeline passes of global, compact or host nodes can't be generated yet");
         }
         const std::string entry = std::format("Segment{}", index);
         generated.entries.push_back(entry);
+        generated.shapes.push_back(DispatchShape::Elements);
         source += std::format("\n[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\nvoid "
                               "{}(uniform PipelineParams p) {{\n"
                               "    PipelineElement element;\n    if (!FindElement(p, element)) "
@@ -86,10 +170,13 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
             std::string arguments;
             for (uint32_t port = 0; port < def.inputs.size(); ++port) {
                 const uint32_t value = resolved.inputs[port];
+                const SignalType taken = def.inputs[port].type;
                 if (value == kNoValue) {
-                    throw Error(
-                        "{}'s optional {} isn't connected, which generated passes don't take yet",
-                        resolved.path, def.inputs[port].name);
+                    arguments +=
+                        taken == SignalType::CaptureStat
+                            ? std::string(", CaptureStat.Zero()")
+                            : std::format(", {}.Make(Channels(0))", kSignalNames[uint32_t(taken)]);
+                    continue;
                 }
                 if (def.kind == NodeKind::Stencil && port == 0) {
                     if (storedSlot[value] == kNoValue) {
@@ -98,8 +185,7 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                     }
                     source += std::format(
                         "    const Neighborhood<{0}> n{1} = Neighborhood<{0}>(p, element, {2});\n",
-                        kSignalNames[uint32_t(pipeline.values[value].type)], value,
-                        storedSlot[value]);
+                        signalType(value), value, storedSlot[value]);
                     arguments += std::format(", n{}", value);
                     continue;
                 }
@@ -108,18 +194,20 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                         throw Error("{}'s {} reads a value no earlier pass stored", resolved.path,
                                     def.inputs[port].name);
                     }
-                    const std::string_view type =
-                        kSignalNames[uint32_t(pipeline.values[value].type)];
                     source +=
-                        std::format("    const {0} v{1} = ReadSignal<{0}>(p, element, {2});\n",
-                                    type, value, storedSlot[value]);
+                        taken == SignalType::CaptureStat
+                            ? std::format(
+                                  "    const CaptureStat v{} = ReadStat(p, element.capture, {});\n",
+                                  value, storedSlot[value])
+                            : std::format(
+                                  "    const {0} v{1} = ReadSignal<{0}>(p, element, {2});\n",
+                                  signalType(value), value, storedSlot[value]);
                     available.insert(value);
                 }
                 arguments += std::format(", v{}", value);
             }
             for (const uint32_t value : resolved.outputs) {
-                source += std::format("    {} v{};\n",
-                                      kSignalNames[uint32_t(pipeline.values[value].type)], value);
+                source += std::format("    {} v{};\n", signalType(value), value);
                 arguments += std::format(", v{}", value);
                 available.insert(value);
             }
@@ -127,15 +215,8 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                                   NodeType(def, resolved), node, definition.parameterOffsets[node],
                                   arguments);
             for (const uint32_t value : resolved.outputs) {
-                if (storedSlot[value] != kNoValue) {
-                    source += std::format("    WriteSignal(p, element, {}, v{});\n",
-                                          storedSlot[value], value);
-                }
-                for (uint32_t output = 0; output < pipeline.outputs.size(); ++output) {
-                    if (pipeline.outputs[output].value == value) {
-                        source += std::format("    WriteSignal(p, element, {}, v{});\n",
-                                              storedValues + output, value);
-                    }
+                for (const uint32_t slot : outputSlots(value)) {
+                    source += std::format("    WriteSignal(p, element, {}, v{});\n", slot, value);
                 }
             }
         }

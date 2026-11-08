@@ -40,7 +40,8 @@ inline NodeRegistry FakeRegistry() {
     registry.Add({.id = "Meter",
                   .kind = NodeKind::Reduce,
                   .inputs = {{"digital", SignalType::Digital}},
-                  .outputs = {{"stat", SignalType::CaptureStat}}});
+                  .outputs = {{"stat", SignalType::CaptureStat}},
+                  .layout = LayoutRule::Stat});
     registry.Add(
         {.id = "Expose",
          .inputs = {{"digital", SignalType::Digital}, {"stat", SignalType::CaptureStat, true}},

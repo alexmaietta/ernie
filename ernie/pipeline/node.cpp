@@ -14,6 +14,13 @@ uint32_t NodeRegistry::Add(NodeDef def) {
             "Pipeline node {} is a stencil, so it needs a signal input and a radius up to {}",
             def.id, kMostStencilRadius);
     }
+    if (def.kind == NodeKind::Reduce &&
+        (def.inputs.empty() || def.outputs.size() != 1 ||
+         def.outputs[0].type != SignalType::CaptureStat || def.layout != LayoutRule::Stat)) {
+        throw Error("Pipeline node {} is a reduction, so it takes a signal and outputs one "
+                    "CaptureStat laid out per capture",
+                    def.id);
+    }
     const auto found = m_ids.find(def.id);
     if (found != m_ids.end()) {
         m_defs[found->second] = std::move(def);

@@ -65,8 +65,11 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
             registry[pipeline.nodes[pipeline.values[value].node].def].kind == NodeKind::Source;
         const Ref<device::Buffer> buffer =
             source ? device.CreateBuffer({.label = "rates"}, rates)
-                   : device.CreateBuffer({.label = "value"},
-                                         std::vector<float>(size_t(elements) * channels));
+                   : device.CreateBuffer(
+                         {.label = "value"},
+                         std::vector<float>(
+                             size_t(layouts[value].perCapture ? frame.captures : elements) *
+                             channels));
         if (slot >= storedCount) {
             outputs[pipeline.outputs[slot - storedCount].name] = buffer.Get();
         }
@@ -82,8 +85,11 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
     words.push_back(0);
     const Ref<device::Buffer> wordBuffer = device.CreateBuffer({.label = "words"}, words);
     for (uint32_t capture = 0; capture < frame.captures; ++capture) {
-        for (PipelineValue value : values) {
-            value.address += uint64_t(capture) * perCapture * value.channels * sizeof(float);
+        for (uint32_t slot = 0; slot < values.size(); ++slot) {
+            PipelineValue value = values[slot];
+            const bool stat = layouts[generated.slots[slot]].perCapture;
+            value.address +=
+                uint64_t(capture) * (stat ? 1 : perCapture) * value.channels * sizeof(float);
             slots.push_back(value);
         }
         captures.push_back({.firstElement = uint64_t(capture) * perCapture,
@@ -111,10 +117,15 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
                                 .elementCount = elements,
                                 .captureCount = frame.captures};
     device::CommandEncoder encoder = device.GetQueue().CreateEncoder();
-    for (const std::string& entry : generated.entries) {
-        device::Kernel& kernel = program->Entry(entry);
+    for (uint32_t index = 0; index < generated.entries.size(); ++index) {
+        device::Kernel& kernel = program->Entry(generated.entries[index]);
         kernel.Wait();
-        encoder.Dispatch(kernel, params, {.x = device::GroupCount(elements, kPipelineGroup)});
+        const uint32_t groups = generated.shapes[index] == DispatchShape::Elements
+                                    ? device::GroupCount(elements, kPipelineGroup)
+                                : generated.shapes[index] == DispatchShape::ReduceGroups
+                                    ? frame.captures * kReduceGroups
+                                    : device::GroupCount(frame.captures, kPipelineGroup);
+        encoder.Dispatch(kernel, params, {.x = groups});
         encoder.Barrier();
     }
     device.GetQueue().Submit(encoder.Finish());

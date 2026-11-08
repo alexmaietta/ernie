@@ -172,7 +172,7 @@ class BlackLevel : SensorNode (
 }
 
 class WhiteBalance : SensorNode (
-    doc = "Scales red, green and blue by fixed gains."
+    doc = "Scales red, green and blue by fixed gains. With a Meter's stat connected, it also scales red and blue so the metered mean comes out gray, as gray-world auto white balance does."
 ) {
     token info:id = WhiteBalance
     float3 inputs:gains = (1, 1, 1) (
@@ -180,6 +180,26 @@ class WhiteBalance : SensorNode (
         group = "White Balance"
         displayName = "Gains"
         doc = "The red, green and blue gains."
+    )
+}
+
+class Meter : SensorNode (
+    doc = "Measures each capture's mean color and luminance over a weighted area, for auto white balance and auto exposure to read. Its stat holds the per-channel means, then the mean luminance, with the total weight last."
+) {
+    token info:id = Meter
+    token inputs:mode = average (
+        tracked
+        allowed = [average, centerWeighted, spot]
+        group = "Meter"
+        displayName = "Mode"
+        doc = "average weighs every pixel equally. centerWeighted weighs pixels by a Gaussian of their distance from the center over half the diagonal, with radius as its standard deviation. spot reads only pixels within radius of the center."
+    )
+    float inputs:radius = 0.3 (
+        tracked
+        group = "Meter"
+        displayName = "Radius"
+        min = 0
+        doc = "The center-weighted spread or the spot's size, as a fraction of half the image's diagonal."
     )
 }
 
