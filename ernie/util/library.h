@@ -23,6 +23,7 @@ class Library {
     static Library Load(std::initializer_list<const char*> names,
                         std::initializer_list<const char*> paths = {},
                         const std::filesystem::path& beside = {});
+    static Library Find(std::initializer_list<const char*> names);
 
     explicit operator bool() const {
         return m_handle != nullptr;

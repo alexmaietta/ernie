@@ -7,6 +7,8 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -21,6 +23,7 @@
 #include <nvtx3/nvToolsExt.h>
 
 #include "ernie/util/environment.h"
+#include "ernie/util/library.h"
 #include "ernie/util/text.h"
 
 namespace ernie::profiler {
@@ -57,6 +60,16 @@ State& GetState() {
 
 std::atomic<bool> g_recording{false};
 nvtxDomainHandle_t g_domain = nullptr;
+
+enum RangeSink : uint8_t { kNvtxRanges = 1, kRoctxRanges = 2 };
+
+struct Roctx {
+    Library library;
+    int (*push)(const char*) = nullptr;
+    int (*pop)() = nullptr;
+    int (*nameThread)(const char*) = nullptr;
+};
+
 thread_local uint32_t t_depth = 0;
 
 uint32_t OsThread() {
@@ -109,6 +122,41 @@ bool StartNvtx() {
 bool NvtxActive() {
     static const bool active = StartNvtx();
     return active;
+}
+
+std::optional<Roctx> StartRoctx() {
+    const std::string wanted = Environment("ERNIE_ROCTX");
+    if (wanted == "0") {
+        return std::nullopt;
+    }
+    Roctx roctx;
+    roctx.library =
+        wanted == "1"
+            ? Library::Load({"librocprofiler-sdk-roctx.so.1", "libroctx64.so.4", "libroctx64.so"})
+            : Library::Find({"librocprofiler-sdk-roctx.so.1", "libroctx64.so.4", "libroctx64.so"});
+    if (!roctx.library || !roctx.library.Symbol("roctxRangePushA", roctx.push) ||
+        !roctx.library.Symbol("roctxRangePop", roctx.pop)) {
+        return std::nullopt;
+    }
+    roctx.library.Symbol("roctxNameOsThread", roctx.nameThread);
+    return roctx;
+}
+
+const Roctx* RoctxActive() {
+    static const std::optional<Roctx> active = StartRoctx();
+    return active ? &*active : nullptr;
+}
+
+void PushRoctx(const Roctx& roctx, ZoneId zone) {
+    thread_local std::vector<std::string> names;
+    if (zone.Index() >= names.size()) {
+        names.resize(zone.Index() + 1);
+    }
+    std::string& name = names[zone.Index()];
+    if (name.empty()) {
+        name = "ernie:" + std::string(zone.Name());
+    }
+    roctx.push(name.c_str());
 }
 
 void PushRange(ZoneId zone) {
@@ -309,12 +357,16 @@ void Clear() {
 void SetThreadName(std::string_view name) {
     const uint32_t track = ThreadTrack();
     const bool nvtx = NvtxActive();
+    const Roctx* roctx = RoctxActive();
     State& state = GetState();
     const std::lock_guard lock(state.mutex);
     TrackEntry& entry = state.tracks[track];
     entry.track.name = name;
     if (nvtx) {
         nvtxNameOsThreadA(entry.osThread, entry.track.name.c_str());
+    }
+    if (roctx != nullptr && roctx->nameThread != nullptr) {
+        roctx->nameThread(entry.track.name.c_str());
     }
 }
 
@@ -351,9 +403,13 @@ void AddZone(uint64_t frame, const Zone& zone) {
 }
 
 ScopedZone::ScopedZone(ZoneId zone) : m_zone(zone) {
-    m_nvtx = NvtxActive();
-    if (m_nvtx) {
+    if (NvtxActive()) {
+        m_ranges |= kNvtxRanges;
         PushRange(zone);
+    }
+    if (const Roctx* roctx = RoctxActive()) {
+        m_ranges |= kRoctxRanges;
+        PushRoctx(*roctx, zone);
     }
 
     m_recording = Enabled();
@@ -364,7 +420,10 @@ ScopedZone::ScopedZone(ZoneId zone) : m_zone(zone) {
 }
 
 ScopedZone::~ScopedZone() {
-    if (m_nvtx) {
+    if ((m_ranges & kRoctxRanges) != 0) {
+        RoctxActive()->pop();
+    }
+    if ((m_ranges & kNvtxRanges) != 0) {
         nvtxDomainRangePop(g_domain);
     }
     if (!m_recording) {

@@ -125,7 +125,7 @@ class ERNIE_API ScopedZone {
     ZoneId m_zone;
     uint64_t m_startNs = 0;
     bool m_recording = false;
-    bool m_nvtx = false;
+    uint8_t m_ranges = 0;
 };
 
 }

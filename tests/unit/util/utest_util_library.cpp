@@ -42,6 +42,13 @@ TEST(LibraryTest, LoadPrefersALibraryAlreadyInTheProcess) {
               std::string("using the ") + kLoaded + " already in the process");
 }
 
+TEST(LibraryTest, FindReturnsOnlyLibrariesAlreadyInTheProcess) {
+    const Library loaded = Library::Find({kMissing, kLoaded});
+    ASSERT_TRUE(loaded);
+    EXPECT_EQ(loaded.Name(), kLoaded);
+    EXPECT_FALSE(Library::Find({kMissing}));
+}
+
 TEST(LibraryTest, LoadOpensTheFirstNameThatExists) {
     const test::CapturedLog log;
     const Library library = Library::Load({kMissing, kUnloaded});

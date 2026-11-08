@@ -154,6 +154,7 @@ ernie_test(
         unit/util/utest_util_library.cpp
         unit/util/utest_util_log.cpp
         unit/util/utest_util_profiler.cpp
+        unit/util/utest_util_roctx.cpp
         unit/util/utest_util_span.cpp
         unit/util/utest_util_text.cpp
         unit/util/utest_util_thread_pool.cpp
@@ -169,6 +170,26 @@ target_compile_definitions(
 )
 
 if(UNIX AND NOT APPLE)
+    add_library(ernie_fake_roctx SHARED support/fake_roctx.cpp)
+    set_target_properties(
+        ernie_fake_roctx
+        PROPERTIES
+            OUTPUT_NAME
+                roctx64
+    )
+    add_dependencies(ernie_util_tests ernie_fake_roctx)
+    add_test(
+        NAME ernie_util_roctx_tests
+        COMMAND
+            ernie_util_tests --gtest_filter=RoctxTest.*
+    )
+    set_tests_properties(
+        ernie_util_roctx_tests
+        PROPERTIES
+            ENVIRONMENT
+                "LD_PRELOAD=$<TARGET_FILE:ernie_fake_roctx>"
+    )
+
     add_library(ernie_fake_beside SHARED support/fake_beside.cpp)
     set_target_properties(
         ernie_fake_beside

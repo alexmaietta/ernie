@@ -54,6 +54,10 @@ Library Library::First(const std::vector<std::string>& names, bool loadedOnly) {
     return library;
 }
 
+Library Library::Find(std::initializer_list<const char*> names) {
+    return First(WithUnversioned(names), true);
+}
+
 Library Library::Load(std::initializer_list<const char*> names,
                       std::initializer_list<const char*> paths,
                       const std::filesystem::path& beside) {
