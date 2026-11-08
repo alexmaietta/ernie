@@ -13,14 +13,17 @@ struct PointsRecord {
     uint64_t widths;
     uint64_t normals;
     uint64_t ids;
+    uint64_t order;
     uint pointCount;
     uint widthCount;
     uint normalCount;
     uint idCount;
+    uint perBox;
+    uint padding;
     ArrayRef bounds;
 };
 
-ERNIE_CHECK_SIZE(PointsRecord, 72);
+ERNIE_CHECK_SIZE(PointsRecord, 88);
 
 #ifdef __SLANG__
 

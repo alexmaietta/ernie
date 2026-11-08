@@ -2,6 +2,7 @@
 #include "ernie/scene/tables/points.h"
 
 #include <algorithm>
+#include <bit>
 
 #include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
@@ -69,13 +70,19 @@ void PointsTable::Link(Cloud& cloud) {
                              : points.count;
         cloud.blas = nullptr;
         cloud.boxes = nullptr;
+        cloud.order = nullptr;
         if (cloud.capacity > 0) {
             device::Device& device = store.GetDevice();
-            cloud.boxes = device.CreateBuffer({.bytes = uint64_t(cloud.capacity) * sizeof(BvhBox),
+            const uint32_t boxes = (cloud.capacity + m_pointsPerBox - 1) / m_pointsPerBox;
+            cloud.boxes = device.CreateBuffer({.bytes = uint64_t(boxes) * sizeof(BvhBox),
                                                .usage = device::BufferUsage::AccelBuildInput,
                                                .label = "point boxes"});
             cloud.blas = m_builder.CreateBlas(device::AccelBoxes{
-                .boxes = cloud.boxes->Slice(0), .count = cloud.capacity, .refittable = true});
+                .boxes = cloud.boxes->Slice(0), .count = boxes, .refittable = true});
+            if (m_pointsPerBox > 1) {
+                cloud.order = device.CreateBuffer(
+                    {.bytes = uint64_t(cloud.capacity) * sizeof(uint32_t), .label = "point order"});
+            }
         }
         cloud.fresh = true;
     }
@@ -98,6 +105,8 @@ void PointsTable::Link(Cloud& cloud) {
         record.normalCount = normals.count;
         record.ids = ids.address;
         record.idCount = ids.count;
+        record.order = cloud.order ? cloud.order->Address() : 0;
+        record.perBox = m_pointsPerBox;
         record.bounds = cloud.bounds;
     }
     const Prims& prims = m_structure.GetPrims();
@@ -169,9 +178,11 @@ void PointsTable::Run(const ChangeSet& changes, TableVersions& versions) {
 
 void PointsTable::Build(std::vector<uint32_t>& updated) {
     std::vector<PointsJob> jobs;
+    std::vector<PointsJob> sorts;
     std::vector<Ref<bvh::Blas>> built;
     std::vector<Ref<bvh::Blas>> refit;
     uint32_t total = 0;
+    uint32_t keys = 0;
     uint32_t active = 0;
     const Prims& prims = m_structure.GetPrims();
     for (auto& [prim, cloud] : m_clouds) {
@@ -179,22 +190,29 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
             continue;
         }
         cloud.update = false;
-        if (cloud.fresh || cloud.refits >= m_maxRefits) {
-            cloud.fresh = false;
-            cloud.refits = 0;
-            built.push_back(cloud.blas);
-        } else {
-            ++cloud.refits;
-            refit.push_back(cloud.blas);
-        }
         PointsJob job{};
         job.record = m_records.Row(cloud.row);
         job.boxes.address = cloud.boxes->Address();
         job.bounds.address = cloud.bounds.address;
+        if (cloud.fresh || cloud.refits >= m_maxRefits) {
+            cloud.fresh = false;
+            cloud.refits = 0;
+            built.push_back(cloud.blas);
+            if (cloud.order) {
+                PointsJob sort = job;
+                sort.first = keys;
+                sort.capacity = cloud.capacity;
+                sorts.push_back(sort);
+                keys += cloud.capacity;
+            }
+        } else {
+            ++cloud.refits;
+            refit.push_back(cloud.blas);
+        }
         job.first = total;
-        job.capacity = cloud.capacity;
+        job.capacity = (cloud.capacity + m_pointsPerBox - 1) / m_pointsPerBox;
         jobs.push_back(job);
-        total += cloud.capacity;
+        total += job.capacity;
         active += cloud.count;
         if (prims.Alive(prim)) {
             updated.push_back(prims.Record(prim).world);
@@ -203,6 +221,7 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     m_stats.clouds = uint32_t(m_clouds.size());
     m_stats.built = uint32_t(built.size());
     m_stats.refit = uint32_t(refit.size());
+    m_stats.sorted = uint32_t(sorts.size());
     m_stats.capacity = total;
     m_stats.points = active;
     if (jobs.empty()) {
@@ -225,6 +244,42 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
     static const profiler::ZoneId blasZone = profiler::ZoneId::Named("Points/Blas");
     device::Queue& queue = device.GetQueue();
     device::CommandEncoder encoder = queue.CreateEncoder();
+    if (!sorts.empty()) {
+        static const profiler::ZoneId sortZone = profiler::ZoneId::Named("Points/Sort");
+        if (keys > m_sortCapacity) {
+            m_sortCapacity = std::bit_ceil(keys);
+            m_sort = std::make_unique<algorithms::RadixSort>(device, m_sortCapacity, 8);
+            m_keys = device.CreateBuffer(
+                {.bytes = uint64_t(m_sortCapacity) * 2 * sizeof(uint32_t), .label = "point keys"});
+            m_values = device.CreateBuffer(
+                {.bytes = uint64_t(m_sortCapacity) * sizeof(uint32_t), .label = "point values"});
+        }
+        const Ref<device::Buffer> sortTable =
+            device.CreateBuffer({.label = "points sorts"}, std::span<const PointsJob>(sorts));
+        const uint64_t sortWords = uint64_t(sorts.size()) * 3;
+        const Ref<device::Buffer> sortExtents = device.CreateBuffer(
+            {.bytes = sortWords * 2 * sizeof(uint32_t), .label = "points sort extents"});
+        PointsParams sortParams{};
+        sortParams.jobs.address = sortTable->Address();
+        sortParams.extents.address = sortExtents->Address();
+        sortParams.keys.address = m_keys->Address();
+        sortParams.values.address = m_values->Address();
+        sortParams.jobCount = uint32_t(sorts.size());
+        sortParams.total = keys;
+        const device::Size3 groups{.x = device::GroupCount(keys, kPointsGroup)};
+        encoder.BeginZone(sortZone);
+        encoder.Fill(sortExtents->Slice(0, sortWords * sizeof(uint32_t)), ~0u);
+        encoder.Fill(sortExtents->Slice(sortWords * sizeof(uint32_t)), 0u);
+        encoder.Dispatch(Kernels().Entry("ReducePointExtents"), sortParams, groups);
+        encoder.Dispatch(Kernels().Entry("FinishPointBounds"), sortParams,
+                         {.x = device::GroupCount(sortParams.jobCount, kPointsGroup)});
+        encoder.Dispatch(Kernels().Entry("WritePointKeys"), sortParams, groups);
+        m_sort->Sort(encoder, m_keys->Slice(0, uint64_t(keys) * 2 * sizeof(uint32_t)),
+                     m_values->Slice(0, uint64_t(keys) * sizeof(uint32_t)), keys,
+                     32 + std::bit_width(sortParams.jobCount - 1));
+        encoder.Dispatch(Kernels().Entry("StorePointOrder"), sortParams, groups);
+        encoder.EndZone();
+    }
     encoder.BeginZone(boxesZone);
     encoder.Fill(extents->Slice(0, extentWords * sizeof(uint32_t)), ~0u);
     encoder.Fill(extents->Slice(extentWords * sizeof(uint32_t)), 0u);
@@ -241,11 +296,14 @@ void PointsTable::Build(std::vector<uint32_t>& updated) {
 }
 
 void PointsTable::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held, {m_records.Buffer()});
+    HoldBuffers(held, {m_records.Buffer(), m_keys, m_values});
     for (const auto& [prim, cloud] : m_clouds) {
         if (cloud.blas) {
             held.emplace_back(cloud.blas);
             held.emplace_back(cloud.boxes);
+            if (cloud.order) {
+                held.emplace_back(cloud.order);
+            }
         }
     }
 }
@@ -259,7 +317,8 @@ device::Program& PointsTable::Kernels() {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.tables.kernels.points"},
              .library = &kSceneKernels,
-             .entries = {"WritePointBoxes", "FinishPointBounds"},
+             .entries = {"ReducePointExtents", "WritePointKeys", "StorePointOrder",
+                         "WritePointBoxes", "FinishPointBounds"},
              .label = "points"});
     }
     return *m_program;

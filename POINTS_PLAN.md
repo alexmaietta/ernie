@@ -84,7 +84,24 @@ Still open from this milestone.
 - Per-cloud CPU work in `PointsTable::Run` and `Build` that scales to thousands of worlds, and batched BLAS builds for many small clouds.
 - A lower fixed cost for small software BLAS builds.
 - Capacity with inactive boxes for dead slots (done). Capacity grows by half again when exceeded and shrinks to the count when under a quarter is used, and slots past the count get NaN boxes, which Vulkan treats as inactive and the software LBVH now leaves out of its leaves. A count change within capacity rebuilds the same BLAS instead of reallocating it, since refits can't change which primitives are active. Recounting 4096 worlds of 1k points dropped from 137 to about 87 ms, with what remains mostly host array uploads.
-- Clustered leaves, with 4 to 8 Morton-adjacent points per box and the intersector looping over them, for dense fluids and batched worlds.
+- Clustered leaves (done, opt-in). `SceneDesc::pointsPerBox` puts that many Morton-adjacent points in each BVH box. A build sorts every clustered cloud in one radix sort keyed by cloud and Morton code and stores the order per cloud, refits keep the order, and the intersector loops over a box's points and carries the hit point's index out through the hit attributes. It's a scene setting rather than a Points attribute because sizing the boxes needs the value on the host, and scalar columns live on the device.
+
+    `Render/Points/Clusters` results on an RTX 5070 Laptop GPU under load, hardware traversal unless noted.
+
+    | Case | 1 per box | 2 | 4 | 8 |
+    | --- | --- | --- | --- | --- |
+    | Box, 1M moving | 1.33 ms | 1.03 | 0.89 | 0.90 |
+    | Box, 4M moving | 5.23 ms | 4.18 | 3.17 | 2.94 |
+    | Splash, 4M moving | 5.40 ms | 4.63 | 4.20 | 4.35 |
+    | Bed, 4M moving | 5.52 ms | 4.40 | 4.20 | 4.89 |
+    | Box, 4M stationary | 0.24 ms | 0.28 | 0.37 | 0.51 |
+    | Box, 1024 worlds × 10k moving | 17.2 ms | | 31.1 | 46.5 |
+    | Box, 1M moving, software | 1.67 ms | 1.62 | 1.77 | 1.88 |
+    | Device bytes per point, 4M | 163 | 121 | 85 | 67 |
+
+    BLAS time falls about k-fold (3.8 to 0.33 ms at 4M) and memory more than halves, but trace time grows nearly as fast, since each box hit tests up to k spheres and dense clusters overlap. So it pays only where the BLAS rebuild dominates the step, a single large moving cloud on hardware traversal at 4 points per box, and loses for batched worlds, stationary clouds and software traversal. The default stays 1.
+
+    Two follow-ups would shift the balance. The box pass slows from 0.5 to 1.5 ms at 4M because sorted order scatters point reads, which a sorted copy of the points would fix. Testing each point's own box before its sphere would cut the trace cost of loose clusters.
 - Hardware spheres through `VK_NV_ray_tracing_linear_swept_spheres` where the adapter has them, with boxes staying the portable path.
 
 ### 5. Simulation handoff and motion

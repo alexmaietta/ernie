@@ -48,7 +48,7 @@ struct Scene {
     }
 };
 
-template <class Test> void ForEachScene(Test test) {
+template <class Test> void ForEachScene(Test test, uint32_t perBox = 1) {
     test::ForEachDevice([&](device::Device& device) {
         if (device.Adapter().backend == device::Backend::Hip) {
             return;
@@ -57,7 +57,7 @@ template <class Test> void ForEachScene(Test test) {
         Structure structure(store);
         Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        PointsTable points(structure, *builder, kMaxRefits);
+        PointsTable points(structure, *builder, kMaxRefits, perBox);
         publisher.Add(points);
         Scene scene{store, structure, publisher, points};
         test(scene);
@@ -239,6 +239,32 @@ TEST(PointsTest, RecountsWithinCapacityKeepTheBlasAndBoundOnlyTheLiving) {
         ExpectBounds(s.Bounds(a), {-r, -r, -r}, {r, 3 + r, r});
         ExpectBounds(s.Bounds(b), {20 - r, -r, -r}, {20 + r, 2 + r, r});
     });
+}
+
+TEST(PointsTest, BoxesOfPointsSortOnBuildsAndKeepTheirOrderOnRefits) {
+    ForEachScene(
+        [](Scene& s) {
+            const uint32_t prim =
+                s.structure
+                    .Define<Points>(std::vector<std::string>{"/Cloud"}, {.points = Line(10, 0)})
+                    .firstPrim;
+            s.Publish();
+            const float r = kDefaultPointWidth / 2;
+            EXPECT_EQ(s.points.Stats().built, 1u);
+            EXPECT_EQ(s.points.Stats().sorted, 1u);
+            EXPECT_EQ(s.points.Stats().capacity, 4u);
+            ExpectBounds(s.Bounds(prim), {-r, -r, -r}, {r, 9 + r, r});
+            for (uint32_t step = 1; step <= kMaxRefits + 1; ++step) {
+                const float x = float(step);
+                s.Move(prim, Line(10, x));
+                s.Publish();
+                const bool rebuilt = step > kMaxRefits;
+                EXPECT_EQ(s.points.Stats().refit, rebuilt ? 0u : 1u) << step;
+                EXPECT_EQ(s.points.Stats().sorted, rebuilt ? 1u : 0u) << step;
+                ExpectBounds(s.Bounds(prim), {x - r, -r, -r}, {x + r, 9 + r, r});
+            }
+        },
+        3);
 }
 
 }

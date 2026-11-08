@@ -78,6 +78,7 @@ struct Shape {
     Motion motion = Motion::Stationary;
     uint32_t worlds = 1;
     uint32_t points = 1000;
+    uint32_t perBox = 1;
 };
 
 struct Cloud {
@@ -231,7 +232,7 @@ constexpr Double3 kTarget = {0, 0, 0.3 * kExtent};
 Setup Prepare(const Shape& shape, device::Traversal traversal) {
     device::Device& device = bench::BenchDevice(traversal);
     const uint64_t before = device.MemoryUsage().deviceBytes;
-    const Ref<Scene> scene = Scene::Create(device);
+    const Ref<Scene> scene = Scene::Create(device, {.pointsPerBox = shape.perBox});
     Setup setup{scene, Renderer(scene), shape};
     setup.cloud = Scatter(shape.layout, shape.points, 7);
     if (shape.worlds > 1) {
@@ -357,10 +358,10 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
         hardware ? device::Traversal::Hardware : device::Traversal::Software;
     Setup* setup = nullptr;
     try {
-        setup = &bench::Cached<Setup>(std::format("{}/{}/{}/{}/{}/{}", Name(shape.family),
-                                                  Name(shape.layout), Name(shape.motion),
-                                                  shape.worlds, shape.points, hardware),
-                                      [&] { return Prepare(shape, traversal); });
+        setup = &bench::Cached<Setup>(
+            std::format("{}/{}/{}/{}/{}/{}/{}", Name(shape.family), Name(shape.layout),
+                        Name(shape.motion), shape.worlds, shape.points, shape.perBox, hardware),
+            [&] { return Prepare(shape, traversal); });
     } catch (const UnsupportedError& error) {
         state.SkipWithMessage(error.what());
         return;
@@ -385,6 +386,7 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
     double step = 0;
     double boxes = 0;
     double blas = 0;
+    double sort = 0;
     double tlas = 0;
     double render = 0;
     double other = 0;
@@ -396,6 +398,8 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
                 boxes += zone.ms;
             } else if (zone.name == "Points/Blas") {
                 blas += zone.ms;
+            } else if (zone.name == "Points/Sort") {
+                sort += zone.ms;
             } else if (zone.name.starts_with("Bvh/") || zone.name.starts_with("Instances/")) {
                 tlas += zone.ms;
             } else if (zone.name.starts_with("Render/")) {
@@ -416,6 +420,7 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
     state.counters["cpu ms/step"] = step;
     state.counters["gpu boxes ms"] = boxes;
     state.counters["gpu blas ms"] = blas;
+    state.counters["gpu sort ms"] = sort;
     state.counters["gpu tlas ms"] = tlas;
     state.counters["gpu render ms"] = render;
     state.counters["gpu other ms"] = other;
@@ -431,6 +436,16 @@ void Batched(benchmark::State& state, Motion motion) {
     Run(state,
         {.motion = motion, .worlds = uint32_t(state.range(0)), .points = uint32_t(state.range(1))},
         state.range(2) != 0);
+}
+
+void Clustered(benchmark::State& state, Layout layout, Motion motion) {
+    Run(state,
+        {.layout = layout,
+         .motion = motion,
+         .worlds = uint32_t(state.range(0)),
+         .points = uint32_t(state.range(1)),
+         .perBox = uint32_t(state.range(2))},
+        state.range(3) != 0);
 }
 
 const bool kCore =
@@ -482,6 +497,18 @@ const bool kRegistered = [] {
                 Single, family, Layout::Box, motion)
                 ->ArgsProduct({counts, hardware})
                 ->ArgNames({"points", "hardware"})
+                ->Unit(benchmark::kMillisecond)
+                ->UseRealTime();
+        }
+    }
+    for (const Layout layout : {Layout::Box, Layout::Splash, Layout::Bed}) {
+        for (const Motion motion : {Motion::Stationary, Motion::Moving}) {
+            benchmark::RegisterBenchmark(
+                std::format("Render/Points/Clusters/{}/motion:{}", Name(layout), Name(motion)),
+                Clustered, layout, motion)
+                ->ArgsProduct({{1}, {100000, 1000000, 4000000}, {1, 2, 4, 8}, hardware})
+                ->ArgsProduct({{1024}, {10000}, {1, 4, 8}, hardware})
+                ->ArgNames({"worlds", "points", "perBox", "hardware"})
                 ->Unit(benchmark::kMillisecond)
                 ->UseRealTime();
         }

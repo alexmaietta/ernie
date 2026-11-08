@@ -132,16 +132,34 @@ struct ShapeIntersector : IIntersector {
         attributes = float2(0);
         const uint slot = first + instance;
         const ShapeRecord shape = shapes[slot];
+        if (ShapeKind(shape.kind) == ShapeKind::Points) {
+            return IntersectPoints(points[shape.row], surfaces[slot], primitive, ray, t, attributes);
+        }
         const float distance = ShapeDistance(shape, points, primitive, ray);
         if (distance >= t) {
             return false;
         }
-        if (ShapeKind(shape.kind) == ShapeKind::Points &&
-            !PointBlocks(surfaces[slot], opacityName, primitive, ray)) {
-            return false;
-        }
         t = distance;
         return true;
+    }
+
+    bool IntersectPoints(PointsRecord cloud, SurfaceRecord surface, uint box, Ray ray,
+                         inout float t, inout float2 attributes) {
+        const uint perBox = max(cloud.perBox, 1u);
+        const uint start = box * perBox;
+        const uint end = min(start + perBox, cloud.pointCount);
+        bool found = false;
+        for (uint at = start; at < end; ++at) {
+            const uint point = perBox == 1 ? at : Ptr<uint>(cloud.order)[at];
+            const ShapeHit hit = PointHit(cloud, point, ray);
+            if (!hit.inside || hit.t >= t || !PointBlocks(surface, opacityName, point, ray)) {
+                continue;
+            }
+            t = hit.t;
+            attributes = float2(asfloat(point), 0);
+            found = true;
+        }
+        return found;
     }
 
     [Differentiable]

@@ -31,6 +31,7 @@ struct ERNIE_API SceneDesc {
     device::DeviceDesc device;
     device::Traversal traversal = device::Traversal::Auto;
     uint32_t maxRefits = 16;
+    uint32_t pointsPerBox = 1;
     unsigned textureThreads = 4;
     bool waitForKernels = true;
 };

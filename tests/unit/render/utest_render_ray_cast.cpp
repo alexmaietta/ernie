@@ -3,7 +3,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -35,6 +37,13 @@ Tensor Upload(Device& device, DType type, const std::vector<T>& values,
 Tensor Floats(Device& device, const std::vector<float>& values, int64_t columns) {
     return Upload(device, DType::Float32, values, {int64_t(values.size()) / columns, columns});
 }
+
+const std::pair<device::Traversal, uint32_t> kPointLayouts[] = {
+    {device::Traversal::Auto, 1},
+    {device::Traversal::Software, 1},
+    {device::Traversal::Auto, 3},
+    {device::Traversal::Software, 3},
+};
 
 Ref<Scene> TwoBalls(Device& device) {
     const Ref<Scene> scene = Scene::Create(device);
@@ -309,10 +318,11 @@ TEST(RayCastTest, PointsWrittenThroughAMappingHitWhereTheyWereWritten) {
 TEST(RayCastTest, RecountedPointsHitOnlyTheLivingAcrossCapacityChanges) {
     ForEachDevice([](Device& device) {
         constexpr uint32_t kRays = 96;
-        for (const device::Traversal traversal :
-             {device::Traversal::Auto, device::Traversal::Software}) {
-            SCOPED_TRACE(int(traversal));
-            const Ref<Scene> scene = Scene::Create(device, {.traversal = traversal});
+        for (const auto& [traversal, perBox] : kPointLayouts) {
+            SCOPED_TRACE(
+                std::format("traversal {} with {} points per box", int(traversal), perBox));
+            const Ref<Scene> scene =
+                Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
             const auto line = [](uint32_t count, float x, float z) {
                 std::vector<Float3> points;
                 for (uint32_t i = 0; i < count; ++i) {
@@ -400,10 +410,11 @@ TEST(RayCastTest, PointsWithNormalsAreDisksFacingThem) {
 TEST(RayCastTest, TranslucentPointsBlockRaysInProportionToTheirOpacity) {
     ForEachDevice([](Device& device) {
         constexpr uint32_t kRays = 4096;
-        for (const device::Traversal traversal :
-             {device::Traversal::Auto, device::Traversal::Software}) {
-            SCOPED_TRACE(int(traversal));
-            const Ref<Scene> scene = Scene::Create(device, {.traversal = traversal});
+        for (const auto& [traversal, perBox] : kPointLayouts) {
+            SCOPED_TRACE(
+                std::format("traversal {} with {} points per box", int(traversal), perBox));
+            const Ref<Scene> scene =
+                Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
             const Prim veil = scene->Define<Points>(
                 "/Veil", {.displayOpacity = 0, .points = {{3, 0, 0}, {3, 10, 0}}, .widths = {2}});
             scene->Define<Points>("/Wall", {.points = {{6, 0, 0}, {6, 10, 0}}, .widths = {2}});
