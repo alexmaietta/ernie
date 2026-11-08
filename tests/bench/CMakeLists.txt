@@ -77,3 +77,10 @@ ernie_bench(
         render/btest_render_throughput.cpp
         render/btest_render_workloads.cpp
 )
+
+ernie_bench(
+    ernie_scene_bench
+    LINK ernie_scene_internal
+    SOURCES
+        scene/btest_scene_publish.cpp
+)
