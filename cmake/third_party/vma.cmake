@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 FetchContent_Declare(
     vma
+    SYSTEM
     URL
         https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/v3.4.0.tar.gz
     URL_HASH SHA256=822aa850c6ce77346ae96a8a1d351d52e77e85929f35363849a0a4e638e0a2a1
-    SYSTEM
 )
 FetchContent_MakeAvailable(vma)
 
