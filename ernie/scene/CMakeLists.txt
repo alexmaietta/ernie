@@ -48,6 +48,7 @@ target_link_libraries(
         ernie_bvh
         ernie_io
         ernie_texture
+        ernie_material
         ernie_mikktspace
 )
 ernie_embed(
@@ -75,6 +76,7 @@ ernie_static_library(
     ernie_bvh_internal
     ernie_io_internal
     ernie_texture_internal
+    ernie_material_internal
 )
 
 ernie_public_files(

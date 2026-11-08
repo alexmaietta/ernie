@@ -2,6 +2,7 @@
 #include "ernie/render/renderer_impl.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -17,6 +18,7 @@
 #include <fmt/format.h>
 
 #include "ernie/device/commands.h"
+#include "ernie/material/codegen.h"
 #include "ernie/render/kernels.h"
 #include "ernie/render/kernels/render/render.h"
 #include "ernie/scene/scene_impl.h"
@@ -41,9 +43,19 @@ RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
     : m_scene(scene ? std::move(scene) : throw Error("A renderer of no scene")),
       m_maxPixelsPerLaunch(std::clamp<uint64_t>(desc.maxPixelsPerLaunch, 1, ~uint32_t(0))),
       m_overlays(desc.overlays ? desc.overlays : Overlays::Create(m_scene->GetDevice())) {
-    m_renderProgram = m_scene->GetDevice().CreateProgram(
+    const DefinitionSetRef& definitions = SceneImpl::Get(*m_scene).GetMaterials().Definitions();
+    m_renderProgram = CreateRenderProgram(*definitions);
+    m_renderHash = definitions->Hash();
+    Log(LogLevel::Debug, "created a renderer: at most {} per launch",
+        Counted(m_maxPixelsPerLaunch, "pixel"));
+}
+
+Ref<device::Program> RendererImpl::CreateRenderProgram(const DefinitionSet& definitions) const {
+    const auto sources = DispatchSources(definitions);
+    return m_scene->GetDevice().CreateProgram(
         {.modules = {"ernie.render.kernels.render.render"},
          .library = &kRenderKernels,
+         .sources = {sources.begin(), sources.end()},
          .entries =
              [] {
                  std::vector<std::string> entries(std::begin(kRenderEntryNames),
@@ -54,8 +66,62 @@ RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
          .loadEntries = false,
          .label = "render",
          .traversal = SceneImpl::Get(*m_scene).GetBuilder().Format()});
-    Log(LogLevel::Debug, "created a renderer: at most {} per launch",
-        Counted(m_maxPixelsPerLaunch, "pixel"));
+}
+
+device::Kernel& RendererImpl::RenderEntry(std::string_view name) {
+    if (!m_usedEntries.contains(name)) {
+        m_usedEntries.emplace(name);
+    }
+    return m_renderProgram->Entry(name);
+}
+
+void RendererImpl::UpdateRenderProgram() {
+    const DefinitionSetRef& definitions = SceneImpl::Get(*m_scene).GetMaterials().Definitions();
+    const uint64_t hash = definitions->Hash();
+    if (hash == m_renderHash || hash == m_failedHash) {
+        m_pendingProgram = nullptr;
+        m_pendingDefinitions = nullptr;
+    } else if (!m_pendingDefinitions || m_pendingDefinitions->Hash() != hash) {
+        m_pendingProgram = CreateRenderProgram(*definitions);
+        m_pendingDefinitions = definitions;
+        m_pendingStart = std::chrono::steady_clock::now();
+        Log(LogLevel::Debug,
+            "relinking the render kernels for {}, keeping the current ones "
+            "until the new ones are ready",
+            Counted(definitions->Definitions().size(), "generated material definition"));
+    }
+    if (!m_pendingProgram) {
+        return;
+    }
+    const bool wait = SceneImpl::Get(*m_scene).WaitsForKernels();
+    try {
+        for (const std::string& name : m_usedEntries) {
+            device::Kernel& kernel = m_pendingProgram->Entry(name);
+            if (wait) {
+                kernel.Wait();
+            } else if (!kernel.Ready()) {
+                return;
+            } else {
+                kernel.Wait();
+            }
+        }
+    } catch (const std::exception& error) {
+        Log(LogLevel::Error,
+            "relinking the render kernels failed, so materials keep their previous look: {}",
+            error.what());
+        m_failedHash = hash;
+        m_pendingProgram = nullptr;
+        m_pendingDefinitions = nullptr;
+        return;
+    }
+    const double seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - m_pendingStart).count();
+    Log(LogLevel::Info, "relinked the render kernels for {} in {:.1f} s",
+        Counted(m_pendingDefinitions->Definitions().size(), "generated material definition"),
+        seconds);
+    m_renderProgram = std::move(m_pendingProgram);
+    m_renderHash = hash;
+    m_pendingDefinitions = nullptr;
 }
 
 RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt, Stream stream) {
@@ -90,6 +156,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
         published = m_scene->Publish({}, stream);
     }
     const Snapshot snapshot = m_scene->Acquire();
+    UpdateRenderProgram();
     OutputSet& set = AcquireSet(plan);
     SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
     for (size_t index = 0; index < planned.products.size(); ++index) {
@@ -354,7 +421,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
         for (uint64_t first = 0; first < pixelCount; first += m_maxPixelsPerLaunch) {
             params.firstPixel = first;
             params.pixelCount = uint32_t(std::min(m_maxPixelsPerLaunch, pixelCount - first));
-            encoder.Dispatch(m_renderProgram->Entry(kRenderEntryNames[entry]), params,
+            encoder.Dispatch(RenderEntry(kRenderEntryNames[entry]), params,
                              {.x = device::GroupCount(params.pixelCount, kRenderGroup)});
         }
     }
@@ -372,7 +439,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, const OutputSet& 
         scatter.cloud.address = cloud.cloud->Address();
         scatter.tables.address = snapshot.tables;
         scatter.slotCount = cloud.slots;
-        encoder.Dispatch(m_renderProgram->Entry("RenderScatterPoints"), scatter,
+        encoder.Dispatch(RenderEntry("RenderScatterPoints"), scatter,
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});
     }
     encoder.EndZone();

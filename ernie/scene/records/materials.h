@@ -8,6 +8,7 @@ namespace ernie {
 static const uint kDefinitionDiffuse = 0;
 static const uint kDefinitionPreviewConstant = 1;
 static const uint kDefinitionPreviewTextured = 2;
+static const uint kDefinitionPlaceholder = 3;
 
 ERNIE_ENUM(TextureChannel){
     Rgb,
@@ -38,8 +39,8 @@ static const uint kPreviewInputs = 13;
 struct MaterialRecord {
     uint definition;
     uint words;
-    uint padding0;
-    uint padding1;
+    uint previousDefinition;
+    uint previousWords;
 };
 
 ERNIE_CHECK_SIZE(MaterialRecord, 16);

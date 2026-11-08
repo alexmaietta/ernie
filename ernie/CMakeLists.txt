@@ -33,6 +33,7 @@ add_subdirectory(algorithms)
 add_subdirectory(bvh)
 add_subdirectory(io)
 add_subdirectory(texture)
+add_subdirectory(material)
 add_subdirectory(scene)
 add_subdirectory(overlay)
 add_subdirectory(render)
@@ -47,6 +48,7 @@ ernie_shared_library(
     ernie_algorithms
     ernie_bvh
     ernie_texture
+    ernie_material
     ernie_scene
     ernie_overlay
     ernie_render

@@ -9,6 +9,7 @@
 
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
+#include "ernie/material/definition.h"
 #include "ernie/scene/records/materials.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"
@@ -49,6 +50,10 @@ class MaterialTable : public Table {
 
     uint32_t Resolves() const {
         return m_resolves;
+    }
+
+    const DefinitionSetRef& Definitions() const {
+        return m_definitions;
     }
 
   private:
@@ -94,6 +99,7 @@ class MaterialTable : public Table {
     std::vector<Binding> m_bindings;
     uint32_t m_wordCount = 0;
     uint32_t m_resolves = 0;
+    DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();
     DeviceTable<NonVisualRecord> m_nonVisuals{"nonvisual material records"};
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
 };

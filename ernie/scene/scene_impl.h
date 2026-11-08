@@ -136,6 +136,10 @@ class SceneImpl {
         return m_materials;
     }
 
+    bool WaitsForKernels() const {
+        return m_waitForKernels;
+    }
+
     SemanticTable& GetSemantics() {
         return m_semantics;
     }
@@ -183,6 +187,7 @@ class SceneImpl {
   private:
     Scene& m_scene;
     Ref<device::Device> m_device;
+    bool m_waitForKernels = true;
     ColumnStore m_store;
     Structure m_structure;
     Publisher m_publisher;

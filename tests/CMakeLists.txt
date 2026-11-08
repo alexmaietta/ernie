@@ -31,6 +31,14 @@ ernie_test(
 )
 
 ernie_test(
+    ernie_material_tests
+    LINK
+        ernie_material_internal
+    SOURCES
+        unit/material/utest_material_codegen.cpp
+)
+
+ernie_test(
     ernie_algorithms_tests
     LINK
         ernie_algorithms_internal

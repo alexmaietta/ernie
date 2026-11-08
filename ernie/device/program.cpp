@@ -160,8 +160,8 @@ const KernelStats& Kernel::Stats() const {
 }
 
 struct Device::ProgramCache {
-    using Key =
-        std::tuple<const KernelLibrary*, std::vector<std::string>, Traversal, const SourceFiles*>;
+    using Key = std::tuple<const KernelLibrary*, std::vector<std::string>, Traversal,
+                           const SourceFiles*, SourceFiles>;
 
     std::mutex mutex;
     std::map<Key, Ref<Program>> programs;
@@ -384,16 +384,25 @@ Ref<Program> Device::CreateProgram(const ProgramDesc& desc) {
         }
         cache = m_programs;
     }
-    const std::shared_ptr<const SourceFiles> sources = RegisteredFiles();
+    const std::shared_ptr<const SourceFiles> registered = RegisteredFiles();
     const Traversal traversal = desc.traversal == Traversal::Auto ? m_traversal : desc.traversal;
-    const ProgramCache::Key key{desc.library, desc.modules, traversal, sources.get()};
+    const ProgramCache::Key key{desc.library, desc.modules, traversal, registered.get(),
+                                SourceFiles(desc.sources.begin(), desc.sources.end())};
     Ref<Program> program;
     {
         const std::lock_guard lock(cache->mutex);
         if (const auto found = cache->programs.find(key); found != cache->programs.end()) {
             program = found->second;
         } else {
-            program = Ref<Program>(new Program(*this, desc, sources));
+            std::shared_ptr<const SourceFiles> sources = registered;
+            if (!desc.sources.empty()) {
+                auto merged = std::make_shared<SourceFiles>(*registered);
+                for (const auto& [path, source] : desc.sources) {
+                    (*merged)[path] = source;
+                }
+                sources = std::move(merged);
+            }
+            program = Ref<Program>(new Program(*this, desc, std::move(sources)));
             Adopt(*program);
             cache->programs.emplace(key, program);
         }

@@ -8,11 +8,11 @@ using namespace ernie;
 
 struct PreviewMaterial : IStandardMaterial {
     static PreviewParams* Params(ShadeContext context) {
-        return context.materials.Params<PreviewParams>(context.material);
+        return context.materials.Params<PreviewParams>(context.words);
     }
 
     static bool Textured(ShadeContext context) {
-        return context.materials.Definition(context.material) == kDefinitionPreviewTextured;
+        return context.definition == kDefinitionPreviewTextured;
     }
 
     [noinline]

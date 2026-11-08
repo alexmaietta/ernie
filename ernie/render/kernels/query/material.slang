@@ -27,11 +27,19 @@ struct MaterialQuery {
         return PrimImageable(hit.tables, prim).material;
     }
 
-    uint Definition(uint material) {
-        return material == kNoPrim ? kDefinitionDiffuse : hit.tables->materials[material].definition;
+    MaterialRecord Record(uint material) {
+        if (material == kNoPrim) {
+            MaterialRecord diffuse;
+            diffuse.definition = kDefinitionDiffuse;
+            diffuse.words = 0;
+            diffuse.previousDefinition = kDefinitionPlaceholder;
+            diffuse.previousWords = 0;
+            return diffuse;
+        }
+        return hit.tables->materials[material];
     }
 
-    T* Params<T>(uint material) {
-        return (T*)(hit.tables->materialWords + hit.tables->materials[material].words);
+    T* Params<T>(uint words) {
+        return (T*)(hit.tables->materialWords + words);
     }
 }

@@ -53,6 +53,7 @@ ERNIE_API void RegisterFile(std::string path, std::string source);
 struct ProgramDesc {
     std::vector<std::string> modules;
     const KernelLibrary* library = nullptr;
+    std::map<std::string, std::string, std::less<>> sources;
     std::vector<std::string> entries;
     bool loadEntries = true;
     std::string label = "program";

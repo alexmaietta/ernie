@@ -5,8 +5,7 @@ import ernie.render.kernels.light.area;
 import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.dome;
 import ernie.render.kernels.light.scatter;
-import ernie.render.kernels.material.definitions.diffuse;
-import ernie.render.kernels.material.definitions.preview;
+import ernie.render.kernels.material.dispatch;
 import ernie.render.kernels.random;
 import ernie.render.kernels.basis;
 
@@ -224,13 +223,7 @@ struct RealTimeIntegrator<S : ISpectrum> : IIntegrator {
         const float weighted = bounce < bounces ? 1.0f : 0.0f;
         ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
         OpticalClosure<Spectrum> closure = OpticalClosure<Spectrum>();
-        const uint definition = materials.Definition(material);
-        if (definition == kDefinitionPreviewTextured ||
-                definition == kDefinitionPreviewConstant) {
-            StandardDefinition<PreviewMaterial, Spectrum>.Shade(context, closure);
-        } else {
-            StandardDefinition<DiffuseMaterial, Spectrum>.Shade(context, closure);
-        }
+        ShadeDefinition<Spectrum>(context, closure);
         point = context.point;
         PathVertex<Spectrum> vertex;
         vertex.point = point;

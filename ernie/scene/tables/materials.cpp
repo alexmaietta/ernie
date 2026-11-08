@@ -300,7 +300,10 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
     ResolvePlacement(placement, at(offsetof(PreviewParams, mapping)));
     const uint32_t definition =
         textured > 0 ? kDefinitionPreviewTextured : kDefinitionPreviewConstant;
-    m_records.Set(material, {.definition = definition, .words = base});
+    m_records.Set(material, {.definition = definition,
+                             .words = base,
+                             .previousDefinition = kDefinitionPlaceholder,
+                             .previousWords = 0});
     Log(LogLevel::Debug, "{} shades with {} through {}, with {} textures in {} words",
         paths.Path(material), textured > 0 ? "a textured UsdPreviewSurface" : "UsdPreviewSurface",
         paths.Path(shader), textured, Word(sizeof(PreviewParams)));
@@ -331,7 +334,10 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
             paths.Path(material),
             surface == kNoPrim ? std::string("nothing") : paths.Path(surface));
     }
-    m_records.Set(material, {.definition = kDefinitionDiffuse});
+    m_records.Set(material, {.definition = kDefinitionDiffuse,
+                             .words = 0,
+                             .previousDefinition = kDefinitionPlaceholder,
+                             .previousWords = 0});
 }
 
 void MaterialTable::Resolve() {

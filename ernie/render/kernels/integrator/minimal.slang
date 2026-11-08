@@ -3,8 +3,7 @@
 __exported import ernie.render.kernels.integrator.iintegrator;
 import ernie.render.kernels.light.distant;
 import ernie.render.kernels.light.scatter;
-import ernie.render.kernels.material.definitions.diffuse;
-import ernie.render.kernels.material.definitions.preview;
+import ernie.render.kernels.material.dispatch;
 import ernie.render.kernels.surface.primvars;
 import ernie.render.kernels.random;
 import ernie.render.kernels.basis;
@@ -124,27 +123,15 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             materials.minimal = true;
             materials.maxAnisotropy = min(materials.maxAnisotropy, kMinimalAnisotropy);
             const uint material = materials.BoundMaterial(point.prim);
-            const uint definition = materials.Definition(material);
             if (Mode == MinimalMode::TextureDiffuse) {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
-                RgbSpectrum albedo;
-                if (definition == kDefinitionPreviewTextured ||
-                        definition == kDefinitionPreviewConstant) {
-                    albedo = StandardDefinition<PreviewMaterial, RgbSpectrum>.Albedo(context);
-                } else {
-                    albedo = StandardDefinition<DiffuseMaterial, RgbSpectrum>.Albedo(context);
-                }
+                const RgbSpectrum albedo = AlbedoDefinition<RgbSpectrum>(context);
                 shade = lighting.Shade(ray, context.point,
                                        OpticalClosure<RgbSpectrum>.Diffuse(albedo));
             } else {
                 ShadeContext context = ShadeContext(materials, material, point, -ray.direction);
                 OpticalClosure<RgbSpectrum> closure = OpticalClosure<RgbSpectrum>();
-                if (definition == kDefinitionPreviewTextured ||
-                        definition == kDefinitionPreviewConstant) {
-                    StandardDefinition<PreviewMaterial, RgbSpectrum>.Shade(context, closure);
-                } else {
-                    StandardDefinition<DiffuseMaterial, RgbSpectrum>.Shade(context, closure);
-                }
+                ShadeDefinition<RgbSpectrum>(context, closure);
                 shade = lighting.Shade(ray, context.point, closure);
             }
         }
