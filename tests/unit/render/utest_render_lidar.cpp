@@ -85,5 +85,31 @@ TEST(LidarTest, DustPointsReturnWhereTheBeamMeetsThem) {
     });
 }
 
+TEST(LidarTest, PointCloudsReportWhichParticleEachReturnHit) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = BeamAtWall(device, {0, 0});
+        scene->Find("/Render/Points")
+            ->Set(RenderVar::kChannels, std::vector<std::string>{"Coordinates", "InstanceId"});
+        const Prim dust = scene->Define<Points>(
+            "/Dust", {.points = {{3, 0, -2}, {0, 0, -2}}, .widths = {0.5f}, .ids = {42, 7}});
+        Renderer renderer(scene);
+        const auto hit = [&] {
+            RenderOutput output = renderer.Step(kProducts, 0);
+            output.Wait();
+            const std::vector<int64_t> ids = output["/Render/Scan"]
+                                                 .frames.at(0)
+                                                 .Source("PointCloud")
+                                                 .channels.at("InstanceId")
+                                                 .ToHost<int64_t>();
+            return ids.empty() ? int64_t(-2) : ids.front();
+        };
+        EXPECT_EQ(hit(), 7);
+        dust.Set(Points::kIds, std::vector<int64_t>{});
+        EXPECT_EQ(hit(), 1);
+        dust.Set(Points::kPoints, std::vector<Float3>{{3, 0, -2}});
+        EXPECT_EQ(hit(), -1);
+    });
+}
+
 }
 }

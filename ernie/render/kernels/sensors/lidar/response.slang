@@ -15,6 +15,7 @@ struct LidarReturn {
     float intensity;
     float3 normal;
     uint prim;
+    int64_t instance;
 }
 
 struct LidarResponse : IResponse<LidarPattern> {
@@ -32,6 +33,7 @@ struct LidarResponse : IResponse<LidarPattern> {
     float intensitySum;
     float3 normalSum;
     uint firstPrim;
+    int64_t firstInstance;
 
     static LidarResponse Load(SensorContext context, LidarPattern pattern) {
         Capture* capture = context.capture;
@@ -45,7 +47,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         response.returns = min(response.stride, kMostLidarReturns);
         response.found = 0;
         for (uint i = 0; i < kMostLidarReturns; ++i) {
-            response.kept[i] = { float3(0), 0, 0, float3(0), kNoPrim };
+            response.kept[i] = { float3(0), 0, 0, float3(0), kNoPrim, -1 };
         }
         response.samples = 0;
         response.hits = 0;
@@ -54,6 +56,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         response.intensitySum = 0;
         response.normalSum = float3(0);
         response.firstPrim = kNoPrim;
+        response.firstInstance = -1;
         return response;
     }
 
@@ -114,13 +117,17 @@ struct LidarResponse : IResponse<LidarPattern> {
         candidate.intensity = Intensity(point.prim, point.geometricNormal, ray.ray.direction);
         candidate.normal = point.shadingNormal;
         candidate.prim = point.prim;
+        candidate.instance = HitInstanceId(tables, point);
         if (mode == ReturnMode::Mean) {
             ++hits;
             positionSum += candidate.position;
             distanceSum += candidate.distance;
             intensitySum += candidate.intensity;
             normalSum += candidate.normal;
-            firstPrim = firstPrim == kNoPrim ? candidate.prim : firstPrim;
+            if (firstPrim == kNoPrim) {
+                firstPrim = candidate.prim;
+                firstInstance = candidate.instance;
+            }
             return;
         }
         Keep(candidate);
@@ -134,7 +141,8 @@ struct LidarResponse : IResponse<LidarPattern> {
             count = hits > 0 ? 1 : 0;
             const float spread = float(max(hits, 1u));
             results[0] = { positionSum / spread, distanceSum / spread,
-                           intensitySum / float(max(samples, 1u)), normalize(normalSum), firstPrim };
+                           intensitySum / float(max(samples, 1u)), normalize(normalSum), firstPrim,
+                           firstInstance };
         }
         for (uint i = 0; i < stride; ++i) {
             CapturePixel at = pixel;
@@ -142,7 +150,7 @@ struct LidarResponse : IResponse<LidarPattern> {
             const bool returned = i < count && i < kMostLidarReturns;
             const LidarReturn point = results[min(i, kMostLidarReturns - 1)];
             WritePoint(at, returned, pattern.frame, point.position, point.distance, point.intensity, 0,
-                       point.prim);
+                       point.prim, point.instance);
             if (returned) {
                 const LidarReturn result = results[i];
                 Write(at, RenderVarSource::DistanceToCamera, result.distance);

@@ -73,15 +73,15 @@ So a moving cloud is bound by the BLAS rebuild, many small clouds are bound by p
 - `ids` on Points, reported per point by the `InstanceId` output, with each point's index when ids are empty, and the Points prim's stable id as `InstancerStableId`.
 - Lidar tests for dust spheres, dust disks, transparent dust and a moved point, and a radar test for a moving plume.
 
-Still open from this milestone.
+Since finished.
 
-- Colour and opacity as primvars are packed on the host, so a simulation can't write them every step through `Map`. Device-writable per-point colour and opacity arrays belong with milestone 5.
-- Point clouds from lidar don't carry an instance id channel, only the prim's stable id.
+- `UntypedAttribute::MapPrimvar(name, access)` maps one primvar of the mapped prims' `primvars` as a strided tensor of shape [prims, values, components] that aliases the packed tables, so a simulation writes `displayColor`, `displayOpacity` or any other primvar in place every step and shading reads it at once. The tables reuse array mapping, so prims laid out as a run alias directly and others move into one. The primvar's place in the table is read back once and cached on the view until the prims' tables change, and every mapped prim must lay its primvars out the same way, as clones do.
+- Point clouds have an `InstanceId` channel, the id the `InstanceId` output reports, so lidar and radar returns name the particle or instancer copy they hit.
 
 ### 4. Efficiency
 
 - A refit or rebuild policy per Points prim (done). Moved points refit their BLAS and rebuild after `SceneDesc::maxRefits` refits, and a count change rebuilds. On hardware traversal a moving step drops from 6.1 to 1.3 ms at 1M points, 86 to 19 ms at 16M, and 77 to 30 ms for 4096 worlds of 1k, and on software traversal from 1.6 to 0.4 ms at 1k.
-- Per-cloud CPU work in `PointsTable::Run` and `Build` that scales to thousands of worlds, and batched BLAS builds for many small clouds.
+- Per-cloud CPU work for thousands of worlds. Profiling 4096 worlds of 1k moving points on hardware traversal puts 13 of the 18 ms of host time per step inside the NVIDIA driver recording 8192 acceleration structure builds, one BLAS refit per cloud and one TLAS refit per world, already in a single `vkCmdBuildAccelerationStructuresKHR` call, about 1.6 µs each. `PointsTable` itself takes about 1.9 ms. Cutting the build count, for example by padding boxes and refitting only clouds whose points left them, is the lever if this matters.
 - A lower fixed cost for small software BLAS builds.
 - Capacity with inactive boxes for dead slots (done). Capacity grows by half again when exceeded and shrinks to the count when under a quarter is used, and slots past the count get NaN boxes, which Vulkan treats as inactive and the software LBVH now leaves out of its leaves. A count change within capacity rebuilds the same BLAS instead of reallocating it, since refits can't change which primitives are active. Recounting 4096 worlds of 1k points dropped from 137 to about 87 ms, with what remains mostly host array uploads.
 - Clustered leaves (done, opt-in). `SceneDesc::pointsPerBox` puts that many Morton-adjacent points in each BVH box. A build sorts every clustered cloud in one radix sort keyed by cloud and Morton code and stores the order per cloud, refits keep the order, and the intersector loops over a box's points and carries the hit point's index out through the hit attributes. It's a scene setting rather than a Points attribute because sizing the boxes needs the value on the host, and scalar columns live on the device.

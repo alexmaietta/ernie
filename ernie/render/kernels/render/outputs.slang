@@ -73,35 +73,36 @@ void WriteSegmentation(RenderParams params, CapturePixel pixel, uint prim) {
     Write(pixel, RenderVarSource::StableIdSegmentation, StableWords(semantics.stableIds[prim]));
 }
 
+int64_t HitInstanceId(RenderTables* tables, SurfacePoint point) {
+    const ShapeRecord shape = tables->instances->shapes[point.slot];
+    if (ShapeKind(shape.kind) == ShapeKind::Points) {
+        const PointsRecord cloud = tables->points[shape.row];
+        const uint index = point.element.face;
+        return cloud.idCount == cloud.pointCount ? Ptr<int64_t>(cloud.ids)[index]
+                                                 : int64_t(index);
+    }
+    return tables->instances->hits[point.slot].instancer == kNoPrim
+               ? int64_t(-1)
+               : tables->surfaces[point.slot].instanceId;
+}
+
 void WriteInstance(RenderParams params, CapturePixel pixel, SurfacePoint point, bool hit) {
     if (!Wants(pixel, RenderVarSource::InstanceId) &&
         !Wants(pixel, RenderVarSource::InstancerStableId)) {
         return;
     }
-    const uint slot = point.slot;
-    SlotHit drawn = Drawn(kNoPrim, kNoPrim, 0, 0);
-    if (hit) {
-        drawn = params.tables->instances->hits[slot];
-        const ShapeRecord shape = params.tables->instances->shapes[slot];
-        if (ShapeKind(shape.kind) == ShapeKind::Points) {
-            const PointsRecord cloud = params.tables->points[shape.row];
-            const uint index = point.element.face;
-            Write(pixel, RenderVarSource::InstanceId,
-                  cloud.idCount == cloud.pointCount ? Ptr<int64_t>(cloud.ids)[index]
-                                                    : int64_t(index));
-            Write(pixel, RenderVarSource::InstancerStableId,
-                  StableWords(params.tables->semantics.stableIds[point.prim]));
-            return;
-        }
-    }
-    if (drawn.instancer == kNoPrim) {
+    if (!hit) {
         Write(pixel, RenderVarSource::InstanceId, int64_t(-1));
         Write(pixel, RenderVarSource::InstancerStableId, uint4(0));
         return;
     }
-    Write(pixel, RenderVarSource::InstanceId, params.tables->surfaces[slot].instanceId);
+    RenderTables* tables = params.tables;
+    const bool cloud =
+        ShapeKind(tables->instances->shapes[point.slot].kind) == ShapeKind::Points;
+    const uint instancer = cloud ? point.prim : tables->instances->hits[point.slot].instancer;
+    Write(pixel, RenderVarSource::InstanceId, HitInstanceId(tables, point));
     Write(pixel, RenderVarSource::InstancerStableId,
-          StableWords(params.tables->semantics.stableIds[drawn.instancer]));
+          instancer == kNoPrim ? uint4(0) : StableWords(tables->semantics.stableIds[instancer]));
 }
 
 void WritePrimId(CapturePixel pixel, uint prim) {

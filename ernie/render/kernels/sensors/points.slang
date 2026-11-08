@@ -6,7 +6,8 @@ __exported import ernie.render.kernels.sensors.isensor;
 using namespace ernie;
 
 void WritePoint(CapturePixel at, bool returned, SensorFrame frame, float3 position,
-                float distance, float intensity, float radialVelocity, uint prim) {
+                float distance, float intensity, float radialVelocity, uint prim,
+                int64_t instance) {
     for (uint64_t points = at.capture->vars[uint(RenderVarSource::PointCloud)]; points != 0;
          points = Ptr<PointCloud>(points)->next) {
         PointCloud* cloud = Ptr<PointCloud>(points);
@@ -14,8 +15,9 @@ void WritePoint(CapturePixel at, bool returned, SensorFrame frame, float3 positi
         if (returned) {
             const float3 point =
                 cloud->world != 0 ? position + frame.origin : frame.ToLocal(position);
-            Ptr<PointRecord>(cloud->records)[at.index] = { point.x, point.y, point.z, distance,
-                                                           intensity, radialVelocity, prim };
+            Ptr<PointRecord>(cloud->records)[at.index] = {
+                point.x, point.y, point.z, distance, intensity, radialVelocity, prim, 0, instance
+            };
         }
     }
 }
@@ -55,6 +57,9 @@ void ScatterPoints(ScatterParams p) {
     }
     if (cloud->radialVelocity != 0) {
         Ptr<float>(cloud->radialVelocity)[at] = record.radialVelocity;
+    }
+    if (cloud->instanceId != 0) {
+        Ptr<int64_t>(cloud->instanceId)[at] = record.instanceId;
     }
     if (cloud->stableId != 0) {
         const StableId id = p.tables->semantics.stableIds[record.prim];

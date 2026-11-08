@@ -11,7 +11,7 @@ class RenderVar : Typed (
         tracked
         group = "Render Var"
         displayName = "Channels"
-        doc = "The fields a PointCloud holds, each a tensor of its own. Coordinates are xyz in frameOfReference, Distance the range along the beam, Intensity the return's intensity, StableId the hit prim's stable id, RadialVelocity a radar return's speed away from it, and Emitter, Firing and Echo where the return sits in the sensor's grid, which for a radar are its row, its column and 0. Empty holds Coordinates and Intensity. Every point cloud also has Counts, the points each sensor returned."
+        doc = "The fields a PointCloud holds, each a tensor of its own. Coordinates are xyz in frameOfReference, Distance the range along the beam, Intensity the return's intensity, StableId the hit prim's stable id, InstanceId the hit's instance id as the InstanceId output reports it, RadialVelocity a radar return's speed away from it, and Emitter, Firing and Echo where the return sits in the sensor's grid, which for a radar are its row, its column and 0. Empty holds Coordinates and Intensity. Every point cloud also has Counts, the points each sensor returned."
     )
     token frameOfReference = sensor (
         tracked

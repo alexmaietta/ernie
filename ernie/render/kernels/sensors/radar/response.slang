@@ -20,6 +20,7 @@ struct RadarResponse : IResponse<RadarPattern> {
     float radialVelocity;
     float3 normal;
     uint prim;
+    int64_t instance;
 
     static RadarResponse Load(SensorContext context, RadarPattern pattern) {
         RenderParams params = context.params;
@@ -35,6 +36,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         response.radialVelocity = 0;
         response.normal = float3(0);
         response.prim = kNoPrim;
+        response.instance = -1;
         return response;
     }
 
@@ -62,11 +64,13 @@ struct RadarResponse : IResponse<RadarPattern> {
         radialVelocity = dot(velocity - sensorVelocity, ray.ray.direction);
         normal = point.shadingNormal;
         prim = point.prim;
+        instance = HitInstanceId(tables, point);
     }
 
     void Write(SensorContext context, RadarPattern pattern, CapturePixel pixel) {
         RenderParams params = context.params;
-        WritePoint(pixel, hit, pattern.frame, position, distance, intensity, radialVelocity, prim);
+        WritePoint(pixel, hit, pattern.frame, position, distance, intensity, radialVelocity, prim,
+                   instance);
         if (!hit) {
             Write(pixel, RenderVarSource::DistanceToCamera, pixel.capture->plan.missDistance);
             Write(pixel, RenderVarSource::Intensity, 0.0f);
