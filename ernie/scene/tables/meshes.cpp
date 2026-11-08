@@ -24,12 +24,6 @@ constexpr ColumnRef kInputs[] = {kPointBasedPoints, kMeshFaceVertexIndices, kMes
 
 constexpr TableId kTableOutputs[] = {TableId::Meshes, TableId::MeshPoints};
 
-void AddWorld(std::vector<uint32_t>& worlds, uint32_t world) {
-    if (std::ranges::find(worlds, world) == worlds.end()) {
-        worlds.push_back(world);
-    }
-}
-
 }
 
 std::span<const ColumnRef> MeshTable::Inputs() const {
@@ -320,7 +314,7 @@ void MeshTable::Link(const Mesh& mesh) {
         record.bounds = shape.bounds;
     }
     if (m_records.Set(mesh.meshRow, record) && m_structure.GetPrims().Alive(mesh.prim)) {
-        AddWorld(m_relinked, m_structure.GetPrims().Record(mesh.prim).world);
+        m_relinked.push_back(m_structure.GetPrims().Record(mesh.prim).world);
     }
 }
 
@@ -469,7 +463,7 @@ void MeshTable::Update(std::vector<uint32_t>& updated) {
     const Prims& prims = m_structure.GetPrims();
     for (const auto& [prim, mesh] : m_meshes) {
         if (mesh.shape && mesh.shape->updated == Runs() && prims.Alive(prim)) {
-            AddWorld(updated, prims.Record(prim).world);
+            updated.push_back(prims.Record(prim).world);
         }
     }
 

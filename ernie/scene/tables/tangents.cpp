@@ -324,10 +324,7 @@ void TangentTable::Link(uint32_t prim, const Mesh& mesh) {
     }
     const Prims& prims = m_structure.GetPrims();
     if (m_records.Set(mesh.meshRow, record) && prims.Alive(prim)) {
-        const uint32_t world = prims.Record(prim).world;
-        if (std::ranges::find(m_relinked, world) == m_relinked.end()) {
-            m_relinked.push_back(world);
-        }
+        m_relinked.push_back(prims.Record(prim).world);
     }
 }
 

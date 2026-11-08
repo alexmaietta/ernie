@@ -63,7 +63,9 @@ bool ChangeSet::Global() const {
 void TableVersions::Record(TableId table, std::span<const uint32_t> worlds) {
     ++m_sequence;
     m_versions[uint32_t(table)] = m_sequence;
-    m_entries.push_back({m_sequence, table, {worlds.begin(), worlds.end()}});
+    Entry& entry = m_entries.emplace_back(Entry{m_sequence, table, {worlds.begin(), worlds.end()}});
+    std::ranges::sort(entry.worlds);
+    entry.worlds.erase(std::ranges::unique(entry.worlds).begin(), entry.worlds.end());
 }
 
 void TableVersions::Collect(TableId table, uint64_t since, std::vector<uint32_t>& worlds) const {
