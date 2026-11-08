@@ -20,8 +20,8 @@
 #include "ernie/device/queue.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/columns/array_heap.h"
+#include "ernie/scene/columns/column_table.h"
 #include "ernie/scene/columns/heap.h"
-#include "ernie/scene/columns/table.h"
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/changes.h"
@@ -65,22 +65,22 @@ class ColumnStore {
         return m_heap;
     }
 
-    Table& Schema(SchemaId schema);
-    const Table& Schema(SchemaId schema) const;
+    ColumnTable& Schema(SchemaId schema);
+    const ColumnTable& Schema(SchemaId schema) const;
 
     void Pin(SchemaId schema);
     void Unpin(SchemaId schema);
     bool Pinned(SchemaId schema) const;
 
-    Table& Prims() {
+    ColumnTable& Prims() {
         return m_prims;
     }
 
-    Table& Slots() {
+    ColumnTable& Slots() {
         return m_slots;
     }
 
-    Table& Worlds() {
+    ColumnTable& Worlds() {
         return m_worlds;
     }
 
@@ -184,7 +184,7 @@ class ColumnStore {
 
   private:
     struct Entry {
-        std::unique_ptr<Table> table;
+        std::unique_ptr<ColumnTable> table;
         std::vector<uint32_t> stamps;
         std::vector<uint64_t> writes;
         uint32_t pins = 0;
@@ -212,7 +212,7 @@ class ColumnStore {
 
     const Entry& Lookup(SchemaId schema) const;
     void Place(std::byte* data, uint32_t offset, uint64_t address) const;
-    void FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,
+    void FillWords(ColumnTable& table, uint32_t column, uint32_t first, uint32_t count,
                    std::span<const std::byte> cell);
     void StampRows(ColumnRef column, uint32_t first, uint32_t count);
     void StageLive(ColumnRef column, uint32_t first, std::span<const std::byte> cells);
@@ -224,9 +224,9 @@ class ColumnStore {
     device::Device& m_device;
     Heap m_heap;
     std::vector<Entry> m_entries;
-    Table m_prims;
-    Table m_slots;
-    Table m_worlds;
+    ColumnTable m_prims;
+    ColumnTable m_slots;
+    ColumnTable m_worlds;
     std::map<uint32_t, std::unique_ptr<ArrayHeap>> m_arrayHeaps;
     std::vector<std::byte> m_payload;
     std::unordered_map<uint64_t, ArrayRef> m_arrays;

@@ -1,51 +1,45 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/schema/types.h"
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <vector>
+
+#include "ernie/device/program.h"
+#include "ernie/device/ref.h"
+#include "ernie/scene/records/sensors.h"
+#include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/storage.h"
+#include "ernie/scene/tables/table.h"
 
 namespace ernie {
 
-static const uint kMostLidarReturns = 4;
+class SensorTable : public Table {
+  public:
+    explicit SensorTable(Structure& structure) : m_structure(structure) {}
 
-struct CameraRecord {
-    Float2 aperture;
-    Float2 offset;
-    float focalLength;
-    uint projection;
-    float apertureRadius;
-    float focusDistance;
-    Float2 clipping;
-    Float2 shutter;
-    ArrayRef clippingPlanes;
-    float exposure;
-    uint padding0;
-    uint padding1;
-    uint padding2;
+    std::string_view Name() const override {
+        return "sensors";
+    }
+
+    std::span<const ColumnRef> Inputs() const override;
+    void Prepare() override;
+    void Run(const ChangeSet& changes, TableVersions& versions) override;
+    void Describe(RenderTables& tables) const override;
+
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override {
+        HoldBuffers(held, {m_cameras.Buffer(), m_lidars.Buffer(), m_radars.Buffer()});
+    }
+
+  private:
+    device::Program& Kernels();
+
+    Structure& m_structure;
+    Ref<device::Program> m_program;
+    DeviceTable<CameraRecord> m_cameras{"camera records"};
+    DeviceTable<LidarRecord> m_lidars{"lidar records"};
+    DeviceTable<RadarRecord> m_radars{"radar records"};
 };
-
-ERNIE_CHECK_SIZE(CameraRecord, 80);
-
-struct LidarRecord {
-    ArrayRef elevations;
-    ArrayRef azimuths;
-    Float2 sweep;
-    Float2 range;
-    Float2 divergence;
-    uint rotary;
-    uint samples;
-    uint latticeStep;
-    uint returnMode;
-    uint padding0;
-    uint padding1;
-};
-
-ERNIE_CHECK_SIZE(LidarRecord, 80);
-
-struct RadarRecord {
-    Float2 fieldOfView;
-    Float2 range;
-};
-
-ERNIE_CHECK_SIZE(RadarRecord, 16);
 
 }

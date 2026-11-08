@@ -62,8 +62,8 @@ ColumnStore::ColumnStore(device::Device& device)
         const SchemaId schema = SchemaId(id);
         Entry entry;
         std::vector<TableColumn> columns = SchemaColumns(schema, entry.stamps);
-        entry.table =
-            std::make_unique<Table>(m_heap, fmt::format("{} data", Info(schema).name), columns);
+        entry.table = std::make_unique<ColumnTable>(
+            m_heap, fmt::format("{} data", Info(schema).name), columns);
         entry.writes.assign(Info(schema).columnCount, 0);
         m_entries.push_back(std::move(entry));
     }
@@ -77,11 +77,11 @@ const ColumnStore::Entry& ColumnStore::Lookup(SchemaId schema) const {
     return m_entries[uint32_t(schema)];
 }
 
-Table& ColumnStore::Schema(SchemaId schema) {
+ColumnTable& ColumnStore::Schema(SchemaId schema) {
     return *Lookup(schema).table;
 }
 
-const Table& ColumnStore::Schema(SchemaId schema) const {
+const ColumnTable& ColumnStore::Schema(SchemaId schema) const {
     return *Lookup(schema).table;
 }
 
@@ -208,7 +208,7 @@ uint64_t ColumnStore::LastWrite(ColumnRef column) const {
 
 StampTarget ColumnStore::Stamps(ColumnRef column) {
     const uint32_t stamps = StampColumn(column);
-    const Table& table = Schema(column.schema);
+    const ColumnTable& table = Schema(column.schema);
     StampTarget target{};
     target.stamps.address = stamps == kNoStamp ? 0 : table.Pages(stamps);
     target.tablePrims.address = table.Pages(PrimsColumn(column.schema));
@@ -264,7 +264,7 @@ device::Download ColumnStore::ReadRowsAsync(const Ref<device::Buffer>& source, u
     return m_device.GetQueue().ReadAsync(out->Slice(0, bytes));
 }
 
-void ColumnStore::FillWords(Table& table, uint32_t column, uint32_t first, uint32_t count,
+void ColumnStore::FillWords(ColumnTable& table, uint32_t column, uint32_t first, uint32_t count,
                             std::span<const std::byte> cell) {
     if (cell.size() != table.CellBytes(column)) {
         throw Error("{} bytes for a cell of {} bytes in {}", cell.size(), table.CellBytes(column),
@@ -299,7 +299,7 @@ void ColumnStore::StampRows(ColumnRef column, uint32_t first, uint32_t count) {
 }
 
 void ColumnStore::StageLive(ColumnRef column, uint32_t first, std::span<const std::byte> cells) {
-    Table& table = Schema(column.schema);
+    ColumnTable& table = Schema(column.schema);
     table.Stage(column.index, first, cells);
     Touch(column);
     StampRows(column, first, uint32_t(cells.size() / table.CellBytes(column.index)));
@@ -410,7 +410,7 @@ void ColumnStore::Reassert(ColumnRef column, std::span<const uint32_t> rows) {
     if (m_overrides.empty()) {
         return;
     }
-    Table& table = Schema(column.schema);
+    ColumnTable& table = Schema(column.schema);
     for (const uint32_t row : rows) {
         if (const auto found = m_overrides.find(ArrayKey(column, row));
             found != m_overrides.end()) {
@@ -440,7 +440,7 @@ void ColumnStore::CloneRows(SchemaId table, std::span<const uint32_t> sources, u
         return;
     }
     Flush();
-    Table& rows = Schema(table);
+    ColumnTable& rows = Schema(table);
     const Ref<device::Buffer> sourceRows = m_device.CreateBuffer({.label = "cloned rows"}, sources);
     const uint32_t count = uint32_t(sources.size());
     const Span<const ColumnInfo> columns = Columns(table);
@@ -553,7 +553,7 @@ void ColumnStore::Flush() {
     LandAuthored(false);
 
     struct Scattered {
-        Table* table;
+        ColumnTable* table;
         uint32_t column;
         uint32_t count;
         uint32_t words;
@@ -564,7 +564,7 @@ void ColumnStore::Flush() {
     std::vector<Scattered> scattered;
     std::vector<std::byte>& payload = m_payload;
     payload.clear();
-    const auto flush = [&](Table& table) {
+    const auto flush = [&](ColumnTable& table) {
         table.Flush(
             [&](uint32_t column, std::span<const uint32_t> rows, std::span<const std::byte> cells) {
                 const uint64_t at = payload.size();

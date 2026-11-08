@@ -9,12 +9,12 @@
 
 #include "ernie/device/device.h"
 #include "ernie/io/image.h"
-#include "ernie/scene/builders/textures.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/textures.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -35,7 +35,7 @@ struct Scene {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    TextureBuilder& textures;
+    TextureTable& textures;
     Ordinal ordinal = 0;
 
     void Publish() {
@@ -66,7 +66,7 @@ struct Scene {
     }
 };
 
-class TextureProbe : public TableBuilder {
+class TextureProbe : public Table {
   public:
     std::string_view Name() const override {
         return "texture probe";
@@ -85,7 +85,7 @@ class TextureProbe : public TableBuilder {
         return false;
     }
 
-    void Run(const ChangeSet& changes, TableWrites&) override {
+    void Run(const ChangeSet& changes, TableVersions&) override {
         wrote = changes.Wrote(TableId::Textures);
         worlds = changes.worlds;
     }
@@ -99,7 +99,7 @@ template <class Test> void ForEachScene(Test test) {
         ColumnStore store(device);
         Structure structure(store);
         Publisher publisher(structure);
-        TextureBuilder textures(structure);
+        TextureTable textures(structure);
         publisher.Add(textures);
         Scene scene{store, structure, publisher, textures};
         test(scene);
@@ -196,7 +196,7 @@ TEST(TexturesTest, DomeRecordsCarryTheirImageSizeAndRebindsAreLoggedPerWorld) {
         ColumnStore store(device);
         Structure structure(store);
         Publisher publisher(structure);
-        TextureBuilder textures(structure);
+        TextureTable textures(structure);
         TextureProbe probe;
         publisher.Add(textures);
         publisher.Add(probe);

@@ -14,8 +14,8 @@
 namespace ernie {
 
 void Publisher::Finish() {
-    for (const Scheduled& scheduled : m_systems) {
-        scheduled.system->Finish();
+    for (const Scheduled& scheduled : m_scheduled) {
+        scheduled.table->Finish();
     }
 }
 
@@ -23,26 +23,26 @@ bool Publisher::Pending() const {
     return m_structure.GetColumnStore().WriteSequence() != m_writes ||
            m_structure.Epoch() != m_epoch ||
            std::ranges::any_of(
-               m_systems, [](const Scheduled& scheduled) { return scheduled.system->Pending(); });
+               m_scheduled, [](const Scheduled& scheduled) { return scheduled.table->Pending(); });
 }
 
-void Publisher::Add(TableBuilder& system) {
-    for (const TableId output : system.TableOutputs()) {
-        for (const TableId input : system.TableInputs()) {
+void Publisher::Add(Table& table) {
+    for (const TableId output : table.TableOutputs()) {
+        for (const TableId input : table.TableInputs()) {
             if (input == output) {
-                throw Error("TableBuilder {} reads its own table output", system.Name());
+                throw Error("Table {} reads its own output", table.Name());
             }
         }
-        for (const Scheduled& earlier : m_systems) {
-            for (const TableId input : earlier.system->TableInputs()) {
+        for (const Scheduled& earlier : m_scheduled) {
+            for (const TableId input : earlier.table->TableInputs()) {
                 if (input == output) {
-                    throw Error("TableBuilder {} writes a table {} reads, so add {} first",
-                                system.Name(), earlier.system->Name(), system.Name());
+                    throw Error("Table {} writes a table {} reads, so add {} first", table.Name(),
+                                earlier.table->Name(), table.Name());
                 }
             }
         }
     }
-    m_systems.push_back({&system});
+    m_scheduled.push_back({&table});
 }
 
 Ordinal Publisher::SealedStamp(Ordinal ordinal) const {
@@ -98,7 +98,7 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
         if (!store.Tracked(column)) {
             continue;
         }
-        const Table& table = store.Schema(column.schema);
+        const ColumnTable& table = store.Schema(column.schema);
         const uint32_t rows = table.Rows();
         const uint64_t bytes =
             (uint64_t(kChangedRowsOffset) + std::max(rows, 1u)) * sizeof(uint32_t);
@@ -127,36 +127,36 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
     return changes;
 }
 
-void Publisher::RunBuilders(Ordinal stamp, Ordinal ordinal) {
+void Publisher::RunTables(Ordinal stamp, Ordinal ordinal) {
     ColumnStore& store = m_structure.GetColumnStore();
-    for (Scheduled& scheduled : m_systems) {
-        TableBuilder& system = *scheduled.system;
-        const bool written = std::ranges::any_of(system.Inputs(), [&](ColumnRef input) {
+    for (Scheduled& scheduled : m_scheduled) {
+        Table& table = *scheduled.table;
+        const bool written = std::ranges::any_of(table.Inputs(), [&](ColumnRef input) {
             return store.LastWrite(input) > scheduled.writes;
         });
-        const bool restructured = system.Structural() && m_structure.Epoch() != scheduled.epoch;
-        const bool tabled = std::ranges::any_of(system.TableInputs(), [&](TableId table) {
-            return m_tableWrites.Version(table) > scheduled.logged;
+        const bool restructured = table.Structural() && m_structure.Epoch() != scheduled.epoch;
+        const bool tabled = std::ranges::any_of(table.TableInputs(), [&](TableId id) {
+            return m_versions.Version(id) > scheduled.logged;
         });
-        if (scheduled.ran && !written && !restructured && !tabled && !system.Pending()) {
+        if (scheduled.ran && !written && !restructured && !tabled && !table.Pending()) {
             continue;
         }
-        ERNIE_ZONE("Publisher/TableBuilder");
+        ERNIE_ZONE("Publisher/Table");
         ChangeSet changes = Build(scheduled.ran ? scheduled.stamp : 0, stamp, ordinal,
-                                  system.Inputs(), &scheduled.changed);
-        for (const TableId table : system.TableInputs()) {
-            if (m_tableWrites.Version(table) > scheduled.logged) {
-                changes.wrote.push_back(table);
-                m_tableWrites.Collect(table, scheduled.logged, changes.worlds);
+                                  table.Inputs(), &scheduled.changed);
+        for (const TableId id : table.TableInputs()) {
+            if (m_versions.Version(id) > scheduled.logged) {
+                changes.wrote.push_back(id);
+                m_versions.Collect(id, scheduled.logged, changes.worlds);
             }
         }
         const uint64_t writes = store.WriteSequence();
         const uint64_t epoch = m_structure.Epoch();
-        const uint64_t logged = m_tableWrites.Sequence();
+        const uint64_t logged = m_versions.Sequence();
         changes.tables = &m_tables;
-        ++system.m_runs;
-        system.Run(changes, m_tableWrites);
-        system.Describe(m_tables);
+        ++table.m_runs;
+        table.Run(changes, m_versions);
+        table.Describe(m_tables);
         scheduled.writes = writes;
         scheduled.epoch = epoch;
         scheduled.logged = logged;
@@ -164,17 +164,17 @@ void Publisher::RunBuilders(Ordinal stamp, Ordinal ordinal) {
         scheduled.ran = true;
     }
     Ordinal seen = stamp;
-    for (const Scheduled& scheduled : m_systems) {
+    for (const Scheduled& scheduled : m_scheduled) {
         seen = std::min(seen, scheduled.stamp);
     }
     store.TrimArrayWrites(seen);
-    uint64_t logged = m_tableWrites.Sequence();
-    for (const Scheduled& scheduled : m_systems) {
-        if (!scheduled.system->TableInputs().empty()) {
+    uint64_t logged = m_versions.Sequence();
+    for (const Scheduled& scheduled : m_scheduled) {
+        if (!scheduled.table->TableInputs().empty()) {
             logged = std::min(logged, scheduled.logged);
         }
     }
-    m_tableWrites.Trim(logged);
+    m_versions.Trim(logged);
 }
 
 device::Operation Publisher::Publish(Ordinal ordinal, Stream producer) {
@@ -192,7 +192,7 @@ device::Operation Publisher::Publish(Ordinal ordinal, Stream producer) {
         queue.BeginBatch();
         try {
             store.Flush();
-            RunBuilders(stamp, ordinal);
+            RunTables(stamp, ordinal);
             Seal();
             store.DeviceData();
         } catch (...) {
@@ -239,8 +239,8 @@ void Publisher::Seal() {
     }
     pinned->tables = tables;
     pinned->held.emplace_back(pinned->header);
-    for (const Scheduled& scheduled : m_systems) {
-        scheduled.system->Hold(pinned->held);
+    for (const Scheduled& scheduled : m_scheduled) {
+        scheduled.table->Hold(pinned->held);
     }
     m_pinned = std::move(pinned);
 }

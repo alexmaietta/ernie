@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/builders/tangents.h"
+#include "ernie/scene/tables/tangents.h"
 
 #include <cmath>
 #include <cstdint>
@@ -79,7 +79,7 @@ struct Scene {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    TangentBuilder& tangents;
+    TangentTable& tangents;
     Ordinal ordinal = 0;
 
     void Publish() {
@@ -125,8 +125,8 @@ template <class Test> void ForEachScene(Test test) {
         Structure structure(store);
         Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        MeshBuilder geometry(structure, *builder);
-        TangentBuilder tangents(structure, geometry);
+        MeshTable geometry(structure, *builder);
+        TangentTable tangents(structure, geometry);
         publisher.Add(geometry);
         publisher.Add(tangents);
         Scene scene{store, structure, publisher, tangents};

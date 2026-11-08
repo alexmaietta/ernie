@@ -11,14 +11,14 @@
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/instances.h"
-#include "ernie/scene/builders/meshes.h"
-#include "ernie/scene/builders/surfaces.h"
-#include "ernie/scene/builders/transforms.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/instances.h"
+#include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/surfaces.h"
+#include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -186,10 +186,10 @@ TEST(UpdatesTest, EachChangeDoesExactlyTheWorkItNeeds) {
             Structure structure(store);
             Publisher publisher(structure);
             const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-            TransformBuilder hierarchy(structure);
-            MeshBuilder geometry(structure, *builder);
-            InstanceBuilder instances(structure, *builder);
-            SurfaceBuilder surfaces(structure, instances);
+            TransformTable hierarchy(structure);
+            MeshTable geometry(structure, *builder);
+            InstanceTable instances(structure, *builder);
+            SurfaceTable surfaces(structure, instances);
             publisher.Add(hierarchy);
             publisher.Add(geometry);
             publisher.Add(instances);

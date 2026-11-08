@@ -8,12 +8,12 @@
 
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/semantics.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/packing.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/semantics.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -26,7 +26,7 @@ struct Scene {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    SemanticBuilder& semantics;
+    SemanticTable& semantics;
     Token taxonomy;
     Ordinal ordinal = 0;
 
@@ -62,7 +62,7 @@ template <class Test> void ForEachScene(Test test) {
         ColumnStore store(device);
         Structure structure(store);
         Publisher publisher(structure);
-        SemanticBuilder semantics(structure);
+        SemanticTable semantics(structure);
         publisher.Add(semantics);
         const Token taxonomy = structure.GetTokens().Intern("class");
         semantics.Require(std::vector<Token>{taxonomy});

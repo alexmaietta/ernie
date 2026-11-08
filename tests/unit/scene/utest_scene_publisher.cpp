@@ -10,11 +10,11 @@
 
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/builder.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -39,7 +39,7 @@ std::vector<uint32_t> Rows(Structure& structure, std::span<const uint32_t> prims
     return rows;
 }
 
-class Counter : public TableBuilder {
+class Counter : public Table {
   public:
     explicit Counter(std::vector<ColumnRef> inputs, bool structural = true)
         : m_inputs(std::move(inputs)), m_structural(structural) {}
@@ -56,7 +56,7 @@ class Counter : public TableBuilder {
         return m_structural;
     }
 
-    void Run(const ChangeSet& changes, TableWrites&) override {
+    void Run(const ChangeSet& changes, TableVersions&) override {
         ++runs;
         last = changes;
     }

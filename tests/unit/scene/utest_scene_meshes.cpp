@@ -12,11 +12,11 @@
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/meshes.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/meshes.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -31,7 +31,7 @@ struct Scene {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    MeshBuilder& geometry;
+    MeshTable& geometry;
     Ordinal ordinal = 0;
 
     uint32_t Quad(const std::string& path) {
@@ -79,7 +79,7 @@ template <class Test> void ForEachScene(Test test) {
         Structure structure(store);
         Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        MeshBuilder geometry(structure, *builder);
+        MeshTable geometry(structure, *builder);
         publisher.Add(geometry);
         Scene scene{device, store, structure, publisher, geometry};
         test(scene);

@@ -99,7 +99,7 @@ ColumnStore& UntypedAttribute::GetColumnStore() const {
     return m_view->GetColumnStore();
 }
 
-Table& UntypedAttribute::GetTable() const {
+ColumnTable& UntypedAttribute::GetTable() const {
     return GetColumnStore().Schema(m_column.schema);
 }
 
@@ -562,7 +562,7 @@ device::Operation UntypedAttribute::AttachTensor(const DLTensor* tensor, Stream 
         Ref<device::Buffer> borrowed =
             device.Borrow(source.device, uint64_t(TensorBytes(source)), bytes,
                           fmt::format("attached {}", column.field));
-        Table& table = GetTable();
+        ColumnTable& table = GetTable();
         table.Flush();
         queue.Follow(producer);
         if (from == AttachFrom::Scene) {
@@ -610,7 +610,7 @@ device::Operation UntypedAttribute::Detach(Stream consumer) {
     if (attachment.inPlace && IsArray(m_column.column->type)) {
         ReleaseArrays();
     } else if (attachment.inPlace) {
-        Table& table = GetTable();
+        ColumnTable& table = GetTable();
         const uint32_t first = rows.blocks.front().firstRow;
         const Ref<device::Buffer> borrowed = table.Restore(m_column.index, first);
         const device::BufferRange owned = *table.Contiguous(m_column.index, first, Size());

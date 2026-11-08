@@ -1,103 +1,44 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include "ernie/scene/kernels/schema/types.h"
+#include <span>
+#include <string_view>
+#include <vector>
+
+#include "ernie/device/program.h"
+#include "ernie/device/ref.h"
+#include "ernie/scene/records/materials.h"
+#include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/storage.h"
+#include "ernie/scene/tables/table.h"
 
 namespace ernie {
 
-struct MappingRecord {
-    uint projection;
-    uint projectionSpace;
-    uint uvPrimvar;
-    float tileSize;
-    float triplanarBlend;
-    Float2 uvScale;
-    Float2 uvOffset;
-    float uvRotation;
-    uint hexTiling;
-    float hexTilingContrast;
-    float hexTilingRotation;
-    uint padding0;
-    uint padding1;
-    uint padding2;
+class MaterialTable : public Table {
+  public:
+    explicit MaterialTable(Structure& structure) : m_structure(structure) {}
+
+    std::string_view Name() const override {
+        return "materials";
+    }
+
+    std::span<const ColumnRef> Inputs() const override;
+    void Prepare() override;
+    void Run(const ChangeSet& changes, TableVersions& versions) override;
+    void Describe(RenderTables& tables) const override;
+
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override {
+        HoldBuffers(held, {m_previews.Buffer(), m_nonVisuals.Buffer(), m_checkers.Buffer()});
+    }
+
+  private:
+    device::Program& Kernels();
+
+    Structure& m_structure;
+    Ref<device::Program> m_program;
+    DeviceTable<PreviewRecord> m_previews{"preview surface records"};
+    DeviceTable<NonVisualRecord> m_nonVisuals{"nonvisual material records"};
+    DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
 };
-
-ERNIE_CHECK_SIZE(MappingRecord, 64);
-
-struct DetailRecord {
-    Float3 normal;
-    float normalTextureInfluence;
-    float normalStrength;
-    uint normalConvention;
-    uint enableDetail;
-    Float3 detailNormal;
-    float detailNormalTextureInfluence;
-    float detailNormalStrength;
-    Float3 detailAlbedo;
-    uint detailAlbedoTextureChannel;
-    float detailAlbedoTextureInfluence;
-    float detailAlbedoStrength;
-    Float2 detailScale;
-    Float2 detailOffset;
-    float detailRotation;
-    uint detailHexTiling;
-};
-
-ERNIE_CHECK_SIZE(DetailRecord, 96);
-
-struct PreviewRecord {
-    Float3 diffuseColor;
-    uint diffuseColorTextureChannel;
-    float diffuseColorTextureInfluence;
-    Float3 emissiveColor;
-    uint emissiveColorTextureChannel;
-    float emissiveColorTextureInfluence;
-    uint useSpecularWorkflow;
-    Float3 specularColor;
-    uint specularColorTextureChannel;
-    float specularColorTextureInfluence;
-    float metallic;
-    uint metallicTextureChannel;
-    float metallicTextureInfluence;
-    float roughness;
-    uint roughnessTextureChannel;
-    float roughnessTextureInfluence;
-    float ior;
-    float clearcoat;
-    uint clearcoatTextureChannel;
-    float clearcoatTextureInfluence;
-    float clearcoatRoughness;
-    uint clearcoatRoughnessTextureChannel;
-    float clearcoatRoughnessTextureInfluence;
-    float opacity;
-    uint opacityTextureChannel;
-    float opacityTextureInfluence;
-    MappingRecord mapping;
-    DetailRecord detail;
-};
-
-ERNIE_CHECK_SIZE(PreviewRecord, 288);
-
-struct NonVisualRecord {
-    float lidarReflectance;
-    float radarBackscatter;
-    uint retroreflective;
-    uint padding0;
-};
-
-ERNIE_CHECK_SIZE(NonVisualRecord, 16);
-
-struct CheckerRecord {
-    Float3 colorA;
-    uint enabled;
-    Float3 colorB;
-    float size;
-    uint axis;
-    uint padding0;
-    uint padding1;
-    uint padding2;
-};
-
-ERNIE_CHECK_SIZE(CheckerRecord, 48);
 
 }

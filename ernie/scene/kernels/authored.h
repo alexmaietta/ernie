@@ -3,7 +3,7 @@
 
 #include "ernie/scene/kernels/ids.h"
 #include "ernie/scene/kernels/schema/schema.h"
-#include "ernie/scene/tables/transforms.h"
+#include "ernie/scene/records/transforms.h"
 
 namespace ernie {
 

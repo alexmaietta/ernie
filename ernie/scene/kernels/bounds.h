@@ -4,9 +4,9 @@
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/tables/bounds.h"
-#include "ernie/scene/tables/meshes.h"
-#include "ernie/scene/tables/transforms.h"
+#include "ernie/scene/records/bounds.h"
+#include "ernie/scene/records/meshes.h"
+#include "ernie/scene/records/transforms.h"
 
 namespace ernie {
 

@@ -1,28 +1,28 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_scene
-    builders/bounds.cpp
-    builders/instance_layout.cpp
-    builders/instances.cpp
-    builders/lights.cpp
-    builders/materials.cpp
-    builders/meshes.cpp
-    builders/products.cpp
-    builders/regions.cpp
-    builders/semantics.cpp
-    builders/sensors.cpp
-    builders/surfaces.cpp
-    builders/tangents.cpp
-    builders/textures.cpp
-    builders/transforms.cpp
+    tables/bounds.cpp
+    tables/instance_layout.cpp
+    tables/instances.cpp
+    tables/lights.cpp
+    tables/materials.cpp
+    tables/meshes.cpp
+    tables/products.cpp
+    tables/regions.cpp
+    tables/semantics.cpp
+    tables/sensors.cpp
+    tables/surfaces.cpp
+    tables/tangents.cpp
+    tables/textures.cpp
+    tables/transforms.cpp
     columns/array_heap.cpp
     columns/column_store.cpp
     columns/heap.cpp
-    columns/table.cpp
+    columns/column_table.cpp
     prim.cpp
     publish/change_set.cpp
     publish/publisher.cpp
-    publish/table_writes.cpp
+    publish/table_versions.cpp
     rotation.cpp
     scene.cpp
     structure/packing.cpp
@@ -58,7 +58,7 @@ ernie_embed(
     ROOTS
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/scene/kernels/|*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/tables|ernie/scene/tables/|*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/records|ernie/scene/records/|*.h"
         "${ERNIE_GENERATED_INCLUDE_DIR}/ernie/scene/kernels|ernie/scene/kernels/|*.h"
 )
 
@@ -84,7 +84,7 @@ ernie_public_files(
     rotation.h
     scene.h
     structure/tokens.h
-    tables/transforms.h
+    records/transforms.h
     types.h
     views/attribute.h
     views/layout.h

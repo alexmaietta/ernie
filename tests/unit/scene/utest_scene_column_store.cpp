@@ -13,8 +13,8 @@
 #include "ernie/device/queue.h"
 #include "ernie/scene/columns/array_heap.h"
 #include "ernie/scene/columns/column_store.h"
+#include "ernie/scene/columns/column_table.h"
 #include "ernie/scene/columns/heap.h"
-#include "ernie/scene/columns/table.h"
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/kernels/attributes.h"
 #include "ernie/scene/kernels/schema/columns.h"
@@ -98,7 +98,7 @@ TEST(HeapTest, ZeroBytesAllocateNothing) {
 TEST(TableTest, FreshRowsHoldTheirColumnsFill) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}, {4, 0xFFFFFFFF}, {8, 0}});
+        ColumnTable table(heap, "test", {{4, 0}, {4, 0xFFFFFFFF}, {8, 0}});
         table.Allocate(3);
         EXPECT_EQ(Cells<uint32_t>(table.Read(0, 0, 3)), (std::vector<uint32_t>{0, 0, 0}));
         EXPECT_EQ(Cells<uint32_t>(table.Read(1, 0, 3)),
@@ -110,7 +110,7 @@ TEST(TableTest, FreshRowsHoldTheirColumnsFill) {
 TEST(TableTest, StagedWritesLandOnFlushAndTheLastOneWins) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(4);
         table.Stage(0, 0, Bytes(std::vector<uint32_t>{1, 2, 3, 4}));
         table.Stage(0, 2, Bytes(std::vector<uint32_t>{30}));
@@ -124,7 +124,7 @@ TEST(TableTest, StagedWritesLandOnFlushAndTheLastOneWins) {
 TEST(TableTest, GrowthNeverMovesRowsAlreadyThere) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}, {12, 0}});
+        ColumnTable table(heap, "test", {{4, 0}, {12, 0}});
         table.Allocate(10);
         table.Stage(0, 0, Bytes(Sequence(10, 100)));
         table.Flush();
@@ -141,7 +141,7 @@ TEST(TableTest, GrowthNeverMovesRowsAlreadyThere) {
 TEST(TableTest, ABatchIsContiguousEvenWhenItStartsANewSpan) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(200);
         const uint32_t first = table.Allocate(1000);
         ASSERT_TRUE(table.Contiguous(0, first, 1000));
@@ -154,7 +154,7 @@ TEST(TableTest, ABatchIsContiguousEvenWhenItStartsANewSpan) {
 TEST(TableTest, TailRowsLeftBehindByGrowthAreReused) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(250);
         const uint32_t batch = table.Allocate(10);
         EXPECT_GE(batch, kPageRows);
@@ -167,7 +167,7 @@ TEST(TableTest, TailRowsLeftBehindByGrowthAreReused) {
 TEST(TableTest, ReleasedRowsAreAcquiredAgain) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(4);
         table.Release(2);
         EXPECT_EQ(table.Acquire(), 2u);
@@ -178,7 +178,7 @@ TEST(TableTest, ReleasedRowsAreAcquiredAgain) {
 TEST(TableTest, WritesAcrossSpansSplitAtTheBoundary) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(300);
         table.Allocate(300);
         const uint32_t rows = table.Rows();
@@ -191,7 +191,7 @@ TEST(TableTest, WritesAcrossSpansSplitAtTheBoundary) {
 TEST(TableTest, KernelsFindEveryRowThroughThePageTable) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}, {12, 0}});
+        ColumnTable table(heap, "test", {{4, 0}, {12, 0}});
         table.Allocate(100);
         table.Allocate(700);
         table.Allocate(3000);
@@ -222,7 +222,7 @@ TEST(TableTest, KernelsFindEveryRowThroughThePageTable) {
 TEST(TableTest, AlignedBatchesStartAPageAndKeepTheirTail) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(10);
         const uint32_t first = table.Allocate(300, true);
         EXPECT_EQ(first, kPageRows);
@@ -239,7 +239,7 @@ TEST(TableTest, AlignedBatchesStartAPageAndKeepTheirTail) {
 TEST(TableTest, RedirectedRowsAreReadAndWrittenThroughTheirBuffer) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(5);
         const uint32_t first = table.Allocate(300, true);
         table.Stage(0, 0, Bytes(Sequence(table.Rows(), 0)));
@@ -274,7 +274,7 @@ TEST(TableTest, RedirectedRowsAreReadAndWrittenThroughTheirBuffer) {
 TEST(TableTest, PageTablesKeepTheirAddressUntilTheyOutgrowIt) {
     test::ForEachDevice([](device::Device& device) {
         Heap heap(device, "test");
-        Table table(heap, "test", {{4, 0}});
+        ColumnTable table(heap, "test", {{4, 0}});
         table.Allocate(1);
         const uint64_t layout = table.Layout();
         const uint64_t pages = table.Pages(0);
@@ -337,7 +337,7 @@ TEST(ArrayHeapTest, SharedArraysLiveUntilTheirLastReference) {
 TEST(ColumnStoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
     test::ForEachDevice([](device::Device& device) {
         ColumnStore store(device);
-        Table& xformable = store.Schema(SchemaId::Xformable);
+        ColumnTable& xformable = store.Schema(SchemaId::Xformable);
         xformable.Allocate(1);
         const AuthoredData data = store.Data();
         EXPECT_EQ(data.schemas.xformable.translate.pages.address,
@@ -354,10 +354,10 @@ TEST(ColumnStoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
     test::ForEachDevice([](device::Device& device) {
         ColumnStore store(device);
         store.SetCounts(4, 3);
-        Table& prims = store.Prims();
+        ColumnTable& prims = store.Prims();
         prims.Allocate(4);
         prims.Stage(kPrimWorld, 0, Bytes(std::vector<uint32_t>{0, 2, 2, kGlobalWorld}));
-        Table& xformable = store.Schema(SchemaId::Xformable);
+        ColumnTable& xformable = store.Schema(SchemaId::Xformable);
         xformable.Allocate(4);
         xformable.Stage(store.PrimsColumn(SchemaId::Xformable), 0,
                         Bytes(std::vector<uint32_t>{0, 1, 2, 3}));

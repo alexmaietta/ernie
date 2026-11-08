@@ -168,7 +168,7 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
     m_publisher.Add(m_lights);
     m_store.Prepare();
     m_builder->Prepare();
-    for (TableBuilder* system : std::initializer_list<TableBuilder*>{
+    for (Table* system : std::initializer_list<Table*>{
              &m_transforms, &m_meshes, &m_bounds, &m_tangents, &m_textures, &m_semantics,
              &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights}) {
         system->Prepare();

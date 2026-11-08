@@ -12,14 +12,14 @@
 #include "ernie/bvh/kernels/bvh.h"
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
-#include "ernie/scene/builders/instances.h"
-#include "ernie/scene/builders/meshes.h"
-#include "ernie/scene/builders/transforms.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/kernels/shapes.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/instances.h"
+#include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -34,7 +34,7 @@ struct Scene {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    InstanceBuilder& instances;
+    InstanceTable& instances;
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
@@ -76,9 +76,9 @@ template <class Test> void ForEachScene(Test test) {
         Structure structure(store);
         Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        TransformBuilder hierarchy(structure);
-        MeshBuilder geometry(structure, *builder);
-        InstanceBuilder instances(structure, *builder, 2);
+        TransformTable hierarchy(structure);
+        MeshTable geometry(structure, *builder);
+        InstanceTable instances(structure, *builder, 2);
         publisher.Add(hierarchy);
         publisher.Add(geometry);
         publisher.Add(instances);

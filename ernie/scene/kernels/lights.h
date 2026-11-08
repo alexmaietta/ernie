@@ -4,8 +4,8 @@
 #include "ernie/io/kernels/ies.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/kernels/instance_layout.h"
-#include "ernie/scene/tables/instances.h"
-#include "ernie/scene/tables/textures.h"
+#include "ernie/scene/records/instances.h"
+#include "ernie/scene/records/textures.h"
 
 namespace ernie {
 

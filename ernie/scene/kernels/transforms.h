@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ernie/scene/kernels/authored.h"
-#include "ernie/scene/tables/transforms.h"
+#include "ernie/scene/records/transforms.h"
 
 namespace ernie {
 

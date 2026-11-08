@@ -11,22 +11,22 @@
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/builders/bounds.h"
-#include "ernie/scene/builders/instances.h"
-#include "ernie/scene/builders/lights.h"
-#include "ernie/scene/builders/materials.h"
-#include "ernie/scene/builders/meshes.h"
-#include "ernie/scene/builders/products.h"
-#include "ernie/scene/builders/semantics.h"
-#include "ernie/scene/builders/sensors.h"
-#include "ernie/scene/builders/surfaces.h"
-#include "ernie/scene/builders/tangents.h"
-#include "ernie/scene/builders/textures.h"
-#include "ernie/scene/builders/transforms.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/bounds.h"
+#include "ernie/scene/tables/instances.h"
+#include "ernie/scene/tables/lights.h"
+#include "ernie/scene/tables/materials.h"
+#include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/products.h"
+#include "ernie/scene/tables/semantics.h"
+#include "ernie/scene/tables/sensors.h"
+#include "ernie/scene/tables/surfaces.h"
+#include "ernie/scene/tables/tangents.h"
+#include "ernie/scene/tables/textures.h"
+#include "ernie/scene/tables/transforms.h"
 
 namespace ernie {
 
@@ -107,43 +107,43 @@ class SceneImpl {
         return *m_builder;
     }
 
-    TransformBuilder& GetTransforms() {
+    TransformTable& GetTransforms() {
         return m_transforms;
     }
 
-    MeshBuilder& GetMeshes() {
+    MeshTable& GetMeshes() {
         return m_meshes;
     }
 
-    ernie::BoundsBuilder& GetBounds() {
+    ernie::BoundsTable& GetBounds() {
         return m_bounds;
     }
 
-    TangentBuilder& GetTangents() {
+    TangentTable& GetTangents() {
         return m_tangents;
     }
 
-    TextureBuilder& GetTextures() {
+    TextureTable& GetTextures() {
         return m_textures;
     }
 
-    SemanticBuilder& GetSemantics() {
+    SemanticTable& GetSemantics() {
         return m_semantics;
     }
 
-    InstanceBuilder& GetInstances() {
+    InstanceTable& GetInstances() {
         return m_instances;
     }
 
-    LightBuilder& GetLights() {
+    LightTable& GetLights() {
         return m_lights;
     }
 
-    SurfaceBuilder& GetSurfaces() {
+    SurfaceTable& GetSurfaces() {
         return m_surfaces;
     }
 
-    ProductBuilder& GetProducts() {
+    ProductTable& GetProducts() {
         return m_products;
     }
 
@@ -166,18 +166,18 @@ class SceneImpl {
     Structure m_structure;
     Publisher m_publisher;
     std::unique_ptr<bvh::Builder> m_builder;
-    TransformBuilder m_transforms;
-    MeshBuilder m_meshes;
-    ernie::BoundsBuilder m_bounds;
-    TangentBuilder m_tangents;
-    TextureBuilder m_textures;
-    SemanticBuilder m_semantics;
-    SensorBuilder m_sensors;
-    ProductBuilder m_products;
-    MaterialBuilder m_materials;
-    InstanceBuilder m_instances;
-    SurfaceBuilder m_surfaces;
-    LightBuilder m_lights;
+    TransformTable m_transforms;
+    MeshTable m_meshes;
+    ernie::BoundsTable m_bounds;
+    TangentTable m_tangents;
+    TextureTable m_textures;
+    SemanticTable m_semantics;
+    SensorTable m_sensors;
+    ProductTable m_products;
+    MaterialTable m_materials;
+    InstanceTable m_instances;
+    SurfaceTable m_surfaces;
+    LightTable m_lights;
     std::vector<std::function<bool()>> m_commitSteps;
 };
 

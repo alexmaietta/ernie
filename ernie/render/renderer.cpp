@@ -145,7 +145,7 @@ bool Outputs(const SensorKind& kind, RenderVarSource source) {
     }
 }
 
-IdEntries MapEntries(const SemanticBuilder& semantics, RenderVarSource source, Token taxonomy) {
+IdEntries MapEntries(const SemanticTable& semantics, RenderVarSource source, Token taxonomy) {
     switch (source) {
     case RenderVarSource::SemanticSegmentation:
     case RenderVarSource::SemanticIdMap:
@@ -349,7 +349,7 @@ bool RendererImpl::Due(const std::string& path, const Product& product, double d
 }
 
 void RendererImpl::DropStaleProducts() {
-    const ProductBuilder& resolved = SceneImpl::Get(*m_scene).GetProducts();
+    const ProductTable& resolved = SceneImpl::Get(*m_scene).GetProducts();
     std::vector<std::string> stale;
     for (const auto& [path, product] : m_products) {
         const ResolvedProduct* current = resolved.Find(product.prim);
@@ -531,7 +531,7 @@ RendererImpl::ProductVar RendererImpl::PrepareVar(const ResolvedVar& var, const 
 }
 
 void RendererImpl::UpdateMaps() {
-    const SemanticBuilder& semantics = SceneImpl::Get(*m_scene).GetSemantics();
+    const SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
     for (auto& [path, planned] : m_plan->products) {
         Product& product = m_products.at(path);
         if (!product.semantic) {

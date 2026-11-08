@@ -11,17 +11,17 @@
 
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
-#include "ernie/scene/builders/meshes.h"
-#include "ernie/scene/builders/table_storage.h"
-#include "ernie/scene/builders/transforms.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/change_set.h"
 #include "ernie/scene/publish/publisher.h"
-#include "ernie/scene/publish/table_writes.h"
+#include "ernie/scene/publish/table_versions.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/meshes.h"
+#include "ernie/scene/tables/storage.h"
+#include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
 
@@ -29,33 +29,33 @@ namespace ernie {
 namespace {
 
 TEST(TableLogTest, CollectsTheWorldsWrittenSinceASequence) {
-    TableWrites writes;
-    EXPECT_EQ(writes.Version(TableId::Transforms), 0u);
+    TableVersions versions;
+    EXPECT_EQ(versions.Version(TableId::Transforms), 0u);
     const uint32_t first[] = {1, 2};
-    writes.Add(TableId::Transforms, first);
-    const uint64_t seen = writes.Sequence();
+    versions.Record(TableId::Transforms, first);
+    const uint64_t seen = versions.Sequence();
     const uint32_t other[] = {7};
-    writes.Add(TableId::Imageables, other);
+    versions.Record(TableId::Imageables, other);
     const uint32_t second[] = {2, 3};
-    writes.Add(TableId::Transforms, second);
-    EXPECT_EQ(writes.Version(TableId::Transforms), 3u);
-    EXPECT_EQ(writes.Version(TableId::Imageables), 2u);
+    versions.Record(TableId::Transforms, second);
+    EXPECT_EQ(versions.Version(TableId::Transforms), 3u);
+    EXPECT_EQ(versions.Version(TableId::Imageables), 2u);
 
     std::vector<uint32_t> all;
-    writes.Collect(TableId::Transforms, 0, all);
+    versions.Collect(TableId::Transforms, 0, all);
     EXPECT_EQ(all, (std::vector<uint32_t>{1, 2, 3}));
     std::vector<uint32_t> later;
-    writes.Collect(TableId::Transforms, seen, later);
+    versions.Collect(TableId::Transforms, seen, later);
     EXPECT_EQ(later, (std::vector<uint32_t>{2, 3}));
 
-    writes.Trim(seen);
+    versions.Trim(seen);
     std::vector<uint32_t> trimmed;
-    writes.Collect(TableId::Transforms, 0, trimmed);
+    versions.Collect(TableId::Transforms, 0, trimmed);
     EXPECT_EQ(trimmed, (std::vector<uint32_t>{2, 3}));
-    EXPECT_EQ(writes.Version(TableId::Transforms), 3u);
+    EXPECT_EQ(versions.Version(TableId::Transforms), 3u);
 }
 
-class Probe : public TableBuilder {
+class Probe : public Table {
   public:
     std::string_view Name() const override {
         return "probe";
@@ -74,7 +74,7 @@ class Probe : public TableBuilder {
         return false;
     }
 
-    void Run(const ChangeSet& changes, TableWrites&) override {
+    void Run(const ChangeSet& changes, TableVersions&) override {
         if (fail) {
             fail = false;
             throw Error("probe failed");
@@ -104,7 +104,7 @@ struct Fixture {
     ColumnStore store;
     Structure structure;
     Publisher publisher;
-    TransformBuilder hierarchy;
+    TransformTable hierarchy;
     Probe probe;
     Ordinal ordinal = 0;
 
@@ -168,7 +168,7 @@ TEST(TableTrackingTest, ReadersMustBeAddedAfterTheirWriters) {
         ColumnStore store(device);
         Structure structure(store);
         Publisher publisher(structure);
-        TransformBuilder hierarchy(structure);
+        TransformTable hierarchy(structure);
         Probe probe;
         publisher.Add(probe);
         EXPECT_THROW(publisher.Add(hierarchy), Error);
@@ -264,8 +264,8 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
         f.structure.Define(SchemaId::Sphere, pads);
         f.Publish();
         const uint32_t rebuilds = f.hierarchy.Rebuilds();
-        const Table& imageables = f.store.Schema(SchemaId::Imageable);
-        const Table& xformables = f.store.Schema(SchemaId::Xformable);
+        const ColumnTable& imageables = f.store.Schema(SchemaId::Imageable);
+        const ColumnTable& xformables = f.store.Schema(SchemaId::Xformable);
         const uint32_t room = std::min(imageables.Capacity() - imageables.Rows(),
                                        xformables.Capacity() - xformables.Rows());
         ASSERT_GE(room, 70u);
@@ -386,7 +386,7 @@ class MeshProbe : public Probe {
         return kTables;
     }
 
-    void Run(const ChangeSet& changes, TableWrites&) override {
+    void Run(const ChangeSet& changes, TableVersions&) override {
         ++runs;
         relinked = changes.Wrote(TableId::Meshes);
         updated = changes.Wrote(TableId::MeshPoints);
@@ -406,7 +406,7 @@ TEST(TableTrackingTest, DeformingAMeshUpdatesItsDataAndReshapingRelinksIt) {
         Structure structure(store);
         Publisher publisher(structure);
         const std::unique_ptr<bvh::Builder> builder = bvh::Builder::Create(device);
-        MeshBuilder geometry(structure, *builder);
+        MeshTable geometry(structure, *builder);
         MeshProbe probe;
         publisher.Add(geometry);
         publisher.Add(probe);

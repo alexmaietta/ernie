@@ -31,7 +31,7 @@ class Buffer;
 }
 
 class ColumnStore;
-class Table;
+class ColumnTable;
 struct Attachment;
 struct ViewRows;
 
@@ -96,7 +96,7 @@ class ERNIE_API UntypedAttribute {
 
     const ViewRows& Rows() const;
     ColumnStore& GetColumnStore() const;
-    Table& GetTable() const;
+    ColumnTable& GetTable() const;
     void CheckWritable(bool arrays = false) const;
     void CheckNotAttached() const;
     void CheckArrayType(ColumnType type) const;

@@ -8,11 +8,11 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
-#include "ernie/scene/builders/transforms.h"
 #include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/kernels/schema/columns.h"
 #include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/structure/structure.h"
+#include "ernie/scene/tables/transforms.h"
 #include "ernie/scene/views/attribute.h"
 #include "ernie/scene/views/view.h"
 #include "support/devices.h"
@@ -24,7 +24,7 @@ struct World {
     ColumnStore& store;
     Structure& structure;
     Publisher& publisher;
-    TransformBuilder& hierarchy;
+    TransformTable& hierarchy;
     Ordinal ordinal = 0;
 
     uint32_t Define(SchemaId schema, const std::string& path) {
@@ -72,7 +72,7 @@ template <class Test> void ForEachWorld(Test test) {
         ColumnStore store(device);
         Structure structure(store);
         Publisher publisher(structure);
-        TransformBuilder hierarchy(structure);
+        TransformTable hierarchy(structure);
         publisher.Add(hierarchy);
         World world{store, structure, publisher, hierarchy};
         test(world);

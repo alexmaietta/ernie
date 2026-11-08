@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ernie/scene/kernels/authored.h"
-#include "ernie/scene/tables/materials.h"
+#include "ernie/scene/records/materials.h"
 
 namespace ernie {
 

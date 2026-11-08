@@ -8,11 +8,11 @@
 
 #include "ernie/device/operation.h"
 #include "ernie/device/stream.h"
-#include "ernie/scene/builders/builder.h"
 #include "ernie/scene/kernels/schema/schema.h"
 #include "ernie/scene/publish/change_set.h"
+#include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/structure/structure.h"
-#include "ernie/scene/tables/render_tables.h"
+#include "ernie/scene/tables/table.h"
 #include "ernie/scene/types.h"
 
 namespace ernie {
@@ -42,7 +42,7 @@ class Publisher {
         return m_outstanding;
     }
 
-    void Add(TableBuilder& system);
+    void Add(Table& table);
     device::Operation Publish(Ordinal ordinal, Stream producer = Stream::None());
     ChangeSet Changes(Ordinal since, std::span<const ColumnRef> columns = {});
 
@@ -56,7 +56,7 @@ class Publisher {
     };
 
     struct Scheduled {
-        TableBuilder* system = nullptr;
+        Table* table = nullptr;
         Ordinal stamp = 0;
         uint64_t writes = 0;
         uint64_t epoch = 0;
@@ -70,17 +70,17 @@ class Publisher {
     ChangeSet Build(Ordinal since, Ordinal until, Ordinal sealing,
                     std::span<const ColumnRef> columns,
                     std::vector<Ref<device::Buffer>>* reused = nullptr);
-    void RunBuilders(Ordinal stamp, Ordinal ordinal);
+    void RunTables(Ordinal stamp, Ordinal ordinal);
     void Seal();
 
     Structure& m_structure;
     std::vector<Sealed> m_sealed;
-    std::vector<Scheduled> m_systems;
+    std::vector<Scheduled> m_scheduled;
     uint64_t m_writes = 0;
     uint64_t m_epoch = 0;
     uint32_t m_outstanding = 0;
     RenderTables m_tables{};
-    TableWrites m_tableWrites;
+    TableVersions m_versions;
     std::shared_ptr<const PinnedTables> m_pinned;
 };
 
