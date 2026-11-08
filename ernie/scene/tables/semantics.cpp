@@ -216,6 +216,10 @@ void SemanticTable::Upload(std::span<const uint32_t> prims) {
 void SemanticTable::Run(const ChangeSet& changes, TableVersions&) {
     ERNIE_ZONE("Semantics/Run");
     m_stats = {};
+    {
+        const std::lock_guard lock(m_mapMutex);
+        m_maps.clear();
+    }
     const Prims& prims = m_structure.GetPrims();
     const Paths& paths = m_structure.GetPaths();
     const bool full = !m_built || changes.resync || m_wanted != m_taxonomies;
@@ -358,12 +362,45 @@ IdEntries SemanticTable::PrimEntries(Token taxonomy, bool stable) const {
     return entries;
 }
 
-IdEntries SemanticTable::InstanceIdEntries(Token taxonomy) const {
-    return PrimEntries(taxonomy, false);
+IdEntries SemanticTable::Entries(RenderVarSource source, Token taxonomy) const {
+    switch (source) {
+    case RenderVarSource::SemanticSegmentation:
+    case RenderVarSource::SemanticIdMap:
+        return SemanticIdEntries(taxonomy);
+    case RenderVarSource::NonStableInstanceSegmentation:
+        return PrimEntries(taxonomy, false);
+    case RenderVarSource::SemanticInstanceSegmentation:
+        return PrimEntries(taxonomy, true);
+    default:
+        return StableIdEntries();
+    }
 }
 
-IdEntries SemanticTable::SemanticInstanceIdEntries(Token taxonomy) const {
-    return PrimEntries(taxonomy, true);
+SemanticMap SemanticTable::Map(RenderVarSource source, Token taxonomy) {
+    const std::lock_guard lock(m_mapMutex);
+    const auto key = std::pair(source, taxonomy.id);
+    if (const auto found = m_maps.find(key); found != m_maps.end()) {
+        return found->second;
+    }
+    ERNIE_ZONE("Semantics/Map");
+    IdMap map;
+    std::vector<std::pair<StableId, std::string>> texts;
+    for (const IdEntry& entry : Entries(source, taxonomy)) {
+        const StableId& id = entry.id;
+        IdLabel& label = map[{id.words[0], id.words[1], id.words[2], id.words[3]}];
+        label.path = entry.path;
+        label.labels.insert(entry.labels.begin(), entry.labels.end());
+        texts.emplace_back(id, entry.text);
+    }
+    SemanticMap built{std::make_shared<const IdMap>(std::move(map))};
+    if (source == RenderVarSource::SemanticIdMap || source == RenderVarSource::StableIdMap) {
+        const std::vector<std::byte> bytes = PackIdMap(texts);
+        built.packed =
+            device::Tensor(m_structure.GetColumnStore().GetDevice().CreateBuffer(
+                               {.label = "semantic id map"}, std::span<const std::byte>(bytes)),
+                           0, device::DType::UInt8, {int64_t(bytes.size())});
+    }
+    return m_maps.emplace(key, std::move(built)).first->second;
 }
 
 IdEntries SemanticTable::StableIdEntries() const {

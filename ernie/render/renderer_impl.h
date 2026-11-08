@@ -32,11 +32,6 @@ class RendererImpl {
     RenderOutput Step(std::span<const std::string> products, double dt,
                       Stream stream = Stream::None());
 
-    struct Product : ResolvedProduct {
-        uint32_t mapVersion = ~0u;
-        std::vector<RenderVarOutput> outputs;
-    };
-
     struct OwnedVar {
         std::string product;
         std::string renderVar;
@@ -79,11 +74,10 @@ class RendererImpl {
 
     void DropStaleProducts();
     StepPlan& PlanProducts(std::span<const std::string> products);
-    Product& PrepareProduct(const std::string& path, uint32_t prim);
     void UpdateMaps();
 
     OutputSet& AcquireSet(StepPlan& plan);
-    uint64_t AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
+    uint64_t AcquireCloud(OutputSet& set, const std::string& path, const ResolvedProduct& product,
                           const ResolvedVar& var, uint64_t next);
     device::Operation Trace(const OutputSet& set, const std::set<uint32_t>& due,
                             const Snapshot& snapshot);
@@ -102,7 +96,7 @@ class RendererImpl {
     uint64_t m_maxPixelsPerLaunch;
     Ref<device::Program> m_renderProgram;
 
-    std::map<std::string, Product> m_products;
+    std::map<std::string, ResolvedProduct> m_products;
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;
     std::list<StepPlan> m_plans;

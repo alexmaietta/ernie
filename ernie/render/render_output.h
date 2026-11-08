@@ -15,16 +15,9 @@
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
 #include "ernie/io/image.h"
+#include "ernie/scene/types.h"
 
 namespace ernie {
-
-struct IdLabel {
-    std::string path;
-    std::map<std::string, std::vector<std::string>> labels;
-};
-
-using IdMap = std::map<std::array<uint32_t, 4>, IdLabel>;
-using IdTexts = std::map<std::array<uint32_t, 4>, std::string>;
 
 struct ERNIE_API RenderVarOutput {
     std::string renderVarPath;

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "ernie/device/operation.h"
@@ -20,6 +23,14 @@ struct ComposedWorldDesc {
     bool global = true;
     bool stageLights = true;
 };
+
+struct IdLabel {
+    std::string path;
+    std::map<std::string, std::vector<std::string>> labels;
+};
+
+using IdMap = std::map<std::array<uint32_t, 4>, IdLabel>;
+using IdTexts = std::map<std::array<uint32_t, 4>, std::string>;
 
 using Ordinal = uint64_t;
 using FileBytes = std::shared_ptr<const std::vector<std::byte>>;

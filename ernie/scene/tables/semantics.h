@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <span>
 #include <string>
@@ -14,10 +16,12 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
+#include "ernie/device/tensor.h"
 #include "ernie/scene/kernels/authored.h"
 #include "ernie/scene/records/semantics.h"
 #include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/scene/types.h"
 
 namespace ernie {
 
@@ -32,6 +36,11 @@ using IdEntries = std::vector<IdEntry>;
 
 StableId HashPath(std::string_view path);
 std::vector<std::byte> PackIdMap(std::span<const std::pair<StableId, std::string>> entries);
+
+struct SemanticMap {
+    std::shared_ptr<const IdMap> map;
+    device::Tensor packed;
+};
 
 struct SemanticStats {
     uint32_t resolved = 0;
@@ -73,12 +82,12 @@ class SemanticTable : public Table {
     uint32_t SemanticId(Token taxonomy, uint32_t prim) const;
     uint32_t LabeledPrim(Token taxonomy, uint32_t prim) const;
 
-    IdEntries SemanticIdEntries(Token taxonomy) const;
-    IdEntries InstanceIdEntries(Token taxonomy) const;
-    IdEntries SemanticInstanceIdEntries(Token taxonomy) const;
-    IdEntries StableIdEntries() const;
+    SemanticMap Map(RenderVarSource source, Token taxonomy);
 
   private:
+    IdEntries Entries(RenderVarSource source, Token taxonomy) const;
+    IdEntries SemanticIdEntries(Token taxonomy) const;
+    IdEntries StableIdEntries() const;
     using Labels = std::vector<uint32_t>;
 
     uint32_t TaxonomyIndex(Token taxonomy) const;
@@ -108,6 +117,8 @@ class SemanticTable : public Table {
     SemanticsData m_data{};
     SemanticStats m_stats;
     bool m_built = false;
+    std::mutex m_mapMutex;
+    std::map<std::pair<RenderVarSource, uint32_t>, SemanticMap> m_maps;
 };
 
 }

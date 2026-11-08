@@ -33,20 +33,6 @@ constexpr uint64_t PointCloud::* kPointFields[] = {
     &PointCloud::stableId,    &PointCloud::emitter,       &PointCloud::firing,
     &PointCloud::echo,        &PointCloud::radialVelocity};
 
-IdEntries MapEntries(const SemanticTable& semantics, RenderVarSource source, Token taxonomy) {
-    switch (source) {
-    case RenderVarSource::SemanticSegmentation:
-    case RenderVarSource::SemanticIdMap:
-        return semantics.SemanticIdEntries(taxonomy);
-    case RenderVarSource::NonStableInstanceSegmentation:
-        return semantics.InstanceIdEntries(taxonomy);
-    case RenderVarSource::SemanticInstanceSegmentation:
-        return semantics.SemanticInstanceIdEntries(taxonomy);
-    default:
-        return semantics.StableIdEntries();
-    }
-}
-
 constexpr const char* kRenderEntries[kRenderEntryCount] = {"RenderMinimalData",
                                                            "RenderMinimalDisplayColor",
                                                            "RenderMinimalTextureDiffuse",
@@ -204,10 +190,22 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
     StepPlan plan{planned};
     for (size_t index = 0; index < planned->paths.size(); ++index) {
         const std::string& path = planned->paths[index];
-        const Product& product = PrepareProduct(path, planned->products[index]);
+        const auto [prepared, added] = m_products.try_emplace(
+            path, *SceneImpl::Get(*m_scene).GetProducts().Find(planned->products[index]));
+        const ResolvedProduct& product = prepared->second;
         FrameOutput frame;
-        for (const RenderVarOutput& output : product.outputs) {
-            frame.renderVars[output.renderVarPath] = output;
+        std::string sources;
+        for (const ResolvedVar& var : product.vars) {
+            const std::string_view source = kRenderVarSourceTokens[uint32_t(var.source)];
+            frame.renderVars[var.path] = {var.path, std::string(source), {}};
+            sources += std::format("{}{}", sources.empty() ? "" : ", ", source);
+        }
+        if (added) {
+            const ProductRecord& record = product.record;
+            Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
+                Counted(product.sensors.size(), "sensor"), record.width, record.height,
+                sources.empty() ? "nothing" : sources, kRenderEntries[uint32_t(product.entry)],
+                record.frameRate > 0 ? std::format(", capturing at {} Hz", record.frameRate) : "");
         }
         plan.products[path] = ProductOutput{path, {std::move(frame)}};
     }
@@ -233,69 +231,23 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
     return *m_plan;
 }
 
-RendererImpl::Product& RendererImpl::PrepareProduct(const std::string& path, uint32_t prim) {
-    if (const auto found = m_products.find(path); found != m_products.end()) {
-        return found->second;
-    }
-    ERNIE_ZONE("Render/PrepareProduct");
-    Product product{*SceneImpl::Get(*m_scene).GetProducts().Find(prim)};
-    std::string sources;
-    for (const ResolvedVar& var : product.vars) {
-        const std::string_view source = kRenderVarSourceTokens[uint32_t(var.source)];
-        product.outputs.push_back({var.path, std::string(source), {}});
-        sources += std::format("{}{}", sources.empty() ? "" : ", ", source);
-    }
-    const ProductRecord& record = product.record;
-    Log(LogLevel::Debug, "prepared {}: {} at {} x {} writing {} with {}{}", path,
-        Counted(product.sensors.size(), "sensor"), record.width, record.height,
-        sources.empty() ? "nothing" : sources, kRenderEntries[uint32_t(product.entry)],
-        record.frameRate > 0 ? fmt::format(", capturing at {} Hz", record.frameRate) : "");
-    return m_products.emplace(path, std::move(product)).first->second;
-}
-
 void RendererImpl::UpdateMaps() {
-    const SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
+    SemanticTable& semantics = SceneImpl::Get(*m_scene).GetSemantics();
     for (auto& [path, planned] : m_plan->products) {
-        Product& product = m_products.at(path);
-        if (!product.semantic) {
-            continue;
-        }
-        const bool stale = product.mapVersion != semantics.Runs();
-        for (size_t index = 0; index < product.vars.size(); ++index) {
-            const ResolvedVar& var = product.vars[index];
-            RenderVarOutput& owned = product.outputs[index];
+        const ResolvedProduct& product = m_products.at(path);
+        for (const ResolvedVar& var : product.vars) {
             if (!var.semantic || var.source == RenderVarSource::PointCloud) {
                 continue;
             }
-            if (stale) {
-                const IdEntries entries = MapEntries(semantics, var.source, product.taxonomy);
-                IdMap map;
-                std::vector<std::pair<StableId, std::string>> texts;
-                for (const IdEntry& entry : entries) {
-                    const StableId& id = entry.id;
-                    IdLabel& label = map[{id.words[0], id.words[1], id.words[2], id.words[3]}];
-                    label.path = entry.path;
-                    label.labels.insert(entry.labels.begin(), entry.labels.end());
-                    texts.emplace_back(id, entry.text);
-                }
-                owned.idMap = std::make_shared<const IdMap>(std::move(map));
-                if (var.shape.empty()) {
-                    const std::vector<std::byte> bytes = PackIdMap(texts);
-                    const Ref<device::Buffer> buffer = m_scene->GetDevice().CreateBuffer(
-                        {.label = var.path}, std::span<const std::byte>(bytes));
-                    owned.tensor =
-                        device::Tensor(buffer, 0, device::DType::UInt8, {int64_t(bytes.size())});
-                }
-            }
+            const SemanticMap map = semantics.Map(var.source, product.taxonomy);
             for (FrameOutput& frame : planned.frames) {
                 RenderVarOutput& output = frame.renderVars.at(var.path);
-                output.idMap = owned.idMap;
+                output.idMap = map.map;
                 if (var.shape.empty()) {
-                    output.tensor = owned.tensor;
+                    output.tensor = map.packed;
                 }
             }
         }
-        product.mapVersion = semantics.Runs();
     }
 }
 
@@ -327,7 +279,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     std::map<uint32_t, std::array<uint64_t, kRenderVarSourceCount>> addresses;
     std::map<uint32_t, uint64_t> primIds;
     for (const auto& [path, output] : plan.products) {
-        const Product& product = m_products.at(path);
+        const ResolvedProduct& product = m_products.at(path);
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
         for (const ResolvedVar& var : product.vars) {
             if (var.source == RenderVarSource::PointCloud) {
@@ -406,8 +358,9 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     return plan.sets.back();
 }
 
-uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path, const Product& product,
-                                    const ResolvedVar& var, uint64_t next) {
+uint64_t RendererImpl::AcquireCloud(OutputSet& set, const std::string& path,
+                                    const ResolvedProduct& product, const ResolvedVar& var,
+                                    uint64_t next) {
     device::Device& device = m_scene->GetDevice();
     const device::BufferUsage usage =
         device.SharedDevice() ? device::BufferUsage::Interop : device::BufferUsage::None;
@@ -564,7 +517,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     std::vector<OverlayTarget> targets;
     std::vector<std::pair<std::string, uint32_t>> targetKeys;
     for (const OwnedOverlay& overlay : set.overlays) {
-        const Product& product = m_products.at(overlay.product);
+        const ResolvedProduct& product = m_products.at(overlay.product);
         if (!due.contains(product.prim)) {
             continue;
         }
@@ -602,7 +555,7 @@ std::vector<OverlayContents> RendererImpl::RecordOverlays(device::CommandEncoder
     }
     std::vector<OverlayCameraSource> cameraImages;
     for (const OwnedVar& var : set.vars) {
-        const Product& product = m_products.at(var.product);
+        const ResolvedProduct& product = m_products.at(var.product);
         if (!due.contains(product.prim) ||
             !IsA(SchemaId(product.record.sensorSchema), SchemaId::Camera)) {
             continue;

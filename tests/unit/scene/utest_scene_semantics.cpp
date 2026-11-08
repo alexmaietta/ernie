@@ -180,7 +180,28 @@ TEST(SemanticsTest, StableIdsAreTheirPathsHash) {
             EXPECT_EQ(uploaded.words[word], expected.words[word]);
         }
         EXPECT_NE(HashPath("/Ball").words[0], HashPath("/Ball2").words[0]);
-        EXPECT_FALSE(s.semantics.StableIdEntries().empty());
+        const SemanticMap map = s.semantics.Map(RenderVarSource::StableIdSegmentation, s.taxonomy);
+        EXPECT_EQ(
+            map.map
+                ->at({expected.words[0], expected.words[1], expected.words[2], expected.words[3]})
+                .path,
+            "/Ball");
+        EXPECT_TRUE(map.packed.Empty());
+    });
+}
+
+TEST(SemanticsTest, MapsStayCachedUntilTheSemanticsRunAgain) {
+    ForEachScene([](Scene& s) {
+        s.Labeled("/Ball", "ball");
+        s.Publish();
+        const SemanticMap first = s.semantics.Map(RenderVarSource::SemanticIdMap, s.taxonomy);
+        EXPECT_FALSE(first.packed.Empty());
+        EXPECT_EQ(s.semantics.Map(RenderVarSource::SemanticIdMap, s.taxonomy).map, first.map);
+        s.Labeled("/Box", "box");
+        s.Publish();
+        const SemanticMap second = s.semantics.Map(RenderVarSource::SemanticIdMap, s.taxonomy);
+        EXPECT_NE(second.map, first.map);
+        EXPECT_EQ(second.map->size(), first.map->size() + 1);
     });
 }
 
