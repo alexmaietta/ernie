@@ -2,6 +2,8 @@
 
 __exported import ernie.overlay.kernels.common;
 
+#include "ernie/overlay/kernels/groups.h"
+
 using namespace ernie;
 
 [shader("compute")]

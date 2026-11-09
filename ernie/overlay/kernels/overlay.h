@@ -2,7 +2,11 @@
 #pragma once
 
 #include "ernie/device/kernels/shared.h"
+#include "ernie/overlay/kernels/fills.h"
+#include "ernie/overlay/kernels/mask.h"
+#include "ernie/overlay/kernels/picks.h"
 #include "ernie/overlay/kernels/style.h"
+#include "ernie/overlay/kernels/text.h"
 
 #ifndef __SLANG__
 #include "ernie/io/kernels/encoding.h"
@@ -38,12 +42,6 @@ ERNIE_ENUM(OverlayPiece){
     Box,
     Triangle,
 };
-
-static const uint kOverlaySphereSegments = 24;
-static const uint kOverlayCircleSegments = 32;
-static const uint kOverlayArrowHeadLines = 6;
-static const uint kOverlayCapsuleSegments = 16;
-static const uint kOverlayCapsuleArcSegments = 8;
 
 static const uint kOverlayGroup = 64;
 static const uint kOverlayTile = 8;
@@ -91,37 +89,8 @@ static const uint kOverlayPickable = 1u << 15;
 static const uint kOverlayHasIds = 1u << 16;
 static const uint kOverlayScreenPoints = 1u << 17;
 static const uint kOverlayEndVectors = 1u << 18;
-static const uint kOverlayNoPick = ~0u;
 
-static const uint kOverlayFrustumLines = 15;
-static const uint kOverlayLightLines = 3 * kOverlaySphereSegments;
-static const uint kOverlayNoImage = ~0u;
 static const uint kOverlayBoxWords = 8;
-static const uint kOverlayTextChars = 64;
-static const uint kOverlayAffixChars = 16;
-static const uint kOverlayMostDecimals = 6;
-static const uint kOverlayNewline = 10;
-static const uint kOverlayKernFirstCode = 32;
-static const uint kOverlayKernCodeCount = 224;
-static const float kOverlayLineUnits = 12.0f;
-static const float kOverlayFieldEdge = 128.0f;
-static const float kOverlayFieldLevels = 16.0f;
-static const float kOverlayFieldTexelsPerUnit = 40.0f / 12.0f;
-static const uint kOverlayFieldPadding = 8;
-static const uint kOverlayFieldShift = 16;
-
-struct OverlayGlyph {
-    float x0;
-    float y0;
-    float x1;
-    float y1;
-    float advance;
-    uint texel;
-    uint width;
-    uint height;
-};
-
-ERNIE_CHECK_SIZE(OverlayGlyph, 32);
 
 static const uint kMostOverlays = 64;
 
@@ -144,16 +113,6 @@ struct OverlayView {
 };
 
 ERNIE_CHECK_SIZE(OverlayView, 80);
-
-struct OverlayOutline {
-    Ptr<uint> bits;
-    uint bitWords;
-    uint color;
-    float width;
-    uint overlay;
-};
-
-ERNIE_CHECK_SIZE(OverlayOutline, 24);
 
 struct OverlayBatch {
     Ptr<float> points;
@@ -237,89 +196,6 @@ struct OverlayBatch {
 
 ERNIE_CHECK_SIZE(OverlayBatch, 400);
 
-struct OverlayPickQuery {
-    uint view;
-    float x;
-    float y;
-    float radius;
-};
-
-ERNIE_CHECK_SIZE(OverlayPickQuery, 16);
-
-struct OverlayPickResult {
-    uint key;
-    uint work;
-    uint batch;
-    uint row;
-    uint piece;
-    uint id;
-    uint overlay;
-    uint world;
-    float distance;
-    float depth;
-    uint hit;
-    uint padding;
-    float position[3];
-    float origin[3];
-    float direction[3];
-    uint prim;
-    uint tail[2];
-};
-
-ERNIE_CHECK_SIZE(OverlayPickResult, 96);
-
-struct OverlayGroupParams {
-    Ptr<uint> worlds;
-    Ptr<uint> itemCounts;
-    Ptr<uint> keys;
-    Ptr<uint> order;
-    Ptr<uint> starts;
-    Ptr<uint> needs;
-    uint rows;
-    uint worldStride;
-    uint groups;
-    uint need;
-};
-
-ERNIE_CHECK_SIZE(OverlayGroupParams, 64);
-
-struct OverlayUniteParams {
-    Ptr<RenderTables> tables;
-    Ptr<uint> prims;
-    Ptr<uint> groups;
-    Ptr<uint> boxes;
-    uint primCount;
-    uint primStride;
-    uint groupStride;
-    uint boxCount;
-};
-
-ERNIE_CHECK_SIZE(OverlayUniteParams, 48);
-
-struct OverlayFill {
-    uint64_t pixels;
-    float x[3];
-    float y[3];
-    float depth[3];
-    uint width;
-    uint height;
-    uint rowStride;
-    uint opaque;
-    uint padding;
-};
-
-ERNIE_CHECK_SIZE(OverlayFill, 64);
-
-struct OverlayCameraImage {
-    uint64_t pixels;
-    uint camera;
-    uint width;
-    uint height;
-    uint padding;
-};
-
-ERNIE_CHECK_SIZE(OverlayCameraImage, 24);
-
 struct OverlayRecord {
     float ax;
     float ay;
@@ -368,16 +244,6 @@ struct OverlayParams {
 };
 
 ERNIE_CHECK_SIZE(OverlayParams, 200);
-
-struct BlendParams {
-    Ptr<uint> color;
-    Ptr<uint> overlay;
-    Ptr<uint> blended;
-    uint count;
-    uint padding;
-};
-
-ERNIE_CHECK_SIZE(BlendParams, 32);
 
 ERNIE_SHARED uint PackOverlayColor(float r, float g, float b, float a) {
     return EncodeUnorm8(EncodeSrgb(r)) | EncodeUnorm8(EncodeSrgb(g)) << 8 |

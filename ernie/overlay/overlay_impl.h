@@ -18,7 +18,11 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/commands.h"
 #include "ernie/device/program.h"
+#include "ernie/overlay/kernels/composite.h"
+#include "ernie/overlay/kernels/groups.h"
 #include "ernie/overlay/kernels/overlay.h"
+#include "ernie/overlay/kernels/selection.h"
+#include "ernie/overlay/kernels/shapes.h"
 #include "ernie/overlay/overlay.h"
 #include "ernie/stage/types.h"
 

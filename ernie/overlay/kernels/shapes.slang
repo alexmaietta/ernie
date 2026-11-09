@@ -2,6 +2,8 @@
 
 __exported import ernie.overlay.kernels.common;
 
+#include "ernie/overlay/kernels/shapes.h"
+
 using namespace ernie;
 
 float3 Rotate(float4 q, float3 v) {

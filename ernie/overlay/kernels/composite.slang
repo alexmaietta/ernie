@@ -2,6 +2,8 @@
 
 __exported import ernie.overlay.kernels.common;
 
+#include "ernie/overlay/kernels/composite.h"
+
 using namespace ernie;
 
 float MarkerDistance(uint shape, float2 offset, float radius) {
