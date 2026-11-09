@@ -32,25 +32,71 @@ int64_t LastElement(std::span<const int64_t> shape, std::span<const int64_t> str
     return last;
 }
 
-std::vector<std::byte> Gather(std::span<const std::byte> source, std::span<const int64_t> shape,
-                              std::span<const int64_t> strides, uint32_t elementBytes,
-                              int64_t elements) {
-    std::vector<std::byte> out(uint64_t(elements) * elementBytes);
-    std::vector<int64_t> index(shape.size(), 0);
-    for (int64_t e = 0; e < elements; ++e) {
+bool Packed(std::span<const int64_t> shape, std::span<const int64_t> strides) {
+    int64_t packed = 1;
+    for (size_t axis = shape.size(); axis-- > 0;) {
+        if (shape[axis] > 1 && strides[axis] != packed) {
+            return false;
+        }
+        packed *= shape[axis];
+    }
+    return true;
+}
+
+template <size_t kBytes>
+std::byte* CopyStrided(std::byte* to, const std::byte* from, int64_t count, int64_t step,
+                       uint64_t bytes) {
+    const uint64_t each = kBytes == 0 ? bytes : kBytes;
+    for (int64_t n = 0; n < count; ++n, from += step, to += each) {
+        std::memcpy(to, from, kBytes == 0 ? bytes : kBytes);
+    }
+    return to;
+}
+
+void Gather(std::span<const std::byte> source, std::span<const int64_t> shape,
+            std::span<const int64_t> strides, uint32_t elementBytes, int64_t elements,
+            std::byte* out) {
+    size_t outer = shape.size();
+    int64_t run = 1;
+    while (outer > 0 && (shape[outer - 1] == 1 || strides[outer - 1] == run)) {
+        run *= shape[--outer];
+    }
+    const uint64_t runBytes = uint64_t(run) * elementBytes;
+    const size_t last = outer - 1;
+    const int64_t count = shape[last];
+    const int64_t step = strides[last] * elementBytes;
+    std::vector<int64_t> index(last, 0);
+    std::byte* to = out;
+    const std::byte* const end = out + uint64_t(elements) * elementBytes;
+    while (to < end) {
         int64_t at = 0;
-        for (size_t i = 0; i < shape.size(); ++i) {
+        for (size_t i = 0; i < last; ++i) {
             at += index[i] * strides[i];
         }
-        std::memcpy(out.data() + e * elementBytes, source.data() + at * elementBytes, elementBytes);
-        for (size_t i = shape.size(); i-- > 0;) {
+        const std::byte* from = source.data() + at * elementBytes;
+        switch (runBytes) {
+        case 1:
+            to = CopyStrided<1>(to, from, count, step, runBytes);
+            break;
+        case 2:
+            to = CopyStrided<2>(to, from, count, step, runBytes);
+            break;
+        case 4:
+            to = CopyStrided<4>(to, from, count, step, runBytes);
+            break;
+        case 8:
+            to = CopyStrided<8>(to, from, count, step, runBytes);
+            break;
+        default:
+            to = CopyStrided<0>(to, from, count, step, runBytes);
+        }
+        for (size_t i = last; i-- > 0;) {
             if (++index[i] < shape[i]) {
                 break;
             }
             index[i] = 0;
         }
     }
-    return out;
 }
 
 }
@@ -111,27 +157,42 @@ Tensor Tensor::Select(int64_t index) const {
 }
 
 std::vector<std::byte> Tensor::ToHostBytes() const {
-    const int64_t elements = Elements();
-    if (elements == 0) {
+    if (Elements() == 0) {
         return {};
     }
+    if (Packed(m_shape, m_strides)) {
+        const Download download = ToHostAsync();
+        download.Wait();
+        const std::span<const std::byte> bytes = download.Bytes();
+        return {bytes.begin(), bytes.end()};
+    }
+    std::vector<std::byte> out(uint64_t(Elements()) * ElementBytes(m_dtype));
+    ReadInto(out.data());
+    return out;
+}
 
+void Tensor::ReadInto(void* out) const {
+    const int64_t elements = Elements();
     const uint32_t size = ElementBytes(m_dtype);
-    std::vector<std::byte> span((uint64_t(LastElement(m_shape, m_strides)) + 1) * size);
-    m_buffer->GetDevice().GetQueue().Read(m_buffer->Slice(m_offset, span.size()), span.data());
-    return Gather(span, m_shape, m_strides, size, elements);
+    if (Packed(m_shape, m_strides)) {
+        const Download download = ToHostAsync();
+        download.Wait();
+        std::memcpy(out, download.Bytes().data(), uint64_t(elements) * size);
+        return;
+    }
+    const uint64_t spanBytes = (uint64_t(LastElement(m_shape, m_strides)) + 1) * size;
+    const Download download =
+        m_buffer->GetDevice().GetQueue().ReadAsync(m_buffer->Slice(m_offset, spanBytes));
+    download.Wait();
+    Gather(download.Bytes(), m_shape, m_strides, size, elements, static_cast<std::byte*>(out));
 }
 
 Download Tensor::ToHostAsync() const {
     if (Empty()) {
         throw Error("An empty tensor has nothing to read");
     }
-    int64_t packed = 1;
-    for (size_t axis = m_shape.size(); axis-- > 0;) {
-        if (!m_strides.empty() && m_shape[axis] > 1 && m_strides[axis] != packed) {
-            throw UnsupportedError("ToHostAsync reads contiguous tensors only");
-        }
-        packed *= m_shape[axis];
+    if (!Packed(m_shape, m_strides)) {
+        throw UnsupportedError("ToHostAsync reads contiguous tensors only");
     }
     return m_buffer->GetDevice().GetQueue().ReadAsync(
         m_buffer->Slice(m_offset, uint64_t(Elements()) * ElementBytes(m_dtype)));

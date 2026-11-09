@@ -528,8 +528,9 @@ Operation Device::Copy(const Tensor& src, const Tensor& dst, const Operation& af
         return m_queue->Mark();
     }
     after.Wait();
-    const std::vector<std::byte> bytes = src.ToHostBytes();
-    m_queue->Write(to, bytes.data());
+    const Download download = src.ToHostAsync();
+    download.Wait();
+    m_queue->Write(to, download.Bytes().data());
     return m_queue->Mark();
 }
 

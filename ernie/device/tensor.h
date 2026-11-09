@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -102,13 +101,16 @@ class ERNIE_API Tensor {
         if (sizeof(T) != ElementBytes(m_dtype)) {
             throw std::invalid_argument("ToHost of a type unlike the tensor's elements");
         }
-        const std::vector<std::byte> bytes = ToHostBytes();
-        std::vector<T> values(bytes.size() / sizeof(T));
-        std::memcpy(values.data(), bytes.data(), bytes.size());
+        std::vector<T> values(static_cast<size_t>(Elements()));
+        if (!values.empty()) {
+            ReadInto(values.data());
+        }
         return values;
     }
 
   private:
+    void ReadInto(void* out) const;
+
     Ref<Buffer> m_buffer;
     uint64_t m_offset = 0;
     DType m_dtype = DType::Float32;

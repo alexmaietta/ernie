@@ -3,7 +3,9 @@
 
 #include <cstdint>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -57,6 +59,31 @@ TEST(TensorTest, ShapesSelectsAndReadsBack) {
     });
 }
 
+TEST(TensorTest, ReadsBackStridedViews) {
+    ForEachDevice([](Device& device) {
+        std::vector<float> values(24);
+        std::iota(values.begin(), values.end(), 0.0f);
+        const Tensor tensor = Filled(device, values, {2, 3, 4});
+        const Ref<Buffer> buffer(&tensor.GetBuffer());
+
+        const Tensor rows(buffer, tensor.Offset() + 4 * 4, DType::Float32, {2, 2, 4}, {12, 4, 1});
+        EXPECT_EQ(rows.ToHost<float>(),
+                  (std::vector<float>{4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23}));
+        EXPECT_THROW(rows.ToHostAsync(), UnsupportedError);
+
+        const Tensor columns(buffer, tensor.Offset() + 4, DType::Float32, {2, 3, 2}, {12, 4, 2});
+        EXPECT_EQ(columns.ToHost<float>(),
+                  (std::vector<float>{1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23}));
+
+        const Tensor transposed(buffer, tensor.Offset(), DType::Float32, {4, 3}, {1, 4});
+        EXPECT_EQ(transposed.ToHost<float>(),
+                  (std::vector<float>{0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11}));
+
+        const Tensor single(buffer, tensor.Offset() + 5 * 4, DType::Float32, {1, 3, 1}, {24, 4, 1});
+        EXPECT_EQ(single.ToHost<float>(), (std::vector<float>{5, 9, 13}));
+    });
+}
+
 TEST(TensorTest, CopiesBetweenTensorsOfOneSize) {
     ForEachDevice([](Device& device) {
         const Tensor from = Filled(device, {1, 2, 3, 4}, {4});
@@ -65,6 +92,34 @@ TEST(TensorTest, CopiesBetweenTensorsOfOneSize) {
         EXPECT_EQ(to.ToHost<float>(), (std::vector<float>{1, 2, 3, 4}));
         EXPECT_THROW(device.Copy(from, device.CreateTensor(DType::Float32, {3})), Error);
     });
+}
+
+TEST(TensorTest, CopiesBetweenDevicesThroughTheHost) {
+    std::optional<std::string> cpu;
+    for (const AdapterInfo& adapter : EnumerateAdapters()) {
+        if (adapter.type == AdapterType::Cpu && adapter.unsupported.empty()) {
+            cpu = adapter.alias;
+        }
+    }
+    if (!cpu) {
+        GTEST_SKIP() << "no CPU adapter";
+    }
+    const Ref<Device> first = Device::Create();
+    if (first->Adapter().alias == *cpu) {
+        GTEST_SKIP() << "the default adapter is the CPU one";
+    }
+    const Ref<Device> second = Device::Create({.adapter = *cpu});
+    std::vector<float> values(4096);
+    std::iota(values.begin(), values.end(), 0.5f);
+    const Tensor from = Filled(*first, values, {64, 64});
+    const Tensor middle = second->CreateTensor(DType::Float32, {64, 64});
+    second->Copy(from, middle).Wait();
+    EXPECT_EQ(middle.ToHost<float>(), values);
+    const Tensor back = first->CreateTensor(DType::Float32, {4096});
+    first->Copy(middle, back).Wait();
+    EXPECT_EQ(back.ToHost<float>(), values);
+    second->GetQueue().WaitIdle();
+    first->GetQueue().WaitIdle();
 }
 
 TEST(TensorTest, ImportsHostMemory) {
