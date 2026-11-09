@@ -60,7 +60,8 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .outputs = {{"electrons", SignalType::Electrons}},
                   .parameters = {{"time", 1, {0}}},
                   .uniforms = {{"shot", {"poisson", "gaussian", "off"}, "poisson"},
-                               {"fixedPatterns", {"false", "true"}, "true"}},
+                               {"fixedPatterns", {"false", "true"}, "true"},
+                               {"clipping", {"clip", "none"}, "clip"}},
                   .module = kCameraNodes,
                   .type = "Emva1288Node"});
     registry.Add({.id = "Adc",
@@ -90,8 +91,8 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .kind = NodeKind::Stencil,
                   .inputs = {{"digital", SignalType::Digital}},
                   .outputs = {{"digital", SignalType::Digital}},
-                  .uniforms = {{"method", {"bilinear"}, "bilinear"}},
-                  .radius = 1,
+                  .uniforms = {{"method", {"bilinear", "malvar"}, "bilinear"}},
+                  .radius = 2,
                   .layout = LayoutRule::FullChannels,
                   .module = kIspNodes,
                   .type = "DemosaicNode"});
@@ -103,6 +104,30 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .radius = 3,
                   .module = kIspNodes,
                   .type = "GaussianPsfNode"});
+    registry.Add(
+        {.id = "DiffractionPsf",
+         .kind = NodeKind::Stencil,
+         .inputs = {{"electronRate", SignalType::ElectronRate}},
+         .outputs = {{"electronRate", SignalType::ElectronRate}},
+         .parameters = {{"fNumber", 1, {2.8f}}, {"wavelength", 1, {550}}, {"pixelPitch", 1, {3}}},
+         .radius = kMostStencilRadius,
+         .module = kIspNodes,
+         .type = "DiffractionPsfNode"});
+    registry.Add({.id = "Glare",
+                  .kind = NodeKind::Global,
+                  .inputs = {{"electronRate", SignalType::ElectronRate}},
+                  .outputs = {{"electronRate", SignalType::ElectronRate}},
+                  .parameters = {{"sigma", 1, {8}}, {"strength", 1, {0.04f}}},
+                  .passes = 3,
+                  .module = kIspNodes,
+                  .type = "GlareNode"});
+    registry.Add({.id = "Blooming",
+                  .kind = NodeKind::Global,
+                  .inputs = {{"electrons", SignalType::Electrons}},
+                  .outputs = {{"electrons", SignalType::Electrons}},
+                  .parameters = {{"reach", 1, {32}, ParameterType::Int}},
+                  .module = kIspNodes,
+                  .type = "BloomingNode"});
     registry.Add({.id = "Denoise",
                   .kind = NodeKind::Stencil,
                   .inputs = {{"color", SignalType::LinearColor}},
@@ -213,7 +238,7 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
     registry.Add({.id = "Tone",
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"color", SignalType::LinearColor}},
-                  .uniforms = {{"curve", {"none", "reinhard", "aces"}, "none"}},
+                  .uniforms = {{"curve", {"none", "reinhard", "aces", "agx"}, "none"}},
                   .module = kIspNodes,
                   .type = "ToneNode"});
 }

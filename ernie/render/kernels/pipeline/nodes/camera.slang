@@ -27,7 +27,7 @@ struct IntegrateNode {
     }
 }
 
-struct Emva1288Node<let shot : uint, let fixedPatterns : uint> {
+struct Emva1288Node<let shot : uint, let fixedPatterns : uint, let clipping : uint> {
     static void Evaluate(PointContext context, Electrons mean, out Electrons electrons) {
         const DetectorRecord detector = context.Detector();
         const float time = ExposureTime(context, context.Parameter(0));
@@ -53,7 +53,9 @@ struct Emva1288Node<let shot : uint, let fixedPatterns : uint> {
                 } else if (shot == 1) {
                     collected = max(expected + sqrt(expected) * temporal.Normal(), 0.0f);
                 }
-                collected = min(collected, detector.fullWell);
+                if (clipping == 0) {
+                    collected = min(collected, detector.fullWell);
+                }
                 channels[i] = collected + detector.readNoise * temporal.Normal() + offset;
             }
         }

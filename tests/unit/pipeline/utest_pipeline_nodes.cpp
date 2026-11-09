@@ -156,6 +156,12 @@ TEST(PipelineNodesTest, TheFullWellClipsCollectedCharge) {
             RunPipeline(device, registry, Noisy("off", "false"), Camera(), detector, frame)
                 .at("electrons");
         EXPECT_EQ(electrons, (std::vector<float>{10, 40, 50, 50}));
+
+        PipelineDesc unclipped = Noisy("off", "false");
+        unclipped.nodes[2].uniforms.emplace_back("clipping", "none");
+        EXPECT_EQ(
+            RunPipeline(device, registry, unclipped, Camera(), detector, frame).at("electrons"),
+            (std::vector<float>{10, 40, 60, 1000}));
     });
 }
 

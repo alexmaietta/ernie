@@ -45,6 +45,7 @@ struct ResolvedNode {
     std::vector<float> parameters;
     std::vector<uint32_t> inputs;
     std::vector<uint32_t> outputs;
+    std::vector<uint32_t> scratch;
 };
 
 struct Value {

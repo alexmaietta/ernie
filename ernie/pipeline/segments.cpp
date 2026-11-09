@@ -53,6 +53,13 @@ SegmentPlan SplitSegments(const ResolvedPipeline& pipeline, const NodeRegistry& 
             stored = true;
             last = end;
         }
+        const auto scratch = [&](const ResolvedNode& node) {
+            return std::ranges::find(node.scratch, value) != node.scratch.end();
+        };
+        if (made != kBeforeSegments && scratch(pipeline.nodes[pipeline.values[value].node])) {
+            stored = true;
+            last = made;
+        }
         if (stored) {
             plan.stored.push_back({value, made, last});
         }

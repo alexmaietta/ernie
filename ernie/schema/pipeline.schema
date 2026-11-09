@@ -43,7 +43,7 @@ class Integrate : SensorNode (
 }
 
 class Emva1288 : SensorNode (
-    doc = "Adds a camera's noise as EMVA 1288 models it, from the camera's detector values. Dark current at the detector's temperature and photo response non-uniformity add to the mean, shot noise draws the collected charge, the full well clips it, and read noise and dark signal non-uniformity add to it."
+    doc = "Adds a camera's noise as EMVA 1288 models it, from the camera's detector values. Dark current at the detector's temperature and photo response non-uniformity add to the mean, shot noise draws the collected charge, the full well clips it unless clipping is none, and read noise and dark signal non-uniformity add to it."
 ) {
     token info:id = Emva1288
     token inputs:shot = poisson (
@@ -53,6 +53,14 @@ class Emva1288 : SensorNode (
         group = "Noise"
         displayName = "Shot Noise"
         doc = "poisson draws exact counts at low means and a normal approximation above about 20 electrons. gaussian always uses the normal approximation. off leaves the mean."
+    )
+    token inputs:clipping = clip (
+        enum = FullWellClipping
+        tracked
+        allowed = [clip, none]
+        group = "Noise"
+        displayName = "Clipping"
+        doc = "clip limits the collected charge to the full well. none leaves the excess for a Blooming node to spread and clip."
     )
     bool inputs:fixedPatterns = true (
         tracked
@@ -110,16 +118,16 @@ class Encode : SensorNode (
 }
 
 class Demosaic : SensorNode (
-    doc = "Fills in every channel at every pixel of a mosaic, averaging the nearest samples of each channel around the pixel. Signals that aren't mosaics pass through."
+    doc = "Fills in every channel at every pixel of a mosaic from the samples around it. Signals that aren't mosaics pass through."
 ) {
     token info:id = Demosaic
     token inputs:method = bilinear (
         enum = DemosaicMethod
         tracked
-        allowed = [bilinear]
+        allowed = [bilinear, malvar]
         group = "Demosaic"
         displayName = "Method"
-        doc = "bilinear averages the nearest samples of each channel within one pixel, which is bilinear interpolation on a Bayer mosaic."
+        doc = "bilinear averages the nearest samples of each channel within one pixel, which is bilinear interpolation on a Bayer mosaic. malvar adds the gradient-corrected 5 x 5 filters of Malvar, He and Cutler on Bayer mosaics, which keep edges sharper, and falls back to bilinear on other patterns."
     )
 }
 
@@ -275,10 +283,10 @@ class Tone : SensorNode (
     token inputs:curve = none (
         enum = ToneCurve
         tracked
-        allowed = [none, reinhard, aces]
+        allowed = [none, reinhard, aces, agx]
         group = "Tone"
         displayName = "Curve"
-        doc = "none leaves color as it is, reinhard maps x to x / (1 + x), and aces applies Narkowicz's fit of the ACES filmic curve."
+        doc = "none leaves color as it is, reinhard maps x to x / (1 + x), aces applies Narkowicz's fit of the ACES filmic curve, and agx applies Sobotka's AgX base look, which desaturates bright colors toward white rather than clipping them."
     )
 }
 
@@ -431,5 +439,67 @@ class Cfar : SensorNode (
         min = 0
         max = 1
         doc = "The fraction of noise-only cells detected."
+    )
+}
+
+class Glare : SensorNode (
+    doc = "Scatters a fraction of the photoelectron rate into a wide Gaussian veil, as stray light in a lens does, keeping the total. It is a global node of three passes, so its spread may reach far past a stencil's."
+) {
+    token info:id = Glare
+    float inputs:sigma = 8 (
+        tracked
+        group = "Optics"
+        displayName = "Sigma"
+        min = 0
+        doc = "The veil's standard deviation in pixels. It reaches three sigmas, up to 64 pixels."
+    )
+    float inputs:strength = 0.04 (
+        tracked
+        group = "Optics"
+        displayName = "Strength"
+        min = 0
+        max = 1
+        doc = "The fraction of the rate scattered into the veil."
+    )
+}
+
+class DiffractionPsf : SensorNode (
+    doc = "Blurs the photoelectron rate by the Airy pattern of a circular aperture, sampled at pixel centers out to 8 pixels. On a mosaic it uses only samples of the same channel."
+) {
+    token info:id = DiffractionPsf
+    float inputs:fNumber = 2.8 (
+        tracked
+        group = "Optics"
+        displayName = "F-Number"
+        min = 0.5
+        doc = "The lens's f-number."
+    )
+    float inputs:wavelength = 550 (
+        tracked
+        group = "Optics"
+        displayName = "Wavelength"
+        min = 1
+        doc = "The wavelength in nanometers the pattern is computed at."
+    )
+    float inputs:pixelPitch = 3 (
+        tracked
+        group = "Optics"
+        displayName = "Pixel Pitch"
+        min = 0.01
+        doc = "The distance between pixel centers in micrometers."
+    )
+}
+
+class Blooming : SensorNode (
+    doc = "Spreads charge above the detector's full well up and down its column into neighbors with room, then clips every pixel to the full well, as a CCD's saturated pixels bleed. Put it after an Emva1288 whose clipping is none. It is a global node, so the spread may reach far."
+) {
+    token info:id = Blooming
+    int inputs:reach = 32 (
+        tracked
+        group = "Detector"
+        displayName = "Reach"
+        min = 1
+        max = 512
+        doc = "The farthest a saturated pixel's excess travels along its column, in pixels."
     )
 }

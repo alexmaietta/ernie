@@ -146,6 +146,46 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
             generated.shapes.push_back(DispatchShape::Captures);
             continue;
         }
+        if (segment.kind == NodeKind::Global) {
+            const uint32_t node = segment.nodes.front();
+            const ResolvedNode& resolved = pipeline.nodes[node];
+            const NodeDef& def = registry[resolved.def];
+            const uint32_t input = resolved.inputs[0];
+            if (input == kNoValue || storedSlot[input] == kNoValue) {
+                throw Error("{} is global, but its {} isn't stored", resolved.path,
+                            def.inputs[0].name);
+            }
+            const uint32_t output = resolved.outputs[0];
+            const std::string signal(signalType(output));
+            for (uint32_t pass = 0; pass < def.passes; ++pass) {
+                const uint32_t previous = pass == 0 ? input : resolved.scratch[pass - 1];
+                const std::vector<uint32_t> slots =
+                    pass + 1 == def.passes
+                        ? outputSlots(output)
+                        : std::vector<uint32_t>{storedSlot[resolved.scratch[pass]]};
+                std::string writes;
+                for (const uint32_t slot : slots) {
+                    writes += std::format("    WriteSignal(p, element, {}, result);\n", slot);
+                }
+                const std::string entry = std::format("Segment{}Pass{}", index, pass);
+                generated.entries.push_back(entry);
+                generated.shapes.push_back(DispatchShape::Elements);
+                source += std::format(
+                    "\n[shader(\"compute\")]\n[numthreads(kPipelineGroup, 1, 1)]\nvoid "
+                    "{0}(uniform PipelineParams p) {{\n"
+                    "    PipelineElement element;\n    if (!FindElement(p, element)) "
+                    "{{\n        return;\n    }}\n"
+                    "    {1} result;\n"
+                    "    {2}.Evaluate(PointContext(p, element, {3}, {4}, {5}), {6},\n"
+                    "        Neighborhood<{1}>(p, element, {7}), Neighborhood<{1}>(p, element, "
+                    "{8}), result);\n"
+                    "{9}}}\n",
+                    entry, signal, NodeType(def, resolved), node, definition.parameterOffsets[node],
+                    definition.stateOffsets[node], pass, storedSlot[input], storedSlot[previous],
+                    writes);
+            }
+            continue;
+        }
         if (segment.kind != NodeKind::Point && segment.kind != NodeKind::Stencil) {
             throw Error("Pipeline passes of global, compact or host nodes can't be generated yet");
         }

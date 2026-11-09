@@ -89,6 +89,110 @@ TEST(PipelineIspTest, DemosaicReconstructsLinearRampsOfABayerMosaic) {
     });
 }
 
+TEST(PipelineIspTest, MalvarIsExactOnRampsAndSharperOnFineDetail) {
+    ernie::test::ForEachDevice([](device::Device& device) {
+        const NodeRegistry registry = Builtins();
+        constexpr uint32_t kSide = 16;
+        bool linear = true;
+        const auto truth = [&](uint32_t x, uint32_t y) {
+            return linear ? float(1000 + 20 * x + 15 * y)
+                          : float(1000 + 300 * std::sin(1.3 * x + 0.7 * y));
+        };
+        Frame frame{.width = kSide,
+                    .height = kSide,
+                    .channels = 3,
+                    .parameters = {0},
+                    .pattern = uint32_t(DetectorPattern::Rggb),
+                    .mosaic = true};
+        const auto error = [&](const char* method) {
+            frame.rates.clear();
+            for (uint32_t y = 0; y < kSide; ++y) {
+                for (uint32_t x = 0; x < kSide; ++x) {
+                    frame.rates.push_back(truth(x, y));
+                }
+            }
+            const std::vector<float> full =
+                RunPipeline(device, registry,
+                            RawThen({Node(4, "Demosaic", {{"digital", 3, "digital"}},
+                                          {{"method", method}})},
+                                    {{"full", 4, "digital"}}),
+                            Camera(), Detector(3, DetectorPattern::Rggb), frame)
+                    .at("full");
+            double sum = 0;
+            for (uint32_t y = 2; y + 2 < kSide; ++y) {
+                for (uint32_t x = 2; x + 2 < kSide; ++x) {
+                    for (uint32_t channel = 0; channel < 3; ++channel) {
+                        sum += std::abs(full[(y * kSide + x) * 3 + channel] - truth(x, y));
+                    }
+                }
+            }
+            return sum;
+        };
+        EXPECT_NEAR(error("malvar"), 0, 1e-2);
+        linear = false;
+        const double bilinear = error("bilinear");
+        const double malvar = error("malvar");
+        EXPECT_GT(bilinear, 0);
+        EXPECT_LT(malvar, 0.5 * bilinear);
+    });
+}
+
+TEST(PipelineIspTest, AgxCompressesMonotonicallyAndDesaturatesBrightColor) {
+    ernie::test::ForEachDevice([](device::Device& device) {
+        const NodeRegistry registry = Builtins();
+        const PipelineDesc desc = Pipeline(
+            {Node(1, "CameraSignal"), Node(2, "Integrate", {{"electronRate", 1, "electronRate"}}),
+             Node(3, "Adc", {{"electrons", 2, "electrons"}}),
+             Node(4, "ToColor", {{"digital", 3, "digital"}}),
+             Node(5, "Tone", {{"color", 4, "color"}}, {{"curve", "agx"}})},
+            {{"color", 5, "color"}});
+        const std::vector<float> grays = {0.01f, 0.05f, 0.18f, 0.5f, 1};
+        Frame frame{.width = uint32_t(grays.size() + 1), .height = 1, .channels = 3};
+        frame.parameters = {0};
+        for (const float gray : grays) {
+            frame.rates.insert(frame.rates.end(), 3, gray * 65535);
+        }
+        frame.rates.insert(frame.rates.end(), {65535, 0, 0});
+        const std::vector<float> color =
+            RunPipeline(device, registry, desc, Camera(), Detector(3, DetectorPattern::Rgb), frame)
+                .at("color");
+        for (size_t at = 1; at < grays.size(); ++at) {
+            EXPECT_GT(color[at * 3], color[(at - 1) * 3]) << at;
+            EXPECT_LT(color[at * 3], 1) << at;
+        }
+        const float* red = &color[grays.size() * 3];
+        EXPECT_GT(red[0], red[1]);
+        EXPECT_GT(red[1], 0.01f);
+        EXPECT_GT(red[2], 0.01f);
+    });
+}
+
+TEST(PipelineIspTest, DiffractionSpreadsWithTheFNumberAndKeepsEnergy) {
+    ernie::test::ForEachDevice([](device::Device& device) {
+        const NodeRegistry registry = Builtins();
+        constexpr uint32_t kSide = 32;
+        const PipelineDesc desc =
+            Pipeline({Node(1, "CameraSignal"),
+                      Node(2, "DiffractionPsf", {{"electronRate", 1, "electronRate"}})},
+                     {{"blurred", 2, "electronRate"}});
+        Frame frame{.width = kSide, .height = kSide, .channels = 1};
+        frame.rates.assign(kSide * kSide, 0);
+        frame.rates[16 * kSide + 16] = 1000;
+        const auto run = [&](float fNumber, float pitch) {
+            frame.parameters = {fNumber, 550, pitch};
+            return RunPipeline(device, registry, desc, Camera(), Detector(1, DetectorPattern::Mono),
+                               frame)
+                .at("blurred");
+        };
+        const std::vector<float> sharp = run(1, 10);
+        const std::vector<float> soft = run(16, 1);
+        EXPECT_GT(sharp[16 * kSide + 16], 990);
+        EXPECT_LT(soft[16 * kSide + 16], 300);
+        EXPECT_GT(soft[16 * kSide + 20], 0);
+        EXPECT_NEAR(std::accumulate(soft.begin(), soft.end(), 0.0), 1000, 0.5);
+    });
+}
+
 TEST(PipelineIspTest, ThePsfConservesEnergyAndKeepsMosaicChannelsApart) {
     ernie::test::ForEachDevice([](device::Device& device) {
         const NodeRegistry registry = Builtins();

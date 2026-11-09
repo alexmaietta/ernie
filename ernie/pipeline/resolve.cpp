@@ -162,6 +162,13 @@ ResolvedPipeline ResolvePipeline(const PipelineDesc& desc, const NodeRegistry& r
             resolved.outputs.push_back(uint32_t(pipeline.values.size()));
             pipeline.values.push_back({position[node], port, def.outputs[port].type});
         }
+        if (def.kind == NodeKind::Global) {
+            for (uint32_t pass = 0; pass + 1 < def.passes; ++pass) {
+                resolved.scratch.push_back(uint32_t(pipeline.values.size()));
+                pipeline.values.push_back(
+                    {position[node], uint32_t(def.outputs.size()) + pass, def.outputs[0].type});
+            }
+        }
         resolved.inputs.assign(def.inputs.size(), kNoValue);
         for (const graph::Edge& edge : graph[node].inputs) {
             const uint32_t from = position[edge.source];
@@ -250,6 +257,9 @@ std::vector<SignalLayout> PropagateLayouts(const ResolvedPipeline& pipeline,
             break;
         }
         for (const uint32_t value : node.outputs) {
+            layouts[value] = layout;
+        }
+        for (const uint32_t value : node.scratch) {
             layouts[value] = layout;
         }
     }

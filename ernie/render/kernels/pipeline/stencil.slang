@@ -40,6 +40,10 @@ struct Neighborhood<S : ISignal> {
                                uint(at.y) * element.capture->width + uint(at.x));
     }
 
+    uint2 Size() {
+        return uint2(element.capture->width, element.capture->height);
+    }
+
     bool Inside(int2 offset) {
         const int2 at = int2(element.coord) + offset;
         return all(at >= 0) && at.x < int(element.capture->width) &&

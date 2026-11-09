@@ -21,6 +21,13 @@ uint32_t NodeRegistry::Add(NodeDef def) {
                     "CaptureStat laid out per capture",
                     def.id);
     }
+    if (def.kind == NodeKind::Global &&
+        (def.inputs.size() != 1 || def.outputs.size() != 1 || def.passes == 0 ||
+         def.inputs[0].type != def.outputs[0].type)) {
+        throw Error("Pipeline node {} is global, so it takes one signal and outputs one of the "
+                    "same type over one or more passes",
+                    def.id);
+    }
     if (!def.state.empty() && def.kind != NodeKind::Point) {
         throw Error("Pipeline node {} keeps state, which only point nodes do for now", def.id);
     }

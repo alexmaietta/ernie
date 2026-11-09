@@ -69,6 +69,7 @@ struct NodeDef {
     std::vector<UniformDef> uniforms;
     std::vector<float> state;
     uint32_t radius = 0;
+    uint32_t passes = 1;
     LayoutRule layout = LayoutRule::FirstInput;
     std::string module;
     std::string type;

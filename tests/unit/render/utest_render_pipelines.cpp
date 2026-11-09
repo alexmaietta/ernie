@@ -117,6 +117,47 @@ TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
     });
 }
 
+TEST(PipelinesTest, GlobalNodesRunTracedAsTheyDoStandalone) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Sky(device, DetectorPattern::Rgb);
+        DefineRaw(*scene);
+        const Prim glare = Node(*scene, "/Pipes/Raw/Glare", "Glare");
+        glare.Set(Glare::kSigma, 3.0f);
+        glare.Set(Glare::kStrength, 0.3f);
+        glare.Connect("electronRate", *scene->Find("/Pipes/Raw/Signal"), "electronRate");
+        scene->Find("/Pipes/Raw/Integrate")->Connect("electronRate", glare, "electronRate");
+        scene->Define<Camera>("/Cam2", {.translate = {0, 0, 1}, .focalLength = 10});
+        for (const char* camera : {"/Cam", "/Cam2"}) {
+            scene->Find(camera)->Set(Camera::kExposureTime, kExposureTime);
+            scene->Find(camera)->Set(Camera::kPipelineBinding,
+                                     std::vector<std::string>{"/Pipes/Raw"});
+        }
+        scene->Define<RenderProduct>("/Render/View",
+                                     {.renderMode = RenderMode::RealTime,
+                                      .camera = {"/Cam", "/Cam2"},
+                                      .resolution = {kWidth, kHeight},
+                                      .orderedVars = {"/Render/Rate", "/Render/Raw"}});
+        Renderer renderer(scene);
+        RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+        output.Wait();
+        const FrameOutput& frame = output["/Render/View"].frames.at(0);
+        const Pipeline loaded(scene, "/Pipes/Raw");
+        for (int64_t layer = 0; layer < 2; ++layer) {
+            const char* camera = layer == 0 ? "/Cam" : "/Cam2";
+            PipelineRunDesc run{.exposureTime = kExposureTime,
+                                .identity = HashPath(camera).words[0]};
+            const std::vector<float> rates =
+                frame.Source("ElectronRate").tensor.Select(layer).ToHost<float>();
+            run.inputs = {
+                {"Signal", device::Tensor(device.CreateBuffer({.label = "rates"}, rates), 0,
+                                          device::DType::Float32, {1, kHeight, kWidth, 3})}};
+            EXPECT_EQ(frame.Source("raw").tensor.Select(layer).ToHost<float>(),
+                      loaded.Run(run).at("raw").ToHost<float>())
+                << camera;
+        }
+    });
+}
+
 TEST(PipelinesTest, ValueEditsRerunThePipelineWithoutTracingAgain) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Sky(device, DetectorPattern::Rgb);
