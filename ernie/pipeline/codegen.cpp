@@ -187,7 +187,7 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
             continue;
         }
         if (segment.kind != NodeKind::Point && segment.kind != NodeKind::Stencil) {
-            throw Error("Pipeline passes of global, compact or host nodes can't be generated yet");
+            throw Error("Pipeline passes of compact nodes can't be generated yet");
         }
         const std::string entry = std::format("Segment{}", index);
         generated.entries.push_back(entry);
