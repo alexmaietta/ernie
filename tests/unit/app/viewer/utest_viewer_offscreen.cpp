@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/viewer/viewer.h"
+#include "ernie/app/viewer/viewport/viewport.h"
 
 #include <algorithm>
 #include <chrono>
@@ -85,6 +86,52 @@ TEST_F(OffscreenViewerTest, OutlinesTheSelectionUntilItClears) {
     viewer.Frame();
     EXPECT_TRUE(viewer.Selected().empty());
     EXPECT_FALSE(Drawing(viewer, "viewer/selection"));
+}
+
+std::vector<std::string> CloudSensors(Scene& scene) {
+    std::vector<std::string> sensors;
+    std::vector<Prim> stack;
+    if (const std::optional<Prim> root = scene.Find(kSessionRoot)) {
+        stack.push_back(*root);
+    }
+    while (!stack.empty()) {
+        const Prim prim = stack.back();
+        stack.pop_back();
+        if (prim.IsA<RenderProduct>() && prim.Name().starts_with("Cloud")) {
+            const std::vector<std::string> cameras = scene.Select(prim).Get("camera").GetTargets(0);
+            sensors.insert(sensors.end(), cameras.begin(), cameras.end());
+        }
+        for (const Prim& child : prim.Children()) {
+            stack.push_back(child);
+        }
+    }
+    return sensors;
+}
+
+TEST_F(OffscreenViewerTest, DrawsTheCloudsOfSelectedLidarsAndRadars) {
+    const Ref<Scene> scene = Row(*s_device);
+    scene->Define<Lidar>("/Lidar", {.translate = {0, 0, 10},
+                                    .scanType = ScanType::SolidState,
+                                    .firingsPerScan = 1,
+                                    .emitterElevations = {-80, -70, -60}});
+    scene->Define<Radar>("/Radar", {.translate = {0, 0, 10}, .rays = {8, 4}});
+    Viewer viewer(scene, {.width = kWidth, .height = kHeight, .offscreen = true});
+    ASSERT_TRUE(FrameUntil(viewer, [&] { return viewer.Shown() != nullptr; }));
+    EXPECT_TRUE(CloudSensors(*scene).empty());
+    EXPECT_FALSE(Drawing(viewer, "viewer/clouds"));
+
+    viewer.Select({"/Lidar"});
+    ASSERT_TRUE(FrameUntil(viewer, [&] { return Drawing(viewer, "viewer/clouds"); }));
+    EXPECT_EQ(CloudSensors(*scene), std::vector<std::string>{"/Lidar"});
+
+    viewer.Select({"/Lidar", "/Radar"});
+    ASSERT_TRUE(FrameUntil(viewer, [&] { return CloudSensors(*scene).size() == 2; }));
+    EXPECT_TRUE(Drawing(viewer, "viewer/clouds"));
+
+    viewer.Select({});
+    viewer.Frame();
+    EXPECT_TRUE(CloudSensors(*scene).empty());
+    EXPECT_FALSE(Drawing(viewer, "viewer/clouds"));
 }
 
 }

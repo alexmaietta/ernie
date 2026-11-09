@@ -20,6 +20,7 @@
 #include "ernie/app/viewer/overlays/toolbar.h"
 #include "ernie/app/viewer/widgets/widgets.h"
 #include "ernie/render/renderer.h"
+#include "ernie/util/log.h"
 
 namespace ernie::app {
 namespace {
@@ -37,12 +38,15 @@ constexpr Float4 kGridXColor = {0.80f, 0.32f, 0.30f, 0.85f};
 constexpr Float4 kGridYColor = {0.42f, 0.72f, 0.34f, 0.85f};
 constexpr float kSelectionAxisPixels = 60;
 constexpr double kFraming = 1.1;
-constexpr double kStartFraming = 1.6;
 constexpr Float4 kCameraGuideColor = {0.55f, 0.75f, 0.95f, 0.8f};
 constexpr Float4 kLightGuideColor = {0.95f, 0.85f, 0.45f, 0.8f};
 constexpr std::string_view kViewerOverlays = "viewer/";
 constexpr std::string_view kGuidesOverlay = "viewer/guides";
 constexpr std::string_view kSelectionOverlay = "viewer/selection";
+constexpr std::string_view kCloudsOverlay = "viewer/clouds";
+constexpr Float4 kCloudColors[] = {{0.30f, 0.85f, 0.95f, 1}, {0.95f, 0.55f, 0.25f, 1},
+                                   {0.55f, 0.90f, 0.40f, 1}, {0.90f, 0.40f, 0.80f, 1},
+                                   {0.95f, 0.90f, 0.35f, 1}, {0.50f, 0.60f, 1.00f, 1}};
 
 struct GridLines {
     std::vector<Float3> endpoints;
@@ -146,8 +150,10 @@ class ErnieDelegate : public RenderDelegate {
         : m_renderer(std::move(renderer)), m_viewport(viewport), m_shown(std::move(shown)) {}
 
     std::optional<RenderFrame> Render(const RenderRequest& request) override {
-        const std::string products[] = {std::string(request.product)};
+        std::vector<std::string> products = m_viewport.CloudProducts();
+        products.insert(products.begin(), std::string(request.product));
         const RenderOutput output = m_renderer->Step(products, 0);
+        m_viewport.ShowClouds(output);
         const std::vector<FrameOutput>& frames = output[request.product].frames;
         if (frames.empty()) {
             return std::nullopt;
@@ -336,15 +342,13 @@ void Viewport::DefineSession() {
     } else {
         m_scene->Define<RenderProduct>(m_product, {.renderMode = RenderMode::RealTime});
     }
-    std::string lookThrough = m_views[0];
     if (camera && camera->IsA(SchemaId::Camera)) {
         m_scene->Paste(m_scene->Copy(*camera), m_views[0]);
     } else {
-        const OrbitCamera orbit{.yaw = 0.6, .pitch = 0.45, .distance = 10};
-        m_scene->Define<Camera>(m_views[0], {.translate = orbit.Eye(),
-                                             .orient = orbit.Orient(),
+        const Double3 eye{20, 30, 18};
+        m_scene->Define<Camera>(m_views[0], {.translate = eye,
+                                             .orient = LookAt(eye, Double3{}),
                                              .clippingRange = {kNearClip, kFarClip}});
-        m_unframed.insert(m_views[0]);
     }
     const Quatd orients[] = {LookAlong({0, 0, -1}, {0, 1, 0}), LookAlong({0, 1, 0}),
                              LookAlong({-1, 0, 0})};
@@ -355,12 +359,8 @@ void Viewport::DefineSession() {
         m_unframed.insert(m_views[view]);
     }
     const View product = m_scene->Select(m_product);
-    product.Get(RenderProduct::kCamera.Column()).SetTargets(0, {lookThrough});
+    product.Get(RenderProduct::kCamera.Column()).SetTargets(0, {m_views[0]});
     product.Get(RenderProduct::kOrderedVars.Column()).SetTargets(0, {m_shownVar});
-    if (m_unframed.erase(lookThrough) > 0) {
-        m_framing.push_back(m_scene->ReadBoundsAsync());
-        m_framingMargin = kStartFraming;
-    }
 }
 
 void Viewport::Advance(const device::Operation& lastDraw) {
@@ -684,9 +684,13 @@ void Viewport::UpdateGuides() {
     }
     const Double3 centre{std::round(m_orbit.target.x / step) * step,
                          std::round(m_orbit.target.y / step) * step, grid.height};
-    GuideKey key{
-        m_scene->StructureVersion(), m_selection.paths,     guides,
-        grid.shown ? step : 0,       grid.shown ? fade : 0, grid.shown ? centre : Double3{}};
+    GuideKey key{m_scene->StructureVersion(),
+                 m_selection.paths,
+                 m_session ? m_session->shown : std::vector<uint32_t>{},
+                 guides,
+                 grid.shown ? step : 0,
+                 grid.shown ? fade : 0,
+                 grid.shown ? centre : Double3{}};
     if (m_guideKey == key) {
         return;
     }
@@ -695,6 +699,7 @@ void Viewport::UpdateGuides() {
     std::vector<uint32_t> cameras;
     std::vector<uint32_t> lights;
     std::vector<uint32_t> bounded;
+    std::vector<uint32_t> sensors;
     std::vector<Prim> stack;
     const View roots = m_scene->Select("/*");
     for (const uint32_t root : roots.Prims()) {
@@ -708,6 +713,8 @@ void Viewport::UpdateGuides() {
         stack.pop_back();
         if (prim.IsA(SchemaId::Camera)) {
             cameras.push_back(prim.Index());
+        } else if (prim.IsA(SchemaId::Lidar) || prim.IsA(SchemaId::Radar)) {
+            sensors.push_back(prim.Index());
         } else if (IsLight(prim)) {
             lights.push_back(prim.Index());
         } else if (guides.allBounds && prim.IsA(SchemaId::Gprim)) {
@@ -723,6 +730,7 @@ void Viewport::UpdateGuides() {
     std::vector<uint32_t> groups;
     std::vector<uint32_t> chosenCameras;
     std::vector<uint32_t> chosenLights;
+    std::vector<uint32_t> chosenSensors;
     for (uint32_t group = 0; group < m_selection.paths.size(); ++group) {
         const std::optional<Prim> selected = m_scene->Find(m_selection.paths[group]);
         if (!selected) {
@@ -738,6 +746,8 @@ void Viewport::UpdateGuides() {
                 groups.push_back(group);
             } else if (prim.IsA(SchemaId::Camera)) {
                 chosenCameras.push_back(prim.Index());
+            } else if (prim.IsA(SchemaId::Lidar) || prim.IsA(SchemaId::Radar)) {
+                chosenSensors.push_back(prim.Index());
             } else if (IsLight(prim)) {
                 chosenLights.push_back(prim.Index());
             }
@@ -791,6 +801,91 @@ void Viewport::UpdateGuides() {
     selection.Prims(chosenCameras, OverlayPrimShape::Frustums, chosen);
     selection.Prims(chosenLights, OverlayPrimShape::Lights, chosen);
     m_renderer->GetOverlays()->Set(kSelectionOverlay, selection);
+    SyncSensorClouds(guides.sensorClouds == SensorClouds::Off        ? std::vector<uint32_t>{}
+                     : guides.sensorClouds == SensorClouds::Selected ? chosenSensors
+                                                                     : sensors);
+}
+
+void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors) {
+    const std::vector<uint32_t> worlds = m_session ? m_session->shown : std::vector<uint32_t>{};
+    std::erase_if(sensors, [&](uint32_t sensor) {
+        const uint32_t world = m_scene->ByIndex(sensor).World();
+        return !worlds.empty() && world != kGlobalWorld &&
+               std::ranges::find(worlds, world) == worlds.end();
+    });
+    std::ranges::sort(sensors);
+    sensors.erase(std::unique(sensors.begin(), sensors.end()), sensors.end());
+    if (sensors.size() > guides.mostSensorClouds) {
+        Log(LogLevel::Warning,
+            "{} lidars and radars are shown, so the viewer draws the clouds of the first {}",
+            sensors.size(), guides.mostSensorClouds);
+        sensors.resize(guides.mostSensorClouds);
+    }
+    const std::string root = m_product + "Clouds";
+    const std::string points = root + "/Points";
+    std::vector<SensorCloud> clouds;
+    for (size_t at = 0; at < sensors.size(); ++at) {
+        const Prim sensor = m_scene->ByIndex(sensors[at]);
+        const std::string product = std::format("{}/Cloud{}", root, sensor.Index());
+        const auto kept = std::ranges::find(m_sensorClouds, product, &SensorCloud::product);
+        if (kept != m_sensorClouds.end()) {
+            clouds.push_back(std::move(*kept));
+            continue;
+        }
+        if (!m_scene->Find(root)) {
+            m_scene->Define<Scope>(root);
+            m_scene->Define<RenderVar>(points, {.sourceName = "PointCloud",
+                                                .channels = {"Coordinates"},
+                                                .frameOfReference = FrameOfReference::World});
+        }
+        m_scene->Define<RenderProduct>(product,
+                                       {.camera = {sensor.Path()}, .orderedVars = {points}});
+        clouds.push_back(
+            {product, sensor.World(), kCloudColors[sensor.Index() % std::size(kCloudColors)]});
+    }
+    for (const SensorCloud& cloud : m_sensorClouds) {
+        if (std::ranges::find(clouds, cloud.product, &SensorCloud::product) == clouds.end()) {
+            if (const std::optional<Prim> prim = m_scene->Find(cloud.product)) {
+                m_scene->Remove(*prim);
+            }
+        }
+    }
+    m_sensorClouds = std::move(clouds);
+    if (m_sensorClouds.empty()) {
+        m_renderer->GetOverlays()->Set(kCloudsOverlay, Overlay());
+    }
+}
+
+std::vector<std::string> Viewport::CloudProducts() const {
+    std::vector<std::string> products;
+    for (const SensorCloud& cloud : m_sensorClouds) {
+        products.push_back(cloud.product);
+    }
+    return products;
+}
+
+void Viewport::ShowClouds(const RenderOutput& output) {
+    if (m_sensorClouds.empty()) {
+        return;
+    }
+    Overlay shown;
+    for (SensorCloud& cloud : m_sensorClouds) {
+        if (output.Contains(cloud.product) && !output[cloud.product].frames.empty()) {
+            const RenderVarOutput& points =
+                output[cloud.product].frames.front().Source("PointCloud");
+            const device::Tensor& coordinates = points.channels.at("Coordinates");
+            cloud.points = coordinates.Select(0);
+            cloud.count = points.channels.at("Counts");
+        }
+        if (cloud.points.Empty()) {
+            continue;
+        }
+        shown.Add(OverlayMarkers{
+            .points = cloud.points,
+            .itemCount = cloud.count,
+            .style = {.color = cloud.color, .size = 3, .world = cloud.world, .pickable = false}});
+    }
+    m_renderer->GetOverlays()->Set(kCloudsOverlay, shown);
 }
 
 void Viewport::AddOverlay(std::function<void(const ViewportRect&)> draw) {
@@ -1270,7 +1365,6 @@ void Viewport::LandFraming() {
                                             : m_scene->ReadBoundsAsync());
         return;
     }
-    const double margin = std::exchange(m_framingMargin, kFraming);
     if (box.lower.x > box.upper.x) {
         return;
     }
@@ -1284,7 +1378,7 @@ void Viewport::LandFraming() {
     if (m_view->orthographic) {
         const Float3 back = m_view->frame.z;
         const double away = 4 * radius + 1;
-        const float height = float(2 * margin * radius / kOrthographicUnits);
+        const float height = float(2 * kFraming * radius / kOrthographicUnits);
         const float width = height * m_view->width / std::max(m_view->height, 1e-6f);
         const View camera = m_scene->Select(m_camera);
         camera.Get<Double3>("translate")
@@ -1299,7 +1393,7 @@ void Viewport::LandFraming() {
     const double aperture = std::max(std::min(m_view->width, m_view->height), 1e-3f);
     const double half = std::atan(0.5 * aperture / std::max(m_view->focal, 1e-3f));
     m_orbit.target = center;
-    m_orbit.distance = margin * radius / std::sin(std::max(half, 1e-3));
+    m_orbit.distance = kFraming * radius / std::sin(std::max(half, 1e-3));
     const View camera = m_scene->Select(m_camera);
     camera.Get<Double3>("translate").Set(m_orbit.Eye());
     camera.Get<Quatd>("orient").Set(m_orbit.Orient());
@@ -1813,8 +1907,9 @@ void Viewport::SetLighting(LightingMode lighting) {
     const std::string lights = m_session->root + "/Lights";
     if (lighting != LightingMode::Stage && !m_scene->Find(lights)) {
         m_scene->Define<Scope>(lights);
-        m_scene->Define<DistantLight>(lights + "/Camera", {.visibility = Visibility::Invisible,
-                                                           .visibleInPrimaryRay = false});
+        m_scene->Define<DistantLight>(
+            lights + "/Camera",
+            {.visibility = Visibility::Invisible, .visibleInPrimaryRay = false, .angle = 0});
         m_scene->Define<DistantLight>(lights + "/Default", {.visibility = Visibility::Invisible,
                                                             .orient = LookAlong({-0.35, 0.5, -1.0}),
                                                             .visibleInPrimaryRay = false});

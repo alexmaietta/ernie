@@ -628,6 +628,18 @@ void Toolbar::DrawHudMenu() {
     ImGui::SetItemTooltip("Each scene camera's frustum, but the one looked through");
     ImGui::MenuItem("Lights", nullptr, &guides.lights);
     ImGui::SetItemTooltip("Each light's shape and direction");
+    ImGui::SeparatorText("Sensor Clouds");
+    const std::pair<const char*, SensorClouds> clouds[] = {
+        {"Off", SensorClouds::Off},
+        {"Selected Sensors", SensorClouds::Selected},
+        {"All Sensors", SensorClouds::All}};
+    for (const auto& [label, mode] : clouds) {
+        if (ImGui::MenuItem(label, nullptr, guides.sensorClouds == mode)) {
+            guides.sensorClouds = mode;
+        }
+    }
+    ImGui::SetItemTooltip("Each lidar's and radar's latest point cloud in the shown worlds, from "
+                          "the selected sensors or all of them");
     ImGui::SeparatorText("Guides");
     ImGui::MenuItem("Selection Outline", nullptr, &guides.outline);
     ImGui::MenuItem("Selection Bounds", nullptr, &guides.bounds);

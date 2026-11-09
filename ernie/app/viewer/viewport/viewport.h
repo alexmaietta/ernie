@@ -27,6 +27,10 @@
 #include "ernie/render/ray_cast/ray_cast.h"
 #include "ernie/scene/scene.h"
 
+namespace ernie {
+class RenderOutput;
+}
+
 namespace ernie::app {
 
 class Toolbar;
@@ -114,8 +118,12 @@ struct RenderResolution {
     bool fill = true;
 };
 
+enum class SensorClouds : uint8_t { Off, Selected, All };
+
 struct ViewportGuides {
     GridGuide grid;
+    SensorClouds sensorClouds = SensorClouds::Selected;
+    uint32_t mostSensorClouds = 16;
     bool cameras = true;
     bool lights = false;
     bool outline = true;
@@ -289,6 +297,9 @@ class Viewport {
         return m_view && !m_view->orthographic ? std::optional(m_view->focal) : std::nullopt;
     }
 
+    std::vector<std::string> CloudProducts() const;
+    void ShowClouds(const RenderOutput& output);
+
     void AddOverlay(std::function<void(const ViewportRect&)> draw);
     void AddText(uint64_t id, std::string text, const TextStyle& style);
     bool SetText(uint64_t id, std::string text);
@@ -361,9 +372,20 @@ class Viewport {
         std::function<std::string()> value;
     };
 
+    struct SensorCloud {
+        std::string product;
+        uint32_t world = kGlobalWorld;
+        Float4 color;
+        device::Tensor points;
+        device::Tensor count;
+    };
+
+    void SyncSensorClouds(std::vector<uint32_t> sensors);
+
     struct GuideKey {
         uint64_t structure = 0;
         std::vector<std::string> selection;
+        std::vector<uint32_t> worlds;
         ViewportGuides guides;
         double gridStep = 0;
         double gridFade = 0;
@@ -416,7 +438,6 @@ class Viewport {
     std::map<std::string, AovDisplay, std::less<>> m_displays;
     bool m_framingWorlds = false;
     bool m_framingPrims = false;
-    double m_framingMargin = 1.1;
     std::optional<device::BuildProgress> m_builds;
     std::optional<device::Download> m_bounds;
     std::optional<std::array<float, 2>> m_range;
@@ -428,6 +449,7 @@ class Viewport {
 
     std::optional<RenderFrame> m_rendering;
     std::optional<Pending> m_pending;
+    std::vector<SensorCloud> m_sensorClouds;
     std::optional<device::Tensor> m_shown;
     device::Tensor m_shownOverlay;
     device::Operation m_shownReady;
