@@ -836,9 +836,7 @@ std::optional<KernelCode> KernelCode::Decode(std::string_view entry) {
 }
 
 bool HasModule(const KernelLibrary* library, const SourceFiles& sources, std::string_view name) {
-    std::string path(name);
-    std::replace(path.begin(), path.end(), '.', '/');
-    return FindFile(library, sources, path + std::string(kExtension)).has_value();
+    return FindFile(library, sources, ModulePath(name)).has_value();
 }
 
 KernelCode Compile(Backend backend, Traversal traversal, Sampling sampling, bool debugInfo,

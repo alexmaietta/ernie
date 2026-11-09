@@ -21,6 +21,7 @@ struct DefinitionModule {
     std::string source;
     std::vector<std::pair<std::string, std::string>> files;
     std::vector<std::pair<std::string, std::string>> origins;
+    uint32_t words = 0;
     bool surface = false;
 };
 

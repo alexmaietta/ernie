@@ -5,12 +5,9 @@
 #include <cstring>
 #include <format>
 
-#include "ernie/device/commands.h"
 #include "ernie/device/queue.h"
 #include "ernie/pipeline/builtins.h"
-#include "ernie/scene/kernels.h"
 #include "ernie/scene/schema/columns.h"
-#include "ernie/scene/tables/kernels/materials.h"
 #include "ernie/stage/publish/change_set.h"
 #include "ernie/stage/views/attribute.h"
 #include "ernie/stage/views/view.h"
@@ -76,30 +73,14 @@ std::shared_ptr<const pipeline::PipelineSet> PipelineTable::Definitions() const 
 }
 
 std::vector<pipeline::ConnectionDesc> PipelineTable::Connections(uint32_t prim) const {
-    const Prims& prims = m_structure.GetPrims();
-    ColumnStore& store = m_structure.GetColumnStore();
-    const uint32_t row = prims.Row(prim, SchemaId::Connectable);
-    const auto read = [&](ColumnRef column, ColumnType type) {
-        const ArrayRef array = store.Array(column, row);
-        return array.address == 0 ? std::vector<uint32_t>{}
-                                  : Items<uint32_t>(store.Arrays(type).Read(array));
-    };
-    const std::vector<uint32_t> sources =
-        read(kConnectableConnectionsSources, ColumnType::PrimArray);
-    const std::vector<uint32_t> inputs =
-        read(kConnectableConnectionsInputs, ColumnType::TokenArray);
-    const std::vector<uint32_t> outputs =
-        read(kConnectableConnectionsOutputs, ColumnType::TokenArray);
-    const Tokens& tokens = m_structure.GetTokens();
     std::vector<pipeline::ConnectionDesc> connections;
-    const size_t count = std::min({sources.size(), inputs.size(), outputs.size()});
-    for (size_t i = 0; i < count; ++i) {
-        const bool alive = sources[i] != kNoPrim && prims.Alive(sources[i]);
-        connections.push_back(
-            {.input = std::string(tokens.Text(Token{inputs[i]})),
-             .source = alive ? sources[i] : kNoPrim,
-             .sourcePath = alive ? m_structure.GetPaths().Path(sources[i]) : std::string("nothing"),
-             .output = std::string(tokens.Text(Token{outputs[i]}))});
+    for (const ConnectionCache::Connection& connection : m_connections.Get(prim)) {
+        connections.push_back({.input = std::string(connection.input),
+                               .source = connection.source,
+                               .sourcePath = connection.source != kNoPrim
+                                                 ? m_structure.GetPaths().Path(connection.source)
+                                                 : std::string("nothing"),
+                               .output = std::string(connection.output)});
     }
     return connections;
 }
@@ -284,7 +265,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
     const bool restructured =
         reloaded || changes.resync || changes.structure || !changes.apis.empty();
     if (!restructured && std::ranges::all_of(written, [&](const ColumnInfo* column) {
-            return m_values.contains(column);
+            return m_pack.Reads(column);
         })) {
         if (!written.empty()) {
             Pack(false);
@@ -294,10 +275,10 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
     const Prims& prims = m_structure.GetPrims();
     const pipeline::NodeRegistry& registry = *m_registry;
     std::map<uint32_t, std::shared_ptr<const PipelineInstance>> resolved;
+    m_connections.Update(changes);
     const std::vector<Tap> taps = GatherTaps();
     m_gathered.clear();
-    m_copies.clear();
-    m_values.clear();
+    m_pack.Clear();
     uint32_t words = 0;
     bool changed = false;
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
@@ -331,9 +312,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
                     for (uint32_t index = 0; index < gathered.parameter; ++index) {
                         offset += parameters[index].words;
                     }
-                    m_copies.push_back(
-                        {gathered.column, gathered.row, instance->firstWord + offset});
-                    m_values.insert(gathered.column.column);
+                    m_pack.Copy(gathered.column, gathered.row, instance->firstWord + offset);
                 }
             }
         } catch (const Error& error) {
@@ -353,6 +332,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
         }
     }
     m_words.Reserve(m_structure.GetColumnStore().GetDevice(), std::max(words, 1u));
+    m_pack.Build(store, false);
     Pack(true);
 }
 
@@ -370,38 +350,7 @@ void PipelineTable::Pack(bool rewrite) {
             }
         }
     }
-    if (m_copies.empty()) {
-        return;
-    }
-    ColumnStore& store = m_structure.GetColumnStore();
-    std::vector<PackEntry> entries;
-    entries.reserve(m_copies.size());
-    for (const Copy& copy : m_copies) {
-        ColumnTable& table = store.Schema(copy.column.schema);
-        entries.push_back({.pages = table.Pages(copy.column.index),
-                           .row = copy.row,
-                           .words = table.CellBytes(copy.column.index) / uint32_t(sizeof(uint32_t)),
-                           .destination = copy.destination});
-    }
-    const uint64_t bytes = entries.size() * sizeof(PackEntry);
-    if (!m_entries || m_entries->Bytes() < bytes) {
-        m_entries = device.CreateBuffer({.bytes = bytes, .label = "pipeline pack entries"});
-    }
-    queue.Write(m_entries->Slice(0, bytes), entries.data());
-    if (!m_program) {
-        m_program = device.CreateProgram({.modules = {"ernie.scene.tables.kernels.materials"},
-                                          .library = &kSceneKernels,
-                                          .entries = {"PackMaterials"},
-                                          .label = "pipeline words"});
-    }
-    PackParams params{};
-    params.entries.address = m_entries->Address();
-    params.words.address = m_words.Address();
-    params.count = uint32_t(entries.size());
-    device::CommandEncoder encoder = queue.CreateEncoder();
-    encoder.Dispatch(m_program->Entry("PackMaterials"), params,
-                     {.x = device::GroupCount(params.count, kMaterialGroup)});
-    queue.Submit(encoder.Finish());
+    m_pack.Pack(m_structure.GetColumnStore(), m_words.Address());
 }
 
 std::vector<uint32_t> PipelineTable::ReadWords(const PipelineInstance& instance) const {

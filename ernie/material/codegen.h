@@ -9,6 +9,7 @@
 #include <span>
 #include <vector>
 
+#include "ernie/graph/shape.h"
 #include "ernie/material/definition.h"
 #include "ernie/material/node.h"
 
@@ -48,7 +49,7 @@ bool Texturable(NodeInputType type);
 
 GraphLayout LayOut(const ShadingGraph& graph);
 
-std::string GraphKey(const ShadingGraph& graph);
+graph::ShapeKey DefinitionKey(const ShadingGraph& graph);
 
 DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph);
 

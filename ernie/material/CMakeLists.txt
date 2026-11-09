@@ -6,10 +6,10 @@ ernie_object_library(
     node.cpp
     uplift.cpp
 )
-target_link_libraries(ernie_material PUBLIC ernie_util)
+target_link_libraries(ernie_material PUBLIC ernie_graph)
 
 ernie_static_library(
     ernie_material_internal
     ernie_material
-    ernie_util_internal
+    ernie_graph_internal
 )

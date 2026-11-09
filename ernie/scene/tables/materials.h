@@ -12,9 +12,12 @@
 
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
+#include "ernie/graph/library.h"
 #include "ernie/material/definition.h"
 #include "ernie/material/node.h"
 #include "ernie/scene/records/materials.h"
+#include "ernie/scene/tables/connections.h"
+#include "ernie/scene/tables/pack.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/stage/structure/structure.h"
@@ -66,26 +69,12 @@ class MaterialTable : public RenderTable {
     }
 
   private:
-    struct Connection {
-        std::string_view input;
-        uint32_t source = kNoPrim;
-        std::string_view output;
-    };
-
-    struct Copy {
-        ColumnRef column;
-        uint32_t row = 0;
-        uint32_t destination = 0;
-    };
-
-    struct Literal {
-        uint32_t destination = 0;
-        uint32_t value = 0;
-    };
+    using Connection = ConnectionCache::Connection;
 
     struct Binding {
         uint32_t texture = kNoPrim;
-        uint32_t destination = 0;
+        uint32_t low = 0;
+        uint32_t high = 0;
     };
 
     struct Carry {
@@ -113,14 +102,10 @@ class MaterialTable : public RenderTable {
     void WriteRadios();
     void ResolvePlacement(uint32_t placement, uint32_t mapping);
     bool Restructured(const ChangeSet& changes) const;
-    bool Packed() const;
     bool Changed(SchemaId schema) const;
-    void ReadConnections(const ChangeSet& changes);
-    void ReadConnections(std::span<const uint32_t> owners);
-    const std::vector<Connection>& Connections(uint32_t prim);
+    std::span<const Connection> Connections(uint32_t prim);
     void CopyCell(ColumnRef column, uint32_t prim, uint32_t destination);
     void BuildEntries();
-    void Pack();
     device::Program& Kernels();
 
     Structure& m_structure;
@@ -128,24 +113,15 @@ class MaterialTable : public RenderTable {
     Ref<device::Program> m_program;
     RecordTable<MaterialRecord> m_records{"material records"};
     DeviceTable<uint32_t> m_words{"material words"};
-    Ref<device::Buffer> m_entries;
-    std::vector<Copy> m_copies;
-    std::vector<Literal> m_literals;
+    PackPlan m_pack{"material"};
     std::vector<Binding> m_bindings;
     std::vector<Carry> m_carries;
-    std::vector<std::vector<Connection>> m_connections;
+    ConnectionCache m_connections{m_structure, {SchemaId::Connectable}};
     std::vector<bool> m_touched;
-    std::vector<uint32_t> m_rowPrims;
-    std::vector<ColumnRef> m_packed;
     uint64_t m_writes = 0;
     std::vector<RadarLink> m_radarLinks;
-    uint32_t m_entryCount = 0;
     Ref<device::Buffer> m_carried;
-    std::map<std::string, DefinitionModule, std::less<>> m_library;
-    std::map<uint32_t, uint32_t> m_definitionWords = {
-        {kDefinitionPreviewConstant, uint32_t(sizeof(PreviewParams) / sizeof(uint32_t))},
-        {kDefinitionPreviewTextured, uint32_t(sizeof(PreviewParams) / sizeof(uint32_t))}};
-    uint32_t m_nextDefinition = kFirstGeneratedDefinition;
+    graph::DefinitionLibrary<DefinitionModule> m_library{kFirstGeneratedDefinition};
     std::vector<uint32_t> m_generations;
     std::set<uint32_t> m_spectral;
     std::set<std::pair<uint64_t, uint64_t>> m_warned;

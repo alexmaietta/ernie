@@ -15,6 +15,7 @@
 #include "ernie/scene/kernels.h"
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/schema/columns.h"
+#include "ernie/scene/tables/connections.h"
 #include "ernie/scene/tables/kernels/materials.h"
 #include "ernie/scene/tables/textures.h"
 #include "ernie/stage/publish/change_set.h"
@@ -136,12 +137,6 @@ bool MaterialTable::Restructured(const ChangeSet& changes) const {
     return false;
 }
 
-bool MaterialTable::Packed() const {
-    const ColumnStore& store = m_structure.GetColumnStore();
-    return std::ranges::any_of(
-        m_packed, [&](ColumnRef column) { return store.LastWrite(column) > m_writes; });
-}
-
 bool MaterialTable::Changed(SchemaId schema) const {
     const ColumnStore& store = m_structure.GetColumnStore();
     return std::ranges::any_of(Inputs(), [&](ColumnRef column) {
@@ -173,104 +168,27 @@ void MaterialTable::Describe(RenderTables& tables) const {
     tables.temperaturePrimvar = m_temperaturePrimvar;
 }
 
-void MaterialTable::ReadConnections(const ChangeSet& changes) {
-    ERNIE_ZONE("Materials/Connections");
-    const Prims& prims = m_structure.GetPrims();
-    m_touched.assign(prims.Size(), false);
-    if (!changes.resync && changes.added.empty() && changes.removed.empty() &&
-        changes.apis.empty() && m_connections.size() == prims.Size()) {
-        std::vector<uint32_t> owners;
-        bool known = true;
-        for (const ColumnRef column :
-             {kConnectableConnectionsSources, kConnectableConnectionsInputs,
-              kConnectableConnectionsOutputs}) {
-            for (const uint32_t row : changes.ArrayRows(column)) {
-                const uint32_t prim = row < m_rowPrims.size() ? m_rowPrims[row] : kNoPrim;
-                known = known && prim != kNoPrim;
-                if (prim != kNoPrim && std::ranges::find(owners, prim) == owners.end()) {
-                    owners.push_back(prim);
-                }
-            }
-        }
-        if (known) {
-            ReadConnections(owners);
-            return;
-        }
+std::span<const MaterialTable::Connection> MaterialTable::Connections(uint32_t prim) {
+    const std::span<const Connection> connections = m_connections.Get(prim);
+    if (prim < m_touched.size()) {
+        m_touched[prim] = true;
     }
-    std::vector<uint32_t> owners;
-    m_rowPrims.clear();
-    for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
-        if (!prims.Alive(prim) || !IsA(prims.Record(prim).schema, SchemaId::Connectable)) {
-            continue;
-        }
-        const uint32_t row = prims.Row(prim, SchemaId::Connectable);
-        if (row >= m_rowPrims.size()) {
-            m_rowPrims.resize(row + 1, kNoPrim);
-        }
-        m_rowPrims[row] = prim;
-        owners.push_back(prim);
-    }
-    m_connections.assign(prims.Size(), {});
-    ReadConnections(owners);
-}
-
-void MaterialTable::ReadConnections(std::span<const uint32_t> owners) {
-    const Prims& prims = m_structure.GetPrims();
-    ColumnStore& store = m_structure.GetColumnStore();
-    std::vector<ArrayRef> sources;
-    std::vector<ArrayRef> tokens;
-    for (const uint32_t prim : owners) {
-        const uint32_t row = prims.Row(prim, SchemaId::Connectable);
-        sources.push_back(store.Array(kConnectableConnectionsSources, row));
-        tokens.push_back(store.Array(kConnectableConnectionsInputs, row));
-    }
-    for (const uint32_t prim : owners) {
-        tokens.push_back(
-            store.Array(kConnectableConnectionsOutputs, prims.Row(prim, SchemaId::Connectable)));
-    }
-    const std::vector<std::vector<std::byte>> sourceBytes =
-        store.Arrays(ColumnType::PrimArray).Read(sources);
-    const std::vector<std::vector<std::byte>> tokenBytes =
-        store.Arrays(ColumnType::TokenArray).Read(tokens);
-    const Tokens& text = m_structure.GetTokens();
-    for (size_t k = 0; k < owners.size(); ++k) {
-        const std::vector<uint32_t> from = Items<uint32_t>(sourceBytes[k]);
-        const std::vector<uint32_t> to = Items<uint32_t>(tokenBytes[k]);
-        const std::vector<uint32_t> out = Items<uint32_t>(tokenBytes[owners.size() + k]);
-        std::vector<Connection>& connections = m_connections[owners[k]];
-        connections.clear();
-        const size_t count = std::min({from.size(), to.size(), out.size()});
-        for (size_t i = 0; i < count; ++i) {
-            const uint32_t source = from[i] != kNoPrim && prims.Alive(from[i]) ? from[i] : kNoPrim;
-            connections.push_back({text.Text(Token{to[i]}), source, text.Text(Token{out[i]})});
-        }
-    }
-}
-
-const std::vector<MaterialTable::Connection>& MaterialTable::Connections(uint32_t prim) {
-    static const std::vector<Connection> kNone;
-    if (prim >= m_connections.size()) {
-        return kNone;
-    }
-    m_touched[prim] = true;
-    for (const Connection& connection : m_connections[prim]) {
-        if (connection.source != kNoPrim) {
+    for (const Connection& connection : connections) {
+        if (connection.source < m_touched.size()) {
             m_touched[connection.source] = true;
         }
     }
-    return m_connections[prim];
+    return connections;
 }
 
 void MaterialTable::CopyCell(ColumnRef column, uint32_t prim, uint32_t destination) {
-    m_copies.push_back({column, m_structure.GetPrims().Row(prim, column.schema), destination});
+    m_pack.Copy(column, m_structure.GetPrims().Row(prim, column.schema), destination);
 }
 
 void MaterialTable::ResolvePlacement(uint32_t placement, uint32_t mapping) {
     const Prims& prims = m_structure.GetPrims();
     const auto at = [&](size_t offset) { return mapping + Word(offset); };
-    const auto literal = [&](size_t offset, uint32_t value) {
-        m_literals.push_back({at(offset), value});
-    };
+    const auto literal = [&](size_t offset, uint32_t value) { m_pack.Literal(at(offset), value); };
     const auto real = [&](size_t offset, float value) {
         literal(offset, std::bit_cast<uint32_t>(value));
     };
@@ -372,15 +290,15 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
     CopyCell(kSurfaceDetailAPIEnableDetail, shader,
              at(detail + offsetof(DetailRecord, enableDetail)));
 
-    const std::vector<Connection>& connections = Connections(shader);
+    const std::span<const Connection> connections = Connections(shader);
     uint32_t placement = kNoPrim;
     bool placed = false;
     uint32_t textured = 0;
     for (uint32_t input = 0; input < kPreviewInputs; ++input) {
         const size_t slot = offsetof(PreviewParams, inputs) + input * sizeof(TextureInput);
         const auto unbound = [&] {
-            m_literals.push_back({at(slot + offsetof(TextureInput, handle)), 0});
-            m_literals.push_back({at(slot + offsetof(TextureInput, handle)) + 1, 0});
+            m_pack.Literal(at(slot + offsetof(TextureInput, handle)), 0);
+            m_pack.Literal(at(slot + offsetof(TextureInput, handle)) + 1, 0);
         };
         const auto found =
             std::ranges::find(connections, kPreviewInputNames[input], &Connection::input);
@@ -397,7 +315,7 @@ void MaterialTable::ResolvePreview(uint32_t material, uint32_t shader) {
                 m_structure.GetPaths().Path(shader), kPreviewInputNames[input],
                 m_structure.GetPaths().Path(found->source));
         }
-        m_literals.push_back({at(slot + offsetof(TextureInput, spectrum)), spectrum});
+        m_pack.Literal(at(slot + offsetof(TextureInput, spectrum)), spectrum);
         if (found == connections.end() || spectral) {
             unbound();
             continue;
@@ -463,8 +381,9 @@ bool MaterialTable::BindTexture(uint32_t shader, const Connection& connection,
     if (slot == kNoPrim) {
         return true;
     }
-    m_bindings.push_back({texture, slot + Word(offsetof(TextureInput, handle))});
-    m_literals.push_back({slot + Word(offsetof(TextureInput, channel)), uint32_t(channel)});
+    const uint32_t handle = slot + Word(offsetof(TextureInput, handle));
+    m_bindings.push_back({texture, m_pack.Literal(handle, 0), m_pack.Literal(handle + 1, 0)});
+    m_pack.Literal(slot + Word(offsetof(TextureInput, channel)), uint32_t(channel));
     CopyCell(kUsdUVTextureScale, texture, slot + Word(offsetof(TextureInput, scale)));
     CopyCell(kUsdUVTextureBias, texture, slot + Word(offsetof(TextureInput, bias)));
     return true;
@@ -493,7 +412,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
     for (uint32_t k = 0; k < reached.size(); ++k) {
         const uint32_t prim = reached[k].prim;
         const std::shared_ptr<const NodeDefinition> node = reached[k].node;
-        const std::vector<Connection>& connections = Connections(prim);
+        const std::span<const Connection> connections = Connections(prim);
         std::vector<InputBinding> inputs(node->inputs.size());
         std::vector<Connection> textures(node->inputs.size());
         for (uint32_t i = 0; i < node->inputs.size(); ++i) {
@@ -595,19 +514,15 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         }
     }
     const GraphLayout layout = LayOut(graph);
-    const std::string key = GraphKey(graph);
-    auto known = m_library.find(key);
-    if (known == m_library.end()) {
-        const uint32_t id = m_nextDefinition++;
-        known = m_library.emplace(key, GenerateDefinition(id, graph)).first;
-        m_definitionWords[id] = Word(layout.bytes);
+    const uint32_t definition = m_library.Intern(DefinitionKey(graph), [&](uint32_t id) {
+        DefinitionModule module = GenerateDefinition(id, graph);
         Log(LogLevel::Debug,
             "new material definition {} for {} with {}, {} in {} words and {} bytes of generated "
             "Slang",
             id, graph.nodes.back().node->name, Counted(graph.nodes.size() - 1, "pattern"),
-            Counted(layout.textureCount, "texture"), Word(layout.bytes),
-            known->second.source.size());
-    }
+            Counted(layout.textureCount, "texture"), Word(layout.bytes), module.source.size());
+        return module;
+    });
     m_wordCount = (m_wordCount + 1) & ~1u;
     const uint32_t base = m_wordCount;
     m_wordCount += Word(layout.bytes);
@@ -629,7 +544,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                         m_spectral.insert(material);
                     }
                 }
-                m_literals.push_back({base + Word(layout.cells[n][i] + 12), spectrum});
+                m_pack.Literal(base + Word(layout.cells[n][i] + 12), spectrum);
             }
             if (node.inputs[i].kind != BindingKind::Texture) {
                 continue;
@@ -653,11 +568,11 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
     if (layout.textureCount > 0) {
         ResolvePlacement(coordinates, base + Word(layout.mapping));
     }
-    Define(material, known->second.id, base);
+    Define(material, definition, base);
     if (GetLogLevel() <= LogLevel::Debug) {
         Log(LogLevel::Debug, "{} shades with node {} through {} as definition {}, in {} words",
-            paths.Path(material), graph.nodes.back().node->name, paths.Path(shader),
-            known->second.id, Word(layout.bytes));
+            paths.Path(material), graph.nodes.back().node->name, paths.Path(shader), definition,
+            Word(layout.bytes));
     }
 }
 
@@ -703,12 +618,12 @@ void MaterialTable::Resolve(const ChangeSet& changes) {
     ERNIE_ZONE("Materials/Resolve");
     ++m_resolves;
     const Prims& prims = m_structure.GetPrims();
-    m_copies.clear();
-    m_literals.clear();
+    m_pack.Clear();
     m_bindings.clear();
     m_spectral.clear();
     m_wordCount = 0;
-    ReadConnections(changes);
+    m_connections.Update(changes);
+    m_touched.assign(prims.Size(), false);
     std::vector<MaterialRecord> before;
     for (uint32_t prim = 0; prim < m_generations.size(); ++prim) {
         before.push_back(m_records.Row(prim));
@@ -737,37 +652,11 @@ void MaterialTable::Resolve(const ChangeSet& changes) {
     }
     CarryPrevious(before);
     ResolveRadios();
-    m_packed.clear();
-    for (const Copy& copy : m_copies) {
-        if (std::ranges::find(m_packed, copy.column.column, &ColumnRef::column) == m_packed.end()) {
-            m_packed.push_back(copy.column);
-        }
-    }
-    std::vector<uint8_t> written(m_wordCount, 0);
-    uint32_t twice = kNoPrim;
-    const auto write = [&](uint32_t word) {
-        if (word < written.size() && written[word]++ != 0 && twice == kNoPrim) {
-            twice = word;
-        }
-    };
-    for (const Copy& copy : m_copies) {
-        const uint32_t words = ElementBytes(copy.column.column->type) / sizeof(uint32_t);
-        for (uint32_t word = 0; word < words; ++word) {
-            write(copy.destination + word);
-        }
-    }
-    for (const Literal& literal : m_literals) {
-        write(literal.destination);
-    }
-    for (const Binding& binding : m_bindings) {
-        write(binding.destination);
-        write(binding.destination + 1);
-    }
-    if (twice != kNoPrim) {
+    if (const uint32_t twice = m_pack.Twice(m_wordCount); twice != kNoPrim) {
         Log(LogLevel::Error, "material word {} is packed twice, so its value is undefined", twice);
     }
     Log(LogLevel::Debug, "resolved {} materials into {} words, {} copies and {} textures",
-        materials, m_wordCount, m_copies.size(), m_bindings.size());
+        materials, m_wordCount, m_pack.CopyCount(), m_bindings.size());
 }
 
 void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
@@ -775,6 +664,14 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
     m_carries.clear();
     std::vector<uint32_t> generations(prims.Size(), 0);
     std::set<uint32_t> used;
+    const auto library = m_library.Snapshot();
+    const auto definitionWords = [&](uint32_t id) -> uint32_t {
+        if (id == kDefinitionPreviewConstant || id == kDefinitionPreviewTextured) {
+            return Word(sizeof(PreviewParams));
+        }
+        const std::shared_ptr<const DefinitionModule> found = library->Find(id);
+        return found ? found->words : 0;
+    };
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
         if (!prims.Alive(prim) || !IsA(prims.Record(prim).schema, SchemaId::Material)) {
             continue;
@@ -790,14 +687,14 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
             const bool changed = old.definition != record.definition;
             const uint32_t previous = changed ? old.definition : old.previousDefinition;
             const uint32_t from = changed ? old.words : old.previousWords;
-            const auto words = m_definitionWords.find(previous);
+            const uint32_t words = definitionWords(previous);
             record.previousDefinition = previous;
             record.previousWords = 0;
-            if (words != m_definitionWords.end() && words->second > 0) {
+            if (words > 0) {
                 m_wordCount = (m_wordCount + 1) & ~1u;
                 record.previousWords = m_wordCount;
-                m_carries.push_back({from, m_wordCount, words->second});
-                m_wordCount += words->second;
+                m_carries.push_back({from, m_wordCount, words});
+                m_wordCount += words;
             }
             if (changed && GetLogLevel() <= LogLevel::Debug) {
                 Log(LogLevel::Debug,
@@ -824,9 +721,9 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
         m_carried = nullptr;
     }
     std::vector<DefinitionModule> definitions;
-    for (const auto& [key, definition] : m_library) {
-        if (used.contains(definition.id)) {
-            definitions.push_back(definition);
+    for (const auto& entry : library->Entries()) {
+        if (used.contains(entry.id)) {
+            definitions.push_back(*entry.definition);
         }
     }
     auto set = std::make_shared<const DefinitionSet>(std::move(definitions),
@@ -924,60 +821,12 @@ void MaterialTable::WarnOutsideVisible() {
 }
 
 void MaterialTable::BuildEntries() {
-    ColumnStore& store = m_structure.GetColumnStore();
-    device::Device& device = store.GetDevice();
-    std::vector<PackEntry> entries;
-    entries.reserve(m_copies.size() + m_literals.size() + m_bindings.size());
-    for (const Copy& copy : m_copies) {
-        ColumnTable& table = store.Schema(copy.column.schema);
-        entries.push_back({.pages = table.Pages(copy.column.index),
-                           .row = copy.row,
-                           .words = table.CellBytes(copy.column.index) / uint32_t(sizeof(uint32_t)),
-                           .destination = copy.destination});
-    }
-    for (const Literal& literal : m_literals) {
-        if (literal.value != 0) {
-            entries.push_back(
-                {.words = 1, .destination = literal.destination, .value = literal.value});
-        }
-    }
     for (const Binding& binding : m_bindings) {
         const uint64_t handle = m_textures.Handle(binding.texture, "file");
-        entries.push_back(
-            {.words = 1, .destination = binding.destination, .value = uint32_t(handle)});
-        entries.push_back(
-            {.words = 1, .destination = binding.destination + 1, .value = uint32_t(handle >> 32)});
+        m_pack.SetLiteral(binding.low, uint32_t(handle));
+        m_pack.SetLiteral(binding.high, uint32_t(handle >> 32));
     }
-    m_entryCount = uint32_t(entries.size());
-    if (entries.empty()) {
-        return;
-    }
-    const uint64_t bytes = entries.size() * sizeof(PackEntry);
-    if (!m_entries || m_entries->Bytes() < bytes) {
-        m_entries = device.CreateBuffer({.bytes = bytes, .label = "material pack entries"});
-    }
-    device.GetQueue().Write(m_entries->Slice(0, bytes), entries.data());
-}
-
-void MaterialTable::Pack() {
-    ColumnStore& store = m_structure.GetColumnStore();
-    device::Device& device = store.GetDevice();
-    device::Queue& queue = device.GetQueue();
-    if (m_entryCount == 0) {
-        return;
-    }
-    PackParams params{};
-    params.entries.address = m_entries->Address();
-    params.words.address = m_words.Address();
-    params.count = m_entryCount;
-    static const profiler::ZoneId zone = profiler::ZoneId::Named("Materials/Pack");
-    device::CommandEncoder encoder = queue.CreateEncoder();
-    {
-        const device::ZoneScope scope(encoder, zone);
-        encoder.Dispatch(Kernels().Entry("PackMaterials"), params,
-                         {.x = device::GroupCount(params.count, kMaterialGroup)});
-    }
-    queue.Submit(encoder.Finish());
+    m_pack.Build(m_structure.GetColumnStore(), true);
 }
 
 void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
@@ -1014,8 +863,8 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
         }
         queue.Submit(encoder.Finish());
     }
-    if (rebound || Packed()) {
-        Pack();
+    if (rebound || m_pack.Stale(store, m_writes)) {
+        m_pack.Pack(store, m_words.Address());
     }
     if (resolve || Changed(SchemaId::DetectorAPI)) {
         WarnOutsideVisible();
@@ -1054,7 +903,7 @@ device::Program& MaterialTable::Kernels() {
         m_program = m_structure.GetColumnStore().GetDevice().CreateProgram(
             {.modules = {"ernie.scene.tables.kernels.materials"},
              .library = &kSceneKernels,
-             .entries = {"WriteMaterials", "PackMaterials"},
+             .entries = {"WriteMaterials"},
              .label = "materials"});
     }
     return *m_program;

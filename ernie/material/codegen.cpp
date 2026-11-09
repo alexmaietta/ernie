@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <format>
 
+#include "ernie/util/text.h"
+
 namespace ernie {
 
 namespace {
@@ -78,14 +80,6 @@ Spectrum AlbedoDefinition<Spectrum : ISpectrum>(inout ShadeContext context) {{
               "{}<Spectrum>.Shade(context, closure);"),
         Cases(set, "return StandardDefinition<{}, Spectrum>.Albedo(context);",
               "return {}<Spectrum>.Albedo(context);"));
-}
-
-std::string ModuleFile(std::string_view module) {
-    std::string file(module);
-    for (char& c : file) {
-        c = c == '.' ? '/' : c;
-    }
-    return file + ".slang";
 }
 
 std::string_view CellType(NodeInputType type) {
@@ -218,19 +212,29 @@ GraphLayout LayOut(const ShadingGraph& graph) {
     return layout;
 }
 
-std::string GraphKey(const ShadingGraph& graph) {
-    std::string key;
-    for (const ShadingNode& node : graph.nodes) {
-        key += std::format("{}/{}:", node.node->module, node.node->name);
-        for (const InputBinding& binding : node.inputs) {
-            key += binding.kind == BindingKind::Value     ? std::string("v")
-                   : binding.kind == BindingKind::Texture ? std::string("t")
-                                                          : std::format("p{}", binding.source);
-            key += ',';
-        }
-        key += ';';
+graph::ShapeKey DefinitionKey(const ShadingGraph& shading) {
+    graph::Graph graph;
+    std::vector<uint32_t> order;
+    for (size_t node = 0; node < shading.nodes.size(); ++node) {
+        order.push_back(graph.Add(0, 0));
     }
-    return key;
+    for (uint32_t node = 0; node < shading.nodes.size(); ++node) {
+        for (uint32_t input = 0; input < shading.nodes[node].inputs.size(); ++input) {
+            const InputBinding& binding = shading.nodes[node].inputs[input];
+            if (binding.kind == BindingKind::Pattern) {
+                graph.Connect(node, shading.nodes[node].node->inputs[input].name, binding.source,
+                              "result");
+            }
+        }
+    }
+    return graph::GraphShape(graph, order, [&](uint32_t node, graph::ShapeWriter& writer) {
+        const ShadingNode& each = shading.nodes[node];
+        writer.Add(each.node->module);
+        writer.Add(each.node->name);
+        for (const InputBinding& binding : each.inputs) {
+            writer.Add(uint32_t(binding.kind));
+        }
+    });
 }
 
 DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
@@ -244,7 +248,8 @@ DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
                               layout.textureCount);
     }
     std::string imports;
-    DefinitionModule module{.id = id, .type = type};
+    DefinitionModule module{
+        .id = id, .type = type, .words = layout.bytes / uint32_t(sizeof(uint32_t))};
     std::string body;
     for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
         const NodeDefinition& definition = *graph.nodes[node].node;
@@ -254,7 +259,7 @@ DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
                 fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
             }
         }
-        const std::string file = ModuleFile(definition.module);
+        const std::string file = ModulePath(definition.module);
         if (std::ranges::find(module.files, file, &std::pair<std::string, std::string>::first) ==
             module.files.end()) {
             imports += std::format("import {};\n", definition.module);
@@ -344,7 +349,7 @@ PrimitiveSources(std::span<const std::shared_ptr<const PrimitiveDefinition>> pri
     std::string pdf;
     std::string direction;
     for (const std::shared_ptr<const PrimitiveDefinition>& primitive : primitives) {
-        sources[ModuleFile(primitive->module)] = primitive->source;
+        sources[ModulePath(primitive->module)] = primitive->source;
         imports += std::format("import {};\n", primitive->module);
         kinds += std::format("static const uint kLobe{} = {};\n", primitive->name, primitive->kind);
         const auto add = [&](std::string& cases, std::string_view call) {
@@ -423,7 +428,7 @@ std::map<std::string, std::string, std::less<>> DispatchSources(const Definition
     std::map<std::string, std::string, std::less<>> sources(set.Files().begin(), set.Files().end());
     sources[kDispatchFile] = Dispatch(set);
     for (const DefinitionModule& definition : set.Definitions()) {
-        sources[ModuleFile(definition.module)] = definition.source;
+        sources[ModulePath(definition.module)] = definition.source;
         for (const auto& [path, source] : definition.files) {
             sources[path] = source;
         }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/text.h"
 
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -82,6 +83,16 @@ TEST(TextTest, DigestsAreStableHexFnv1a) {
     EXPECT_EQ(Digest("a"), "af63dc4c8601ec8c");
     EXPECT_EQ(Digest(std::string_view("\xff", 1)), "af64724c8602eb6e");
     EXPECT_NE(Digest("kernel a"), Digest("kernel b"));
+}
+
+TEST(TextTest, ModulePathsAndErrorOriginsMapGeneratedFilesToTheirSource) {
+    EXPECT_EQ(ModulePath("ernie.material.nodes.n12"), "ernie/material/nodes/n12.slang");
+    const std::pair<std::string, std::string> origins[] = {
+        {"ernie/material/nodes/n12.slang", "/home/user/wet.slang"}};
+    EXPECT_EQ(MapOrigins("./ernie/material/nodes/n12.slang(3): error, "
+                         "ernie/material/nodes/n12.slang(4): note",
+                         origins),
+              "/home/user/wet.slang(3): error, /home/user/wet.slang(4): note");
 }
 
 }

@@ -27,6 +27,7 @@
 #include "ernie/scene/tables/semantics.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"
+#include "ernie/util/text.h"
 
 namespace ernie {
 
@@ -126,14 +127,7 @@ void RendererImpl::UpdateRenderProgram() {
     } catch (const std::exception& error) {
         std::string message = error.what();
         for (const DefinitionModule& definition : m_pendingDefinitions->Definitions()) {
-            for (const auto& [generated, origin] : definition.origins) {
-                for (size_t at = message.find(generated); at != std::string::npos;
-                     at = message.find(generated, at + origin.size())) {
-                    const bool dotted = at >= 2 && message.compare(at - 2, 2, "./") == 0;
-                    at -= dotted ? 2 : 0;
-                    message.replace(at, generated.size() + (dotted ? 2 : 0), origin);
-                }
-            }
+            message = MapOrigins(std::move(message), definition.origins);
         }
         Log(LogLevel::Error,
             "relinking the render kernels failed, so materials keep their previous look: {}",

@@ -5,7 +5,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -14,6 +13,8 @@
 #include "ernie/device/program.h"
 #include "ernie/pipeline/builtins.h"
 #include "ernie/pipeline/definition.h"
+#include "ernie/scene/tables/connections.h"
+#include "ernie/scene/tables/pack.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/stage/structure/structure.h"
@@ -73,12 +74,6 @@ class PipelineTable : public RenderTable {
         uint32_t row = 0;
     };
 
-    struct Copy {
-        ColumnRef column;
-        uint32_t row = 0;
-        uint32_t destination = 0;
-    };
-
     void Pack(bool rewrite);
 
     struct Tap {
@@ -96,11 +91,9 @@ class PipelineTable : public RenderTable {
     pipeline::PipelineLibrary m_library;
     std::shared_ptr<const pipeline::NodeRegistry> m_registry;
     mutable std::map<uint32_t, std::vector<Gathered>> m_gathered;
-    std::vector<Copy> m_copies;
-    std::set<const ColumnInfo*> m_values;
+    ConnectionCache m_connections{m_structure, {SchemaId::SensorNode, SchemaId::SensorPipeline}};
+    PackPlan m_pack{"pipeline"};
     DeviceTable<uint32_t> m_words{"pipeline words"};
-    Ref<device::Buffer> m_entries;
-    Ref<device::Program> m_program;
     mutable std::vector<ColumnRef> m_inputs;
     mutable uint32_t m_inputSchemas = 0;
     mutable std::mutex m_mutex;

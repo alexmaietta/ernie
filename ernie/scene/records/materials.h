@@ -109,16 +109,6 @@ struct PreviewParams {
 
 ERNIE_CHECK_SIZE(PreviewParams, 832);
 
-struct PackEntry {
-    uint64_t pages;
-    uint row;
-    uint words;
-    uint destination;
-    uint value;
-};
-
-ERNIE_CHECK_SIZE(PackEntry, 24);
-
 struct RadioRecord {
     uint kind;
     uint valid;

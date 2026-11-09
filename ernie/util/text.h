@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,5 +24,10 @@ bool Glob(std::string_view pattern, std::string_view text);
 std::string Digest(std::string_view bytes);
 
 std::string Replaced(std::string text, std::string_view from, std::string_view to);
+
+std::string ModulePath(std::string_view module);
+
+std::string MapOrigins(std::string message,
+                       std::span<const std::pair<std::string, std::string>> origins);
 
 }

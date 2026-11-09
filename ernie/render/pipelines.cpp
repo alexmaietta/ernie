@@ -27,9 +27,7 @@ CompilePipeline(device::Device& device,
         if (def.source.empty()) {
             continue;
         }
-        std::string path = def.module;
-        std::ranges::replace(path, '.', '/');
-        path += ".slang";
+        const std::string path = ModulePath(def.module);
         if (std::ranges::find(files, path, &std::pair<std::string, std::string>::first) ==
             files.end()) {
             sources.emplace(path, def.source);
@@ -43,11 +41,7 @@ CompilePipeline(device::Device& device,
                                                   .entries = compiled->generated.entries,
                                                   .label = "sensor pipeline"});
     } catch (const Error& error) {
-        std::string message = error.what();
-        for (const auto& [path, file] : files) {
-            message = Replaced(message, path, file);
-        }
-        throw Error("{}", message);
+        throw Error("{}", MapOrigins(error.what(), files));
     }
     compiled->definition = std::move(definition);
     return compiled;

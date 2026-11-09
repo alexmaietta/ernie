@@ -1,36 +1,25 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/pipeline/builtins.h"
 
-#include <mutex>
+#include "ernie/graph/published.h"
 
 namespace ernie::pipeline {
 
 namespace {
 
-struct Registered {
-    std::mutex mutex;
-    std::shared_ptr<const NodeRegistry> nodes = std::make_shared<NodeRegistry>(BuiltinNodes());
-};
-
-Registered& Registry() {
-    static Registered registered;
+graph::Published<NodeRegistry>& Registry() {
+    static graph::Published<NodeRegistry> registered(BuiltinNodes());
     return registered;
 }
 
 }
 
 std::shared_ptr<const NodeRegistry> PipelineNodes() {
-    Registered& registered = Registry();
-    const std::lock_guard lock(registered.mutex);
-    return registered.nodes;
+    return Registry().Get();
 }
 
 void RegisterPipelineNode(NodeDef def) {
-    Registered& registered = Registry();
-    const std::lock_guard lock(registered.mutex);
-    auto nodes = std::make_shared<NodeRegistry>(*registered.nodes);
-    nodes->Add(std::move(def));
-    registered.nodes = std::move(nodes);
+    Registry().Update([&](NodeRegistry& nodes) { nodes.Add(std::move(def)); });
 }
 
 const NodeRegistry& BuiltinNodes() {

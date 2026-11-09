@@ -9,7 +9,9 @@ ernie_object_library(
     tables/instance_layout.cpp
     tables/instances.cpp
     tables/lights.cpp
+    tables/connections.cpp
     tables/materials.cpp
+    tables/pack.cpp
     tables/meshes.cpp
     tables/pipelines.cpp
     tables/plans.cpp

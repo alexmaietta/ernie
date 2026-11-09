@@ -101,4 +101,19 @@ std::string Replaced(std::string text, std::string_view from, std::string_view t
     return text;
 }
 
+std::string ModulePath(std::string_view module) {
+    std::string path(module);
+    std::ranges::replace(path, '.', '/');
+    return path + ".slang";
+}
+
+std::string MapOrigins(std::string message,
+                       std::span<const std::pair<std::string, std::string>> origins) {
+    for (const auto& [generated, origin] : origins) {
+        message =
+            Replaced(Replaced(std::move(message), "./" + generated, origin), generated, origin);
+    }
+    return message;
+}
+
 }

@@ -133,14 +133,11 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
     const bool pipelineNodes = source.find("import ernie.pipeline") != std::string::npos;
     const std::string module =
         (pipelineNodes ? "ernie.pipeline.nodes.n" : "ernie.material.nodes.n") + digest;
-    std::string path = module;
-    std::replace(path.begin(), path.end(), '.', '/');
-    path += ".slang";
+    const std::string path = ModulePath(module);
+    const std::pair<std::string, std::string> origins[] = {{path, file.string()},
+                                                           {module + ".slang", file.string()}};
     const auto mapped = [&](const Error& error) {
-        std::string message = Replaced(error.what(), "./" + path, file.string());
-        message =
-            Replaced(Replaced(message, path, file.string()), module + ".slang", file.string());
-        return Error("{}", message);
+        return Error("{}", MapOrigins(error.what(), origins));
     };
     const device::Backend backend = scene.GetDevice().Adapter().backend;
     if (pipelineNodes) {
