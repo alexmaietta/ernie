@@ -188,6 +188,28 @@ void RegisterBuiltinNodes(NodeRegistry& registry) {
                   .outputs = {{"cloud", SignalType::PointCloud}},
                   .module = kLidarNodes,
                   .type = "ToPointCloudNode"});
+    registry.Add({.id = "RadarReturns",
+                  .kind = NodeKind::Source,
+                  .outputs = {{"returns", SignalType::Returns}},
+                  .layout = LayoutRule::Returns});
+    registry.Add({.id = "RadarNoise",
+                  .inputs = {{"returns", SignalType::Returns}},
+                  .outputs = {{"returns", SignalType::Returns}},
+                  .parameters = {{"rangeSigma", 1, {0.05f}},
+                                 {"velocitySigma", 1, {0.1f}},
+                                 {"floor", 1, {0}}},
+                  .module = kRadarNodes,
+                  .type = "RadarNoiseNode"});
+    registry.Add({.id = "Cfar",
+                  .kind = NodeKind::Stencil,
+                  .inputs = {{"returns", SignalType::Returns}},
+                  .outputs = {{"returns", SignalType::Returns}},
+                  .parameters = {{"guard", 1, {1}, ParameterType::Int},
+                                 {"training", 1, {2}, ParameterType::Int},
+                                 {"falseAlarmRate", 1, {1e-3f}}},
+                  .radius = kCfarRadius,
+                  .module = kRadarNodes,
+                  .type = "CfarNode"});
     registry.Add({.id = "Tone",
                   .inputs = {{"color", SignalType::LinearColor}},
                   .outputs = {{"color", SignalType::LinearColor}},

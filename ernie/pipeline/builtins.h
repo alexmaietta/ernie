@@ -10,6 +10,8 @@ namespace ernie::pipeline {
 inline constexpr const char* kCameraNodes = "ernie.render.kernels.pipeline.nodes.camera";
 inline constexpr const char* kIspNodes = "ernie.render.kernels.pipeline.nodes.isp";
 inline constexpr const char* kLidarNodes = "ernie.render.kernels.pipeline.nodes.lidar";
+inline constexpr const char* kRadarNodes = "ernie.render.kernels.pipeline.nodes.radar";
+inline constexpr uint32_t kCfarRadius = 4;
 
 void RegisterBuiltinNodes(NodeRegistry& registry);
 

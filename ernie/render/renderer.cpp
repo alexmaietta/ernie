@@ -695,6 +695,13 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
             arenaBytes});
         each.scratch = each.base + each.arena.bytes;
         arenaBytes = each.scratch;
+        for (const pipeline::ResolvedNode& node : run.instance->resolved.nodes) {
+            if (registry[node.def].kind == pipeline::NodeKind::Source &&
+                run.instance->resolved.values[node.outputs.front()].type ==
+                    pipeline::SignalType::Returns) {
+                arenaBytes += recordBytes(elements);
+            }
+        }
         for (const pipeline::ResolvedOutput& output : run.instance->resolved.outputs) {
             const pipeline::SignalLayout& layout = product.layouts[output.value];
             if (run.instance->resolved.values[output.value].type ==
@@ -721,6 +728,7 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     std::map<uint32_t, Batch> batches;
     std::vector<uint32_t> words;
     std::vector<std::pair<device::BufferRange, device::BufferRange>> copies;
+    std::vector<std::pair<device::BufferRange, device::BufferRange>> sources;
     for (size_t index = 0; index < runs.size(); ++index) {
         const PipelineRun& run = runs[index];
         const PlannedPipeline& planned = *run.planned;
@@ -766,7 +774,25 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
                     throw Error("{} reads lidar returns, but no point cloud of {} reads it",
                                 run.instance->path, m_scene->ByIndex(product.prim).Path());
                 }
-                bindRecords(*cloud, layer(source, planned.sensor) * elements);
+                const uint64_t first = layer(source, planned.sensor) * elements;
+                const device::BufferRange records =
+                    device::BufferRange(*set.arena).Slice(scratch, elements * sizeof(PointRecord));
+                const device::BufferRange flags =
+                    device::BufferRange(*set.arena)
+                        .Slice(scratch + elements * sizeof(PointRecord),
+                               elements * sizeof(uint32_t));
+                scratch += recordBytes(elements);
+                sources.emplace_back(
+                    device::BufferRange(*cloud->records)
+                        .Slice(first * sizeof(PointRecord), elements * sizeof(PointRecord)),
+                    records);
+                sources.emplace_back(
+                    device::BufferRange(*cloud->flags)
+                        .Slice(first * sizeof(uint32_t), elements * sizeof(uint32_t)),
+                    flags);
+                entry.address = records.Address();
+                entry.returned = flags.Address();
+                entry.flags |= kSignalRecords | (cloud->world ? kSignalWorld : 0u);
             } else if (slot >= storedCount && type == pipeline::SignalType::PointCloud) {
                 const std::string& name = resolved.outputs[slot - storedCount].name;
                 const OwnedCloud* bound = nullptr;
@@ -865,6 +891,12 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     const uint64_t wordAddress =
         queue.Upload(words.data(), words.size() * sizeof(uint32_t)).Address();
     encoder.Barrier();
+    for (const auto& [from, to] : sources) {
+        encoder.Copy(from, to);
+    }
+    if (!sources.empty()) {
+        encoder.Barrier();
+    }
     for (auto& [id, batch] : batches) {
         for (PipelineCapture& capture : batch.captures) {
             capture.words.address += wordAddress;

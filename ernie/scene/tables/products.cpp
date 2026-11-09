@@ -204,9 +204,9 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const 
                     .output = output,
                     .tap = tap};
     if (bound.instance->resolved.values[found->value].type == pipeline::SignalType::PointCloud) {
-        if (kind.schema != SchemaId::Lidar) {
-            throw Error("{} reads the point cloud {} makes, and only lidars make them in a "
-                        "pipeline for now",
+        if (kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) {
+            throw Error("{} reads the point cloud {} makes, and only lidars and radars make them "
+                        "in a pipeline",
                         prim.Path(), bound.instance->path);
         }
         var.source = RenderVarSource::PointCloud;
@@ -508,9 +508,10 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 }
                 frame = var.frame;
             }
-            if (kind.schema != SchemaId::Lidar || !frame) {
-                throw Error("{} runs {}, which reads lidar returns, so its sensor must be a Lidar "
-                            "and a PointCloud render var must read one of its point cloud outputs",
+            if ((kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) || !frame) {
+                throw Error("{} runs {}, which reads returns, so its sensor must be a Lidar or a "
+                            "Radar and a PointCloud render var must read one of its point cloud "
+                            "outputs",
                             path, bound.instance->path);
             }
         }

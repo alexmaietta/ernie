@@ -369,3 +369,67 @@ class ToPointCloud : SensorNode (
 ) {
     token info:id = ToPointCloud
 }
+
+class RadarReturns : SensorNode (
+    doc = "The returns a radar's trace found, one per ray with its range, radial velocity, intensity and position, and whether it hit. It's how a radar pipeline asks the trace for its returns, in the frame of the point cloud that reads the pipeline."
+) {
+    token info:id = RadarReturns
+}
+
+class RadarNoise : SensorNode (
+    doc = "Adds Gaussian noise to each return's range and radial velocity, and a thermal noise floor to its intensity as complex Gaussian noise on its amplitude."
+) {
+    token info:id = RadarNoise
+    float inputs:rangeSigma = 0.05 (
+        tracked
+        unit = meters
+        group = "Noise"
+        displayName = "Range Sigma"
+        min = 0
+        doc = "The range noise's standard deviation."
+    )
+    float inputs:velocitySigma = 0.1 (
+        tracked
+        group = "Noise"
+        displayName = "Velocity Sigma"
+        min = 0
+        doc = "The radial velocity noise's standard deviation in meters per second."
+    )
+    float inputs:floor = 0 (
+        tracked
+        group = "Noise"
+        displayName = "Noise Floor"
+        min = 0
+        doc = "The mean noise power added to each return's intensity. 0 adds none."
+    )
+}
+
+class Cfar : SensorNode (
+    doc = "Cell-averaging CFAR over the ray grid. It keeps a return only when its intensity beats the mean of its training cells, past its guard cells, by the factor that gives falseAlarmRate on exponentially distributed noise."
+) {
+    token info:id = Cfar
+    int inputs:guard = 1 (
+        tracked
+        group = "Detection"
+        displayName = "Guard Cells"
+        min = 0
+        max = 4
+        doc = "How many cells on each side of the cell under test are left out of the average."
+    )
+    int inputs:training = 2 (
+        tracked
+        group = "Detection"
+        displayName = "Training Cells"
+        min = 1
+        max = 4
+        doc = "How many cells past the guard cells on each side are averaged, up to 4 cells from the cell under test in all."
+    )
+    float inputs:falseAlarmRate = 0.001 (
+        tracked
+        group = "Detection"
+        displayName = "False Alarm Rate"
+        min = 0
+        max = 1
+        doc = "The fraction of noise-only cells detected."
+    )
+}

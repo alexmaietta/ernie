@@ -130,6 +130,7 @@ ernie_test(
         unit/render/utest_render_in_flight.cpp
         unit/render/utest_render_lidar.cpp
         unit/render/utest_render_lidar_pipeline.cpp
+        unit/render/utest_render_radar_pipeline.cpp
         unit/render/utest_render_origin.cpp
         unit/render/utest_render_overlay.cpp
         unit/render/utest_render_pipelines.cpp
