@@ -213,14 +213,14 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                         read += std::format("{}context{}.Parameter({})", component == 0 ? "" : ", ",
                                             node, word + component);
                     }
-                    word += parameter.words;
                     if (parameter.type == ParameterType::Int) {
-                        read = std::format("int({})", read);
+                        read = std::format("asint(context{}.ParameterBits({}))", node, word);
                     } else if (parameter.type == ParameterType::Bool) {
-                        read = std::format("{} != 0", read);
+                        read = std::format("context{}.ParameterBits({}) != 0", node, word);
                     } else if (parameter.words > 1) {
                         read = std::format("float{}({})", parameter.words, read);
                     }
+                    word += parameter.words;
                     source += std::format("    node{}.{} = {};\n", node, parameter.name, read);
                 }
                 if (def.context != kNoContextArgument) {

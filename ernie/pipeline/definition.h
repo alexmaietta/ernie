@@ -25,7 +25,7 @@ using PipelineLibrary = graph::DefinitionLibrary<PipelineDefinition>;
 using PipelineSet = graph::DefinitionSet<PipelineDefinition>;
 
 std::vector<uint32_t> PackWords(const PipelineDefinition& definition,
-                                const ResolvedPipeline& instance);
+                                const ResolvedPipeline& instance, const NodeRegistry& registry);
 
 PipelineDefinition BuildDefinition(uint32_t id, const ResolvedPipeline& pipeline,
                                    const NodeRegistry& registry, Fusion fusion = Fusion::Fused);

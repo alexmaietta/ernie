@@ -5,13 +5,16 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "ernie/device/program.h"
 #include "ernie/pipeline/builtins.h"
 #include "ernie/pipeline/definition.h"
+#include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/stage/structure/structure.h"
 
@@ -25,6 +28,7 @@ struct PipelineInstance {
     uint32_t definition = 0;
     pipeline::ResolvedPipeline resolved;
     std::vector<uint32_t> words;
+    uint32_t firstWord = 0;
     std::string error;
 };
 
@@ -42,6 +46,16 @@ class PipelineTable : public RenderTable {
         return Registry() != pipeline::PipelineNodes();
     }
 
+    void Hold(std::vector<Ref<const RefCounted>>& held) const override {
+        HoldBuffers(held, {m_words.Buffer()});
+    }
+
+    uint64_t WordsAddress() const {
+        return m_words.Address();
+    }
+
+    std::vector<uint32_t> ReadWords(const PipelineInstance& instance) const;
+
     void Run(const ChangeSet& changes, TableVersions& versions) override;
 
     std::shared_ptr<const PipelineInstance> Find(uint32_t prim) const;
@@ -53,6 +67,20 @@ class PipelineTable : public RenderTable {
     }
 
   private:
+    struct Gathered {
+        uint32_t parameter = 0;
+        ColumnRef column;
+        uint32_t row = 0;
+    };
+
+    struct Copy {
+        ColumnRef column;
+        uint32_t row = 0;
+        uint32_t destination = 0;
+    };
+
+    void Pack(bool rewrite);
+
     struct Tap {
         std::string name;
         uint32_t node = kNoPrim;
@@ -67,6 +95,12 @@ class PipelineTable : public RenderTable {
     Structure& m_structure;
     pipeline::PipelineLibrary m_library;
     std::shared_ptr<const pipeline::NodeRegistry> m_registry;
+    mutable std::map<uint32_t, std::vector<Gathered>> m_gathered;
+    std::vector<Copy> m_copies;
+    std::set<const ColumnInfo*> m_values;
+    DeviceTable<uint32_t> m_words{"pipeline words"};
+    Ref<device::Buffer> m_entries;
+    Ref<device::Program> m_program;
     mutable std::vector<ColumnRef> m_inputs;
     mutable uint32_t m_inputSchemas = 0;
     mutable std::mutex m_mutex;

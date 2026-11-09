@@ -6,13 +6,20 @@
 namespace ernie::pipeline {
 
 std::vector<uint32_t> PackWords(const PipelineDefinition& definition,
-                                const ResolvedPipeline& instance) {
+                                const ResolvedPipeline& instance, const NodeRegistry& registry) {
     std::vector<uint32_t> words(definition.parameterWords, 0);
     for (uint32_t node = 0; node < instance.nodes.size(); ++node) {
         const std::vector<float>& values = instance.nodes[node].parameters;
-        for (uint32_t index = 0; index < values.size(); ++index) {
-            words[definition.parameterOffsets[node] + index] =
-                std::bit_cast<uint32_t>(values[index]);
+        uint32_t index = 0;
+        for (const ParameterDef& parameter : registry[instance.nodes[node].def].parameters) {
+            for (uint32_t word = 0; word < parameter.words && index < values.size();
+                 ++word, ++index) {
+                const float value = values[index];
+                words[definition.parameterOffsets[node] + index] =
+                    parameter.type == ParameterType::Int ? std::bit_cast<uint32_t>(int32_t(value))
+                    : parameter.type == ParameterType::Bool ? uint32_t(value != 0)
+                                                            : std::bit_cast<uint32_t>(value);
+            }
         }
     }
     return words;

@@ -41,8 +41,8 @@ struct CfarNode {
         if (!output.returned) {
             return;
         }
-        const int guard = clamp(int(context.Parameter(0)), 0, kCfarRadius);
-        const int reach = clamp(guard + int(context.Parameter(1)), guard, kCfarRadius);
+        const int guard = clamp(asint(context.ParameterBits(0)), 0, kCfarRadius);
+        const int reach = clamp(guard + asint(context.ParameterBits(1)), guard, kCfarRadius);
         float sum = 0;
         float cells = 0;
         for (int dy = -reach; dy <= reach; ++dy) {

@@ -732,7 +732,7 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     };
 
     std::map<uint32_t, Batch> batches;
-    std::vector<uint32_t> words;
+    const uint64_t wordAddress = SceneImpl::Get(*m_scene).GetPipelines().WordsAddress();
     std::vector<std::pair<device::BufferRange, device::BufferRange>> copies;
     std::vector<std::pair<device::BufferRange, device::BufferRange>> sources;
     for (size_t index = 0; index < runs.size(); ++index) {
@@ -887,7 +887,7 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         const uint32_t camera = prims.FindRow(planned.sensor, SchemaId::Camera);
         batch.captures.push_back(
             {.firstElement = batch.elements,
-             .words = {words.size() * sizeof(uint32_t)},
+             .words = {wordAddress + uint64_t(run.instance->firstWord) * sizeof(uint32_t)},
              .sensor = planned.sensor,
              .detector = detector == kNoRow ? 0 : detector,
              .width = product.width * returns,
@@ -897,13 +897,9 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
              .firstValue = firstValue,
              .camera = camera == kNoRow ? 0 : camera,
              .state = {state.state->Address()}});
-        words.insert(words.end(), run.instance->words.begin(), run.instance->words.end());
-        words.push_back(0);
         batch.elements += elements;
     }
 
-    const uint64_t wordAddress =
-        queue.Upload(words.data(), words.size() * sizeof(uint32_t)).Address();
     encoder.Barrier();
     for (const auto& [from, to] : sources) {
         encoder.Copy(from, to);
@@ -912,9 +908,6 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         encoder.Barrier();
     }
     for (auto& [id, batch] : batches) {
-        for (PipelineCapture& capture : batch.captures) {
-            capture.words.address += wordAddress;
-        }
         const PipelineParams params{
             .tables = {snapshot.tables},
             .captures = {queue

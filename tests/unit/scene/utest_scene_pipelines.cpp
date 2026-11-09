@@ -88,13 +88,18 @@ TEST(PipelinesTest, ValueEditsRepackAndUniformEditsMakeNewDefinitions) {
         ASSERT_NE(first, nullptr);
         ASSERT_EQ(first->error, "");
         EXPECT_GT(first->definition, 0u);
-        EXPECT_EQ(first->words, (std::vector<uint32_t>{0, 0, std::bit_cast<uint32_t>(1.0f)}));
+        const PipelineTable& table = SceneImpl::Get(*rig.scene).GetPipelines();
+        EXPECT_EQ(table.ReadWords(*first),
+                  (std::vector<uint32_t>{0, 0, std::bit_cast<uint32_t>(1.0f)}));
+        const uint64_t version = table.Version();
 
         rig.gain.Set(Gain::kGain, 2.0f);
         rig.scene->Publish().Wait();
         const auto repacked = Instance(rig, rig.raw);
-        EXPECT_EQ(repacked->definition, first->definition);
-        EXPECT_EQ(repacked->words, (std::vector<uint32_t>{0, 0, std::bit_cast<uint32_t>(2.0f)}));
+        EXPECT_EQ(repacked, first);
+        EXPECT_EQ(table.Version(), version);
+        EXPECT_EQ(table.ReadWords(*repacked),
+                  (std::vector<uint32_t>{0, 0, std::bit_cast<uint32_t>(2.0f)}));
 
         rig.emva.Set(Emva1288::kShot, ShotNoise::Gaussian);
         rig.scene->Publish().Wait();

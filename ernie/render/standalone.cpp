@@ -70,6 +70,7 @@ struct Pipeline::State {
     std::string path;
     pipeline::ResolvedPipeline instance;
     std::shared_ptr<const CompiledPipeline> compiled;
+    std::optional<std::vector<uint32_t>> words;
 
     State(device::Device& on, std::shared_ptr<const pipeline::NodeRegistry> nodes, std::string name,
           pipeline::ResolvedPipeline resolved)
@@ -120,6 +121,7 @@ Pipeline::Pipeline(const Ref<Scene>& scene, std::string_view path) {
     }
     m_state = std::make_unique<State>(scene->GetDevice(), table.Registry(), std::string(path),
                                       instance->resolved);
+    m_state->words = table.ReadWords(*instance);
 }
 
 Pipeline::Pipeline(device::Device& device, const pipeline::PipelineDesc& desc)
@@ -239,8 +241,8 @@ PipelineOutputs Pipeline::Run(const PipelineRunDesc& desc, device::Tensor& state
             {tensors[slot].Address(), layout.channels, layout.mosaic ? kSignalMosaic : 0u});
     }
 
-    const std::vector<uint32_t> packed = pipeline::PackWords(definition, instance);
-    std::vector<uint32_t> words = packed;
+    std::vector<uint32_t> words =
+        m_state->words ? *m_state->words : pipeline::PackWords(definition, instance, registry);
     words.push_back(0);
     CameraRecord camera{};
     camera.exposureTime = desc.exposureTime;
