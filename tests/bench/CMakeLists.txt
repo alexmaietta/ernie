@@ -75,6 +75,7 @@ ernie_bench(
         render/btest_render_points.cpp
         render/btest_render_renderer.cpp
         render/btest_render_scaling.cpp
+        render/btest_render_sensors.cpp
         render/btest_render_throughput.cpp
         render/btest_render_workloads.cpp
 )
