@@ -47,6 +47,7 @@ foreach(
     Imath
     ImathConfig
     OpenEXRConfig
+    openjph
 )
     if(TARGET ${target})
         get_target_property(type ${target} TYPE)
