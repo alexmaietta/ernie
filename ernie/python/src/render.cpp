@@ -624,14 +624,17 @@ void RegisterOverlays(nb::module_& module) {
                 nb::arg("device") = nb::none(), nb::arg("stream") = nb::none())
             .def(
                 "add_arrows",
-                [](Overlay& overlay, nb::handle points, nb::handle ends, nb::handle headLengths,
-                   float headLength, nb::handle colors, nb::handle widths, nb::handle worlds,
-                   nb::handle itemCount, std::optional<OverlayStyle> style,
-                   std::optional<Ref<device::Device>> device, std::optional<uintptr_t> stream) {
+                [](Overlay& overlay, nb::handle points, nb::handle ends, nb::handle vectors,
+                   float vectorScale, nb::handle headLengths, float headLength, nb::handle colors,
+                   nb::handle widths, nb::handle worlds, nb::handle itemCount,
+                   std::optional<OverlayStyle> style, std::optional<Ref<device::Device>> device,
+                   std::optional<uintptr_t> stream) {
                     OverlaySources sources{device, stream};
                     overlay.Add(OverlayArrows{
                         .points = sources.Take(points, "overlay points"),
                         .ends = sources.Take(ends, "overlay ends"),
+                        .vectors = sources.Take(vectors, "overlay vectors"),
+                        .vectorScale = vectorScale,
                         .headLengths = sources.Take(headLengths, "overlay head lengths"),
                         .colors = sources.Take(colors, "overlay colors"),
                         .widths = sources.Take(widths, "overlay widths"),
@@ -641,7 +644,8 @@ void RegisterOverlays(nb::module_& module) {
                         .style = Style(style),
                         .owner = sources.held});
                 },
-                nb::arg("points"), nb::arg("ends"), nb::kw_only(),
+                nb::arg("points"), nb::arg("ends") = nb::none(), nb::kw_only(),
+                nb::arg("vectors") = nb::none(), nb::arg("vector_scale") = 1.0f,
                 nb::arg("head_lengths") = nb::none(), nb::arg("head_length") = 0.0f,
                 nb::arg("colors") = nb::none(), nb::arg("widths") = nb::none(),
                 nb::arg("worlds") = nb::none(), nb::arg("item_count") = nb::none(),

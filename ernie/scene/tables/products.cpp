@@ -172,9 +172,10 @@ std::vector<PointChannel> CloudChannels(const Prim& prim, const SensorKind& kind
                         channel);
         }
         const auto point = PointChannel(found - std::begin(kPointChannels));
-        if (point == PointChannel::RadialVelocity &&
+        if ((point == PointChannel::RadialVelocity ||
+             point == PointChannel::RadialVelocityVector) &&
             !Includes(kind.outputs, RenderVarSource::RadialVelocity)) {
-            throw Error("{} asks for RadialVelocity, which a {} doesn't measure", prim.Path(),
+            throw Error("{} asks for {}, which a {} doesn't measure", prim.Path(), channel,
                         Info(kind.schema).name);
         }
         semantic |= point == PointChannel::StableId;

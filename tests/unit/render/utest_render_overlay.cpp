@@ -119,6 +119,42 @@ TEST(OverlayTest, DrawsPicksAndHidesOverlays) {
     });
 }
 
+TEST(OverlayTest, ArrowVectorsDrawLikeTheirEnds) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Empty(device);
+        Renderer renderer(scene);
+        const auto tensor = [&](const std::vector<float>& values) {
+            return device::Tensor(device.CreateBuffer({.label = "arrows"}, values), 0,
+                                  device::DType::Float32, {int64_t(values.size() / 3), 3});
+        };
+        const std::vector<float> points = {-1, 0, -0.5f, 0.5f, 0, 0.5f};
+        const std::vector<float> vectors = {1, 0, 0.5f, -0.5f, 0, -1};
+        std::vector<float> ends = points;
+        for (size_t i = 0; i < ends.size(); ++i) {
+            ends[i] += 0.5f * vectors[i];
+        }
+        const OverlayStyle style{.color = {0, 1, 0, 1}, .width = 3};
+        Overlay byEnds;
+        byEnds.Add(OverlayArrows{.points = tensor(points), .ends = tensor(ends), .style = style});
+        renderer.GetOverlays()->Set("arrows", byEnds);
+        const std::vector<uint8_t> expected = Drawn(renderer);
+        ASSERT_FALSE(expected.empty());
+        ASSERT_TRUE(std::ranges::any_of(expected, [](uint8_t value) { return value > 200; }));
+
+        Overlay byVectors;
+        byVectors.Add(OverlayArrows{.points = tensor(points),
+                                    .vectors = tensor(vectors),
+                                    .vectorScale = 0.5f,
+                                    .style = style});
+        renderer.GetOverlays()->Set("arrows", byVectors);
+        EXPECT_EQ(Drawn(renderer), expected);
+        EXPECT_THROW(Overlay().Add(OverlayArrows{.points = tensor(points),
+                                                 .ends = tensor(ends),
+                                                 .vectors = tensor(vectors)}),
+                     Error);
+    });
+}
+
 TEST(OverlayTest, AnchorsShapesOnTheScreen) {
     ForEachDevice([](Device& device) {
         Renderer renderer(Empty(device));

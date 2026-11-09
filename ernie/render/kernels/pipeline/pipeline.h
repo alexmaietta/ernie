@@ -13,7 +13,7 @@ static const uint kSignalSampled = 4;
 static const uint kSignalRecords = 16;
 static const uint kSignalWorld = 32;
 static const uint kSignalStrideShift = 8;
-static const uint kRecordWords = 10;
+static const uint kRecordWords = 14;
 static const uint kStatWords = 16;
 static const uint kReduceGroups = 64;
 

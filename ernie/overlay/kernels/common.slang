@@ -82,7 +82,9 @@ struct ShapeRow {
     }
 
     float3 End() {
-        return LoadPoint(batch.ends, slice * batch.endWorldStride + row * batch.endStride);
+        const float3 end =
+            LoadPoint(batch.ends, slice * batch.endWorldStride + row * batch.endStride);
+        return (batch.flags & kOverlayEndVectors) != 0 ? Point() + batch.vectorScale * end : end;
     }
 
     float3 Sample(uint index) {

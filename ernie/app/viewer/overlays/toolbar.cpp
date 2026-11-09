@@ -655,9 +655,12 @@ void Toolbar::DrawHudMenu() {
     ImGui::MenuItem("Range Rings", nullptr, &guides.rangeRings);
     ImGui::SetItemTooltip("Rings at a quarter, half, three quarters and all of each sensor's "
                           "range, in its horizontal plane");
+    ImGui::MenuItem("Through Geometry", nullptr, &guides.cloudsThroughGeometry);
+    ImGui::SetItemTooltip("Draw points and arrows over the surfaces in front of them, such as "
+                          "returns on the far side of an object");
     ImGui::MenuItem("Velocity Arrows", nullptr, &guides.velocityArrows);
     ImGui::SetItemTooltip("An arrow along each radar return's beam, as far as the return moves "
-                          "in half a second");
+                          "in half a second, colored by radial velocity");
     ImGui::Unindent();
     ImGui::EndDisabled();
     ImGui::SeparatorText("Guides");

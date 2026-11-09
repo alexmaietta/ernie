@@ -33,9 +33,11 @@ namespace ernie {
 namespace {
 
 constexpr uint64_t PointCloud::* kPointFields[] = {
-    &PointCloud::coordinates, &PointCloud::distance,       &PointCloud::intensity,
-    &PointCloud::stableId,    &PointCloud::emitter,        &PointCloud::firing,
-    &PointCloud::echo,        &PointCloud::radialVelocity, &PointCloud::instanceId};
+    &PointCloud::coordinates, &PointCloud::distance,
+    &PointCloud::intensity,   &PointCloud::stableId,
+    &PointCloud::emitter,     &PointCloud::firing,
+    &PointCloud::echo,        &PointCloud::radialVelocity,
+    &PointCloud::instanceId,  &PointCloud::radialVelocityVector};
 
 constexpr size_t kHeldOutputsWarning = 8;
 

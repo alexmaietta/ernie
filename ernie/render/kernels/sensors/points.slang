@@ -15,8 +15,12 @@ void WritePoint(CapturePixel at, bool returned, SensorFrame frame, float3 positi
         if (returned) {
             const float3 point =
                 cloud->world != 0 ? position + frame.origin : frame.ToLocal(position);
+            const float3 offset = cloud->world != 0 ? position - frame.position : point;
+            const float length = sqrt(dot(offset, offset));
+            const float3 direction = length > 0 ? offset / length : float3(0);
             Ptr<PointRecord>(cloud->records)[at.index] = {
-                point.x, point.y, point.z, distance, intensity, radialVelocity, prim, 0, instance
+                point.x, point.y, point.z, distance, intensity, radialVelocity, prim, 0, instance,
+                direction.x, direction.y, direction.z, 0
             };
         }
     }
@@ -60,6 +64,12 @@ void ScatterPoints(ScatterParams p) {
     }
     if (cloud->instanceId != 0) {
         Ptr<int64_t>(cloud->instanceId)[at] = record.instanceId;
+    }
+    if (cloud->radialVelocityVector != 0) {
+        float* vectors = Ptr<float>(cloud->radialVelocityVector);
+        vectors[3 * at] = record.radialVelocity * record.directionX;
+        vectors[3 * at + 1] = record.radialVelocity * record.directionY;
+        vectors[3 * at + 2] = record.radialVelocity * record.directionZ;
     }
     if (cloud->stableId != 0) {
         const StableId id = p.tables->semantics.stableIds[record.prim];

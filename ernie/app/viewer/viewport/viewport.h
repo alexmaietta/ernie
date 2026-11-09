@@ -130,6 +130,7 @@ struct ViewportGuides {
     bool sensorFields = true;
     bool rangeRings = false;
     bool velocityArrows = false;
+    bool cloudsThroughGeometry = false;
     bool cameras = true;
     bool lights = false;
     bool outline = true;
@@ -391,8 +392,8 @@ class Viewport {
         device::Tensor points;
         device::Tensor count;
         device::Tensor colors;
-        std::optional<std::array<device::Download, 3>> reading;
-        std::vector<Float3> arrows;
+        device::Tensor vectors;
+        device::Tensor vectorColors;
     };
 
     void SyncSensorClouds(std::vector<uint32_t> sensors, const std::vector<uint32_t>& nodes,

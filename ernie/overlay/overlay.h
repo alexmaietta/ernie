@@ -125,6 +125,8 @@ struct ERNIE_API OverlayFrames {
 struct ERNIE_API OverlayArrows {
     device::Tensor points;
     device::Tensor ends;
+    device::Tensor vectors;
+    float vectorScale = 1;
     device::Tensor headLengths;
     device::Tensor colors;
     device::Tensor widths;

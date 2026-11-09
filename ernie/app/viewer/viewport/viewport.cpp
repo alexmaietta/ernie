@@ -11,7 +11,6 @@
 #include <numbers>
 #include <optional>
 #include <random>
-#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -913,7 +912,7 @@ void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors, const std::vector
         }
         std::vector<std::string> channels = {"Coordinates", "Distance", "Intensity"};
         if (radar) {
-            channels.push_back("RadialVelocity");
+            channels.insert(channels.end(), {"RadialVelocity", "RadialVelocityVector"});
         }
         const std::string var = product + "Points";
         if (node == kNoPrim) {
@@ -983,8 +982,9 @@ void Viewport::ShowClouds(const RenderOutput& output) {
     if (m_sensorClouds.empty()) {
         return;
     }
-    constexpr size_t kMostArrows = 4096;
     constexpr float kArrowSeconds = 0.5f;
+    const ColorizeOptions velocityColors{
+        .colormap = Colormap::Turbo, .minimum = -10.0f, .maximum = 10.0f, .centered = true};
     Overlay shown;
     for (SensorCloud& cloud : m_sensorClouds) {
         if (output.Contains(cloud.product) && !output[cloud.product].frames.empty()) {
@@ -1018,50 +1018,26 @@ void Viewport::ShowClouds(const RenderOutput& output) {
                     break;
                 default:
                     values = points.channels.at("RadialVelocity");
-                    options.minimum = -10;
-                    options.maximum = 10;
-                    options.centered = true;
+                    options = velocityColors;
                     break;
                 }
                 cloud.colors = ColorizeScalars(values, options).Select(0);
             }
-            if (cloud.radar && guides.velocityArrows && !cloud.reading) {
-                cloud.reading = {coordinates.ToHostAsync(),
-                                 points.channels.at("RadialVelocity").ToHostAsync(),
-                                 cloud.count.ToHostAsync()};
+            cloud.vectors = {};
+            cloud.vectorColors = {};
+            if (cloud.radar && guides.velocityArrows) {
+                cloud.vectors = points.channels.at("RadialVelocityVector").Select(0);
+                cloud.vectorColors =
+                    mode == CloudColor::Velocity
+                        ? cloud.colors
+                        : ColorizeScalars(points.channels.at("RadialVelocity"), velocityColors)
+                              .Select(0);
             }
-        }
-        if (cloud.reading && std::ranges::all_of(*cloud.reading, [](const device::Download& read) {
-                return read.Ready();
-            })) {
-            const auto floats = [](const device::Download& read) {
-                const Span<const std::byte> bytes = read.Bytes();
-                return std::span(reinterpret_cast<const float*>(bytes.data()),
-                                 bytes.size() / sizeof(float));
-            };
-            const std::span<const float> positions = floats((*cloud.reading)[0]);
-            const std::span<const float> velocities = floats((*cloud.reading)[1]);
-            uint32_t count = 0;
-            std::memcpy(&count, (*cloud.reading)[2].Bytes().data(), sizeof(count));
-            count = std::min<uint32_t>({count, uint32_t(velocities.size()),
-                                        uint32_t(positions.size() / 3), uint32_t(kMostArrows)});
-            cloud.arrows.clear();
-            for (uint32_t at = 0; at < count; ++at) {
-                const Float3 point{positions[3 * at], positions[3 * at + 1], positions[3 * at + 2]};
-                const float length =
-                    std::sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
-                if (length <= 0) {
-                    continue;
-                }
-                const float scale = velocities[at] * kArrowSeconds / length;
-                cloud.arrows.push_back(point);
-                cloud.arrows.push_back(
-                    {point.x * (1 + scale), point.y * (1 + scale), point.z * (1 + scale)});
-            }
-            cloud.reading.reset();
         }
         const OverlayStyle anchored{.color = cloud.color,
                                     .width = 1,
+                                    .depth = guides.cloudsThroughGeometry ? OverlayDepth::XRay
+                                                                          : OverlayDepth::Test,
                                     .world = cloud.world,
                                     .anchor = cloud.sensor,
                                     .pickable = false};
@@ -1090,10 +1066,13 @@ void Viewport::ShowClouds(const RenderOutput& output) {
                 shown.Circle({0, 0, 0}, {0, 1, 0}, cloud.range * float(ring) / 4, style);
             }
         }
-        if (cloud.radar && guides.velocityArrows) {
-            for (size_t at = 0; at + 1 < cloud.arrows.size(); at += 2) {
-                shown.Arrow(cloud.arrows[at], cloud.arrows[at + 1], anchored);
-            }
+        if (cloud.radar && guides.velocityArrows && !cloud.vectors.Empty()) {
+            shown.Add(OverlayArrows{.points = cloud.points,
+                                    .vectors = cloud.vectors,
+                                    .vectorScale = kArrowSeconds,
+                                    .colors = cloud.vectorColors,
+                                    .itemCount = cloud.count,
+                                    .style = anchored});
         }
     }
     m_renderer->GetOverlays()->Set(kCloudsOverlay, shown);

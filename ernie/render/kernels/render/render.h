@@ -30,9 +30,13 @@ struct PointRecord {
     uint prim;
     uint padding;
     int64_t instanceId;
+    float directionX;
+    float directionY;
+    float directionZ;
+    uint padding1;
 };
 
-ERNIE_CHECK_SIZE(PointRecord, 40);
+ERNIE_CHECK_SIZE(PointRecord, 56);
 
 struct PointCloud {
     uint64_t records;
@@ -48,6 +52,7 @@ struct PointCloud {
     uint64_t echo;
     uint64_t radialVelocity;
     uint64_t instanceId;
+    uint64_t radialVelocityVector;
     uint64_t next;
     uint slotsPerSensor;
     uint width;
@@ -57,7 +62,7 @@ struct PointCloud {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(PointCloud, 136);
+ERNIE_CHECK_SIZE(PointCloud, 144);
 
 #ifdef __SLANG__
 

@@ -45,6 +45,7 @@ struct OverlayData {
         OverlayPrimShape primShape = OverlayPrimShape::Frames;
         float length = 0;
         float fade = 0;
+        std::optional<float> vectorScale;
         std::optional<ScreenPlacement> placement;
         OverlayNumberFormat format;
         std::shared_ptr<const void> owner;

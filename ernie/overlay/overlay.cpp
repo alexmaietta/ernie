@@ -1017,16 +1017,21 @@ Overlay& Overlay::Add(OverlayFrames frames) {
 }
 
 Overlay& Overlay::Add(OverlayArrows arrows) {
+    if (!arrows.ends.Empty() && !arrows.vectors.Empty()) {
+        throw Error("Overlay arrows take ends or vectors, not both");
+    }
+    const bool vectors = !arrows.vectors.Empty();
     Batch batch{.kind = OverlayKind::Arrows,
                 .style = arrows.style,
                 .points = std::move(arrows.points),
-                .ends = std::move(arrows.ends),
+                .ends = vectors ? std::move(arrows.vectors) : std::move(arrows.ends),
                 .colors = std::move(arrows.colors),
                 .sizes = std::move(arrows.widths),
                 .worlds = std::move(arrows.worlds),
                 .itemCount = std::move(arrows.itemCount),
                 .scalars = std::move(arrows.headLengths),
                 .length = arrows.headLength,
+                .vectorScale = vectors ? std::optional(arrows.vectorScale) : std::nullopt,
                 .owner = std::move(arrows.owner)};
     Push(Edit(), std::move(batch));
     return *this;
@@ -1467,6 +1472,10 @@ void OverlayPass::AddBatches(const OverlayContents& overlay, uint32_t index, uin
                     (style.facing ? kOverlayFacing : 0) | (style.pickable ? kOverlayPickable : 0);
         gpu.id = style.id;
         gpu.ids = {unused};
+        if (batch.vectorScale) {
+            gpu.flags |= kOverlayEndVectors;
+            gpu.vectorScale = *batch.vectorScale;
+        }
         if (style.screen) {
             gpu.flags |= kOverlayScreenPoints;
             gpu.depth = uint32_t(OverlayDepth::Always);

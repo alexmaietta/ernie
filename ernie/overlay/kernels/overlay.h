@@ -90,6 +90,7 @@ static const uint kOverlayFacing = 1u << 14;
 static const uint kOverlayPickable = 1u << 15;
 static const uint kOverlayHasIds = 1u << 16;
 static const uint kOverlayScreenPoints = 1u << 17;
+static const uint kOverlayEndVectors = 1u << 18;
 static const uint kOverlayNoPick = ~0u;
 
 static const uint kOverlayFrustumLines = 15;
@@ -231,7 +232,7 @@ struct OverlayBatch {
     float justify;
     uint id;
     uint idStride;
-    uint padding;
+    float vectorScale;
 };
 
 ERNIE_CHECK_SIZE(OverlayBatch, 400);

@@ -53,6 +53,7 @@ enum class PointChannel : uint32_t {
     Echo,
     RadialVelocity,
     InstanceId,
+    RadialVelocityVector,
 };
 
 struct PointChannelInfo {
@@ -62,11 +63,16 @@ struct PointChannelInfo {
 };
 
 inline constexpr PointChannelInfo kPointChannels[] = {
-    {"Coordinates", device::DType::Float32, 3}, {"Distance", device::DType::Float32, 1},
-    {"Intensity", device::DType::Float32, 1},   {"StableId", device::DType::UInt32, 4},
-    {"Emitter", device::DType::UInt32, 1},      {"Firing", device::DType::UInt32, 1},
-    {"Echo", device::DType::UInt32, 1},         {"RadialVelocity", device::DType::Float32, 1},
-    {"InstanceId", device::DType::Int64, 1}};
+    {"Coordinates", device::DType::Float32, 3},
+    {"Distance", device::DType::Float32, 1},
+    {"Intensity", device::DType::Float32, 1},
+    {"StableId", device::DType::UInt32, 4},
+    {"Emitter", device::DType::UInt32, 1},
+    {"Firing", device::DType::UInt32, 1},
+    {"Echo", device::DType::UInt32, 1},
+    {"RadialVelocity", device::DType::Float32, 1},
+    {"InstanceId", device::DType::Int64, 1},
+    {"RadialVelocityVector", device::DType::Float32, 3}};
 
 struct ResolvedVar {
     uint32_t prim = kNoPrim;

@@ -144,6 +144,55 @@ TEST(RadarPipelineTest, TracedCfarKeepsReturnsByItsFalseAlarmRate) {
     });
 }
 
+TEST(RadarPipelineTest, RadialVelocityVectorsPointAlongTheirBeams) {
+    for (const FrameOfReference frame : {FrameOfReference::Sensor, FrameOfReference::World}) {
+        ForEachDevice([&](Device& device) {
+            const Ref<Scene> scene = Scene::Create(device);
+            const Prim wall =
+                scene->Define<Plane>("/Wall", {.translate = {0, 0, -20}, .width = 0, .length = 0});
+            scene->Apply<MotionAPI>(wall, {.motionVelocity = {0, 0, 3}});
+            scene->Define<Radar>(
+                "/Radar", {.translate = {1, 2, 3}, .fieldOfView = {40, 20}, .rays = {16, 8}});
+            scene->Define<Scope>("/Render");
+            scene->Define<RenderVar>(
+                "/Render/Points",
+                {.sourceName = "PointCloud",
+                 .channels = {"Coordinates", "RadialVelocity", "RadialVelocityVector"},
+                 .frameOfReference = frame});
+            scene->Define<RenderProduct>("/Render/Scan",
+                                         {.camera = {"/Radar"}, .orderedVars = {"/Render/Points"}});
+            Renderer renderer(scene);
+            RenderOutput output = renderer.Step(kProducts, 0);
+            output.Wait();
+            const RenderVarOutput& cloud =
+                output["/Render/Scan"].frames.at(0).RenderVar("/Render/Points");
+            const uint32_t count = cloud.channels.at("Counts").ToHost<uint32_t>().at(0);
+            ASSERT_EQ(count, 16u * 8u);
+            const std::vector<float> points = cloud.channels.at("Coordinates").ToHost<float>();
+            const std::vector<float> speeds = cloud.channels.at("RadialVelocity").ToHost<float>();
+            const std::vector<float> vectors =
+                cloud.channels.at("RadialVelocityVector").ToHost<float>();
+            const float origin[3] = {frame == FrameOfReference::World ? 1.0f : 0.0f,
+                                     frame == FrameOfReference::World ? 2.0f : 0.0f,
+                                     frame == FrameOfReference::World ? 3.0f : 0.0f};
+            for (uint32_t i = 0; i < count; ++i) {
+                float beam[3];
+                float length = 0;
+                for (int axis = 0; axis < 3; ++axis) {
+                    beam[axis] = points[3 * i + axis] - origin[axis];
+                    length += beam[axis] * beam[axis];
+                }
+                length = std::sqrt(length);
+                ASSERT_GT(std::abs(speeds[i]), 1) << i;
+                for (int axis = 0; axis < 3; ++axis) {
+                    EXPECT_NEAR(vectors[3 * i + axis], speeds[i] * beam[axis] / length, 1e-3f)
+                        << i << " axis " << axis;
+                }
+            }
+        });
+    }
+}
+
 TEST(RadarPipelineTest, CfarFindsATargetAndHoldsItsFalseAlarmRateOnNoise) {
     constexpr int64_t kSide = 96;
     constexpr int64_t kTarget = 40;
