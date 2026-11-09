@@ -639,7 +639,27 @@ void Toolbar::DrawHudMenu() {
         }
     }
     ImGui::SetItemTooltip("Each lidar's and radar's latest point cloud in the shown worlds, from "
-                          "the selected sensors or all of them");
+                          "the selected sensors or all of them. Selecting a pipeline node also "
+                          "draws that stage's cloud for the sensors that bind its pipeline");
+    ImGui::BeginDisabled(guides.sensorClouds == SensorClouds::Off);
+    ImGui::Indent();
+    const char* colors[] = {"Sensor", "Intensity", "Range", "Height", "Radial Velocity"};
+    int color = int(guides.cloudColor);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
+    if (ImGui::Combo("Color", &color, colors, int(std::size(colors)))) {
+        guides.cloudColor = CloudColor(color);
+    }
+    ImGui::SetItemTooltip("What colors each point. Height is along the sensor's up axis, and "
+                          "radial velocity colors radars only");
+    ImGui::MenuItem("Field of View", nullptr, &guides.sensorFields);
+    ImGui::MenuItem("Range Rings", nullptr, &guides.rangeRings);
+    ImGui::SetItemTooltip("Rings at a quarter, half, three quarters and all of each sensor's "
+                          "range, in its horizontal plane");
+    ImGui::MenuItem("Velocity Arrows", nullptr, &guides.velocityArrows);
+    ImGui::SetItemTooltip("An arrow along each radar return's beam, as far as the return moves "
+                          "in half a second");
+    ImGui::Unindent();
+    ImGui::EndDisabled();
     ImGui::SeparatorText("Guides");
     ImGui::MenuItem("Selection Outline", nullptr, &guides.outline);
     ImGui::MenuItem("Selection Bounds", nullptr, &guides.bounds);

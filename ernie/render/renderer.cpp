@@ -704,8 +704,8 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         }
         for (const pipeline::ResolvedOutput& output : run.instance->resolved.outputs) {
             const pipeline::SignalLayout& layout = product.layouts[output.value];
-            if (run.instance->resolved.values[output.value].type ==
-                pipeline::SignalType::PointCloud) {
+            const pipeline::SignalType type = run.instance->resolved.values[output.value].type;
+            if (type == pipeline::SignalType::PointCloud || type == pipeline::SignalType::Returns) {
                 arenaBytes += recordBytes(elements);
             } else if (layout.perCapture || !read(run, output.name)) {
                 arenaBytes += scratchBytes(layout, elements);
@@ -793,7 +793,8 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
                 entry.address = records.Address();
                 entry.returned = flags.Address();
                 entry.flags |= kSignalRecords | (cloud->world ? kSignalWorld : 0u);
-            } else if (slot >= storedCount && type == pipeline::SignalType::PointCloud) {
+            } else if (slot >= storedCount && (type == pipeline::SignalType::PointCloud ||
+                                               type == pipeline::SignalType::Returns)) {
                 const std::string& name = resolved.outputs[slot - storedCount].name;
                 const OwnedCloud* bound = nullptr;
                 uint64_t boundFirst = 0;

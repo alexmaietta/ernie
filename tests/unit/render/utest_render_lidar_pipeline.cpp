@@ -61,6 +61,10 @@ class Bench {
             {.camera = {"/Lidar"}, .orderedVars = {"/Render/Plain", "/Render/Piped"}});
     }
 
+    Scene& GetScene() {
+        return *m_scene;
+    }
+
     Prim Add(const std::string& name, const char* id) {
         const Prim node = m_scene->Define<Shader>("/Pipe/" + name, {.id = id});
         node.Connect("returns", m_last, "returns");
@@ -75,8 +79,7 @@ class Bench {
             m_pipe.Connect("cloud", cloud, "cloud");
             m_renderer.emplace(m_scene);
         }
-        RenderOutput output = m_renderer->Step(kProducts, 0);
-        output.Wait();
+        RenderOutput output = Step();
         const auto& frame = output["/Render/Scan"].frames.at(0);
         const auto read = [&](const char* source) {
             const RenderVarOutput& var = frame.Source(source);
@@ -90,6 +93,12 @@ class Bench {
             return cloud;
         };
         return {read("PointCloud"), read("cloud")};
+    }
+
+    RenderOutput Step() {
+        RenderOutput output = m_renderer->Step(kProducts, 0);
+        output.Wait();
+        return output;
     }
 
   private:
@@ -141,6 +150,36 @@ TEST(LidarPipelineTest, RangeNoiseHasItsSigmaAndKeepsPointsOnTheirBeams) {
             EXPECT_NEAR(sigma, 0.05, 0.005);
         });
     }
+}
+
+TEST(LidarPipelineTest, TapsOfReturnStagesAreClouds) {
+    ForEachDevice([](Device& device) {
+        Bench bench(device, FrameOfReference::Sensor);
+        bench.Add("Noise", "RangeNoise").Set("sigma", 0.05f);
+        Scene& scene = bench.GetScene();
+        for (const auto& [name, node] :
+             {std::pair{"Source", "/Pipe/Returns"}, std::pair{"Noisy", "/Pipe/Noise"}}) {
+            scene.Define<RenderVar>(std::string("/Render/") + name,
+                                    {.sourceName = "Tap", .channels = kChannels, .tap = {node}});
+        }
+        scene.Find("/Render/Scan")
+            ->Set(RenderProduct::kOrderedVars,
+                  std::vector<std::string>{"/Render/Plain", "/Render/Piped", "/Render/Source",
+                                           "/Render/Noisy"});
+        const uint32_t traced = bench.Render().first.count;
+        RenderOutput output = bench.Step();
+        const auto& frame = output["/Render/Scan"].frames.at(0);
+        const auto distances = [&](const char* var) {
+            const RenderVarOutput& cloud = frame.RenderVar(var);
+            std::vector<float> values = cloud.channels.at("Distance").ToHost<float>();
+            values.resize(cloud.channels.at("Counts").ToHost<uint32_t>().at(0));
+            return values;
+        };
+        EXPECT_EQ(distances("/Render/Source"), distances("/Render/Plain"));
+        EXPECT_EQ(distances("/Render/Noisy"), distances("/Render/Piped"));
+        EXPECT_NE(distances("/Render/Noisy"), distances("/Render/Plain"));
+        EXPECT_EQ(distances("/Render/Plain").size(), traced);
+    });
 }
 
 TEST(LidarPipelineTest, DropoutDropsWeakReturnsAndItsRate) {

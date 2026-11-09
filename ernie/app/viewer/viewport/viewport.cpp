@@ -8,8 +8,10 @@
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <numbers>
 #include <optional>
 #include <random>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -19,6 +21,7 @@
 
 #include "ernie/app/viewer/overlays/toolbar.h"
 #include "ernie/app/viewer/widgets/widgets.h"
+#include "ernie/io/image.h"
 #include "ernie/render/renderer.h"
 #include "ernie/util/log.h"
 
@@ -731,6 +734,7 @@ void Viewport::UpdateGuides() {
     std::vector<uint32_t> chosenCameras;
     std::vector<uint32_t> chosenLights;
     std::vector<uint32_t> chosenSensors;
+    std::vector<uint32_t> chosenNodes;
     for (uint32_t group = 0; group < m_selection.paths.size(); ++group) {
         const std::optional<Prim> selected = m_scene->Find(m_selection.paths[group]);
         if (!selected) {
@@ -748,6 +752,8 @@ void Viewport::UpdateGuides() {
                 chosenCameras.push_back(prim.Index());
             } else if (prim.IsA(SchemaId::Lidar) || prim.IsA(SchemaId::Radar)) {
                 chosenSensors.push_back(prim.Index());
+            } else if (prim.IsA(SchemaId::SensorNode)) {
+                chosenNodes.push_back(prim.Index());
             } else if (IsLight(prim)) {
                 chosenLights.push_back(prim.Index());
             }
@@ -801,32 +807,102 @@ void Viewport::UpdateGuides() {
     selection.Prims(chosenCameras, OverlayPrimShape::Frustums, chosen);
     selection.Prims(chosenLights, OverlayPrimShape::Lights, chosen);
     m_renderer->GetOverlays()->Set(kSelectionOverlay, selection);
-    SyncSensorClouds(guides.sensorClouds == SensorClouds::Off        ? std::vector<uint32_t>{}
-                     : guides.sensorClouds == SensorClouds::Selected ? chosenSensors
-                                                                     : sensors);
+    if (guides.sensorClouds == SensorClouds::Off) {
+        SyncSensorClouds({}, {}, {});
+    } else {
+        SyncSensorClouds(guides.sensorClouds == SensorClouds::Selected ? chosenSensors : sensors,
+                         chosenNodes, sensors);
+    }
 }
 
-void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors) {
+namespace {
+
+Float3 BeamDirection(float azimuth, float elevation) {
+    const float a = azimuth * std::numbers::pi_v<float> / 180;
+    const float e = elevation * std::numbers::pi_v<float> / 180;
+    return {-std::sin(a) * std::cos(e), std::sin(e), -std::cos(a) * std::cos(e)};
+}
+
+std::vector<Float3> FieldLines(Float2 azimuths, Float2 elevations, float length) {
+    constexpr int kSteps = 24;
+    std::vector<Float3> lines;
+    const auto at = [&](float azimuth, float elevation) {
+        const Float3 direction = BeamDirection(azimuth, elevation);
+        return Float3{direction.x * length, direction.y * length, direction.z * length};
+    };
+    const bool full = std::abs(azimuths.y - azimuths.x) >= 359.9f;
+    for (const float elevation : {elevations.x, elevations.y}) {
+        for (int step = 0; step < kSteps; ++step) {
+            const float from = azimuths.x + (azimuths.y - azimuths.x) * float(step) / kSteps;
+            const float to = azimuths.x + (azimuths.y - azimuths.x) * float(step + 1) / kSteps;
+            lines.push_back(at(from, elevation));
+            lines.push_back(at(to, elevation));
+        }
+    }
+    if (!full) {
+        for (const float azimuth : {azimuths.x, azimuths.y}) {
+            for (const float elevation : {elevations.x, elevations.y}) {
+                lines.push_back({0, 0, 0});
+                lines.push_back(at(azimuth, elevation));
+            }
+            lines.push_back(at(azimuth, elevations.x));
+            lines.push_back(at(azimuth, elevations.y));
+        }
+    }
+    return lines;
+}
+
+}
+
+void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors, const std::vector<uint32_t>& nodes,
+                                std::vector<uint32_t> candidates) {
     const std::vector<uint32_t> worlds = m_session ? m_session->shown : std::vector<uint32_t>{};
-    std::erase_if(sensors, [&](uint32_t sensor) {
+    const auto hidden = [&](uint32_t sensor) {
         const uint32_t world = m_scene->ByIndex(sensor).World();
         return !worlds.empty() && world != kGlobalWorld &&
                std::ranges::find(worlds, world) == worlds.end();
-    });
+    };
+    std::erase_if(sensors, hidden);
+    std::erase_if(candidates, hidden);
     std::ranges::sort(sensors);
     sensors.erase(std::unique(sensors.begin(), sensors.end()), sensors.end());
-    if (sensors.size() > guides.mostSensorClouds) {
+    std::vector<std::pair<uint32_t, uint32_t>> taps;
+    for (const uint32_t node : nodes) {
+        std::optional<Prim> pipeline = m_scene->ByIndex(node).Parent();
+        while (pipeline && !pipeline->IsA(SchemaId::SensorPipeline)) {
+            pipeline = pipeline->Parent();
+        }
+        if (!pipeline) {
+            continue;
+        }
+        for (const uint32_t sensor : candidates) {
+            const std::vector<std::string> bound =
+                m_scene->ByIndex(sensor).Get(Sensor::kPipelineBinding);
+            if (!bound.empty() && bound.front() == pipeline->Path()) {
+                taps.emplace_back(sensor, node);
+            }
+        }
+    }
+    if (sensors.size() + taps.size() > guides.mostSensorClouds) {
         Log(LogLevel::Warning,
-            "{} lidars and radars are shown, so the viewer draws the clouds of the first {}",
-            sensors.size(), guides.mostSensorClouds);
-        sensors.resize(guides.mostSensorClouds);
+            "{} lidar and radar clouds are shown, so the viewer draws the first {}",
+            sensors.size() + taps.size(), guides.mostSensorClouds);
+        sensors.resize(std::min<size_t>(sensors.size(), guides.mostSensorClouds));
+        taps.resize(guides.mostSensorClouds - sensors.size());
     }
     const std::string root = m_product + "Clouds";
-    const std::string points = root + "/Points";
+    std::vector<std::pair<uint32_t, uint32_t>> wanted;
+    for (const uint32_t sensor : sensors) {
+        wanted.emplace_back(sensor, kNoPrim);
+    }
+    wanted.insert(wanted.end(), taps.begin(), taps.end());
     std::vector<SensorCloud> clouds;
-    for (size_t at = 0; at < sensors.size(); ++at) {
-        const Prim sensor = m_scene->ByIndex(sensors[at]);
-        const std::string product = std::format("{}/Cloud{}", root, sensor.Index());
+    for (const auto& [index, node] : wanted) {
+        const Prim sensor = m_scene->ByIndex(index);
+        const bool radar = sensor.IsA(SchemaId::Radar);
+        const std::string product = node == kNoPrim
+                                        ? std::format("{}/Cloud{}", root, index)
+                                        : std::format("{}/Cloud{}Stage{}", root, index, node);
         const auto kept = std::ranges::find(m_sensorClouds, product, &SensorCloud::product);
         if (kept != m_sensorClouds.end()) {
             clouds.push_back(std::move(*kept));
@@ -834,19 +910,58 @@ void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors) {
         }
         if (!m_scene->Find(root)) {
             m_scene->Define<Scope>(root);
-            m_scene->Define<RenderVar>(points, {.sourceName = "PointCloud",
-                                                .channels = {"Coordinates"},
-                                                .frameOfReference = FrameOfReference::World});
         }
-        m_scene->Define<RenderProduct>(product,
-                                       {.camera = {sensor.Path()}, .orderedVars = {points}});
-        clouds.push_back(
-            {product, sensor.World(), kCloudColors[sensor.Index() % std::size(kCloudColors)]});
+        std::vector<std::string> channels = {"Coordinates", "Distance", "Intensity"};
+        if (radar) {
+            channels.push_back("RadialVelocity");
+        }
+        const std::string var = product + "Points";
+        if (node == kNoPrim) {
+            m_scene->Define<RenderVar>(var, {.sourceName = "PointCloud", .channels = channels});
+        } else {
+            m_scene->Define<RenderVar>(var, {.sourceName = "Tap",
+                                             .channels = channels,
+                                             .tap = {m_scene->ByIndex(node).Path()}});
+        }
+        m_scene->Define<RenderProduct>(product, {.camera = {sensor.Path()}, .orderedVars = {var}});
+        SensorCloud cloud{
+            .product = product,
+            .var = var,
+            .sensor = index,
+            .stage = node != kNoPrim,
+            .radar = radar,
+            .world = sensor.World(),
+            .color = kCloudColors[(index + (node == kNoPrim ? 0 : 3)) % std::size(kCloudColors)]};
+        if (radar) {
+            const Float2 field = sensor.Get(Radar::kFieldOfView);
+            cloud.range = sensor.Get(Radar::kRange).y;
+            cloud.field =
+                FieldLines({field.x / 2, -field.x / 2}, {-field.y / 2, field.y / 2}, cloud.range);
+        } else {
+            const std::vector<float> elevations = sensor.Get(Lidar::kEmitterElevations);
+            std::vector<float> azimuths = sensor.Get(Lidar::kEmitterAzimuths);
+            Float2 sweep{0, 0};
+            if (sensor.Get(Lidar::kScanType) == ScanType::Rotary) {
+                sweep = sensor.Get(Lidar::kAzimuthRange);
+            } else if (!azimuths.empty()) {
+                sweep = {*std::ranges::min_element(azimuths), *std::ranges::max_element(azimuths)};
+            }
+            cloud.range = sensor.Get(Lidar::kRange).y;
+            if (!elevations.empty()) {
+                cloud.field = FieldLines(
+                    sweep,
+                    {*std::ranges::min_element(elevations), *std::ranges::max_element(elevations)},
+                    cloud.range);
+            }
+        }
+        clouds.push_back(std::move(cloud));
     }
     for (const SensorCloud& cloud : m_sensorClouds) {
         if (std::ranges::find(clouds, cloud.product, &SensorCloud::product) == clouds.end()) {
-            if (const std::optional<Prim> prim = m_scene->Find(cloud.product)) {
-                m_scene->Remove(*prim);
+            for (const std::string& path : {cloud.product, cloud.var}) {
+                if (const std::optional<Prim> prim = m_scene->Find(path)) {
+                    m_scene->Remove(*prim);
+                }
             }
         }
     }
@@ -868,22 +983,118 @@ void Viewport::ShowClouds(const RenderOutput& output) {
     if (m_sensorClouds.empty()) {
         return;
     }
+    constexpr size_t kMostArrows = 4096;
+    constexpr float kArrowSeconds = 0.5f;
     Overlay shown;
     for (SensorCloud& cloud : m_sensorClouds) {
         if (output.Contains(cloud.product) && !output[cloud.product].frames.empty()) {
             const RenderVarOutput& points =
-                output[cloud.product].frames.front().Source("PointCloud");
+                output[cloud.product].frames.front().RenderVar(cloud.var);
             const device::Tensor& coordinates = points.channels.at("Coordinates");
             cloud.points = coordinates.Select(0);
             cloud.count = points.channels.at("Counts");
+            cloud.colors = {};
+            const CloudColor mode = guides.cloudColor;
+            if (mode != CloudColor::Sensor && (mode != CloudColor::Velocity || cloud.radar)) {
+                ColorizeOptions options{.colormap = Colormap::Turbo};
+                device::Tensor values;
+                switch (mode) {
+                case CloudColor::Intensity:
+                    values = points.channels.at("Intensity");
+                    options.colormap = Colormap::Viridis;
+                    options.minimum = 0;
+                    options.maximum = cloud.radar ? 10.0f : 1.0f;
+                    break;
+                case CloudColor::Range:
+                    values = points.channels.at("Distance");
+                    options.minimum = 0;
+                    options.maximum = cloud.range;
+                    break;
+                case CloudColor::Height:
+                    values = coordinates;
+                    options.channel = 1;
+                    options.minimum = -5;
+                    options.maximum = 5;
+                    break;
+                default:
+                    values = points.channels.at("RadialVelocity");
+                    options.minimum = -10;
+                    options.maximum = 10;
+                    options.centered = true;
+                    break;
+                }
+                cloud.colors = ColorizeScalars(values, options).Select(0);
+            }
+            if (cloud.radar && guides.velocityArrows && !cloud.reading) {
+                cloud.reading = {coordinates.ToHostAsync(),
+                                 points.channels.at("RadialVelocity").ToHostAsync(),
+                                 cloud.count.ToHostAsync()};
+            }
         }
-        if (cloud.points.Empty()) {
+        if (cloud.reading && std::ranges::all_of(*cloud.reading, [](const device::Download& read) {
+                return read.Ready();
+            })) {
+            const auto floats = [](const device::Download& read) {
+                const Span<const std::byte> bytes = read.Bytes();
+                return std::span(reinterpret_cast<const float*>(bytes.data()),
+                                 bytes.size() / sizeof(float));
+            };
+            const std::span<const float> positions = floats((*cloud.reading)[0]);
+            const std::span<const float> velocities = floats((*cloud.reading)[1]);
+            uint32_t count = 0;
+            std::memcpy(&count, (*cloud.reading)[2].Bytes().data(), sizeof(count));
+            count = std::min<uint32_t>({count, uint32_t(velocities.size()),
+                                        uint32_t(positions.size() / 3), uint32_t(kMostArrows)});
+            cloud.arrows.clear();
+            for (uint32_t at = 0; at < count; ++at) {
+                const Float3 point{positions[3 * at], positions[3 * at + 1], positions[3 * at + 2]};
+                const float length =
+                    std::sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+                if (length <= 0) {
+                    continue;
+                }
+                const float scale = velocities[at] * kArrowSeconds / length;
+                cloud.arrows.push_back(point);
+                cloud.arrows.push_back(
+                    {point.x * (1 + scale), point.y * (1 + scale), point.z * (1 + scale)});
+            }
+            cloud.reading.reset();
+        }
+        const OverlayStyle anchored{.color = cloud.color,
+                                    .width = 1,
+                                    .world = cloud.world,
+                                    .anchor = cloud.sensor,
+                                    .pickable = false};
+        if (!cloud.points.Empty()) {
+            OverlayStyle style = anchored;
+            style.size = cloud.stage ? 4 : 3;
+            style.marker = cloud.stage ? MarkerShape::Square : MarkerShape::Circle;
+            shown.Add(OverlayMarkers{.points = cloud.points,
+                                     .colors = cloud.colors,
+                                     .itemCount = cloud.count,
+                                     .style = style});
+        }
+        if (cloud.stage) {
             continue;
         }
-        shown.Add(OverlayMarkers{
-            .points = cloud.points,
-            .itemCount = cloud.count,
-            .style = {.color = cloud.color, .size = 3, .world = cloud.world, .pickable = false}});
+        if (guides.sensorFields && !cloud.field.empty()) {
+            OverlayStyle style = anchored;
+            style.color.w = 0.6f;
+            style.depth = OverlayDepth::XRay;
+            shown.Lines(cloud.field, style);
+        }
+        if (guides.rangeRings && cloud.range > 0) {
+            OverlayStyle style = anchored;
+            style.color.w = 0.4f;
+            for (int ring = 1; ring <= 4; ++ring) {
+                shown.Circle({0, 0, 0}, {0, 1, 0}, cloud.range * float(ring) / 4, style);
+            }
+        }
+        if (cloud.radar && guides.velocityArrows) {
+            for (size_t at = 0; at + 1 < cloud.arrows.size(); at += 2) {
+                shown.Arrow(cloud.arrows[at], cloud.arrows[at + 1], anchored);
+            }
+        }
     }
     m_renderer->GetOverlays()->Set(kCloudsOverlay, shown);
 }

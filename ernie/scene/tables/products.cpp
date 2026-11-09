@@ -203,7 +203,10 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const 
                     .type = device::DType::Float32,
                     .output = output,
                     .tap = tap};
-    if (bound.instance->resolved.values[found->value].type == pipeline::SignalType::PointCloud) {
+    const pipeline::SignalType type = bound.instance->resolved.values[found->value].type;
+    if (type == pipeline::SignalType::PointCloud ||
+        (type == pipeline::SignalType::Returns &&
+         (kind.schema == SchemaId::Lidar || kind.schema == SchemaId::Radar))) {
         if (kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) {
             throw Error("{} reads the point cloud {} makes, and only lidars and radars make them "
                         "in a pipeline",

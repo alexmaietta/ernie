@@ -132,6 +132,16 @@ TEST_F(OffscreenViewerTest, DrawsTheCloudsOfSelectedLidarsAndRadars) {
     viewer.Frame();
     EXPECT_TRUE(CloudSensors(*scene).empty());
     EXPECT_FALSE(Drawing(viewer, "viewer/clouds"));
+
+    scene->Find("/Lidar")->Set(Sensor::kPipelineBinding, std::vector<std::string>{"/Pipe"});
+    const Prim pipe = scene->Define<SensorPipeline>("/Pipe");
+    const Prim returns = scene->Define<Shader>("/Pipe/Returns", {.id = "LidarReturns"});
+    const Prim noise = scene->Define<Shader>("/Pipe/Noise", {.id = "RangeNoise"});
+    noise.Connect("returns", returns, "returns");
+    pipe.Connect("noisy", noise, "returns");
+    viewer.Select({"/Pipe/Noise"});
+    ASSERT_TRUE(FrameUntil(viewer, [&] { return Drawing(viewer, "viewer/clouds"); }));
+    EXPECT_EQ(CloudSensors(*scene), std::vector<std::string>{"/Lidar"});
 }
 
 }

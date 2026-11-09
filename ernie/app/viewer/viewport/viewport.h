@@ -120,10 +120,16 @@ struct RenderResolution {
 
 enum class SensorClouds : uint8_t { Off, Selected, All };
 
+enum class CloudColor : uint8_t { Sensor, Intensity, Range, Height, Velocity };
+
 struct ViewportGuides {
     GridGuide grid;
     SensorClouds sensorClouds = SensorClouds::Selected;
     uint32_t mostSensorClouds = 16;
+    CloudColor cloudColor = CloudColor::Sensor;
+    bool sensorFields = true;
+    bool rangeRings = false;
+    bool velocityArrows = false;
     bool cameras = true;
     bool lights = false;
     bool outline = true;
@@ -374,13 +380,23 @@ class Viewport {
 
     struct SensorCloud {
         std::string product;
+        std::string var;
+        uint32_t sensor = 0;
+        bool stage = false;
+        bool radar = false;
         uint32_t world = kGlobalWorld;
         Float4 color;
+        float range = 0;
+        std::vector<Float3> field;
         device::Tensor points;
         device::Tensor count;
+        device::Tensor colors;
+        std::optional<std::array<device::Download, 3>> reading;
+        std::vector<Float3> arrows;
     };
 
-    void SyncSensorClouds(std::vector<uint32_t> sensors);
+    void SyncSensorClouds(std::vector<uint32_t> sensors, const std::vector<uint32_t>& nodes,
+                          std::vector<uint32_t> candidates);
 
     struct GuideKey {
         uint64_t structure = 0;

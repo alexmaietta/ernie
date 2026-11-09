@@ -287,6 +287,35 @@ TEST(ImageTest, HdrColorIsExposedLikeLdrColor) {
     EXPECT_EQ(ColorizeHdr(Pixels(std::vector<float>{0, 0, 0}, 1, 1, 3)).Values<uint8_t>()[3], 255);
 }
 
+TEST(ImageTest, PointCoordinatesColorizeByOneAxis) {
+    test::ForEachDevice([](device::Device& device) {
+        constexpr int64_t kPoints = 50;
+        std::vector<float> points(kPoints * 3);
+        std::vector<float> heights(kPoints);
+        for (int64_t i = 0; i < kPoints; ++i) {
+            heights[i] = float(i) / 5 - 5;
+            points[3 * i] = 100;
+            points[3 * i + 1] = heights[i];
+            points[3 * i + 2] = -100;
+        }
+        const ColorizeOptions options{
+            .colormap = Colormap::Turbo, .minimum = -5.0f, .maximum = 5.0f, .channel = 1};
+        const device::Tensor colors = ColorizeScalars(
+            Upload(device, points, {1, kPoints, 3}, device::DType::Float32), options);
+        ASSERT_EQ(std::vector<int64_t>(colors.Shape().begin(), colors.Shape().end()),
+                  (std::vector<int64_t>{1, kPoints, 4}));
+        ColorizeOptions flat = options;
+        flat.channel = 0;
+        const Pixels expected = ColorizeScalars(Pixels(heights, 1, kPoints), flat);
+        const std::vector<uint8_t> gpu = colors.Select(0).ToHost<uint8_t>();
+        const Span<const uint8_t> host = expected.Values<uint8_t>();
+        ASSERT_EQ(gpu.size(), host.size());
+        for (size_t i = 0; i < gpu.size(); ++i) {
+            EXPECT_LE(std::abs(int(gpu[i]) - int(host[i])), 1) << i;
+        }
+    });
+}
+
 TEST(ImageTest, GpuColorizingMatchesTheHost) {
     test::ForEachDevice([](device::Device& device) {
         constexpr int64_t kRows = 300;
