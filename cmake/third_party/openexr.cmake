@@ -68,6 +68,40 @@ foreach(
     endif()
 endforeach()
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" AND NOT MSVC)
+    include(CheckCSourceCompiles)
+    check_c_source_compiles(
+        "#include <immintrin.h>
+__attribute__((target(\"avx2,avxvnni\"))) __m256i f(__m256i a, __m256i b) {
+    return _mm256_dpbusd_avx_epi32(a, a, b);
+}
+int main(void) { return 0; }"
+        ERNIE_ASSEMBLES_AVX_VNNI
+    )
+    check_c_source_compiles(
+        "#include <immintrin.h>
+__attribute__((target(\"avx512vl,avx512vnni\"))) __m256i f(__m256i a, __m256i b) {
+    return _mm256_dpbusd_epi32(a, a, b);
+}
+int main(void) { return 0; }"
+        ERNIE_ASSEMBLES_AVX512_VNNI
+    )
+    if(NOT ERNIE_ASSEMBLES_AVX_VNNI)
+        target_compile_definitions(
+            OpenEXRCore
+            PRIVATE
+                LIBDEFLATE_ASSEMBLER_DOES_NOT_SUPPORT_AVX_VNNI
+        )
+    endif()
+    if(NOT ERNIE_ASSEMBLES_AVX512_VNNI)
+        target_compile_definitions(
+            OpenEXRCore
+            PRIVATE
+                LIBDEFLATE_ASSEMBLER_DOES_NOT_SUPPORT_AVX512VNNI
+        )
+    endif()
+endif()
+
 add_library(ernie_openexr INTERFACE)
 target_link_libraries(ernie_openexr INTERFACE OpenEXR::OpenEXR)
 

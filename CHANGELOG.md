@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ernie builds with a newer GCC paired with binutils older than 2.36, as HPC compiler modules often are, because configuring skips libdeflate's AVX-VNNI checksum when the assembler can't encode it.
 - Ernie builds with GCC 12, whose standard library has no `<format>`, because it formats text with the header-only fmt library on every compiler. CMake 3.25.1 also accepts the VMA download again.
 - `ernie --version`, the viewer's About window and `ernie.build_info().version` show the full version with its patch and any release candidate, such as `0.1.0` or `0.1.1rc1`, instead of `0.1`.
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
