@@ -2,6 +2,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <ctime>
 #include <deque>
 #include <filesystem>
 #include <format>
@@ -315,29 +316,11 @@ void StandaloneRuns(benchmark::State& state) {
                                                  benchmark::Counter::kIsRate);
 }
 
-void Compile(benchmark::State& state) {
-    const auto graph = Graph(state.range(0));
-    const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
-    DefineCameraGraph(*scene, graph);
-    PipelineRunDesc run;
-    const int64_t channels = graph == Graph::Isp ? 1 : 3;
-    run.inputs.emplace(
-        "Signal", bench::BenchDevice().CreateTensor(device::DType::Float32, {1, 4, 4, channels}));
-    run.detector.pattern = graph == Graph::Isp ? DetectorPattern::Rggb : DetectorPattern::Rgb;
-    for (auto _ : state) {
-        const Pipeline pipeline(scene, "/Pipe");
-        const PipelineOutputs outputs = pipeline.Run(run);
-        outputs.begin()->second.GetDevice().GetQueue().WaitIdle();
-    }
-}
-
-void LoadNodes(benchmark::State& state) {
-    static std::atomic<uint32_t> version{0};
+std::filesystem::path WriteNode() {
+    static std::atomic<uint64_t> version{uint64_t(std::time(nullptr)) << 20};
     const std::filesystem::path file =
         std::filesystem::temp_directory_path() / "ernie_bench_sensor_node.slang";
-    const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
-    for (auto _ : state) {
-        std::ofstream(file) << std::format(R"(
+    std::ofstream(file) << std::format(R"(
 import ernie.pipeline;
 using namespace ernie;
 
@@ -351,10 +334,42 @@ struct BenchHotPixels : IPointNode {{
     }}
 }}
 )",
-                                           version++);
-        benchmark::DoNotOptimize(LoadShaders(*scene, file));
+                                       version++);
+    return file;
+}
+
+void Compile(benchmark::State& state) {
+    const auto graph = Graph(state.range(0));
+    const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
+    DefineCameraGraph(*scene, graph);
+    LoadShaders(*scene, WriteNode());
+    const Prim hot =
+        Node(*scene, "/Pipe/Hot", "BenchHotPixels", *scene->Find("/Pipe/Noise"), "e", "electrons");
+    scene->Find("/Pipe/Adc")->Connect("electrons", hot, "electrons");
+    PipelineRunDesc run;
+    const int64_t channels = graph == Graph::Isp ? 1 : 3;
+    run.inputs.emplace(
+        "Signal", bench::BenchDevice().CreateTensor(device::DType::Float32, {1, 4, 4, channels}));
+    run.detector.pattern = graph == Graph::Isp ? DetectorPattern::Rggb : DetectorPattern::Rgb;
+    for (auto _ : state) {
+        state.PauseTiming();
+        LoadShaders(*scene, WriteNode());
+        state.ResumeTiming();
+        const Pipeline pipeline(scene, "/Pipe");
+        const PipelineOutputs outputs = pipeline.Run(run);
+        outputs.begin()->second.GetDevice().GetQueue().WaitIdle();
     }
-    std::filesystem::remove(file);
+    std::filesystem::remove(std::filesystem::temp_directory_path() /
+                            "ernie_bench_sensor_node.slang");
+}
+
+void LoadNodes(benchmark::State& state) {
+    const Ref<Scene> scene = Scene::Create(bench::BenchDevice());
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(LoadShaders(*scene, WriteNode()));
+    }
+    std::filesystem::remove(std::filesystem::temp_directory_path() /
+                            "ernie_bench_sensor_node.slang");
 }
 
 struct Viewed {
