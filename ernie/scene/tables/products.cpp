@@ -511,10 +511,9 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 }
                 frame = var.frame;
             }
-            if ((kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) || !frame) {
+            if (kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) {
                 throw Error("{} runs {}, which reads returns, so its sensor must be a Lidar or a "
-                            "Radar and a PointCloud render var must read one of its point cloud "
-                            "outputs",
+                            "Radar",
                             path, bound.instance->path);
             }
         }

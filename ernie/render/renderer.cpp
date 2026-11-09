@@ -496,7 +496,11 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
             std::ranges::any_of(run.instance->resolved.values, [](const pipeline::Value& value) {
                 return value.type == pipeline::SignalType::Returns;
             });
-        if (!returns || stale.contains(plan.products[run.products.front()]->prim)) {
+        const bool read = std::ranges::any_of(set.clouds, [&](const OwnedCloud& cloud) {
+            return !cloud.output.empty() &&
+                   std::ranges::find(run.products, cloud.index) != run.products.end();
+        });
+        if (!returns || (read && stale.contains(plan.products[run.products.front()]->prim))) {
             traced.push_back(run);
         }
     }
@@ -732,7 +736,14 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     for (size_t index = 0; index < runs.size(); ++index) {
         const PipelineRun& run = runs[index];
         const PlannedPipeline& planned = *run.planned;
-        const uint32_t source = run.products.front();
+        uint32_t source = run.products.front();
+        for (const OwnedCloud& cloud : set.clouds) {
+            if (!cloud.output.empty() &&
+                std::ranges::find(run.products, cloud.index) != run.products.end()) {
+                source = cloud.index;
+                break;
+            }
+        }
         const ResolvedProduct& product = *plan.products[source];
         const pipeline::PipelineDefinition& definition = *run.compiled->definition;
         const pipeline::GeneratedPipeline& generated = run.compiled->generated;

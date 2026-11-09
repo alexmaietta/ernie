@@ -95,8 +95,8 @@ class Bench {
         return {read("PointCloud"), read("cloud")};
     }
 
-    RenderOutput Step() {
-        RenderOutput output = m_renderer->Step(kProducts, 0);
+    RenderOutput Step(const std::vector<std::string>& products = kProducts) {
+        RenderOutput output = m_renderer->Step(products, 0);
         output.Wait();
         return output;
     }
@@ -117,6 +117,29 @@ TEST(LidarPipelineTest, ReturnsStraightToACloudMatchTheTracedCloud) {
         EXPECT_EQ(piped.coordinates, plain.coordinates);
         EXPECT_EQ(piped.distance, plain.distance);
         EXPECT_EQ(piped.intensity, plain.intensity);
+    });
+}
+
+TEST(LidarPipelineTest, ProductsReadingOnlyTheTracedCloudSkipThePipeline) {
+    ForEachDevice([](Device& device) {
+        Bench bench(device, FrameOfReference::Sensor);
+        bench.Add("Noise", "RangeNoise").Set("sigma", 0.05f);
+        Scene& scene = bench.GetScene();
+        scene.Define<RenderProduct>("/Render/Traced",
+                                    {.camera = {"/Lidar"}, .orderedVars = {"/Render/Plain"}});
+        const auto [plain, piped] = bench.Render();
+        RenderOutput output = bench.Step({"/Render/Traced", "/Render/Scan"});
+        const RenderVarOutput& traced =
+            output["/Render/Traced"].frames.at(0).RenderVar("/Render/Plain");
+        EXPECT_EQ(traced.channels.at("Counts").ToHost<uint32_t>().at(0), plain.count);
+        EXPECT_GT(piped.count, 0u);
+        EXPECT_GT(output["/Render/Scan"]
+                      .frames.at(0)
+                      .RenderVar("/Render/Piped")
+                      .channels.at("Counts")
+                      .ToHost<uint32_t>()
+                      .at(0),
+                  0u);
     });
 }
 
