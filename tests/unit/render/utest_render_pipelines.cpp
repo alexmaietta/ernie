@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -9,6 +12,7 @@
 #include "ernie/render/standalone.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tables/semantics.h"
+#include "ernie/util/profiler.h"
 #include "support/devices.h"
 #include "unit/pipeline/registry.h"
 
@@ -110,6 +114,49 @@ TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
             EXPECT_NE(traced, previous);
             previous = traced;
         }
+    });
+}
+
+TEST(PipelinesTest, ValueEditsRerunThePipelineWithoutTracingAgain) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Sky(device, DetectorPattern::Rgb);
+        DefineRaw(*scene);
+        scene->Find("/Cam")->Set(Camera::kPipelineBinding, std::vector<std::string>{"/Pipes/Raw"});
+        scene->Define<RenderProduct>("/Render/View",
+                                     {.renderMode = RenderMode::RealTime,
+                                      .camera = {"/Cam"},
+                                      .resolution = {kWidth, kHeight},
+                                      .orderedVars = {"/Render/Rate", "/Render/Raw"}});
+        Renderer renderer(scene);
+        const auto step = [&] {
+            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            output.Wait();
+            const FrameOutput& frame = output["/Render/View"].frames.at(0);
+            return std::pair{frame.Source("ElectronRate").tensor.ToHost<float>(),
+                             frame.Source("raw").tensor.ToHost<float>()};
+        };
+        const auto traces = [&](const std::function<void()>& edit) {
+            static const profiler::ZoneId zone = profiler::ZoneId::Named("Render/TraceCaptures");
+            profiler::BeginFrame();
+            edit();
+            step();
+            profiler::BeginFrame();
+            const std::vector<profiler::Frame> frames = profiler::Frames();
+            return std::ranges::count_if(
+                frames.back().zones, [](const profiler::Zone& each) { return each.id == zone; });
+        };
+        profiler::SetEnabled(true);
+        profiler::SetHistory(4);
+        profiler::BeginFrame();
+        step();
+        const auto [rates, raw] = step();
+        EXPECT_EQ(traces([] {}), 0);
+        EXPECT_EQ(traces([&] { scene->Find("/Pipes/Raw/Gain")->Set(Gain::kGain, 4.0f); }), 0);
+        const auto [kept, raised] = step();
+        EXPECT_EQ(kept, rates);
+        EXPECT_NE(raised, raw);
+        EXPECT_GT(traces([&] { scene->Find("/Sky")->Set(DomeLight::kIntensity, 2.0f); }), 0);
+        profiler::SetEnabled(false);
     });
 }
 

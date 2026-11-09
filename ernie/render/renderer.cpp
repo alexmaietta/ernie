@@ -244,13 +244,25 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    const std::pair<uint64_t, uint64_t> runs = {snapshot.Version(), m_kernels};
+    const uint64_t pipelineTableRuns = snapshot.Version("pipelines");
+    const PipelineTable& pipelines = SceneImpl::Get(*m_scene).GetPipelines();
     std::set<uint32_t> stale;
-    for (const uint32_t prim : due) {
-        if (const auto traced = set.traced.find(prim);
+    for (const std::shared_ptr<const ResolvedProduct>& product : planned.products) {
+        if (!due.contains(product->prim)) {
+            continue;
+        }
+        const std::shared_ptr<const PipelineInstance> instance =
+            product->pipeline == kNoPrim ? nullptr : pipelines.Find(product->pipeline);
+        const bool returns =
+            instance && std::ranges::any_of(instance->resolved.values, [](const auto& value) {
+                return value.type == pipeline::SignalType::Returns;
+            });
+        const std::pair<uint64_t, uint64_t> runs = {
+            snapshot.Version() - (returns ? 0 : pipelineTableRuns), m_kernels};
+        if (const auto traced = set.traced.find(product->prim);
             traced == set.traced.end() || traced->second != runs) {
-            stale.insert(prim);
-            set.traced[prim] = runs;
+            stale.insert(product->prim);
+            set.traced[product->prim] = runs;
         }
     }
     result.m_done = Trace(planned, set, due, stale, snapshot, pipelineRuns);
@@ -479,6 +491,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
         if (captures.empty()) {
             continue;
         }
+        ERNIE_ZONE("Render/TraceCaptures");
         params.captures.address =
             captures.size() == set.captures[entry].size()
                 ? set.captureBuffers[entry]->Address()

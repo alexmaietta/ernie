@@ -100,11 +100,13 @@ void Nudge(Scene& scene, uint64_t step) {
 }
 
 void Steps(benchmark::State& state, Stepper& stepper, const char* unit,
-           const std::function<void(uint64_t)>& before = {}) {
+           const std::function<void(uint64_t)>& before = {}, bool moving = true) {
     std::deque<RenderOutput> flight;
     uint64_t step = 0;
     for (auto _ : state) {
-        Nudge(*stepper.scene, step);
+        if (moving) {
+            Nudge(*stepper.scene, step);
+        }
         if (before) {
             before(step);
         }
@@ -169,11 +171,19 @@ void CameraSteps(benchmark::State& state) {
 }
 
 void ValueEdits(benchmark::State& state) {
+    const bool edits = state.range(0) != 0;
+    const bool moving = state.range(1) != 0;
     Stepper& stepper =
         bench::Cached<Stepper>("edits", [&] { return PrepareCamera(Graph::Raw, 1, 720); });
     const Prim gain = *stepper.scene->Find("/Pipe/Gain");
-    Steps(state, stepper, "Mpx/s",
-          [&](uint64_t step) { gain.Set(Gain::kGain, step % 2 == 0 ? 1.5f : 2.0f); });
+    Steps(
+        state, stepper, "Mpx/s",
+        [&](uint64_t step) {
+            if (edits) {
+                gain.Set(Gain::kGain, step % 2 == 0 ? 1.5f : 2.0f);
+            }
+        },
+        moving);
 }
 
 void Pipe(Scene& scene, Returns returns, const char* source,
@@ -461,7 +471,12 @@ BENCHMARK(CameraSteps)
     ->UseRealTime()
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK(ValueEdits)->Name("Sensors/ValueEdits")->UseRealTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(ValueEdits)
+    ->Name("Sensors/ValueEdits")
+    ->ArgNames({"edits", "moving"})
+    ->ArgsProduct({{0, 1}, {0, 1}})
+    ->UseRealTime()
+    ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(LidarSteps)
     ->Name("Sensors/Lidar")
