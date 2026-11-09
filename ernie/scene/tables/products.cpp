@@ -453,7 +453,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                                  pattern != DetectorPattern::Rgb &&
                                  pattern != DetectorPattern::Bands;
             product.layouts =
-                pipeline::PropagateLayouts(bound.instance->resolved, m_pipelines.Registry(),
+                pipeline::PropagateLayouts(bound.instance->resolved, *m_pipelines.Registry(),
                                            {.channels = uint32_t(std::max<int64_t>(channels, 1)),
                                             .pattern = uint32_t(pattern),
                                             .mosaics = mosaics});
@@ -472,7 +472,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
             (bound.instance &&
              std::ranges::any_of(
                  bound.instance->resolved.nodes, [&](const pipeline::ResolvedNode& node) {
-                     return m_pipelines.Registry()[node.def].kind == pipeline::NodeKind::Source;
+                     return (*m_pipelines.Registry())[node.def].kind == pipeline::NodeKind::Source;
                  }));
         if (rated && RenderMode(record.renderMode) != RenderMode::RealTime) {
             throw Error("{} measures electron rates, which only a RealTime render traces, so set "

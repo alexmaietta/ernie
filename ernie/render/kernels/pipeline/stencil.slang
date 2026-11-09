@@ -40,6 +40,10 @@ struct Neighborhood<S : ISignal> {
                                uint(at.y) * element.capture->width + uint(at.x));
     }
 
+    S At(int x, int y) {
+        return At(int2(x, y));
+    }
+
     S Center() {
         return ReadSignal<S>(params, element, slot);
     }

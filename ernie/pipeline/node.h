@@ -42,10 +42,15 @@ struct PortDef {
     bool optional = false;
 };
 
+inline constexpr uint32_t kNoContextArgument = ~0u;
+
+enum class ParameterType : uint8_t { Float, Int, Bool };
+
 struct ParameterDef {
     std::string name;
     uint32_t words = 1;
     std::vector<float> fallback;
+    ParameterType type = ParameterType::Float;
 };
 
 struct UniformDef {
@@ -66,6 +71,11 @@ struct NodeDef {
     LayoutRule layout = LayoutRule::FirstInput;
     std::string module;
     std::string type;
+    std::string file;
+    std::string source;
+    std::string version;
+    bool applies = false;
+    uint32_t context = kNoContextArgument;
 };
 
 class NodeRegistry {

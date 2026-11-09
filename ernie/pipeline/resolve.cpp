@@ -178,6 +178,7 @@ ResolvedPipeline ResolvePipeline(const PipelineDesc& desc, const NodeRegistry& r
 
     pipeline.key =
         graph::GraphShape(graph, ordering.order, [&](uint32_t node, graph::ShapeWriter& writer) {
+            writer.Add(registry[pipeline.nodes[position[node]].def].version);
             for (const std::string& uniform : pipeline.nodes[position[node]].uniforms) {
                 writer.Add(uniform);
             }

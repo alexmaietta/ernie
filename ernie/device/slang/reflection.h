@@ -40,6 +40,30 @@ struct ReflectedNode {
     std::vector<ReflectedParameter> parameters;
 };
 
+enum class PipelineNodeKind { Point, Stencil };
+
+struct ReflectedPort {
+    std::string name;
+    std::string type;
+};
+
+inline constexpr uint32_t kNoContext = ~0u;
+
+struct ReflectedPipelineNode {
+    std::string name;
+    std::string displayName;
+    PipelineNodeKind kind = PipelineNodeKind::Point;
+    uint32_t radius = 0;
+    std::vector<ReflectedField> fields;
+    std::vector<ReflectedPort> inputs;
+    uint32_t context = kNoContext;
+    std::string result;
+};
+
+ERNIE_API std::vector<ReflectedPipelineNode>
+ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
+                     std::string_view module, std::string_view label);
+
 ERNIE_API std::vector<ReflectedNode>
 ReflectMaterialNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
                      std::string_view module, std::string_view label);

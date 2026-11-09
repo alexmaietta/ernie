@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <memory>
+
 #include "ernie/pipeline/node.h"
 
 namespace ernie::pipeline {
@@ -11,5 +13,9 @@ inline constexpr const char* kIspNodes = "ernie.render.kernels.pipeline.nodes.is
 void RegisterBuiltinNodes(NodeRegistry& registry);
 
 const NodeRegistry& BuiltinNodes();
+
+std::shared_ptr<const NodeRegistry> PipelineNodes();
+
+void RegisterPipelineNode(NodeDef def);
 
 }

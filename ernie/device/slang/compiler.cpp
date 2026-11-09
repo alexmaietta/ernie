@@ -417,7 +417,7 @@ ReflectedField Field(slang::IGlobalSession& global, slang::VariableReflection* v
                      std::string_view node, std::string_view label) {
     const std::optional<FieldType> type = ReflectedType(variable->getType());
     if (!type) {
-        throw Error("{}'s input {} in {} has type {}, but material inputs are bool, int, "
+        throw Error("{}'s input {} in {} has type {}, but node inputs are bool, int, "
                     "float, float2, float3 or float4",
                     node, variable->getName(), label, variable->getType()->getName());
     }
@@ -530,6 +530,161 @@ std::optional<ReflectedNode> ReflectNode(slang::IGlobalSession& global, slang::D
     return node;
 }
 
+}
+
+namespace {
+
+std::string ShortName(slang::TypeReflection* type) {
+    ComPtr<ISlangBlob> full;
+    std::string name =
+        SLANG_SUCCEEDED(type->getFullName(full.writeRef())) && full
+            ? std::string(static_cast<const char*>(full->getBufferPointer()), full->getBufferSize())
+            : std::string(type->getName());
+    while (!name.empty() && name.back() == '\0') {
+        name.pop_back();
+    }
+    const size_t open = name.find('<');
+    const size_t scope = name.rfind('.', open);
+    return scope == std::string::npos ? name : name.substr(scope + 1);
+}
+
+std::optional<ReflectedPipelineNode> ReflectPipelineNode(slang::IGlobalSession& global,
+                                                         slang::ProgramLayout& layout,
+                                                         slang::DeclReflection* decl,
+                                                         std::string_view label) {
+    slang::TypeReflection* type = decl->getType();
+    slang::TypeReflection* point = layout.findTypeByName("IPointNode");
+    slang::TypeReflection* stencil = layout.findTypeByName("IStencilNode");
+    if (type == nullptr || point == nullptr || stencil == nullptr) {
+        return std::nullopt;
+    }
+    const bool isPoint = layout.isSubType(type, point);
+    const bool isStencil = layout.isSubType(type, stencil);
+    if (!isPoint && !isStencil) {
+        return std::nullopt;
+    }
+    ReflectedPipelineNode node{.name = decl->getName(),
+                               .kind =
+                                   isStencil ? PipelineNodeKind::Stencil : PipelineNodeKind::Point};
+    if (isPoint && isStencil) {
+        throw Error("{} in {} is both a point and a stencil node; pick one", node.name, label);
+    }
+    if (slang::Attribute* named = type->findUserAttributeByName("Node")) {
+        size_t size = 0;
+        if (const char* text = named->getArgumentValueString(0, &size)) {
+            node.displayName.assign(text, size);
+        }
+    }
+    slang::FunctionReflection* apply = nullptr;
+    for (slang::DeclReflection* child : decl->getChildren()) {
+        if (child->getKind() == slang::DeclReflection::Kind::Func &&
+            std::string_view(child->getName()) == "Apply") {
+            if (apply != nullptr) {
+                throw Error("{} in {} has more than one Apply; a node has exactly one", node.name,
+                            label);
+            }
+            apply = child->asFunction();
+            continue;
+        }
+        if (child->getKind() != slang::DeclReflection::Kind::Variable) {
+            continue;
+        }
+        slang::VariableReflection* variable = child->asVariable();
+        const bool constant = variable->findModifier(slang::Modifier::Static) != nullptr ||
+                              variable->findModifier(slang::Modifier::Const) != nullptr;
+        if (constant && std::string_view(variable->getName()) == "kRadius") {
+            ComPtr<ISlangBlob> value;
+            if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(value.writeRef())) && value &&
+                value->getBufferSize() >= sizeof(int32_t)) {
+                int32_t radius = 0;
+                std::memcpy(&radius, value->getBufferPointer(), sizeof(radius));
+                node.radius = uint32_t(std::max(radius, 0));
+            }
+            continue;
+        }
+        if (constant) {
+            continue;
+        }
+        ReflectedField field = Field(global, variable, node.name, label);
+        if (field.type == FieldType::Spectral) {
+            throw Error("{}'s input {} in {} is a SpectralValue, which sensor pipeline nodes "
+                        "don't take",
+                        node.name, field.name, label);
+        }
+        node.fields.push_back(std::move(field));
+    }
+    if (apply == nullptr) {
+        throw Error("{} in {} is a pipeline node, so it needs an Apply method that takes its "
+                    "signals and a PointContext and returns a signal",
+                    node.name, label);
+    }
+    if (isStencil && node.radius == 0) {
+        throw Error("{} in {} is a stencil node, so it needs a static const int kRadius above "
+                    "zero",
+                    node.name, label);
+    }
+    node.result = ShortName(apply->getReturnType());
+    for (unsigned index = 0; index < apply->getParameterCount(); ++index) {
+        slang::VariableReflection* parameter = apply->getParameterByIndex(index);
+        std::string parameterType = ShortName(parameter->getType());
+        if (parameterType == "PointContext") {
+            if (node.context != kNoContext) {
+                throw Error("{}'s Apply in {} takes more than one PointContext", node.name, label);
+            }
+            node.context = index;
+            continue;
+        }
+        if (parameterType.starts_with("Neighborhood<")) {
+            if (!isStencil || !node.inputs.empty()) {
+                throw Error("{}'s Apply in {} takes a Neighborhood, which only the first signal "
+                            "of a stencil node may be",
+                            node.name, label);
+            }
+            parameterType = parameterType.substr(13, parameterType.size() - 14);
+            const size_t scope = parameterType.rfind('.');
+            if (scope != std::string::npos) {
+                parameterType = parameterType.substr(scope + 1);
+            }
+        } else if (isStencil && node.inputs.empty()) {
+            throw Error("{} in {} is a stencil node, so its Apply takes a Neighborhood of its "
+                        "first signal",
+                        node.name, label);
+        }
+        node.inputs.push_back({parameter->getName(), std::move(parameterType)});
+    }
+    return node;
+}
+
+}
+
+std::vector<ReflectedPipelineNode>
+ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
+                     std::string_view module, std::string_view label) {
+    slang::IGlobalSession& global = GlobalSession();
+    ModuleFiles files(library, sources);
+    ComPtr<slang::ISession> session = CreateSession(global, backend, Traversal::Software,
+                                                    Sampling::Software, false, files, label, false);
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* loaded =
+        session->loadModule(std::string(module).c_str(), diagnostics.writeRef());
+    if (loaded == nullptr) {
+        Fail(std::format("Loading {}", label), label, diagnostics);
+    }
+    slang::ProgramLayout* layout = loaded->getLayout(0, diagnostics.writeRef());
+    if (layout == nullptr) {
+        Fail(std::format("Reflecting {}", label), label, diagnostics);
+    }
+    std::vector<ReflectedPipelineNode> nodes;
+    for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
+        if (decl->getKind() != slang::DeclReflection::Kind::Struct) {
+            continue;
+        }
+        if (std::optional<ReflectedPipelineNode> node =
+                ReflectPipelineNode(global, *layout, decl, label)) {
+            nodes.push_back(std::move(*node));
+        }
+    }
+    return nodes;
 }
 
 std::vector<ReflectedNode> ReflectMaterialNodes(Backend backend, const KernelLibrary* library,

@@ -93,3 +93,39 @@ def test_standalone_runs_match_the_traced_pipeline(scene):
         ernie.DetectorDesc(pattern="cmyk")
     with pytest.raises(RuntimeError, match="no input"):
         pipeline.run({}, detector=detector)
+
+
+OFFSET = """
+import ernie.pipeline;
+
+using namespace ernie;
+
+struct PyOffset : IPointNode {
+    [Input(0, 100)] float amount = 5;
+
+    Digital Apply(Digital digital, PointContext context) {
+        return digital.Add(SCALE * amount);
+    }
+}
+"""
+
+
+def test_slang_nodes_load_run_and_reload(scene, tmp_path):
+    source = tmp_path / "offset.slang"
+    source.write_text(OFFSET.replace("SCALE", "1"))
+    assert scene.load_shaders(str(source)) == ["PyOffset"]
+    node = ernie.pipeline_node("PyOffset")
+    assert node["kind"] == "point"
+    assert node["inputs"] == {"digital": ("Digital", False)}
+
+    pipe, _, adc = bench(scene)
+    renderer = ernie.Renderer(scene)
+    raw = render(renderer)[1]
+    offset = pipe.insert_after(adc, "Offset", "PyOffset", amount=7.0)
+    np.testing.assert_allclose(render(renderer)[1], raw + 7)
+    offset["amount"] = 2.0
+    np.testing.assert_allclose(render(renderer)[1], raw + 2)
+
+    source.write_text(OFFSET.replace("SCALE", "10"))
+    assert scene.reload_shaders() == ["PyOffset"]
+    np.testing.assert_allclose(render(renderer)[1], raw + 20)

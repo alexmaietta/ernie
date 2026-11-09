@@ -22,4 +22,6 @@ bool Glob(std::string_view pattern, std::string_view text);
 
 std::string Digest(std::string_view bytes);
 
+std::string Replaced(std::string text, std::string_view from, std::string_view to);
+
 }

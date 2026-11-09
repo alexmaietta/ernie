@@ -11,6 +11,7 @@
 #include "ernie/device/slang/reflection.h"
 #include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
+#include "ernie/pipeline/builtins.h"
 #include "ernie/render/kernels.h"
 #include "ernie/stage/schema/runtime.h"
 #include "ernie/util/error.h"
@@ -86,14 +87,6 @@ NodeInputType InputType(device::FieldType type) {
     }
 }
 
-std::string Replaced(std::string text, std::string_view from, std::string_view to) {
-    for (size_t at = text.find(from); at != std::string::npos; at = text.find(from, at)) {
-        text.replace(at, from.size(), to);
-        at += to.size();
-    }
-    return text;
-}
-
 struct LoadedFile {
     std::string digest;
     std::vector<std::string> names;
@@ -137,7 +130,9 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             return found->second.names;
         }
     }
-    const std::string module = "ernie.material.nodes.n" + digest;
+    const bool pipelineNodes = source.find("import ernie.pipeline") != std::string::npos;
+    const std::string module =
+        (pipelineNodes ? "ernie.pipeline.nodes.n" : "ernie.material.nodes.n") + digest;
     std::string path = module;
     std::replace(path.begin(), path.end(), '.', '/');
     path += ".slang";
@@ -148,6 +143,110 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         return Error("{}", message);
     };
     const device::Backend backend = scene.GetDevice().Adapter().backend;
+    if (pipelineNodes) {
+        std::vector<device::ReflectedPipelineNode> reflected;
+        try {
+            reflected = device::ReflectPipelineNodes(backend, &kRenderKernels, {{path, source}},
+                                                     module, file.string());
+        } catch (const Error& error) {
+            throw mapped(error);
+        }
+        const auto signal = [&](const std::string& node, const std::string& type) {
+            const auto found = std::ranges::find(pipeline::kSignalNames, type);
+            if (found == std::end(pipeline::kSignalNames)) {
+                throw Error(
+                    "{} in {} uses {}, which isn't a pipeline signal; signals are {}", node,
+                    file.string(), type,
+                    Join({std::begin(pipeline::kSignalNames), std::end(pipeline::kSignalNames)}));
+            }
+            return pipeline::SignalType(found - std::begin(pipeline::kSignalNames));
+        };
+        for (const device::ReflectedPipelineNode& node : reflected) {
+            signal(node.name, node.result);
+            for (const device::ReflectedPort& port : node.inputs) {
+                signal(node.name, port.type);
+            }
+        }
+        std::vector<std::string> names;
+        for (const device::ReflectedPipelineNode& node : reflected) {
+            const pipeline::SignalType result = signal(node.name, node.result);
+            pipeline::NodeDef def{
+                .id = node.name,
+                .kind = node.kind == device::PipelineNodeKind::Stencil ? pipeline::NodeKind::Stencil
+                                                                       : pipeline::NodeKind::Point,
+                .outputs = {{std::string(pipeline::kSignalPortNames[uint32_t(result)]), result}},
+                .radius = node.radius,
+                .module = module,
+                .type = node.name,
+                .file = file.string(),
+                .source = source,
+                .version = digest,
+                .applies = true,
+                .context = node.context};
+            for (const device::ReflectedPort& port : node.inputs) {
+                def.inputs.push_back({port.name, signal(node.name, port.type)});
+            }
+            RuntimeSchemaDesc desc{.name = node.name,
+                                   .base = SchemaId::SensorNode,
+                                   .doc = "A sensor pipeline node from " + file.string() + ".",
+                                   .inherited = {{"id", node.name}}};
+            std::vector<std::string> inputs;
+            for (const device::ReflectedField& field : node.fields) {
+                RuntimeColumnDesc column = Column(field);
+                column.group = node.displayName.empty() ? node.name : node.displayName;
+                desc.columns.push_back(std::move(column));
+                pipeline::ParameterDef parameter{.name = field.name};
+                switch (field.type) {
+                case device::FieldType::Bool:
+                    parameter.type = pipeline::ParameterType::Bool;
+                    parameter.fallback = {Read<uint32_t>(field.fallback) != 0 ? 1.0f : 0.0f};
+                    break;
+                case device::FieldType::Int:
+                    parameter.type = pipeline::ParameterType::Int;
+                    parameter.fallback = {float(Read<int32_t>(field.fallback))};
+                    break;
+                default:
+                    parameter.words = uint32_t(field.fallback.size() / sizeof(float));
+                    parameter.fallback.resize(parameter.words);
+                    std::memcpy(parameter.fallback.data(), field.fallback.data(),
+                                field.fallback.size());
+                    break;
+                }
+                def.parameters.push_back(std::move(parameter));
+                inputs.push_back(field.name);
+            }
+            const std::shared_ptr<const pipeline::NodeRegistry> known = pipeline::PipelineNodes();
+            const uint32_t found = known->Find(node.name);
+            if (found != pipeline::kNoDef && (*known)[found].file.empty()) {
+                throw Error("{} in {} has the name of a built-in pipeline node; rename it",
+                            node.name, file.string());
+            }
+            const SchemaId previous = FindSchemaByName(node.name);
+            const bool reloading = found != pipeline::kNoDef && previous != SchemaId::None;
+            const SchemaId schema = RegisterSchema(desc, reloading);
+            if (reloading && previous != schema) {
+                Log(LogLevel::Info,
+                    "{} in {} changed its inputs, so its prims move to the new ones", node.name,
+                    file.string());
+                RetypePrims(scene, previous, schema);
+            }
+            pipeline::RegisterPipelineNode(std::move(def));
+            Log(LogLevel::Debug, "loaded {} pipeline node {} from {} with inputs {}",
+                node.kind == device::PipelineNodeKind::Stencil ? "stencil" : "point", node.name,
+                file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
+            names.push_back(node.name);
+        }
+        if (names.empty()) {
+            Log(LogLevel::Warning,
+                "{} has no pipeline nodes; a node is a struct conforming to IPointNode or "
+                "IStencilNode with an Apply method",
+                file.string());
+        }
+        LoadedFiles& loaded = Loaded();
+        const std::lock_guard lock(loaded.mutex);
+        loaded.files[file] = {digest, names};
+        return names;
+    }
     auto sources = PrimitiveSources(Primitives());
     sources[path] = source;
     std::vector<device::ReflectedNode> nodes;

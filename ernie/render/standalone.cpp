@@ -66,22 +66,24 @@ std::atomic<uint32_t> g_standaloneDefinitions{1u << 24};
 
 struct Pipeline::State {
     device::Device* device = nullptr;
-    const pipeline::NodeRegistry* registry = nullptr;
+    std::shared_ptr<const pipeline::NodeRegistry> registry;
     std::string path;
     pipeline::ResolvedPipeline instance;
     std::shared_ptr<const CompiledPipeline> compiled;
 
-    State(device::Device& on, const pipeline::NodeRegistry& nodes, std::string name,
+    State(device::Device& on, std::shared_ptr<const pipeline::NodeRegistry> nodes, std::string name,
           pipeline::ResolvedPipeline resolved)
-        : device(&on), registry(&nodes), path(std::move(name)), instance(std::move(resolved)) {
+        : device(&on), registry(std::move(nodes)), path(std::move(name)),
+          instance(std::move(resolved)) {
         auto definition = std::make_shared<pipeline::PipelineDefinition>(
-            pipeline::BuildDefinition(g_standaloneDefinitions++, instance, nodes));
-        compiled = CompilePipeline(on, std::move(definition), nodes);
+            pipeline::BuildDefinition(g_standaloneDefinitions++, instance, *registry));
+        compiled = CompilePipeline(on, std::move(definition), *registry);
     }
 };
 
 std::optional<PipelineNodeInfo> FindPipelineNode(std::string_view id) {
-    const pipeline::NodeRegistry& registry = pipeline::BuiltinNodes();
+    const std::shared_ptr<const pipeline::NodeRegistry> nodes = pipeline::PipelineNodes();
+    const pipeline::NodeRegistry& registry = *nodes;
     const uint32_t found = registry.Find(id);
     if (found == pipeline::kNoDef) {
         return std::nullopt;
@@ -121,12 +123,12 @@ Pipeline::Pipeline(const Ref<Scene>& scene, std::string_view path) {
 }
 
 Pipeline::Pipeline(device::Device& device, const pipeline::PipelineDesc& desc)
-    : Pipeline(device, desc, pipeline::BuiltinNodes()) {}
+    : Pipeline(device, desc, *pipeline::PipelineNodes()) {}
 
 Pipeline::Pipeline(device::Device& device, const pipeline::PipelineDesc& desc,
                    const pipeline::NodeRegistry& registry)
-    : m_state(std::make_unique<State>(device, registry, desc.path,
-                                      pipeline::ResolvePipeline(desc, registry))) {}
+    : m_state(std::make_unique<State>(device, std::make_shared<pipeline::NodeRegistry>(registry),
+                                      desc.path, pipeline::ResolvePipeline(desc, registry))) {}
 
 Pipeline::~Pipeline() = default;
 Pipeline::Pipeline(Pipeline&&) noexcept = default;

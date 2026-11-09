@@ -88,4 +88,41 @@ struct PointContext {
     NoiseStream FixedNoise(uint stream) {
         return NoiseStream(element.capture->identity, element.index, node, stream, kFixedCapture);
     }
+
+    float Uniform(uint stream) {
+        NoiseStream noise = Noise(stream);
+        return noise.Uniform();
+    }
+
+    float Normal(uint stream) {
+        NoiseStream noise = Noise(stream);
+        return noise.Normal();
+    }
+
+    float Poisson(uint stream, float mean) {
+        NoiseStream noise = Noise(stream);
+        return noise.Poisson(mean);
+    }
+
+    float FixedUniform(uint stream) {
+        NoiseStream noise = FixedNoise(stream);
+        return noise.Uniform();
+    }
+
+    float FixedNormal(uint stream) {
+        NoiseStream noise = FixedNoise(stream);
+        return noise.Normal();
+    }
+
+    property DetectorRecord detector {
+        get {
+            return Detector();
+        }
+    }
+
+    property uint2 coord {
+        get {
+            return element.coord;
+        }
+    }
 }

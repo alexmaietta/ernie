@@ -332,7 +332,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         const std::shared_ptr<const PipelineInstance> instance =
             product.pipeline == kNoPrim ? nullptr : pipelines.Find(product.pipeline);
         if (instance && std::ranges::any_of(instance->resolved.nodes, [&](const auto& node) {
-                return pipelines.Registry()[node.def].kind == pipeline::NodeKind::Source;
+                return (*pipelines.Registry())[node.def].kind == pipeline::NodeKind::Source;
             })) {
             uint64_t& rates = slots[uint32_t(RenderVarSource::ElectronRate)];
             if (rates == 0) {
@@ -592,7 +592,7 @@ std::vector<RendererImpl::PipelineRun> RendererImpl::PrepareRuns(const ProductPl
             if (!compiled) {
                 definitions = definitions ? definitions : table.Definitions();
                 compiled =
-                    CompilePipeline(m_scene->GetDevice(), definitions->Find(id), table.Registry());
+                    CompilePipeline(m_scene->GetDevice(), definitions->Find(id), *table.Registry());
             }
             run.compiled = compiled;
             for (const std::string& entry : compiled->generated.entries) {
@@ -630,7 +630,9 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     }
     device::Device& device = m_scene->GetDevice();
     device::Queue& queue = device.GetQueue();
-    const pipeline::NodeRegistry& registry = SceneImpl::Get(*m_scene).GetPipelines().Registry();
+    const std::shared_ptr<const pipeline::NodeRegistry> nodes =
+        SceneImpl::Get(*m_scene).GetPipelines().Registry();
+    const pipeline::NodeRegistry& registry = *nodes;
     const Prims& prims = SceneImpl::Get(*m_scene).GetStructure().GetPrims();
     const auto layer = [&](uint32_t product, uint32_t sensor) {
         const std::vector<uint32_t>& sensors = plan.products[product]->sensors;

@@ -90,4 +90,15 @@ std::string Digest(std::string_view bytes) {
     return fmt::format("{:016x}", hash);
 }
 
+std::string Replaced(std::string text, std::string_view from, std::string_view to) {
+    if (from.empty()) {
+        return text;
+    }
+    for (size_t at = text.find(from); at != std::string::npos; at = text.find(from, at)) {
+        text.replace(at, from.size(), to);
+        at += to.size();
+    }
+    return text;
+}
+
 }

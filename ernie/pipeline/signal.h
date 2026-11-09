@@ -24,6 +24,11 @@ inline constexpr std::string_view kSignalNames[] = {
     "Radiance",     "Returns",   "PointCloud", "RadarCube",   "CaptureStat",
 };
 
+inline constexpr std::string_view kSignalPortNames[] = {
+    "electronRate", "electrons", "digital", "color", "display",
+    "radiance",     "returns",   "cloud",   "cube",  "stat",
+};
+
 enum class ElementType : uint8_t {
     F32,
     F16,

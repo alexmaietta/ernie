@@ -22,7 +22,7 @@ enum class AnyEnum : uint32_t {};
 
 std::vector<ColumnRef> PipelineInputs() {
     std::vector<ColumnRef> inputs;
-    for (uint32_t id = 0; id < uint32_t(SchemaId::Count); ++id) {
+    for (uint32_t id = 0; id < SchemaCount(); ++id) {
         const auto schema = SchemaId(id);
         if (schema != SchemaId::Connectable && schema != SchemaId::Shader &&
             !IsA(schema, SchemaId::SensorNode) && schema != SchemaId::SensorPipeline &&
@@ -44,15 +44,20 @@ bool SameInstance(const PipelineInstance& a, const PipelineInstance& b) {
 
 }
 
-PipelineTable::PipelineTable(Structure& structure) : m_structure(structure), m_library(1) {}
+PipelineTable::PipelineTable(Structure& structure)
+    : m_structure(structure), m_library(1), m_registry(pipeline::PipelineNodes()) {}
 
 std::span<const ColumnRef> PipelineTable::Inputs() const {
-    static const std::vector<ColumnRef> inputs = PipelineInputs();
-    return inputs;
+    if (m_inputSchemas != SchemaCount()) {
+        m_inputs = PipelineInputs();
+        m_inputSchemas = SchemaCount();
+    }
+    return m_inputs;
 }
 
-const pipeline::NodeRegistry& PipelineTable::Registry() const {
-    return pipeline::BuiltinNodes();
+std::shared_ptr<const pipeline::NodeRegistry> PipelineTable::Registry() const {
+    const std::lock_guard lock(m_mutex);
+    return m_registry;
 }
 
 std::shared_ptr<const PipelineInstance> PipelineTable::Find(uint32_t prim) const {
@@ -103,7 +108,7 @@ pipeline::NodeDesc PipelineTable::GatherNode(uint32_t prim) const {
     pipeline::NodeDesc node{.prim = prim, .path = m_structure.GetPaths().Path(prim)};
     node.id = std::string(tokens.Text(view.Get<Token>(kShaderId).Get().front()));
     node.inputs = Connections(prim);
-    const pipeline::NodeRegistry& registry = Registry();
+    const pipeline::NodeRegistry& registry = *m_registry;
     const uint32_t def = registry.Find(node.id);
     if (def == pipeline::kNoDef) {
         return node;
@@ -145,6 +150,9 @@ pipeline::NodeDesc PipelineTable::GatherNode(uint32_t prim) const {
             break;
         case ColumnType::Int:
             values = {float(view.Get<int32_t>(column).Get().front())};
+            break;
+        case ColumnType::Bool:
+            values = {view.Get<bool>(column).Get().front() ? 1.0f : 0.0f};
             break;
         case ColumnType::Float2: {
             const Float2 value = view.Get<Float2>(column).Get().front();
@@ -205,12 +213,12 @@ pipeline::PipelineDesc PipelineTable::Gather(uint32_t pipeline, std::span<const 
         std::string output = tap.output;
         if (output.empty()) {
             const pipeline::NodeDesc described = GatherNode(tap.node);
-            const uint32_t def = Registry().Find(described.id);
-            if (def == pipeline::kNoDef || Registry()[def].outputs.size() != 1) {
+            const uint32_t def = m_registry->Find(described.id);
+            if (def == pipeline::kNoDef || (*m_registry)[def].outputs.size() != 1) {
                 throw Error("{} taps {}, so its tapOutput must name one of the node's outputs",
                             tap.name, node);
             }
-            output = Registry()[def].outputs.front().name;
+            output = (*m_registry)[def].outputs.front().name;
         }
         desc.outputs.push_back(
             {.input = tap.name, .source = tap.node, .sourcePath = node, .output = output});
@@ -241,7 +249,13 @@ pipeline::PipelineDesc PipelineTable::Gather(uint32_t pipeline, std::span<const 
 void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
     ERNIE_ZONE("Pipelines/Run");
     ColumnStore& store = m_structure.GetColumnStore();
-    const bool edited = changes.resync || changes.structure || !changes.apis.empty() ||
+    std::shared_ptr<const pipeline::NodeRegistry> nodes = pipeline::PipelineNodes();
+    const bool reloaded = nodes != m_registry;
+    if (reloaded) {
+        const std::lock_guard lock(m_mutex);
+        m_registry = std::move(nodes);
+    }
+    const bool edited = reloaded || changes.resync || changes.structure || !changes.apis.empty() ||
                         std::ranges::any_of(Inputs(), [&](ColumnRef input) {
                             return store.LastWrite(input) > m_seen;
                         });
@@ -250,7 +264,7 @@ void PipelineTable::Run(const ChangeSet& changes, TableVersions&) {
         return;
     }
     const Prims& prims = m_structure.GetPrims();
-    const pipeline::NodeRegistry& registry = Registry();
+    const pipeline::NodeRegistry& registry = *m_registry;
     std::map<uint32_t, std::shared_ptr<const PipelineInstance>> resolved;
     const std::vector<Tap> taps = GatherTaps();
     bool changed = false;

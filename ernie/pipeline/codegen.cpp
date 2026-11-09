@@ -161,15 +161,15 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
         for (const uint32_t node : segment.nodes) {
             const ResolvedNode& resolved = pipeline.nodes[node];
             const NodeDef& def = registry[resolved.def];
-            std::string arguments;
+            std::vector<std::string> arguments;
             for (uint32_t port = 0; port < def.inputs.size(); ++port) {
                 const uint32_t value = resolved.inputs[port];
                 const SignalType taken = def.inputs[port].type;
                 if (value == kNoValue) {
-                    arguments +=
+                    arguments.push_back(
                         taken == SignalType::CaptureStat
-                            ? std::string(", CaptureStat.Zero()")
-                            : std::format(", {}.Make(Channels(0))", kSignalNames[uint32_t(taken)]);
+                            ? std::string("CaptureStat.Zero()")
+                            : std::format("{}.Make(Channels(0))", kSignalNames[uint32_t(taken)]));
                     continue;
                 }
                 if (def.kind == NodeKind::Stencil && port == 0) {
@@ -180,7 +180,7 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                     source += std::format(
                         "    const Neighborhood<{0}> n{1} = Neighborhood<{0}>(p, element, {2});\n",
                         signalType(value), value, storedSlot[value]);
-                    arguments += std::format(", n{}", value);
+                    arguments.push_back(std::format("n{}", value));
                     continue;
                 }
                 if (!available.contains(value)) {
@@ -198,16 +198,57 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                                   signalType(value), value, storedSlot[value]);
                     available.insert(value);
                 }
-                arguments += std::format(", v{}", value);
+                arguments.push_back(std::format("v{}", value));
             }
-            for (const uint32_t value : resolved.outputs) {
-                source += std::format("    {} v{};\n", signalType(value), value);
-                arguments += std::format(", v{}", value);
+            const std::string context =
+                std::format("PointContext(p, element, {}, {}, {})", node,
+                            definition.parameterOffsets[node], definition.stateOffsets[node]);
+            if (def.applies) {
+                source += std::format("    const PointContext context{} = {};\n", node, context);
+                source += std::format("    {} node{};\n", def.type, node);
+                uint32_t word = 0;
+                for (const ParameterDef& parameter : def.parameters) {
+                    std::string read;
+                    for (uint32_t component = 0; component < parameter.words; ++component) {
+                        read += std::format("{}context{}.Parameter({})", component == 0 ? "" : ", ",
+                                            node, word + component);
+                    }
+                    word += parameter.words;
+                    if (parameter.type == ParameterType::Int) {
+                        read = std::format("int({})", read);
+                    } else if (parameter.type == ParameterType::Bool) {
+                        read = std::format("{} != 0", read);
+                    } else if (parameter.words > 1) {
+                        read = std::format("float{}({})", parameter.words, read);
+                    }
+                    source += std::format("    node{}.{} = {};\n", node, parameter.name, read);
+                }
+                if (def.context != kNoContextArgument) {
+                    arguments.insert(arguments.begin() + std::min(ptrdiff_t(def.context),
+                                                                  ptrdiff_t(arguments.size())),
+                                     std::format("context{}", node));
+                }
+                std::string call;
+                for (const std::string& argument : arguments) {
+                    call += (call.empty() ? "" : ", ") + argument;
+                }
+                const uint32_t value = resolved.outputs.front();
+                source += std::format("    const {} v{} = node{}.Apply({});\n", signalType(value),
+                                      value, node, call);
                 available.insert(value);
+            } else {
+                std::string call;
+                for (const std::string& argument : arguments) {
+                    call += ", " + argument;
+                }
+                for (const uint32_t value : resolved.outputs) {
+                    source += std::format("    {} v{};\n", signalType(value), value);
+                    call += std::format(", v{}", value);
+                    available.insert(value);
+                }
+                source +=
+                    std::format("    {}.Evaluate({}{});\n", NodeType(def, resolved), context, call);
             }
-            source += std::format("    {}.Evaluate(PointContext(p, element, {}, {}, {}){});\n",
-                                  NodeType(def, resolved), node, definition.parameterOffsets[node],
-                                  definition.stateOffsets[node], arguments);
             for (const uint32_t value : resolved.outputs) {
                 for (const uint32_t slot : outputSlots(value)) {
                     source += std::format("    WriteSignal(p, element, {}, v{});\n", slot, value);
