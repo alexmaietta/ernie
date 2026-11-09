@@ -657,9 +657,9 @@ std::optional<ReflectedPipelineNode> ReflectPipelineNode(slang::IGlobalSession& 
 
 }
 
-std::vector<ReflectedPipelineNode>
-ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
-                     std::string_view module, std::string_view label) {
+ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
+                            const SourceFiles& sources, std::string_view module,
+                            std::string_view label) {
     slang::IGlobalSession& global = GlobalSession();
     ModuleFiles files(library, sources);
     ComPtr<slang::ISession> session = CreateSession(global, backend, Traversal::Software,
@@ -674,45 +674,34 @@ ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const Source
     if (layout == nullptr) {
         Fail(std::format("Reflecting {}", label), label, diagnostics);
     }
-    std::vector<ReflectedPipelineNode> nodes;
+    ReflectedNodes nodes;
     for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
-        if (decl->getKind() != slang::DeclReflection::Kind::Struct) {
-            continue;
-        }
-        if (std::optional<ReflectedPipelineNode> node =
-                ReflectPipelineNode(global, *layout, decl, label)) {
-            nodes.push_back(std::move(*node));
+        if (decl->getKind() == slang::DeclReflection::Kind::Struct) {
+            if (std::optional<ReflectedPipelineNode> node =
+                    ReflectPipelineNode(global, *layout, decl, label)) {
+                nodes.pipeline.push_back(std::move(*node));
+            } else if (std::optional<ReflectedNode> material = ReflectNode(global, decl, label)) {
+                nodes.material.push_back(std::move(*material));
+            }
+        } else if (decl->getKind() == slang::DeclReflection::Kind::Func) {
+            if (std::optional<ReflectedNode> pattern = ReflectPattern(global, decl, label)) {
+                nodes.material.push_back(std::move(*pattern));
+            }
         }
     }
     return nodes;
 }
 
+std::vector<ReflectedPipelineNode>
+ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
+                     std::string_view module, std::string_view label) {
+    return ReflectNodes(backend, library, sources, module, label).pipeline;
+}
+
 std::vector<ReflectedNode> ReflectMaterialNodes(Backend backend, const KernelLibrary* library,
                                                 const SourceFiles& sources, std::string_view module,
                                                 std::string_view label) {
-    slang::IGlobalSession& global = GlobalSession();
-    ModuleFiles files(library, sources);
-    ComPtr<slang::ISession> session = CreateSession(global, backend, Traversal::Software,
-                                                    Sampling::Software, false, files, label, false);
-    ComPtr<slang::IBlob> diagnostics;
-    slang::IModule* loaded =
-        session->loadModule(std::string(module).c_str(), diagnostics.writeRef());
-    if (loaded == nullptr) {
-        Fail(std::format("Loading {}", label), label, diagnostics);
-    }
-    std::vector<ReflectedNode> nodes;
-    for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
-        std::optional<ReflectedNode> node;
-        if (decl->getKind() == slang::DeclReflection::Kind::Struct) {
-            node = ReflectNode(global, decl, label);
-        } else if (decl->getKind() == slang::DeclReflection::Kind::Func) {
-            node = ReflectPattern(global, decl, label);
-        }
-        if (node) {
-            nodes.push_back(std::move(*node));
-        }
-    }
-    return nodes;
+    return ReflectNodes(backend, library, sources, module, label).material;
 }
 
 namespace {

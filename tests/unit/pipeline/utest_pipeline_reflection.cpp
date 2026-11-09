@@ -259,7 +259,7 @@ TEST(PipelineNodeTest, ErrorsNameTheUsersFile) {
                       std::string::npos)
                 << message;
             EXPECT_NE(message.find(expected), std::string::npos) << message;
-            EXPECT_EQ(message.find("ernie/pipeline/nodes"), std::string::npos) << message;
+            EXPECT_EQ(message.find("ernie/nodes"), std::string::npos) << message;
         }
     };
     const std::filesystem::path lines = WriteFile("ernie_pipeline_nodes_lines.slang", R"(

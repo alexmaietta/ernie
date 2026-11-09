@@ -214,7 +214,7 @@ struct TestLines {
             EXPECT_NE(message.find(std::filesystem::weakly_canonical(broken).string() + ":6"),
                       std::string::npos)
                 << message;
-            EXPECT_EQ(message.find("ernie/material/nodes"), std::string::npos) << message;
+            EXPECT_EQ(message.find("ernie/nodes"), std::string::npos) << message;
         }
     });
 }
@@ -493,6 +493,44 @@ struct TestBad {
         EXPECT_THROW(LoadShaders(*scene, bad), Error);
         EXPECT_THROW(LoadShaders(*scene, broken), Error);
         EXPECT_THROW(LoadShaders(*scene, "/no/such/file.slang"), Error);
+    });
+}
+
+TEST(MaterialNodeTest, FilesAreSortedByTheNodesTheyDefineNotByTheirText) {
+    const std::filesystem::path mentioned = WriteFile("ernie_render_nodes_mentioned.slang", R"(
+// Unlike a pipeline node, this file doesn't import ernie.pipeline;
+import ernie.material;
+
+struct TestMentioned {
+    void Material(inout SurfaceInputs m, ShadeContext c) {}
+}
+)");
+    const std::filesystem::path mixed = WriteFile("ernie_render_nodes_mixed.slang", R"(
+import ernie.material;
+import ernie.pipeline;
+
+using namespace ernie;
+
+struct TestMixedSurface {
+    void Material(inout SurfaceInputs m, ShadeContext c) {}
+}
+
+struct TestMixedStage : IPointNode {
+    Digital Apply(Digital digital, PointContext context) {
+        return digital;
+    }
+}
+)");
+    ForEachDevice([&](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        EXPECT_EQ(LoadShaders(*scene, mentioned), std::vector<std::string>{"TestMentioned"});
+        try {
+            LoadShaders(*scene, mixed);
+            ADD_FAILURE() << "a file with both kinds of node loaded";
+        } catch (const Error& error) {
+            EXPECT_NE(std::string(error.what()).find("both pipeline nodes"), std::string::npos)
+                << error.what();
+        }
     });
 }
 

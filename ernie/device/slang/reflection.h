@@ -60,6 +60,15 @@ struct ReflectedPipelineNode {
     std::string result;
 };
 
+struct ReflectedNodes {
+    std::vector<ReflectedNode> material;
+    std::vector<ReflectedPipelineNode> pipeline;
+};
+
+ERNIE_API ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
+                                      const SourceFiles& sources, std::string_view module,
+                                      std::string_view label);
+
 ERNIE_API std::vector<ReflectedPipelineNode>
 ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
                      std::string_view module, std::string_view label);

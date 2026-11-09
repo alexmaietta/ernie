@@ -130,9 +130,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             return found->second.names;
         }
     }
-    const bool pipelineNodes = source.find("import ernie.pipeline") != std::string::npos;
-    const std::string module =
-        (pipelineNodes ? "ernie.pipeline.nodes.n" : "ernie.material.nodes.n") + digest;
+    const std::string module = "ernie.nodes.n" + digest;
     const std::string path = ModulePath(module);
     const std::pair<std::string, std::string> origins[] = {{path, file.string()},
                                                            {module + ".slang", file.string()}};
@@ -140,14 +138,23 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         return Error("{}", MapOrigins(error.what(), origins));
     };
     const device::Backend backend = scene.GetDevice().Adapter().backend;
-    if (pipelineNodes) {
-        std::vector<device::ReflectedPipelineNode> reflected;
-        try {
-            reflected = device::ReflectPipelineNodes(backend, &kRenderKernels, {{path, source}},
-                                                     module, file.string());
-        } catch (const Error& error) {
-            throw mapped(error);
-        }
+    auto sources = PrimitiveSources(Primitives());
+    sources[path] = source;
+    device::ReflectedNodes reflection;
+    try {
+        reflection = device::ReflectNodes(backend, &kRenderKernels,
+                                          {sources.begin(), sources.end()}, module, file.string());
+    } catch (const Error& error) {
+        throw mapped(error);
+    }
+    if (!reflection.pipeline.empty() && !reflection.material.empty()) {
+        throw Error("{} defines both pipeline nodes ({}) and material nodes ({}); put them in "
+                    "separate files",
+                    file.string(), reflection.pipeline.front().name,
+                    reflection.material.front().name);
+    }
+    if (!reflection.pipeline.empty()) {
+        const std::vector<device::ReflectedPipelineNode>& reflected = reflection.pipeline;
         const auto signal = [&](const std::string& node, const std::string& type) {
             const auto found = std::ranges::find(pipeline::kSignalTypes, type);
             if (found == std::end(pipeline::kSignalTypes)) {
@@ -233,26 +240,12 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                 file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
             names.push_back(node.name);
         }
-        if (names.empty()) {
-            Log(LogLevel::Warning,
-                "{} has no pipeline nodes; a node is a struct conforming to IPointNode or "
-                "IStencilNode with an Apply method",
-                file.string());
-        }
         LoadedFiles& loaded = Loaded();
         const std::lock_guard lock(loaded.mutex);
         loaded.files[file] = {digest, names};
         return names;
     }
-    auto sources = PrimitiveSources(Primitives());
-    sources[path] = source;
-    std::vector<device::ReflectedNode> nodes;
-    try {
-        nodes = device::ReflectMaterialNodes(
-            backend, &kRenderKernels, {sources.begin(), sources.end()}, module, file.string());
-    } catch (const Error& error) {
-        throw mapped(error);
-    }
+    std::vector<device::ReflectedNode> nodes = std::move(reflection.material);
     std::vector<std::string> names;
     const auto primitive = [](const device::ReflectedNode& node) {
         return node.role == device::NodeRole::Primitive;
@@ -350,8 +343,9 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
     }
     if (names.empty()) {
         Log(LogLevel::Warning,
-            "{} has no material nodes; a node is a struct with a "
-            "Material(inout SurfaceInputs, ShadeContext) method or a function marked [Pattern]",
+            "{} has no nodes; a material node is a struct with a "
+            "Material(inout SurfaceInputs, ShadeContext) method or a function marked [Pattern], "
+            "and a pipeline node is a struct conforming to IPointNode or IStencilNode",
             file.string());
     }
     {
