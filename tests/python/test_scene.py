@@ -217,3 +217,49 @@ def test_reloading_an_edited_shader_file_replaces_its_nodes(scene, tmp_path):
     assert scene.reload_shaders() == ["PyHot"]
     hot = scene.define("/Hot", "Shader", {"id": "PyHot"})
     assert hot["strength"] == 2.0
+
+
+def quads(scene, count):
+    corners = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]], np.float32)
+    for i in range(count):
+        ernie.Mesh.define(
+            scene,
+            f"/Quad{i}",
+            points=corners,
+            face_vertex_indices=np.array([0, 1, 2, 1, 3, 2], np.int32),
+            face_vertex_counts=np.array([3, 3], np.int32),
+        )
+    return ernie.Mesh.select(scene, "/Quad*"), corners
+
+
+def test_selection_arrays_split_a_leading_prim_axis(scene):
+    meshes, corners = quads(scene, 3)
+    meshes.points = np.stack([corners + i for i in range(3)])
+    for i, points in enumerate(meshes.points):
+        np.testing.assert_array_equal(points, corners + i)
+
+    meshes.points = corners * 2
+    for points in meshes.points:
+        np.testing.assert_array_equal(points, corners * 2)
+
+
+def test_selection_arrays_set_each_prim_its_own_rows(scene):
+    meshes, corners = quads(scene, 2)
+    meshes.set_each("points", [corners, np.vstack([corners, corners + 5])])
+    assert [len(points) for points in meshes.points] == [4, 8]
+    meshes.set_each("face_vertex_indices", [[0, 1, 2], [0, 1, 2, 1, 3, 2]])
+    assert [len(indices) for indices in meshes.face_vertex_indices] == [3, 6]
+    with pytest.raises(ValueError, match="2 prims"):
+        meshes.set_each("points", [corners])
+
+
+def test_selection_arrays_reject_mismatched_shapes(scene):
+    meshes, corners = quads(scene, 3)
+    with pytest.raises(ValueError, match="3 prims"):
+        meshes.points = np.stack([corners, corners])
+    with pytest.raises(ValueError, match="rows of 3"):
+        meshes.points = np.zeros((4, 2), np.float32)
+    with pytest.raises(ValueError, match="rows of 3"):
+        meshes.prims[0]["points"] = np.zeros((4, 2), np.float32)
+    for points in meshes.points:
+        np.testing.assert_array_equal(points, corners)

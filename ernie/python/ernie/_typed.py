@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, ClassVar, TypeVar
 
 from ernie._ernie import Prim, Selection
@@ -105,6 +105,10 @@ class SchemaSelection:
 
     def world(self: _S, world: int) -> _S:
         return type(self)(self.selection.world(world))
+
+    def set_each(self, field: str, values: Sequence[Any]) -> None:
+        head, *rest = field.split("_")
+        self.selection.set_each(head + "".join(part[:1].upper() + part[1:] for part in rest), values)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({len(self.selection)} prims)"

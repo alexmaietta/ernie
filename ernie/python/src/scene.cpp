@@ -200,6 +200,91 @@ void SetArray(UntypedAttribute& target, uint32_t index, nb::handle value) {
     }
 }
 
+size_t ArrayLanes(ColumnType type) {
+    switch (type) {
+    case ColumnType::Float2Array:
+        return 2;
+    case ColumnType::Float3Array:
+        return 3;
+    case ColumnType::Float4Array:
+        return 4;
+    default:
+        return 1;
+    }
+}
+
+bool IsNumericArray(const ColumnRef& column) {
+    return column.column->type != ColumnType::PrimArray &&
+           column.column->type != ColumnType::TokenArray && !IsPrimvars(column);
+}
+
+std::string ShapeText(const nb::object& array) {
+    return nb::cast<std::string>(array.attr("shape").attr("__str__")());
+}
+
+void CheckRows(const UntypedAttribute& target, std::string_view field, nb::handle value) {
+    const ColumnRef column = target.Reference();
+    const size_t lanes = ArrayLanes(column.column->type);
+    if (!IsNumericArray(column) || lanes == 1) {
+        return;
+    }
+    const nb::object array = nb::module_::import_("numpy").attr("asarray")(value);
+    const size_t rank = nb::cast<size_t>(array.attr("ndim"));
+    const size_t size = nb::cast<size_t>(array.attr("size"));
+    const bool rows = rank == 2 && nb::cast<size_t>(array.attr("shape")[nb::int_(1)]) == lanes;
+    const bool flat = rank == 1 && size % lanes == 0;
+    if (!rows && !flat) {
+        throw nb::value_error((std::string(field) + " takes rows of " + std::to_string(lanes) +
+                               " values, shaped (rows, " + std::to_string(lanes) + "), got " +
+                               ShapeText(array))
+                                  .c_str());
+    }
+}
+
+void AssignArrays(SceneSelection& source, UntypedAttribute& target, std::string_view field,
+                  nb::handle value) {
+    const uint32_t count = source.view.PrimCount();
+    const ColumnRef column = target.Reference();
+    if (!IsNumericArray(column)) {
+        for (uint32_t index = 0; index < count; ++index) {
+            SetArray(target, index, value);
+        }
+        return;
+    }
+    const nb::object array = nb::module_::import_("numpy").attr("asarray")(value);
+    const size_t lanes = ArrayLanes(column.column->type);
+    const size_t rank = nb::cast<size_t>(array.attr("ndim"));
+    const size_t batched = lanes > 1 ? 3 : 2;
+    if (rank == batched) {
+        const nb::object shape = array.attr("shape");
+        const bool leading = nb::cast<size_t>(shape[nb::int_(0)]) == count;
+        const bool rows = lanes == 1 || nb::cast<size_t>(shape[nb::int_(2)]) == lanes;
+        if (!leading || !rows) {
+            const std::string row = lanes > 1 ? ", rows, " + std::to_string(lanes) : ", rows";
+            throw nb::value_error((std::string(field) + " takes one array for each of the " +
+                                   std::to_string(count) + " prims, shaped (" +
+                                   std::to_string(count) + row + "), got " + ShapeText(array) +
+                                   ". Use set_each for a different number of rows per prim")
+                                      .c_str());
+        }
+        for (uint32_t index = 0; index < count; ++index) {
+            const nb::object rows = array[nb::int_(index)];
+            SetArray(target, index, rows);
+        }
+        return;
+    }
+    if (rank > batched || (lanes == 1 && rank > 1)) {
+        throw nb::value_error((std::string(field) +
+                               " takes one array for every prim or one per prim, got " +
+                               ShapeText(array))
+                                  .c_str());
+    }
+    CheckRows(target, field, array);
+    for (uint32_t index = 0; index < count; ++index) {
+        SetArray(target, index, array);
+    }
+}
+
 void Assign(SceneSelection& source, std::string_view field, nb::handle value,
             std::optional<uintptr_t> stream = std::nullopt, nb::handle mask = nb::none()) {
     UntypedAttribute target = source.view.Get(field);
@@ -216,8 +301,25 @@ void Assign(SceneSelection& source, std::string_view field, nb::handle value,
     if (!IsArray(target.Reference().column->type)) {
         return AssignCells(*source.scene, target, value, stream);
     }
-    for (uint32_t index = 0; index < source.view.PrimCount(); ++index) {
-        SetArray(target, index, value);
+    AssignArrays(source, target, field, value);
+}
+
+void AssignEach(SceneSelection& source, std::string_view field, nb::handle values) {
+    UntypedAttribute target = source.view.Get(field);
+    const uint32_t count = source.view.PrimCount();
+    if (nb::len(values) != count) {
+        throw nb::value_error(("set_each(\"" + std::string(field) +
+                               "\") takes one value for each of the " + std::to_string(count) +
+                               " prims, got " + std::to_string(nb::len(values)))
+                                  .c_str());
+    }
+    if (!IsArray(target.Reference().column->type)) {
+        return AssignCells(*source.scene, target, values, std::nullopt);
+    }
+    uint32_t index = 0;
+    for (nb::handle value : values) {
+        CheckRows(target, field, value);
+        SetArray(target, index++, value);
     }
 }
 
@@ -305,6 +407,11 @@ nb::object Read(SceneSelection& source, std::string_view field) {
 void AssignOne(ScenePrim& prim, std::string_view field, nb::handle value,
                std::optional<uintptr_t> stream) {
     SceneSelection single = Single(prim);
+    UntypedAttribute target = single.view.Get(field);
+    if (IsArray(target.Reference().column->type)) {
+        CheckRows(target, field, value);
+        return SetArray(target, 0, value);
+    }
     Assign(single, field, value, stream);
 }
 
@@ -1106,6 +1213,7 @@ void RegisterSelection(nb::module_& module) {
         .def("__getitem__", &Read)
         .def("__setitem__", [](SceneSelection& source, std::string_view field,
                                nb::handle value) { Assign(source, field, value); })
+        .def("set_each", &AssignEach, nb::arg("field"), nb::arg("values"))
         .def("__repr__", [](const SceneSelection& source) {
             return "Selection(" + std::to_string(source.view.PrimCount()) + " prims)";
         });

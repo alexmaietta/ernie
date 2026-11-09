@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The viewer's grid has two levels of lines that fade between zoom levels and toward its edge, and its settings set a fixed spacing, the lines to each major line, its extent, its height and the brightness of its minor and major lines.
 - The viewer's properties panel resets a field to its schema default with the square at its end, shows translations, orientations, scales and other vectors as red, green and blue x, y and z fields, and picks relationship targets from a stage tree as well as by path or by dropping prims.
 - The viewer's render resolution menu offers the viewport's size, sensor and display presets, or a custom size with a locked aspect. Its render scale menu offers 25 to 200 percent, and Fill Viewport fits the image to the viewport or shows it a texel per pixel.
+- Python's `selection.set_each(field, values)` writes one array to each selected prim, so prims can take different numbers of rows, such as meshes with their own vertex counts. Typed selections take the Python field name, as in `meshes.set_each("face_vertex_indices", ...)`.
 
 ### Changed
 
@@ -64,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Ernie builds with a newer GCC paired with binutils older than 2.36, as HPC compiler modules often are, because configuring skips libdeflate's AVX-VNNI checksum when the assembler can't encode it.
 - Ernie builds with GCC 12, whose standard library has no `<format>`, because it formats text with the header-only fmt library on every compiler. CMake 3.25.1 also accepts the VMA download again.
+- Writing an array attribute through a Python selection, such as `meshes.points = array`, now splits a leading axis with one entry per selected prim, so `(prims, rows, 3)` gives each mesh its own points. Before, every prim got all of the rows. An array without that axis still goes to every prim, and shapes that fit neither, such as `(rows, 2)` points or a leading axis that doesn't match the prim count, raise `ValueError` instead of writing.
 - `ernie --version`, the viewer's About window and `ernie.build_info().version` show the full version with its patch and any release candidate, such as `0.1.0` or `0.1.1rc1`, instead of `0.1`.
 - Loading a HIP kernel no longer leaves `hipErrorNotFound` as the thread's last HIP error when the module lacks optional globals, so PyTorch on ROCm no longer raises `named symbol not found` at its next call after Ernie builds a scene or renderer. An error that was already pending stays pending.
 - hipRTC loads from the folder of the HIP runtime Ernie uses, such as the one bundled in PyTorch, instead of from another ROCm install that would pull in a second comgr and HSA runtime. Runtime libraries already in the process are also found under their unversioned names.
