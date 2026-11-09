@@ -159,7 +159,31 @@ struct BoundPipeline {
     std::shared_ptr<const PipelineInstance> instance;
 };
 
-ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
+std::vector<PointChannel> CloudChannels(const Prim& prim, const SensorKind& kind, bool& semantic) {
+    std::vector<std::string> names = prim.Get(RenderVar::kChannels);
+    if (names.empty()) {
+        names = {"Coordinates", "Intensity"};
+    }
+    std::vector<PointChannel> channels;
+    for (const std::string& channel : names) {
+        const auto found = std::ranges::find(kPointChannels, channel, &PointChannelInfo::name);
+        if (found == std::end(kPointChannels)) {
+            throw Error("{} asks for {}, which a PointCloud has no channel for", prim.Path(),
+                        channel);
+        }
+        const auto point = PointChannel(found - std::begin(kPointChannels));
+        if (point == PointChannel::RadialVelocity &&
+            !Includes(kind.outputs, RenderVarSource::RadialVelocity)) {
+            throw Error("{} asks for RadialVelocity, which a {} doesn't measure", prim.Path(),
+                        Info(kind.schema).name);
+        }
+        semantic |= point == PointChannel::StableId;
+        channels.push_back(point);
+    }
+    return channels;
+}
+
+ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
                         const BoundPipeline& bound, const std::string& name) {
     const bool tap = name == kTapSource;
     const std::string output = tap ? prim.Path() : name;
@@ -179,12 +203,25 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product,
                     .type = device::DType::Float32,
                     .output = output,
                     .tap = tap};
+    if (bound.instance->resolved.values[found->value].type == pipeline::SignalType::PointCloud) {
+        if (kind.schema != SchemaId::Lidar) {
+            throw Error("{} reads the point cloud {} makes, and only lidars make them in a "
+                        "pipeline for now",
+                        prim.Path(), bound.instance->path);
+        }
+        var.source = RenderVarSource::PointCloud;
+        var.channels = CloudChannels(prim, kind, var.semantic);
+        return var;
+    }
     var.shape = {int64_t(product.sensors.size())};
     if (layout.perCapture) {
         var.shape.push_back(pipeline::kStatWords);
         return var;
     }
     var.shape.insert(var.shape.end(), {int64_t(product.height), int64_t(product.width)});
+    if (product.returns > 0) {
+        var.shape.push_back(product.returns);
+    }
     if (layout.channels > 1) {
         var.shape.push_back(layout.channels);
     }
@@ -203,7 +240,7 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
             throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(),
                         name);
         }
-        return PipelineVar(prim, product, bound, name);
+        return PipelineVar(prim, product, kind, bound, name);
     }
     const RenderVarSource source = *builtIn;
     ResolvedVar var{.prim = prim.Index(),
@@ -216,25 +253,7 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
                     Info(kind.schema).name);
     }
     if (source == RenderVarSource::PointCloud) {
-        std::vector<std::string> names = prim.Get(RenderVar::kChannels);
-        if (names.empty()) {
-            names = {"Coordinates", "Intensity"};
-        }
-        for (const std::string& channel : names) {
-            const auto found = std::ranges::find(kPointChannels, channel, &PointChannelInfo::name);
-            if (found == std::end(kPointChannels)) {
-                throw Error("{} asks for {}, which a PointCloud has no channel for", var.path,
-                            channel);
-            }
-            const auto point = PointChannel(found - std::begin(kPointChannels));
-            if (point == PointChannel::RadialVelocity &&
-                !Includes(kind.outputs, RenderVarSource::RadialVelocity)) {
-                throw Error("{} asks for RadialVelocity, which a {} doesn't measure", var.path,
-                            Info(kind.schema).name);
-            }
-            var.semantic |= point == PointChannel::StableId;
-            var.channels.push_back(point);
-        }
+        var.channels = CloudChannels(prim, kind, var.semantic);
         return var;
     }
     VarFormat format = SourceFormat(source);
@@ -470,10 +489,31 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                                            var.source == RenderVarSource::ElectronRate;
                                 }) ||
             (bound.instance &&
-             std::ranges::any_of(
-                 bound.instance->resolved.nodes, [&](const pipeline::ResolvedNode& node) {
-                     return (*m_pipelines.Registry())[node.def].kind == pipeline::NodeKind::Source;
-                 }));
+             std::ranges::any_of(bound.instance->resolved.values, [](const pipeline::Value& value) {
+                 return value.type == pipeline::SignalType::ElectronRate;
+             }));
+        if (bound.instance &&
+            std::ranges::any_of(bound.instance->resolved.values, [](const pipeline::Value& value) {
+                return value.type == pipeline::SignalType::Returns;
+            })) {
+            std::optional<FrameOfReference> frame;
+            for (const ResolvedVar& var : product.vars) {
+                if (var.output.empty() || var.source != RenderVarSource::PointCloud) {
+                    continue;
+                }
+                if (frame && *frame != var.frame) {
+                    throw Error("{} reads point clouds from {} in two frames of reference, and a "
+                                "pipeline's clouds share one",
+                                path, bound.instance->path);
+                }
+                frame = var.frame;
+            }
+            if (kind.schema != SchemaId::Lidar || !frame) {
+                throw Error("{} runs {}, which reads lidar returns, so its sensor must be a Lidar "
+                            "and a PointCloud render var must read one of its point cloud outputs",
+                            path, bound.instance->path);
+            }
+        }
         if (rated && RenderMode(record.renderMode) != RenderMode::RealTime) {
             throw Error("{} measures electron rates, which only a RealTime render traces, so set "
                         "its renderMode to RealTime",

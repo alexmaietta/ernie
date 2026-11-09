@@ -245,6 +245,9 @@ std::vector<SignalLayout> PropagateLayouts(const ResolvedPipeline& pipeline,
             layout.channels = kStatStorageWords;
             layout.perCapture = true;
             break;
+        case LayoutRule::Returns:
+            layout.channels = kReturnsChannels;
+            break;
         }
         for (const uint32_t value : node.outputs) {
             layouts[value] = layout;

@@ -152,14 +152,14 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             throw mapped(error);
         }
         const auto signal = [&](const std::string& node, const std::string& type) {
-            const auto found = std::ranges::find(pipeline::kSignalNames, type);
-            if (found == std::end(pipeline::kSignalNames)) {
+            const auto found = std::ranges::find(pipeline::kSignalTypes, type);
+            if (found == std::end(pipeline::kSignalTypes)) {
                 throw Error(
                     "{} in {} uses {}, which isn't a pipeline signal; signals are {}", node,
                     file.string(), type,
-                    Join({std::begin(pipeline::kSignalNames), std::end(pipeline::kSignalNames)}));
+                    Join({std::begin(pipeline::kSignalTypes), std::end(pipeline::kSignalTypes)}));
             }
-            return pipeline::SignalType(found - std::begin(pipeline::kSignalNames));
+            return pipeline::SignalType(found - std::begin(pipeline::kSignalTypes));
         };
         for (const device::ReflectedPipelineNode& node : reflected) {
             signal(node.name, node.result);

@@ -32,6 +32,7 @@ enum class LayoutRule : uint8_t {
     Color,
     Scalar,
     Stat,
+    Returns,
 };
 
 inline constexpr uint32_t kMostStencilRadius = 8;

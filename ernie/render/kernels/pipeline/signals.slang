@@ -104,3 +104,80 @@ struct Radiance : ISignal {
         return channels;
     }
 }
+
+struct Returns : ISignal {
+    Channels channels;
+
+    static Returns Make(Channels channels) {
+        return { channels };
+    }
+
+    Channels Get() {
+        return channels;
+    }
+
+    property bool returned {
+        get {
+            return channels[0] != 0;
+        }
+        set {
+            channels[0] = newValue ? 1 : 0;
+        }
+    }
+
+    property float distance {
+        get {
+            return channels[1];
+        }
+        set {
+            channels[1] = newValue;
+        }
+    }
+
+    property float intensity {
+        get {
+            return channels[2];
+        }
+        set {
+            channels[2] = newValue;
+        }
+    }
+
+    property float3 position {
+        get {
+            return float3(channels[3], channels[4], channels[5]);
+        }
+        set {
+            channels[3] = newValue.x;
+            channels[4] = newValue.y;
+            channels[5] = newValue.z;
+        }
+    }
+
+    property float radialVelocity {
+        get {
+            return channels[6];
+        }
+        set {
+            channels[6] = newValue;
+        }
+    }
+
+    property bool world {
+        get {
+            return channels[7] != 0;
+        }
+    }
+}
+
+struct CloudSignal : ISignal {
+    Channels channels;
+
+    static CloudSignal Make(Channels channels) {
+        return { channels };
+    }
+
+    Channels Get() {
+        return channels;
+    }
+}

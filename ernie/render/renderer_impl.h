@@ -49,6 +49,9 @@ class RendererImpl {
     struct OwnedCloud {
         uint32_t product = kNoPrim;
         uint32_t slots = 0;
+        uint32_t index = 0;
+        std::string output;
+        bool world = false;
         Ref<device::Buffer> cloud;
         Ref<device::Buffer> records;
         Ref<device::Buffer> flags;

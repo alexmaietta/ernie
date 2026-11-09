@@ -79,7 +79,17 @@ PipelineValue ValueSlot(PipelineParams p, PipelineCapture* capture, uint slot) {
 S ReadSignalAt<S : ISignal>(PipelineParams p, PipelineCapture* capture, uint slot, uint index) {
     const PipelineValue value = ValueSlot(p, capture, slot);
     Channels channels = Channels(value.channels);
-    if ((value.flags & kSignalSampled) != 0) {
+    if ((value.flags & kSignalRecords) != 0) {
+        Ptr<float> record = Ptr<float>(value.address) + uint64_t(index) * kRecordWords;
+        channels[0] = float(Ptr<uint>(value.returned)[index]);
+        channels[1] = record[3];
+        channels[2] = record[4];
+        channels[3] = record[0];
+        channels[4] = record[1];
+        channels[5] = record[2];
+        channels[6] = record[5];
+        channels[7] = (value.flags & kSignalWorld) != 0 ? 1 : 0;
+    } else if ((value.flags & kSignalSampled) != 0) {
         const uint stride = value.flags >> kSignalStrideShift;
         const uint2 coord = uint2(index % capture->width, index / capture->width);
         const uint site = MosaicSite(p.tables->detectors[capture->detector].pattern, coord);
@@ -113,7 +123,16 @@ S ReadSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot) 
 void WriteSignal<S : ISignal>(PipelineParams p, PipelineElement element, uint slot, S signal) {
     const PipelineValue value = ValueSlot(p, element.capture, slot);
     const Channels channels = signal.Get();
-    if ((value.flags & kSignalHalf) != 0) {
+    if ((value.flags & kSignalRecords) != 0) {
+        Ptr<float> record = Ptr<float>(value.address) + uint64_t(element.index) * kRecordWords;
+        Ptr<uint>(value.returned)[element.index] = channels[0] != 0 ? 1 : 0;
+        record[3] = channels[1];
+        record[4] = channels[2];
+        record[0] = channels[3];
+        record[1] = channels[4];
+        record[2] = channels[5];
+        record[5] = channels[6];
+    } else if ((value.flags & kSignalHalf) != 0) {
         Ptr<uint> words = Ptr<uint>(value.address);
         const uint64_t first = uint64_t(element.index) * HalfStride(value.channels) / 2;
         [ForceUnroll]

@@ -73,7 +73,7 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
         return slots;
     };
     const auto signalType = [&](uint32_t value) {
-        return kSignalNames[uint32_t(pipeline.values[value].type)];
+        return kSignalTypes[uint32_t(pipeline.values[value].type)];
     };
 
     for (uint32_t index = 0; index < plan.segments.size(); ++index) {
@@ -169,7 +169,7 @@ GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,
                     arguments.push_back(
                         taken == SignalType::CaptureStat
                             ? std::string("CaptureStat.Zero()")
-                            : std::format("{}.Make(Channels(0))", kSignalNames[uint32_t(taken)]));
+                            : std::format("{}.Make(Channels(0))", kSignalTypes[uint32_t(taken)]));
                     continue;
                 }
                 if (def.kind == NodeKind::Stencil && port == 0) {

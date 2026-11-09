@@ -24,6 +24,13 @@ inline constexpr std::string_view kSignalNames[] = {
     "Radiance",     "Returns",   "PointCloud", "RadarCube",   "CaptureStat",
 };
 
+inline constexpr std::string_view kSignalTypes[] = {
+    "ElectronRate", "Electrons", "Digital",     "LinearColor", "DisplayColor",
+    "Radiance",     "Returns",   "CloudSignal", "RadarCube",   "CaptureStat",
+};
+
+inline constexpr uint32_t kReturnsChannels = 8;
+
 inline constexpr std::string_view kSignalPortNames[] = {
     "electronRate", "electrons", "digital", "color", "display",
     "radiance",     "returns",   "cloud",   "cube",  "stat",

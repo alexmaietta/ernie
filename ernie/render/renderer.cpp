@@ -310,7 +310,7 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         const ResolvedProduct& product = *planned.products[index];
         std::array<uint64_t, kRenderVarSourceCount>& slots = addresses[product.prim];
         for (const ResolvedVar& var : product.vars) {
-            if (var.output.empty() && var.source == RenderVarSource::PointCloud) {
+            if (var.source == RenderVarSource::PointCloud) {
                 uint64_t& clouds = slots[uint32_t(var.source)];
                 clouds = AcquireCloud(set, index, path, product, var, clouds);
                 continue;
@@ -331,8 +331,8 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         }
         const std::shared_ptr<const PipelineInstance> instance =
             product.pipeline == kNoPrim ? nullptr : pipelines.Find(product.pipeline);
-        if (instance && std::ranges::any_of(instance->resolved.nodes, [&](const auto& node) {
-                return (*pipelines.Registry())[node.def].kind == pipeline::NodeKind::Source;
+        if (instance && std::ranges::any_of(instance->resolved.values, [](const auto& value) {
+                return value.type == pipeline::SignalType::ElectronRate;
             })) {
             uint64_t& rates = slots[uint32_t(RenderVarSource::ElectronRate)];
             if (rates == 0) {
@@ -418,7 +418,8 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::s
         return address;
     };
 
-    OwnedCloud owned{product.prim, uint32_t(sensors) * perSensor};
+    OwnedCloud owned{product.prim, uint32_t(sensors) * perSensor, index, var.output,
+                     var.frame == FrameOfReference::World};
     owned.records = device.CreateBuffer(
         {.bytes = uint64_t(owned.slots) * sizeof(PointRecord), .label = path + " point records"});
     owned.flags =
@@ -489,6 +490,17 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
         }
     }
     encoder.Concurrent(false);
+    std::vector<PipelineRun> traced;
+    for (const PipelineRun& run : runs) {
+        const bool returns =
+            std::ranges::any_of(run.instance->resolved.values, [](const pipeline::Value& value) {
+                return value.type == pipeline::SignalType::Returns;
+            });
+        if (!returns || stale.contains(plan.products[run.products.front()]->prim)) {
+            traced.push_back(run);
+        }
+    }
+    RecordRuns(encoder, plan, set, traced, snapshot);
     for (const OwnedCloud& cloud : set.clouds) {
         if (!stale.contains(cloud.product)) {
             continue;
@@ -505,7 +517,6 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
         encoder.Dispatch(RenderEntry("RenderScatterPoints"), scatter,
                          {.x = device::GroupCount(cloud.slots, kRenderGroup)});
     }
-    RecordRuns(encoder, plan, set, runs, snapshot);
     encoder.EndZone();
     std::vector<std::string> stepped;
     std::vector<OverlayOutput> views;
@@ -643,6 +654,23 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         return (bytes + pipeline::kArenaAlignment - 1) / pipeline::kArenaAlignment *
                pipeline::kArenaAlignment;
     };
+    const auto recordBytes = [](uint64_t elements) {
+        const uint64_t bytes = elements * (sizeof(PointRecord) + sizeof(uint32_t));
+        return (bytes + pipeline::kArenaAlignment - 1) / pipeline::kArenaAlignment *
+               pipeline::kArenaAlignment;
+    };
+    const auto cloudOf = [&](const PipelineRun& run, uint32_t product, std::string_view output) {
+        const OwnedCloud* found = nullptr;
+        for (const OwnedCloud& cloud : set.clouds) {
+            if (cloud.index == product && !cloud.output.empty() &&
+                (output.empty() || cloud.output == output) &&
+                std::ranges::find(run.products, cloud.index) != run.products.end()) {
+                found = &cloud;
+                break;
+            }
+        }
+        return found;
+    };
     const auto read = [&](const PipelineRun& run, const std::string& name) {
         return std::ranges::any_of(set.vars, [&](const OwnedVar& var) {
             return var.output == name &&
@@ -660,7 +688,8 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
     uint64_t arenaBytes = 0;
     for (const PipelineRun& run : runs) {
         const ResolvedProduct& product = *plan.products[run.products.front()];
-        const uint64_t elements = uint64_t(product.width) * product.height;
+        const uint64_t elements =
+            uint64_t(product.width) * product.height * std::max(product.returns, 1u);
         Placed& each = placed.emplace_back(Placed{
             pipeline::LayoutArena(run.compiled->definition->segments, product.layouts, elements),
             arenaBytes});
@@ -668,7 +697,10 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         arenaBytes = each.scratch;
         for (const pipeline::ResolvedOutput& output : run.instance->resolved.outputs) {
             const pipeline::SignalLayout& layout = product.layouts[output.value];
-            if (layout.perCapture || !read(run, output.name)) {
+            if (run.instance->resolved.values[output.value].type ==
+                pipeline::SignalType::PointCloud) {
+                arenaBytes += recordBytes(elements);
+            } else if (layout.perCapture || !read(run, output.name)) {
                 arenaBytes += scratchBytes(layout, elements);
             }
         }
@@ -697,7 +729,8 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         const pipeline::PipelineDefinition& definition = *run.compiled->definition;
         const pipeline::GeneratedPipeline& generated = run.compiled->generated;
         const pipeline::ResolvedPipeline& resolved = run.instance->resolved;
-        const uint64_t elements = uint64_t(product.width) * product.height;
+        const uint32_t returns = std::max(product.returns, 1u);
+        const uint64_t elements = uint64_t(product.width) * product.height * returns;
         PipelineState& state = m_pipelineStates[std::tuple(planned.pipeline, planned.sensor,
                                                            product.width, product.height)];
         if (!state.state || state.definition != definition.id) {
@@ -718,10 +751,58 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
         for (uint32_t slot = 0; slot < generated.slots.size(); ++slot) {
             const uint32_t value = generated.slots[slot];
             const pipeline::SignalLayout& layout = product.layouts[value];
-            PipelineValue entry{0, layout.channels, layout.mosaic ? kSignalMosaic : 0u};
-            if (slot < storedCount &&
+            PipelineValue entry{0, layout.channels, layout.mosaic ? kSignalMosaic : 0u, 0};
+            const pipeline::SignalType type = resolved.values[value].type;
+            const auto bindRecords = [&](const OwnedCloud& cloud, uint64_t first) {
+                entry.address = cloud.records->Address() + first * sizeof(PointRecord);
+                entry.returned = cloud.flags->Address() + first * sizeof(uint32_t);
+                entry.flags |= kSignalRecords | (cloud.world ? kSignalWorld : 0u);
+            };
+            if (slot < storedCount && type == pipeline::SignalType::Returns &&
                 registry[resolved.nodes[resolved.values[value].node].def].kind ==
                     pipeline::NodeKind::Source) {
+                const OwnedCloud* cloud = cloudOf(run, source, {});
+                if (cloud == nullptr) {
+                    throw Error("{} reads lidar returns, but no point cloud of {} reads it",
+                                run.instance->path, m_scene->ByIndex(product.prim).Path());
+                }
+                bindRecords(*cloud, layer(source, planned.sensor) * elements);
+            } else if (slot >= storedCount && type == pipeline::SignalType::PointCloud) {
+                const std::string& name = resolved.outputs[slot - storedCount].name;
+                const OwnedCloud* bound = nullptr;
+                uint64_t boundFirst = 0;
+                for (const uint32_t reader : run.products) {
+                    for (const OwnedCloud& cloud : set.clouds) {
+                        if (cloud.index != reader || cloud.output != name) {
+                            continue;
+                        }
+                        const uint64_t first = layer(reader, planned.sensor) * elements;
+                        if (bound == nullptr) {
+                            bindRecords(cloud, first);
+                            bound = &cloud;
+                            boundFirst = first;
+                            continue;
+                        }
+                        const auto slice = [&](const Ref<device::Buffer>& buffer, uint64_t at,
+                                               uint64_t stride) {
+                            return device::BufferRange(*buffer).Slice(at * stride,
+                                                                      elements * stride);
+                        };
+                        copies.emplace_back(slice(bound->records, boundFirst, sizeof(PointRecord)),
+                                            slice(cloud.records, first, sizeof(PointRecord)));
+                        copies.emplace_back(slice(bound->flags, boundFirst, sizeof(uint32_t)),
+                                            slice(cloud.flags, first, sizeof(uint32_t)));
+                    }
+                }
+                if (!bound) {
+                    entry.address = set.arena->Address() + scratch;
+                    entry.returned = entry.address + elements * sizeof(PointRecord);
+                    entry.flags |= kSignalRecords;
+                    scratch += recordBytes(elements);
+                }
+            } else if (slot < storedCount &&
+                       registry[resolved.nodes[resolved.values[value].node].def].kind ==
+                           pipeline::NodeKind::Source) {
                 const uint32_t stride = std::max(product.channels, 1u);
                 entry.address = set.rates.at(source) +
                                 layer(source, planned.sensor) * elements * stride * sizeof(float);
@@ -769,7 +850,7 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
              .words = {words.size() * sizeof(uint32_t)},
              .sensor = planned.sensor,
              .detector = detector == kNoRow ? 0 : detector,
-             .width = product.width,
+             .width = product.width * returns,
              .height = product.height,
              .capture = state.captures++,
              .identity = HashPath(m_scene->ByIndex(planned.sensor).Path()).words[0],

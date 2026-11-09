@@ -9,6 +9,7 @@ namespace ernie::pipeline {
 
 inline constexpr const char* kCameraNodes = "ernie.render.kernels.pipeline.nodes.camera";
 inline constexpr const char* kIspNodes = "ernie.render.kernels.pipeline.nodes.isp";
+inline constexpr const char* kLidarNodes = "ernie.render.kernels.pipeline.nodes.lidar";
 
 void RegisterBuiltinNodes(NodeRegistry& registry);
 

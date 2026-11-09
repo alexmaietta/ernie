@@ -281,3 +281,91 @@ class Tone : SensorNode (
         doc = "none leaves color as it is, reinhard maps x to x / (1 + x), and aces applies Narkowicz's fit of the ACES filmic curve."
     )
 }
+
+class LidarReturns : SensorNode (
+    doc = "The returns a lidar's trace found, one per beam and return slot with its range, intensity and position, and whether it returned. It's how a lidar pipeline asks the trace for its returns, in the frame of the point cloud that reads the pipeline."
+) {
+    token info:id = LidarReturns
+}
+
+class RangeNoise : SensorNode (
+    doc = "Adds Gaussian noise to each return's range and moves its point along the beam to match."
+) {
+    token info:id = RangeNoise
+    float inputs:sigma = 0.02 (
+        tracked
+        unit = meters
+        group = "Noise"
+        displayName = "Sigma"
+        min = 0
+        doc = "The range noise's standard deviation at any range."
+    )
+    float inputs:sigmaPerMeter = 0 (
+        tracked
+        group = "Noise"
+        displayName = "Sigma per Meter"
+        min = 0
+        doc = "Extra standard deviation per meter of range, so far returns are noisier."
+    )
+}
+
+class IntensityNoise : SensorNode (
+    doc = "Adds Gaussian noise to each return's intensity, never below zero."
+) {
+    token info:id = IntensityNoise
+    float inputs:sigma = 0 (
+        tracked
+        group = "Noise"
+        displayName = "Sigma"
+        min = 0
+        doc = "The intensity noise's standard deviation at any intensity."
+    )
+    float inputs:relative = 0.05 (
+        tracked
+        group = "Noise"
+        displayName = "Relative"
+        min = 0
+        doc = "Extra standard deviation as a fraction of the intensity."
+    )
+}
+
+class Dropout : SensorNode (
+    doc = "Drops returns too weak to detect, and others at random."
+) {
+    token info:id = Dropout
+    float inputs:threshold = 0 (
+        tracked
+        group = "Detection"
+        displayName = "Threshold"
+        min = 0
+        doc = "Returns with less intensity than this aren't detected."
+    )
+    float inputs:rate = 0 (
+        tracked
+        group = "Detection"
+        displayName = "Rate"
+        min = 0
+        max = 1
+        doc = "The fraction of the remaining returns dropped at random."
+    )
+}
+
+class RangeQuantize : SensorNode (
+    doc = "Snaps each return's range to the sensor's range resolution and moves its point along the beam to match."
+) {
+    token info:id = RangeQuantize
+    float inputs:step = 0.01 (
+        tracked
+        unit = meters
+        group = "Resolution"
+        displayName = "Step"
+        min = 0
+        doc = "The range resolution. 0 leaves ranges as they are."
+    )
+}
+
+class ToPointCloud : SensorNode (
+    doc = "Packs the returns that returned into a point cloud. A PointCloud render variable that reads the pipeline output it feeds picks the channels and frame as it does for the trace's own cloud."
+) {
+    token info:id = ToPointCloud
+}

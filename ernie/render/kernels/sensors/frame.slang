@@ -39,6 +39,10 @@ SensorFrame LoadSensorFrame(RenderTables* tables, uint prim) {
     return frame;
 }
 
+SensorFrame LoadSensorFrameAt(uint64_t tables, uint prim) {
+    return LoadSensorFrame(Ptr<RenderTables>(tables), prim);
+}
+
 float3 SphericalDirection(float azimuth, float elevation) {
     return float3(-sin(azimuth) * cos(elevation), sin(elevation), -cos(azimuth) * cos(elevation));
 }
