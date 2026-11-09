@@ -46,6 +46,56 @@ TEST(MaterialTableTest, ValueEditsPackWithoutResolvingAndConnectionsResolve) {
     });
 }
 
+TEST(MaterialTableTest, OnlyPrimsMaterialsReadResolveThem) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim red = scene->Define<Material>("/Red");
+        const Prim surface = scene->Define<Shader>("/Red/Surface", {.id = "UsdPreviewSurface"});
+        red.Connect("surface", surface, "surface");
+        scene->Define<Sphere>("/Ball", {.materialBinding = {"/Red"}});
+        scene->Publish().Wait();
+        const MaterialTable& materials = SceneImpl::Get(*scene).GetMaterials();
+        const uint32_t resolves = materials.Resolves();
+
+        const Prim other = scene->Define<Cube>("/Other");
+        scene->Publish().Wait();
+        scene->Apply<ThermalAPI>(other, {.thermalTemperature = 300});
+        scene->Publish().Wait();
+        other.Set(ThermalAPI::kThermalTemperature, 310.0f);
+        scene->Publish().Wait();
+        scene->Remove(other);
+        scene->Publish().Wait();
+        EXPECT_EQ(materials.Resolves(), resolves);
+
+        scene->Define<Shader>("/Red/Spare", {.id = "UsdPreviewSurface"});
+        scene->Publish().Wait();
+        EXPECT_EQ(materials.Resolves(), resolves + 1);
+
+        scene->Remove(surface);
+        scene->Publish().Wait();
+        EXPECT_EQ(materials.Resolves(), resolves + 2);
+        EXPECT_EQ(materials.Record(red.Index()).definition, kDefinitionDiffuse);
+    });
+}
+
+TEST(MaterialTableTest, BuiltInDefinitionsKeepNoPreviousDefinition) {
+    test::ForEachDevice([](device::Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim red = scene->Define<Material>("/Red");
+        const Prim surface = scene->Define<Shader>("/Red/Surface", {.id = "UsdPreviewSurface"});
+        red.Connect("surface", surface, "surface");
+        const Prim albedo = scene->Define<Shader>("/Red/Albedo", {.id = "UsdUVTexture"});
+        albedo.Set(UsdUVTexture::kFile, "albedo.png");
+        scene->Publish().Wait();
+        surface.Connect("diffuseColor", albedo, "rgb");
+        scene->Publish().Wait();
+        const MaterialTable& materials = SceneImpl::Get(*scene).GetMaterials();
+        EXPECT_EQ(materials.Record(red.Index()).definition, kDefinitionPreviewTextured);
+        EXPECT_EQ(materials.Record(red.Index()).previousDefinition, kDefinitionPlaceholder);
+        EXPECT_EQ(materials.Record(red.Index()).previousWords, 0u);
+    });
+}
+
 TEST(MaterialTableTest, ShadersTakeTheSchemaTheirInfoIdNames) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Scene::Create(device);

@@ -49,6 +49,7 @@ class ArrayPool {
 
     std::vector<StagedCopy> TakeStaged(uint64_t base);
     std::vector<std::byte> Read(const ArrayRef& array);
+    std::vector<std::vector<std::byte>> Read(std::span<const ArrayRef> arrays);
 
   private:
     struct Run {
@@ -68,6 +69,7 @@ class ArrayPool {
         uint64_t bytes = 0;
     };
 
+    void FlushStaged();
     const Entry& Lookup(const ArrayRef& array) const;
     uint32_t AddRun(HeapBlock block, uint32_t live);
 

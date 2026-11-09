@@ -190,7 +190,7 @@ std::vector<ArrayPool::StagedCopy> ArrayPool::TakeStaged(uint64_t base) {
     return copies;
 }
 
-std::vector<std::byte> ArrayPool::Read(const ArrayRef& array) {
+void ArrayPool::FlushStaged() {
     for (const Staged& staged : m_staged) {
         if (staged.bytes > 0) {
             Write(staged.array, std::span(m_stagedBytes).subspan(staged.offset, staged.bytes));
@@ -199,9 +199,59 @@ std::vector<std::byte> ArrayPool::Read(const ArrayRef& array) {
     m_staged.clear();
     m_stagedBytes.clear();
     m_stagedIndices.clear();
+}
+
+std::vector<std::byte> ArrayPool::Read(const ArrayRef& array) {
+    FlushStaged();
     std::vector<std::byte> bytes(size_t(array.count) * m_itemBytes);
     if (!bytes.empty()) {
         m_heap.GetDevice().GetQueue().Read(Range(array).Slice(0, bytes.size()), bytes.data());
+    }
+    return bytes;
+}
+
+std::vector<std::vector<std::byte>> ArrayPool::Read(std::span<const ArrayRef> arrays) {
+    FlushStaged();
+
+    struct Extent {
+        device::Buffer* buffer = nullptr;
+        uint64_t first = ~uint64_t(0);
+        uint64_t last = 0;
+        device::Download download;
+    };
+
+    std::vector<Extent> spans;
+    std::vector<std::pair<size_t, uint64_t>> located(arrays.size(), {0, 0});
+    for (size_t i = 0; i < arrays.size(); ++i) {
+        if (arrays[i].address == 0 || arrays[i].count == 0) {
+            continue;
+        }
+        device::Buffer* buffer = m_runs[Lookup(arrays[i]).run].block.buffer;
+        auto found = std::ranges::find(spans, buffer, &Extent::buffer);
+        if (found == spans.end()) {
+            found = spans.insert(spans.end(), Extent{.buffer = buffer});
+        }
+        const uint64_t offset = arrays[i].address - buffer->Address();
+        found->first = std::min(found->first, offset);
+        found->last = std::max(found->last, offset + uint64_t(arrays[i].count) * m_itemBytes);
+        located[i] = {size_t(found - spans.begin()), offset};
+    }
+    device::Queue& queue = m_heap.GetDevice().GetQueue();
+    for (Extent& span : spans) {
+        span.download = queue.ReadAsync(span.buffer->Slice(span.first, span.last - span.first));
+    }
+    for (Extent& span : spans) {
+        span.download.Wait();
+    }
+    std::vector<std::vector<std::byte>> bytes(arrays.size());
+    for (size_t i = 0; i < arrays.size(); ++i) {
+        if (arrays[i].address == 0 || arrays[i].count == 0) {
+            continue;
+        }
+        const Extent& span = spans[located[i].first];
+        const std::span<const std::byte> read = span.download.Bytes().subspan(
+            located[i].second - span.first, uint64_t(arrays[i].count) * m_itemBytes);
+        bytes[i].assign(read.begin(), read.end());
     }
     return bytes;
 }

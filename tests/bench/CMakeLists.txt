@@ -71,6 +71,7 @@ ernie_bench(
     LINK ernie_render_internal
     SOURCES
         render/btest_render_instancers.cpp
+        render/btest_render_materials.cpp
         render/btest_render_overlay.cpp
         render/btest_render_points.cpp
         render/btest_render_renderer.cpp

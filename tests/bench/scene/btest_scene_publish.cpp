@@ -210,7 +210,7 @@ const Edit kEdits[] = {
      }},
     {"material",
      [](Setup& s) {
-         s.scene->Find("/Looks/Paint")
+         s.scene->Find("/Looks/Paint/Surface")
              ->Set(UsdPreviewSurface::kRoughness, 0.1f + 0.1f * float(s.step % 7));
      }},
     {"lamp",

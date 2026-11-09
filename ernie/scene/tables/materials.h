@@ -50,7 +50,7 @@ class MaterialTable : public RenderTable {
 
     void Hold(std::vector<Ref<const RefCounted>>& held) const override {
         HoldBuffers(held, {m_records.Buffer(), m_words.Buffer(), m_checkers.Buffer(),
-                           m_temperatures.Buffer(), m_radios});
+                           m_temperatures.Buffer(), m_radios.Buffer()});
     }
 
     const MaterialRecord& Record(uint32_t prim) const {
@@ -67,9 +67,9 @@ class MaterialTable : public RenderTable {
 
   private:
     struct Connection {
-        std::string input;
+        std::string_view input;
         uint32_t source = kNoPrim;
-        std::string output;
+        std::string_view output;
     };
 
     struct Copy {
@@ -94,7 +94,12 @@ class MaterialTable : public RenderTable {
         uint32_t words = 0;
     };
 
-    void Resolve();
+    struct RadarLink {
+        uint32_t material = kNoPrim;
+        uint32_t row = 0;
+    };
+
+    void Resolve(const ChangeSet& changes);
     void ResolveMaterial(uint32_t material);
     void ResolvePreview(uint32_t material, uint32_t shader);
     void ResolveNode(uint32_t material, uint32_t shader,
@@ -104,10 +109,17 @@ class MaterialTable : public RenderTable {
     void CarryPrevious(const std::vector<MaterialRecord>& before);
     void Define(uint32_t material, uint32_t definition, uint32_t words);
     void WarnOutsideVisible();
+    void ResolveRadios();
     void WriteRadios();
     void ResolvePlacement(uint32_t placement, uint32_t mapping);
-    std::vector<Connection> Connections(uint32_t prim);
+    bool Restructured(const ChangeSet& changes) const;
+    bool Packed() const;
+    bool Changed(SchemaId schema) const;
+    void ReadConnections(const ChangeSet& changes);
+    void ReadConnections(std::span<const uint32_t> owners);
+    const std::vector<Connection>& Connections(uint32_t prim);
     void CopyCell(ColumnRef column, uint32_t prim, uint32_t destination);
+    void BuildEntries();
     void Pack();
     device::Program& Kernels();
 
@@ -121,6 +133,13 @@ class MaterialTable : public RenderTable {
     std::vector<Literal> m_literals;
     std::vector<Binding> m_bindings;
     std::vector<Carry> m_carries;
+    std::vector<std::vector<Connection>> m_connections;
+    std::vector<bool> m_touched;
+    std::vector<uint32_t> m_rowPrims;
+    std::vector<ColumnRef> m_packed;
+    uint64_t m_writes = 0;
+    std::vector<RadarLink> m_radarLinks;
+    uint32_t m_entryCount = 0;
     Ref<device::Buffer> m_carried;
     std::map<std::string, DefinitionModule, std::less<>> m_library;
     std::map<uint32_t, uint32_t> m_definitionWords = {
@@ -129,7 +148,7 @@ class MaterialTable : public RenderTable {
     uint32_t m_nextDefinition = kFirstGeneratedDefinition;
     std::vector<uint32_t> m_generations;
     std::set<uint32_t> m_spectral;
-    std::set<std::pair<std::string, std::string>> m_warned;
+    std::set<std::pair<uint64_t, uint64_t>> m_warned;
     mutable std::vector<ColumnRef> m_inputs;
     mutable uint32_t m_inputSchemas = 0;
     uint64_t m_nodeVersion = NodeVersion();
@@ -139,7 +158,7 @@ class MaterialTable : public RenderTable {
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
     DeviceTable<float> m_temperatures{"temperatures"};
     uint32_t m_temperaturePrimvar = 0;
-    Ref<device::Buffer> m_radios;
+    RecordTable<RadioRecord> m_radios{"radio materials"};
 };
 
 }
