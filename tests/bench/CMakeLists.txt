@@ -67,6 +67,13 @@ ernie_bench(
 )
 
 ernie_bench(
+    ernie_device_bench
+    LINK ernie_device_internal
+    SOURCES
+        device/btest_device_tensor.cpp
+)
+
+ernie_bench(
     ernie_render_bench
     LINK ernie_render_internal
     SOURCES
