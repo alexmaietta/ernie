@@ -54,6 +54,30 @@ void OutlineOverlays(uniform OverlayParams p) {
     if (view.outlined == 0) {
         return;
     }
+    int reach = 0;
+    for (uint at = 0; at < min(p.outlineCount, 32u); ++at) {
+        const OverlayOutline outline = p.outlines[at];
+        if (((view.overlays >> outline.overlay) & 1) != 0) {
+            reach = max(reach, int(ceil(outline.width)));
+        }
+    }
+    const int tileReach = (reach + int(kOverlayTile) - 1) / int(kOverlayTile);
+    const int columns = int(view.columnCount);
+    const int rows = int((view.height + kOverlayTile - 1) / kOverlayTile);
+    const uint local = tile - view.firstTile;
+    const int2 place = int2(int(local) % columns, int(local) / columns);
+    const uint value = view.maskTiles[2 * local];
+    bool uniform = true;
+    for (int dy = -tileReach; dy <= tileReach && uniform; ++dy) {
+        for (int dx = -tileReach; dx <= tileReach && uniform; ++dx) {
+            const int2 near = clamp(place + int2(dx, dy), int2(0), int2(columns, rows) - 1);
+            const uint other = uint(near.y * columns + near.x);
+            uniform = view.maskTiles[2 * other] == value && view.maskTiles[2 * other + 1] == value;
+        }
+    }
+    if (uniform) {
+        return;
+    }
     const uint thread = LocalThreadIndex();
     const int2 pixel =
         int2(view.TileCorner(tile) + uint2(thread % kOverlayTile, thread / kOverlayTile));

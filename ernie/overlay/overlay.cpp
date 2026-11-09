@@ -1744,19 +1744,27 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
         return;
     }
 
+    const auto tilesAcross = [](const OverlayTarget& target) {
+        return uint64_t((target.width + kOverlayTile - 1) / kOverlayTile) *
+               ((target.height + kOverlayTile - 1) / kOverlayTile);
+    };
     uint64_t maskPixels = 0;
+    uint64_t maskTiles = 0;
     for (const OverlayTarget& target : targets) {
         if ((target.overlays & outlineMask) != 0) {
             maskPixels += uint64_t(target.width) * target.height;
+            maskTiles += tilesAcross(target);
         }
     }
     if (maskPixels > 0) {
         Reserve(m_outlineMasks, maskPixels * 4, "overlay outline masks");
         Reserve(m_outlineDepths, maskPixels * 4, "overlay outline depths");
+        Reserve(m_outlineTiles, maskTiles * 8, "overlay outline tiles");
     }
     std::vector<OverlayView> views;
     uint32_t tileCount = 0;
     uint64_t maskOffset = 0;
+    uint64_t maskTileOffset = 0;
     for (const OverlayTarget& target : targets) {
         OverlayView view{};
         view.overlay = {target.overlay};
@@ -1773,12 +1781,15 @@ void OverlayPass::Record(device::CommandEncoder& encoder, const Snapshot& snapsh
         view.outlined = (target.overlays & outlineMask) != 0 ? 1 : 0;
         view.mask = {m_unused->Address()};
         view.maskDepth = {m_unused->Address()};
+        view.maskTiles = {m_unused->Address()};
         if (view.outlined != 0) {
             view.mask = {m_outlineMasks->Address() + maskOffset * 4};
             view.maskDepth = {m_outlineDepths->Address() + maskOffset * 4};
+            view.maskTiles = {m_outlineTiles->Address() + maskTileOffset * 8};
             maskOffset += uint64_t(target.width) * target.height;
+            maskTileOffset += tilesAcross(target);
         }
-        tileCount += view.columnCount * ((target.height + kOverlayTile - 1) / kOverlayTile);
+        tileCount += uint32_t(tilesAcross(target));
         views.push_back(view);
     }
 

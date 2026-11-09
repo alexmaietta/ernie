@@ -170,6 +170,7 @@ static const float kOpaque = 254.5f / 255;
 
 groupshared OverlayRecord s_records[kOverlayTilePixels];
 groupshared float4 s_colors[kOverlayTilePixels];
+groupshared float4 s_bounds[kOverlayTilePixels];
 groupshared uint s_open;
 
 struct CompositePixel {
@@ -232,13 +233,35 @@ void CompositeOverlays(uniform OverlayParams p) {
             const OverlayRecord record = p.records[p.values[chunkStart + thread]];
             s_records[thread] = record;
             s_colors[thread] = DecodeOverlayColor(record.color);
+            const uint kind = (record.flags >> kOverlayKindShift) & kOverlayKindMask;
+            const float2 a = float2(record.ax, record.ay);
+            const float2 b = float2(record.bx, record.by);
+            float4 bounds = float4(a - 1, b + 1);
+            if (kind == uint(OverlayPiece::Segment)) {
+                const float reach = RecordRadius(record) + 1;
+                bounds = float4(min(a, b) - reach, max(a, b) + reach);
+            } else if (kind == uint(OverlayPiece::Marker)) {
+                const float reach = RecordRadius(record) + 1;
+                bounds = float4(a - reach, a + reach);
+            } else if (kind == uint(OverlayPiece::Triangle)) {
+                const OverlayFill fill = p.fills[asuint(record.depthA)];
+                const float2 low = min(float2(fill.x[0], fill.y[0]),
+                                       min(float2(fill.x[1], fill.y[1]), float2(fill.x[2], fill.y[2])));
+                const float2 high = max(float2(fill.x[0], fill.y[0]),
+                                        max(float2(fill.x[1], fill.y[1]), float2(fill.x[2], fill.y[2])));
+                bounds = float4(low - 1, high + 1);
+            }
+            s_bounds[thread] = bounds;
         }
         if (thread == 0) {
             s_open = 0;
         }
         GroupMemoryBarrierWithGroupSync();
         for (uint i = loaded; i > 0 && !pixel.done; --i) {
-            pixel.Add(s_records[i - 1], s_colors[i - 1], view.missDistance, p.font, p.fills);
+            const float4 bounds = s_bounds[i - 1];
+            if (all(pixel.point >= bounds.xy) && all(pixel.point <= bounds.zw)) {
+                pixel.Add(s_records[i - 1], s_colors[i - 1], view.missDistance, p.font, p.fills);
+            }
         }
         if (chunkStart == start) {
             break;

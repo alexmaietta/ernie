@@ -99,6 +99,7 @@ struct OverlayView {
     Ptr<float> depth;
     Ptr<uint> mask;
     Ptr<float> maskDepth;
+    Ptr<uint> maskTiles;
     uint64_t overlays;
     uint camera;
     uint layer;
@@ -112,7 +113,7 @@ struct OverlayView {
     uint padding0;
 };
 
-ERNIE_CHECK_SIZE(OverlayView, 80);
+ERNIE_CHECK_SIZE(OverlayView, 88);
 
 struct OverlayBatch {
     Ptr<float> points;

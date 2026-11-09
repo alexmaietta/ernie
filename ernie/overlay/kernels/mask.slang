@@ -38,6 +38,9 @@ struct OutlineFilter : IHitFilter {
     }
 }
 
+groupshared uint s_any;
+groupshared uint s_all;
+
 [shader("compute")]
 [numthreads(kOverlayTile, kOverlayTile, 1)]
 void MaskOutlines(uniform OverlayParams p) {
@@ -51,34 +54,46 @@ void MaskOutlines(uniform OverlayParams p) {
     }
     const uint thread = LocalThreadIndex();
     const uint2 pixel = view.TileCorner(tile) + uint2(thread % kOverlayTile, thread / kOverlayTile);
-    if (pixel.x >= view.width || pixel.y >= view.height) {
-        return;
+    if (thread == 0) {
+        s_any = 0;
+        s_all = ~0u;
     }
-    RenderTables* tables = p.tables;
-    const CameraModel camera = CameraModel.Load(tables, view.camera, view.product);
-    const float2 film = float2((float(pixel.x) + 0.5f) / float(view.width) * 2 - 1,
-                               1 - (float(pixel.y) + 0.5f) / float(view.height) * 2);
-    const CameraRay generated = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));
-    const HitQuery query = HitQuery(tables, tables->prims.world[view.camera]);
-    OutlineFilter filter;
-    filter.outlines = p.outlines;
-    filter.overlays = view.overlays;
-    filter.count = p.outlineCount;
-    filter.hits = query.layout->hits;
-    filter.first = query.layout->firstInstances[query.tlas];
-    uint covering = 0;
-    float depth = 0;
-    if (generated.weight > 0) {
-        const Ray ray = generated.ray;
-        const Hit hit = Tracer.Closest(query.layout->handles[query.tlas], ray, kGeometryMask,
-                                       filter, query.Intersector());
-        if (hit.IsHit()) {
-            covering = Covering(p.outlines, p.outlineCount, view.overlays,
-                                query.layout->hits[filter.first + hit.instance].prim);
-            depth = camera.ImagePlaneDistance(ray.origin + ray.direction * hit.t);
+    GroupMemoryBarrierWithGroupSync();
+    if (pixel.x < view.width && pixel.y < view.height) {
+        RenderTables* tables = p.tables;
+        const CameraModel camera = CameraModel.Load(tables, view.camera, view.product);
+        const float2 film = float2((float(pixel.x) + 0.5f) / float(view.width) * 2 - 1,
+                                   1 - (float(pixel.y) + 0.5f) / float(view.height) * 2);
+        const CameraRay generated = camera.GenerateRay(CameraSample(film, float2(0.5f), 0.5f));
+        const HitQuery query = HitQuery(tables, tables->prims.world[view.camera]);
+        OutlineFilter filter;
+        filter.outlines = p.outlines;
+        filter.overlays = view.overlays;
+        filter.count = p.outlineCount;
+        filter.hits = query.layout->hits;
+        filter.first = query.layout->firstInstances[query.tlas];
+        uint covering = 0;
+        float depth = 0;
+        if (generated.weight > 0) {
+            const Ray ray = generated.ray;
+            const Hit hit = Tracer.Closest(query.layout->handles[query.tlas], ray, kGeometryMask,
+                                           filter, query.Intersector());
+            if (hit.IsHit()) {
+                covering = Covering(p.outlines, p.outlineCount, view.overlays,
+                                    query.layout->hits[filter.first + hit.instance].prim);
+                depth = camera.ImagePlaneDistance(ray.origin + ray.direction * hit.t);
+            }
         }
+        const uint at = MaskIndex(view, pixel);
+        view.mask[at] = covering;
+        view.maskDepth[at] = depth;
+        InterlockedOr(s_any, covering);
+        InterlockedAnd(s_all, covering);
     }
-    const uint at = MaskIndex(view, pixel);
-    view.mask[at] = covering;
-    view.maskDepth[at] = depth;
+    GroupMemoryBarrierWithGroupSync();
+    if (thread == 0) {
+        const uint local = tile - view.firstTile;
+        view.maskTiles[2 * local] = s_any;
+        view.maskTiles[2 * local + 1] = s_all;
+    }
 }

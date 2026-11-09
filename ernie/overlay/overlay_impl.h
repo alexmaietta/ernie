@@ -239,6 +239,7 @@ class OverlayPass {
     Ref<device::Buffer> m_outlineBuffer;
     Ref<device::Buffer> m_outlineMasks;
     Ref<device::Buffer> m_outlineDepths;
+    Ref<device::Buffer> m_outlineTiles;
     Ref<device::Buffer> m_fills;
     Ref<device::Buffer> m_fillCount;
     Ref<device::Buffer> m_cameraImages;

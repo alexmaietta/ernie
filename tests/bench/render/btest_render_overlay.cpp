@@ -405,11 +405,24 @@ void Composite(benchmark::State& state) {
             device::Tensor(device.CreateBuffer({.label = "bench overlay"}, covered), 0,
                            device::DType::UInt8, shape)};
     });
+    const bool download = state.range(2) != 0;
+    device::Queue& queue = device.GetQueue();
+    CompositeOverlay(images.color, images.overlay).ToHostBytes();
     for (auto _ : state) {
-        CompositeOverlay(images.color, images.overlay).ToHostBytes();
+        const device::Tensor blended = CompositeOverlay(images.color, images.overlay);
+        if (download) {
+            blended.ToHostBytes();
+        } else {
+            queue.WaitIdle();
+        }
     }
     state.SetItemsProcessed(int64_t(state.iterations()) * width * height);
 }
+
+const bool kCore = bench::Core("^Render/Overlays/HostLines/lines:100000/shape:0/") &&
+                   bench::Core("^Render/Overlays/WorldLines/lines:102400/shape:1/") &&
+                   bench::Core("^Render/Overlays/Labels/labels:1000/shape:0/") &&
+                   bench::Core("^Render/Overlays/Outline/items:1/shape:0/");
 
 BENCHMARK_CAPTURE(DrawOverlays, HostLines, Source::HostLines)
     ->Name("Render/Overlays/HostLines")
@@ -563,8 +576,10 @@ BENCHMARK_CAPTURE(DrawOverlays, Outline, Source::Outline)
 
 BENCHMARK(Composite)
     ->Name("Render/Overlays/Composite")
-    ->ArgNames({"width", "height"})
-    ->Args({1920, 1080})
+    ->ArgNames({"width", "height", "download"})
+    ->Args({1920, 1080, 0})
+    ->Args({1920, 1080, 1})
+    ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 
 }

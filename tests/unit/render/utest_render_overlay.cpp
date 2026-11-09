@@ -266,6 +266,34 @@ TEST(OverlayTest, OutlinesSelectedPrimsInsideOthers) {
     });
 }
 
+TEST(OverlayTest, OutlinesWiderThanATileReachAcrossTiles) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Empty(device);
+        scene->Define<Cube>("/Box", {.size = 0.5f});
+        Renderer renderer(scene);
+        const std::vector<uint32_t> prims = {scene->Find("/Box")->Index()};
+        const auto leftmost = [&](float width) {
+            Overlay overlay;
+            overlay.Outline(prims, {.color = {1, 0.5f, 0, 1}, .width = width});
+            renderer.GetOverlays()->Set("outline", overlay);
+            const std::vector<uint8_t> drawn = Drawn(renderer);
+            uint32_t left = kWidth;
+            for (uint32_t y = 0; y < kHeight; ++y) {
+                for (uint32_t x = 0; x < kWidth; ++x) {
+                    if (drawn[At(x, y) + 3] > 0) {
+                        left = std::min(left, x);
+                    }
+                }
+            }
+            return left;
+        };
+        const uint32_t thin = leftmost(1);
+        ASSERT_GE(thin, 10u);
+        ASSERT_LT(thin, kWidth);
+        EXPECT_LE(leftmost(10), thin - 8);
+    });
+}
+
 TEST(OverlayTest, OutlinesThroughCamerasWithoutClippingPlanesOnCpuAdapters) {
     bool tested = false;
     for (const device::AdapterInfo& adapter : device::EnumerateAdapters()) {
