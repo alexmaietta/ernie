@@ -134,6 +134,72 @@ jobs:
           path: ${{ env.KERNEL_CACHE }}
           key: kernels-${{ matrix.name }}-${{ github.sha }}
 
+  floor:
+    name: linux-floor (GCC 12, CMake 3.25, glibc 2.34)
+    runs-on: ubuntu-24.04
+    container: rockylinux/rockylinux:9
+    timeout-minutes: 120
+    env:
+      CC: /opt/rh/gcc-toolset-12/root/usr/bin/gcc
+      CXX: /opt/rh/gcc-toolset-12/root/usr/bin/g++
+      CFLAGS: -B/usr/bin/
+      CXXFLAGS: -B/usr/bin/
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 1G
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install GCC 12, CMake 3.25, ccache, the windowing libraries and lavapipe
+        run: |
+          dnf install -y -q epel-release
+          dnf install -y -q gcc-toolset-12-gcc-c++ python3.12-pip ccache \
+            libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel \
+            wayland-devel wayland-protocols-devel libxkbcommon-devel mesa-vulkan-drivers vulkan-loader
+          dnf upgrade -y -q expat
+          python3.12 -m pip install -q cmake==3.25.0 ninja
+          icd=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
+          {
+            echo "VK_DRIVER_FILES=$icd"
+            echo "VK_ICD_FILENAMES=$icd"
+            echo "KERNEL_CACHE=$HOME/.cache/ernie"
+          } >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: ccache
+        with:
+          path: .ccache
+          key: ccache-linux-floor-${{ github.sha }}
+          restore-keys: ccache-linux-floor-
+      - name: Configure with the system assembler and linker
+        run: >
+          cmake --preset ci -DERNIE_WARNINGS_AS_ERRORS=OFF -DERNIE_BUILD_VIEWER=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: |
+          ccache --zero-stats
+          cmake --build --preset ci --parallel 4
+          ccache --show-stats
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.ccache.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: ccache-linux-floor-${{ github.sha }}
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: kernels
+        with:
+          path: ${{ env.KERNEL_CACHE }}
+          key: kernels-linux-floor-${{ github.sha }}
+          restore-keys: kernels-linux-floor-
+      - name: Test
+        env:
+          LP_NUM_THREADS: "1"
+          ERNIE_TEST_REQUIRE_DEVICE: "1"
+        run: ctest --preset ci -j4
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.kernels.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.KERNEL_CACHE }}
+          key: kernels-linux-floor-${{ github.sha }}
+
   kernels:
     name: kernels (nvrtc, hiprtc)
     runs-on: ubuntu-24.04
