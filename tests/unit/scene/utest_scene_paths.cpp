@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/structure/paths.h"
+#include "ernie/stage/structure/paths.h"
 
 #include <cstdint>
 #include <span>

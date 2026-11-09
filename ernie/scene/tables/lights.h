@@ -9,11 +9,11 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/instances.h"
 #include "ernie/scene/tables/kernels/lights.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

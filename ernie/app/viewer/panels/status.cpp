@@ -13,7 +13,7 @@
 
 #include "ernie/app/viewer/panels/panels.h"
 #include "ernie/app/viewer/widgets/widgets.h"
-#include "ernie/scene/schema/schema.h"
+#include "ernie/stage/schema/schema.h"
 #include "ernie/util/log.h"
 
 namespace ernie::app {

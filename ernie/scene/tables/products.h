@@ -12,10 +12,10 @@
 
 #include "ernie/device/tensor.h"
 #include "ernie/scene/records/products.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/pipelines.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

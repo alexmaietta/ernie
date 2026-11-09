@@ -11,10 +11,7 @@
 #include "ernie/bvh/builder.h"
 #include "ernie/device/device.h"
 #include "ernie/device/ref.h"
-#include "ernie/scene/columns/column_store.h"
-#include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/scene.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/bounds.h"
 #include "ernie/scene/tables/captures.h"
 #include "ernie/scene/tables/instances.h"
@@ -34,6 +31,9 @@
 #include "ernie/scene/tables/tangents.h"
 #include "ernie/scene/tables/textures.h"
 #include "ernie/scene/tables/transforms.h"
+#include "ernie/stage/columns/column_store.h"
+#include "ernie/stage/publish/publisher.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

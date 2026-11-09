@@ -20,7 +20,7 @@
 
 #include "ernie/device/queue.h"
 #include "ernie/render/shaders.h"
-#include "ernie/scene/views/poses.h"
+#include "ernie/stage/views/poses.h"
 #include "values.h"
 
 namespace nb = nanobind;

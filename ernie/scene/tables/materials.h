@@ -15,9 +15,9 @@
 #include "ernie/material/definition.h"
 #include "ernie/material/node.h"
 #include "ernie/scene/records/materials.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

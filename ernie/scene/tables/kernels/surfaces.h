@@ -5,8 +5,8 @@
 #include "ernie/scene/records/meshes.h"
 #include "ernie/scene/records/prims.h"
 #include "ernie/scene/records/transforms.h"
-#include "ernie/scene/schema/primvars.h"
 #include "ernie/scene/tables/kernels/instance_layout.h"
+#include "ernie/stage/schema/primvars.h"
 
 namespace ernie {
 

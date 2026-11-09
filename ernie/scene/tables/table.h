@@ -5,9 +5,9 @@
 #include <cstdint>
 #include <span>
 
-#include "ernie/scene/publish/header.h"
-#include "ernie/scene/publish/table.h"
 #include "ernie/scene/records/render_tables.h"
+#include "ernie/stage/publish/header.h"
+#include "ernie/stage/publish/table.h"
 
 namespace ernie {
 

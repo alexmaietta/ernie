@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "ernie/scene/scene.h"
-#include "ernie/scene/schema/runtime.h"
+#include "ernie/stage/schema/runtime.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "ernie/scene/structure/tokens.h"
+#include "ernie/stage/structure/tokens.h"
 
 #include <cstdint>
 #include <stdexcept>

@@ -15,8 +15,8 @@
 #include "ernie/scene/records/tangents.h"
 #include "ernie/scene/records/textures.h"
 #include "ernie/scene/records/transforms.h"
-#include "ernie/scene/schema/ids.h"
-#include "ernie/scene/schema/schema.h"
+#include "ernie/stage/schema/ids.h"
+#include "ernie/stage/schema/schema.h"
 
 namespace ernie {
 

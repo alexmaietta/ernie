@@ -25,7 +25,7 @@
 #include "ernie/app/viewer/widgets/asset_path.h"
 #include "ernie/app/viewer/widgets/widgets.h"
 #include "ernie/scene/rotation.h"
-#include "ernie/scene/schema/schema.h"
+#include "ernie/stage/schema/schema.h"
 #include "ernie/util/log.h"
 #include "ernie/util/span.h"
 

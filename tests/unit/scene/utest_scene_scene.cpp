@@ -11,10 +11,10 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
-#include "ernie/scene/primvar.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/scene/tables/tangents.h"
+#include "ernie/stage/primvar.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
 

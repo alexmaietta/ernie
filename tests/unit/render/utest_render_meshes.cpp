@@ -8,9 +8,9 @@
 
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
-#include "ernie/scene/primvar.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
+#include "ernie/stage/primvar.h"
 #include "support/devices.h"
 
 namespace ernie {

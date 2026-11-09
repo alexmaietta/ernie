@@ -20,7 +20,7 @@
 #include "ernie/device/program.h"
 #include "ernie/overlay/kernels/overlay.h"
 #include "ernie/overlay/overlay.h"
-#include "ernie/scene/types.h"
+#include "ernie/stage/types.h"
 
 namespace ernie {
 

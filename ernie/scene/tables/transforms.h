@@ -10,10 +10,10 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/records/transforms.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/regions.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

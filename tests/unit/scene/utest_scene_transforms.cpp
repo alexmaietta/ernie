@@ -8,14 +8,14 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
-#include "ernie/scene/columns/column_store.h"
-#include "ernie/scene/publish/publisher.h"
 #include "ernie/scene/schema/columns.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/scene/tables/transforms.h"
-#include "ernie/scene/views/attribute.h"
-#include "ernie/scene/views/view.h"
+#include "ernie/stage/columns/column_store.h"
+#include "ernie/stage/publish/publisher.h"
+#include "ernie/stage/structure/structure.h"
+#include "ernie/stage/views/attribute.h"
+#include "ernie/stage/views/view.h"
 #include "support/devices.h"
 
 namespace ernie {

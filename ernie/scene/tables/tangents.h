@@ -15,11 +15,11 @@
 #include "ernie/device/ref.h"
 #include "ernie/scene/records/meshes.h"
 #include "ernie/scene/records/tangents.h"
-#include "ernie/scene/schema/schema.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/meshes.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/schema/schema.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

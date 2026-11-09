@@ -19,12 +19,12 @@
 #include "ernie/scene/defines.h"
 #include "ernie/scene/prim.h"
 #include "ernie/scene/records/render_vars.h"
-#include "ernie/scene/schema/schema.h"
-#include "ernie/scene/structure/tokens.h"
-#include "ernie/scene/types.h"
-#include "ernie/scene/views/attribute.h"
-#include "ernie/scene/views/poses.h"
-#include "ernie/scene/views/view.h"
+#include "ernie/stage/schema/schema.h"
+#include "ernie/stage/structure/tokens.h"
+#include "ernie/stage/types.h"
+#include "ernie/stage/views/attribute.h"
+#include "ernie/stage/views/poses.h"
+#include "ernie/stage/views/view.h"
 #include "ernie/util/span.h"
 
 namespace ernie {

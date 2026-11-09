@@ -11,9 +11,9 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/queue.h"
-#include "ernie/scene/primvar.h"
 #include "ernie/scene/records/points.h"
 #include "ernie/scene/scene.h"
+#include "ernie/stage/primvar.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
 

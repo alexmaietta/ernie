@@ -8,8 +8,8 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/records/spectra.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 
 namespace ernie {
 

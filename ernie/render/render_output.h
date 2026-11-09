@@ -15,7 +15,7 @@
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
 #include "ernie/io/image.h"
-#include "ernie/scene/types.h"
+#include "ernie/stage/types.h"
 
 namespace ernie {
 

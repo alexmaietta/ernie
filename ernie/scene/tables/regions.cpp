@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-#include "ernie/scene/schema/ids.h"
+#include "ernie/stage/schema/ids.h"
 
 namespace ernie {
 

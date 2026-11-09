@@ -11,9 +11,9 @@
 #include <gtest/gtest.h>
 
 #include "ernie/device/device.h"
-#include "ernie/scene/columns/column_store.h"
 #include "ernie/scene/schema/columns.h"
-#include "ernie/scene/structure/structure.h"
+#include "ernie/stage/columns/column_store.h"
+#include "ernie/stage/structure/structure.h"
 #include "support/devices.h"
 
 namespace ernie {

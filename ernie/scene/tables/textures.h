@@ -11,9 +11,9 @@
 #include <vector>
 
 #include "ernie/scene/records/textures.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
+#include "ernie/stage/structure/structure.h"
 #include "ernie/texture/cache.h"
 
 namespace ernie {

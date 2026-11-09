@@ -4,7 +4,7 @@
 #include "ernie/io/kernels/ies.h"
 #include "ernie/scene/records/instances.h"
 #include "ernie/scene/records/textures.h"
-#include "ernie/scene/schema/ids.h"
+#include "ernie/stage/schema/ids.h"
 
 namespace ernie {
 

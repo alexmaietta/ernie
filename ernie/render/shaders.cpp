@@ -12,7 +12,7 @@
 #include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
 #include "ernie/render/kernels.h"
-#include "ernie/scene/schema/runtime.h"
+#include "ernie/stage/schema/runtime.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
 #include "ernie/util/text.h"

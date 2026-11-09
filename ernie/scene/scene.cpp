@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "ernie/device/program.h"
-#include "ernie/scene/primvar.h"
 #include "ernie/scene/scene_impl.h"
-#include "ernie/scene/views/view_state.h"
+#include "ernie/stage/primvar.h"
+#include "ernie/stage/views/view_state.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profiler.h"

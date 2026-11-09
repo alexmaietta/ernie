@@ -21,9 +21,9 @@
 #include "ernie/scene/records/render_vars.h"
 #include "ernie/scene/records/semantics.h"
 #include "ernie/scene/records/transforms.h"
-#include "ernie/scene/structure/structure.h"
 #include "ernie/scene/tables/table.h"
-#include "ernie/scene/types.h"
+#include "ernie/stage/structure/structure.h"
+#include "ernie/stage/types.h"
 
 namespace ernie {
 
