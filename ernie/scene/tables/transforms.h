@@ -19,7 +19,7 @@ namespace ernie {
 
 class TransformTable : public RenderTable {
   public:
-    explicit TransformTable(Structure& structure) : m_structure(structure) {}
+    explicit TransformTable(Structure& structure);
 
     std::string_view Name() const override {
         return "hierarchy";

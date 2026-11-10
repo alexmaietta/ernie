@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <map>
 #include <numeric>
 
@@ -30,8 +31,22 @@ constexpr ColumnRef kInputs[] = {kXformableTranslate,
                                  kMotionAPIMotionVelocity,
                                  kMotionAPIMotionAngularVelocity};
 
+constexpr ColumnRef kStamped[] = {kXformableTranslate,
+                                  kXformableOrient,
+                                  kXformableScale,
+                                  kXformableResetXformStack,
+                                  kImageableVisibility,
+                                  kImageablePurpose,
+                                  kMaterialBindingAPIMaterialBinding};
+
 constexpr TableId kTableOutputs[] = {TableId::Transforms, TableId::Imageables};
 
+}
+
+TransformTable::TransformTable(Structure& structure) : m_structure(structure) {
+    for (const ColumnRef column : kStamped) {
+        m_structure.GetColumnStore().TrackRows(column);
+    }
 }
 
 std::span<const ColumnRef> TransformTable::Inputs() const {
@@ -217,6 +232,14 @@ void TransformTable::Run(const ChangeSet& changes, TableVersions& versions) {
     params.segments.address = dirty->Address();
     params.transforms.address = m_transforms.Address();
     params.imageables.address = m_imageables.Address();
+    Paged<uint64_t>* stamps[] = {&params.translateStamps,      &params.orientStamps,
+                                 &params.scaleStamps,          &params.resetXformStackStamps,
+                                 &params.visibilityStamps,     &params.purposeStamps,
+                                 &params.materialBindingStamps};
+    for (size_t at = 0; at < std::size(kStamped); ++at) {
+        const ColumnRef column = kStamped[at];
+        stamps[at]->pages.address = store.Schema(column.schema).Pages(store.StampColumn(column));
+    }
     params.since = changes.sinceStamp;
     params.until = changes.untilStamp;
     params.all = rebuild ? 1 : 0;
@@ -227,12 +250,10 @@ void TransformTable::Run(const ChangeSet& changes, TableVersions& versions) {
                    return store.LastWrite(input) > m_seen;
                });
     };
-    constexpr ColumnRef kTransforms[] = {kXformableTranslate, kXformableOrient, kXformableScale,
-                                         kXformableResetXformStack};
-    constexpr ColumnRef kInherited[] = {kImageableVisibility, kImageablePurpose,
-                                        kMaterialBindingAPIMaterialBinding};
-    const bool moved = written(kTransforms);
-    const bool inherited = written(kInherited) || !changes.removed.empty() || !changes.apis.empty();
+    const std::span<const ColumnRef> stamped = kStamped;
+    const bool moved = written(stamped.first(4));
+    const bool inherited =
+        written(stamped.subspan(4)) || !changes.removed.empty() || !changes.apis.empty();
     m_seen = store.WriteSequence();
     std::vector<uint32_t> worlds;
     if (global) {

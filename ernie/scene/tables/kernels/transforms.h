@@ -22,6 +22,13 @@ struct ResolveParams {
     Ptr<uint> segments;
     Ptr<WorldTransform> transforms;
     Ptr<ResolvedImageable> imageables;
+    Paged<uint64_t> translateStamps;
+    Paged<uint64_t> orientStamps;
+    Paged<uint64_t> scaleStamps;
+    Paged<uint64_t> resetXformStackStamps;
+    Paged<uint64_t> visibilityStamps;
+    Paged<uint64_t> purposeStamps;
+    Paged<uint64_t> materialBindingStamps;
     uint64_t since;
     uint64_t until;
     uint all;
@@ -30,7 +37,7 @@ struct ResolveParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(ResolveParams, 104);
+ERNIE_CHECK_SIZE(ResolveParams, 160);
 
 struct MotionParams {
     Ptr<AuthoredData> scene;

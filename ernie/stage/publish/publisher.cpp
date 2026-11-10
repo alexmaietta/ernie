@@ -42,6 +42,9 @@ void Publisher::Add(Table& table) {
             }
         }
     }
+    for (const ColumnRef column : table.RowInputs()) {
+        m_structure.GetColumnStore().TrackRows(column);
+    }
     m_scheduled.push_back({&table});
 }
 
@@ -112,9 +115,7 @@ ChangeSet Publisher::Build(Ordinal since, Ordinal until, Ordinal sealing,
     std::optional<device::CommandEncoder> encoder;
     for (size_t i = 0; i < rows.size(); ++i) {
         const ColumnRef column = rows[i];
-        if (!store.Tracked(column)) {
-            continue;
-        }
+        store.TrackRows(column);
         const ColumnTable& table = store.Schema(column.schema);
         const uint32_t count = table.Rows();
         const uint64_t bytes =

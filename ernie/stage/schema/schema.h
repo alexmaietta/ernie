@@ -65,8 +65,7 @@ enum class Unit : uint8_t {
 
 enum class ColumnFlags : uint8_t {
     None = 0,
-    Tracked = 1 << 0,
-    Internal = 1 << 1,
+    Internal = 1 << 0,
 };
 
 constexpr ColumnFlags operator|(ColumnFlags a, ColumnFlags b) {
@@ -143,7 +142,6 @@ struct ColumnInfo {
     ColumnRole role;
     ColumnFlags flags;
     uint32_t offset;
-    uint32_t stampOffset;
     SchemaId api;
     std::string_view doc;
     Unit unit;

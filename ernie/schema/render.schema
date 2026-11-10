@@ -2,32 +2,27 @@ class RenderVar : Typed (
     doc = "One output of a render product, such as its color."
 ) {
     token sourceName = LdrColor (
-        tracked
         group = "Render Var"
         displayName = "Source Name"
         doc = "The output this variable holds. A name one of the product's sensor pipelines outputs reads that output, and Tap reads the output of the node tap targets. Any other name is one the renderer writes itself. LdrColor is display color and HdrColor linear color. DistanceToCamera and DistanceToImagePlane are distances from the camera and from its image plane. NonStableInstanceSegmentation is the index of the hit's nearest labeled prim plus 2, with 0 where nothing is hit and 1 for unlabeled hits. Normal is the world-space surface normal facing the camera, interpolated from the geometry's normals before materials and normal maps, so minimal and real-time modes agree. DiffuseAlbedo is the unlit diffuse color of the bound material, or displayColor where there's none. SemanticSegmentation is the semantic id of the hit's labels, with 0 where nothing is hit and 1 for unlabeled hits, and SemanticIdMap holds its ids and labels. SemanticInstanceSegmentation is the stable id of the hit's nearest labeled prim, with (0, 0, 0, 1) for unlabeled hits, StableIdSegmentation the stable id of the hit prim, and StableIdMap the stable ids and paths of every prim the segmentations name. Intensity is the intensity of a lidar or radar return, PointCloud a lidar's or radar's returns packed into a point cloud with the fields channels names, and RadialVelocity how fast a radar's hit moves away from it in meters per second. InstanceId is the id of the instancer copy a hit belongs to, from the instancer's ids or its index, with -1 for hits on prims drawn in place and for misses, and InstancerStableId the stable id of that copy's instancer, with 0 where there's none. ElectronRate is the photoelectrons per second each of a camera's detector channels collects before any noise, one channel per pixel for mono and as many as the pattern has otherwise."
     )
     token[] channels (
-        tracked
         group = "Render Var"
         displayName = "Channels"
         doc = "The fields a PointCloud holds, each a tensor of its own. Coordinates are xyz in frameOfReference, Distance the range along the beam, Intensity the return's intensity, StableId the hit prim's stable id, InstanceId the hit's instance id as the InstanceId output reports it, RadialVelocity a radar return's speed away from it, RadialVelocityVector that speed along the beam as an xyz vector in frameOfReference, and Emitter, Firing and Echo where the return sits in the sensor's grid, which for a radar are its row, its column and 0. Empty holds Coordinates and Intensity. Every point cloud also has Counts, the points each sensor returned."
     )
     token frameOfReference = sensor (
-        tracked
         allowed = [sensor, world]
         group = "Render Var"
         displayName = "Frame of Reference"
         doc = "The space a PointCloud's Coordinates are in. sensor is the sensor's own frame, looking down -z with +y up. world is the space prims' world transforms are in."
     )
     prim[] tap (
-        tracked
         group = "Render Var"
         displayName = "Tap"
         doc = "With sourceName Tap, the node of the product's sensor pipeline whose output this variable holds, to look at any stage while debugging. Only the first target is used."
     )
     token tapOutput (
-        tracked
         group = "Render Var"
         displayName = "Tap Output"
         doc = "The output of the tapped node this variable holds. Empty means the node's only output."
@@ -38,7 +33,6 @@ api class MinimalAPI (
     doc = "Settings of the minimal render mode: shading, shadows and the ambient environment. It lights with the first distant light the camera's world sees, or a headlight when there is none."
 ) {
     token mode = textureDiffuse (
-        tracked
         allowed = [data, displayColor, textureDiffuse, full]
         enum = MinimalMode
         group = "Minimal Shading"
@@ -150,7 +144,6 @@ class RenderProduct : Typed, MinimalAPI, BackgroundAPI, RealTimeAPI (
     doc = "Images rendered from cameras, one per camera, each holding the product's variables."
 ) {
     token renderMode = Minimal (
-        tracked
         allowed = [Minimal, RealTime]
         enum = RenderMode
         group = "Product"
@@ -158,71 +151,60 @@ class RenderProduct : Typed, MinimalAPI, BackgroundAPI, RealTimeAPI (
         doc = "How the product is shaded. Minimal follows MinimalAPI, RealTime shades displayColor under every light with shadows and no ambient environment."
     )
     token spectralMode = rgb (
-        tracked
         allowed = [rgb, bands]
         group = "Product"
         displayName = "Spectral Mode"
         doc = "How light is carried through cameras, lights and materials. rgb carries three channels and is what Minimal renders with. bands carries fixed wavelength bands, a placeholder that RealTime will use."
     )
     bool disableMotionBlur = false (
-        tracked
         group = "Product"
         displayName = "Disable Motion Blur"
         doc = "Renders every prim at the shutter's opening instead of blurring it across the shutter, as UsdRender's disableMotionBlur does. Rendering doesn't blur anything yet, so it changes nothing."
     )
     prim[] camera (
-        tracked
         group = "Product"
         displayName = "Sensors"
         doc = "The sensors rendered, stacked into one batch of outputs. They are one kind of sensor and capture at the same times. The name follows UsdRender, where it holds cameras."
     )
     uint2 resolution = (640, 480) (
-        tracked
         group = "Product"
         displayName = "Resolution"
         doc = "Width and height of each image in pixels."
     )
     token aspectRatioConformPolicy = expandAperture (
-        tracked
         allowed = [expandAperture, cropAperture, adjustApertureWidth, adjustApertureHeight, adjustPixelAspectRatio]
         group = "Product"
         displayName = "Aspect Ratio Conform Policy"
         doc = "How a camera whose apertures don't match the image's aspect ratio is fitted to it, as in UsdRender. expandAperture widens or heightens the film until it matches, so the image sees at least what the camera does. cropAperture narrows or shortens it, so the camera sees at least what the image does. adjustApertureWidth and adjustApertureHeight change only that side. adjustPixelAspectRatio keeps the film and stretches the pixels instead. The camera's prim isn't edited, and spherical cameras always span the full sphere."
     )
     float pixelAspectRatio = 1 (
-        tracked
         group = "Product"
         displayName = "Pixel Aspect Ratio"
         min = 0
         doc = "Width over height of each pixel, so the image's aspect ratio is its width times this over its height."
     )
     token semanticTaxonomy = class (
-        tracked
         group = "Product"
         displayName = "Semantic Taxonomy"
         doc = "Which taxonomy of SemanticsLabelsAPI the semantic variables segment by."
     )
     float missDistance = inf (
-        tracked
         unit = meters
         group = "Product"
         displayName = "Miss Distance"
         doc = "What DistanceToCamera and DistanceToImagePlane hold where a ray hits nothing before the camera's far clipping distance. Infinite by default, and 0 for renderers that mark a miss with 0."
     )
     prim[] pipeline:binding (
-        tracked
         group = "Product"
         displayName = "Pipeline"
         doc = "A SensorPipeline that processes this product's sensors in place of their own pipeline:binding, so one camera can feed products with different pipelines. Only the first target is used."
     )
     prim[] orderedVars (
-        tracked
         group = "Product"
         displayName = "Render Vars"
         doc = "The render variables written, in order."
     )
     token[] overlays (
-        tracked
         group = "Product"
         displayName = "Overlays"
         doc = "The overlay layers drawn over each camera's image, returned beside the render variables as an image of their own. A name ending in * matches every layer it starts, so * draws them all. Empty draws none. Only cameras draw overlays."

@@ -31,21 +31,13 @@ std::vector<std::byte> Repeat(std::span<const std::byte> cell, uint32_t count) {
     return bytes;
 }
 
-std::vector<TableColumn> SchemaColumns(SchemaId schema, std::vector<uint32_t>& stamps) {
+std::vector<TableColumn> SchemaColumns(SchemaId schema) {
     std::vector<TableColumn> columns;
     const uint32_t count = Info(schema).columnCount;
     for (uint32_t column = 0; column < count; ++column) {
         columns.push_back({ElementBytes(Columns(schema)[column].type), 0});
     }
     columns.push_back({sizeof(uint32_t), kNoPrimFill});
-    for (uint32_t column = 0; column < count; ++column) {
-        if (Has(Columns(schema)[column].flags, ColumnFlags::Tracked)) {
-            stamps.push_back(uint32_t(columns.size()));
-            columns.push_back({sizeof(uint64_t), 0});
-        } else {
-            stamps.push_back(kNoStamp);
-        }
-    }
     return columns;
 }
 
@@ -69,9 +61,9 @@ const ColumnStore::Entry& ColumnStore::Lookup(SchemaId schema) const {
     while (m_entries.size() <= uint32_t(schema)) {
         const SchemaId added = SchemaId(uint32_t(m_entries.size()));
         Entry entry;
-        std::vector<TableColumn> columns = SchemaColumns(added, entry.stamps);
         entry.table = std::make_unique<ColumnTable>(
-            m_heap, std::format("{} data", Info(added).name), columns);
+            m_heap, std::format("{} data", Info(added).name), SchemaColumns(added));
+        entry.stamps.assign(Info(added).columnCount, kNoStamp);
         entry.writes.assign(Info(added).columnCount, 0);
         m_entries.push_back(std::move(entry));
     }
@@ -195,6 +187,19 @@ uint32_t ColumnStore::StampColumn(ColumnRef column) const {
 
 bool ColumnStore::Tracked(ColumnRef column) const {
     return StampColumn(column) != kNoStamp;
+}
+
+void ColumnStore::TrackRows(ColumnRef column) {
+    if (Tracked(column)) {
+        return;
+    }
+    Entry& entry = m_entries[uint32_t(column.schema)];
+    const uint32_t stamps = entry.table->AddColumn({sizeof(uint64_t), 0});
+    entry.stamps[column.index] = stamps;
+    const Ordinal published = m_stamp - 1;
+    FillWords(*entry.table, stamps, 0, entry.table->Rows(),
+              std::as_bytes(std::span(&published, 1)));
+    entry.table->Flush();
 }
 
 void ColumnStore::Touch(ColumnRef column) {
@@ -651,9 +656,6 @@ AuthoredData ColumnStore::Data() const {
         for (uint32_t column = 0; column < Info(schema).columnCount; ++column) {
             const ColumnInfo& at = columns[column];
             Place(schemas + base, at.offset, entry.table->Pages(column));
-            if (entry.stamps[column] != kNoStamp) {
-                Place(schemas + base, at.stampOffset, entry.table->Pages(entry.stamps[column]));
-            }
         }
         Place(schemas + base, info.dataBytes - sizeof(uint64_t),
               entry.table->Pages(Info(schema).columnCount));

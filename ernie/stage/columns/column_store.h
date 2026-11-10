@@ -98,6 +98,7 @@ class ColumnStore {
     uint32_t PrimsColumn(SchemaId schema) const;
     uint32_t StampColumn(ColumnRef column) const;
     bool Tracked(ColumnRef column) const;
+    void TrackRows(ColumnRef column);
 
     void Touch(ColumnRef column);
     uint64_t LastWrite(ColumnRef column) const;

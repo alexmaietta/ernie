@@ -41,6 +41,35 @@ uint32_t ColumnTable::CellBytes(uint32_t column) const {
     return m_columns[column].cellBytes;
 }
 
+uint32_t ColumnTable::AddColumn(TableColumn column) {
+    if (column.cellBytes == 0 || column.cellBytes % 4 != 0) {
+        throw Error("{} has a column of {} bytes; cells are whole words", m_label,
+                    column.cellBytes);
+    }
+    m_columns.push_back(column);
+    m_pages.emplace_back();
+    m_staged.emplace_back();
+    m_redirections.emplace_back();
+    if (!m_spans.empty()) {
+        device::Queue& queue = m_heap.GetDevice().GetQueue();
+        device::CommandEncoder encoder = queue.CreateEncoder();
+        for (Span& span : m_spans) {
+            const HeapBlock block =
+                m_heap.Allocate(uint64_t(span.rows) * column.cellBytes, kSpanAlignment);
+            encoder.Fill(block.Range(), column.fill);
+            for (uint32_t page = 0; page < span.rows / kPageRows; ++page) {
+                m_pages.back().push_back(block.Address() +
+                                         uint64_t(page) * kPageRows * column.cellBytes);
+            }
+            span.blocks.push_back(block);
+        }
+        queue.Submit(encoder.Finish());
+        m_pageCapacity = 0;
+        WritePages(0, m_capacity / kPageRows);
+    }
+    return uint32_t(m_columns.size() - 1);
+}
+
 uint32_t ColumnTable::Allocate(uint32_t count, bool pageAligned) {
     if (count == 0) {
         return m_rows;

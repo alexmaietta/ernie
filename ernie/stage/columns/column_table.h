@@ -42,6 +42,7 @@ class ColumnTable {
     }
 
     uint32_t CellBytes(uint32_t column) const;
+    uint32_t AddColumn(TableColumn column);
 
     uint64_t Layout() const {
         return m_layout;

@@ -6,7 +6,6 @@ api class MaterialBindingAPI (
     doc = "Binds a material to a prim and, unless they bind their own, its descendants."
 ) {
     prim[] material:binding (
-        tracked
         group = "Material"
         displayName = "Material"
         doc = "The bound Material. Only the first target is used."
@@ -17,25 +16,21 @@ multiple api class CollectionAPI (
     doc = "A named set of prims, such as the prims a light lights, given by the prims it includes and excludes."
 ) {
     bool collection:__INSTANCE_NAME__:includeRoot = false (
-        tracked
         group = "Collection"
         displayName = "Include Root"
         doc = "Include every prim that no include or exclude decides."
     )
     prim[] collection:__INSTANCE_NAME__:includes (
-        tracked
         group = "Collection"
         displayName = "Includes"
         doc = "Prims in the collection, with their descendants unless expansionRule is explicitOnly."
     )
     prim[] collection:__INSTANCE_NAME__:excludes (
-        tracked
         group = "Collection"
         displayName = "Excludes"
         doc = "Prims left out of the collection, with their descendants unless expansionRule is explicitOnly. A prim counts by its nearest listed ancestor, and an exclude wins a tie."
     )
     token collection:__INSTANCE_NAME__:expansionRule = expandPrims (
-        tracked
         allowed = [explicitOnly, expandPrims, expandPrimsAndProperties]
         group = "Collection"
         displayName = "Expansion Rule"
@@ -48,7 +43,6 @@ multiple api class SemanticsLabelsAPI (
     doc = "Semantic labels of a prim and its descendants, one list per taxonomy such as class. Descendants without labels in a taxonomy take their nearest labeled ancestor's."
 ) {
     token[] semantics:labels:__INSTANCE_NAME__ (
-        tracked
         group = "Semantics"
         displayName = "Labels"
         doc = "The labels in the taxonomy the instance names."
@@ -59,14 +53,12 @@ abstract class Imageable : Typed, MaterialBindingAPI (
     doc = "A prim that can be rendered or seen."
 ) {
     token visibility = inherited (
-        tracked
         allowed = [inherited, invisible]
         group = "Visibility"
         displayName = "Visibility"
         doc = "Invisible hides the prim and its subtree."
     )
     token purpose = default (
-        tracked
         allowed = [default, render, proxy, guide]
         group = "Visibility"
         displayName = "Purpose"
@@ -83,26 +75,22 @@ api class MotionAPI (
     doc = "How a prim and its descendants move, for sensors that measure velocity such as radar, and how they blur, as USD's MotionAPI gives it. A prim without it moves with its nearest ancestor that has it, and is still when none does. Rendering doesn't move or blur anything by it yet."
 ) {
     vector3f motion:velocity = (0, 0, 0) (
-        tracked
         group = "Motion"
         displayName = "Velocity"
         doc = "The world-space velocity of the prim's origin, in meters per second."
     )
     vector3f motion:angularVelocity = (0, 0, 0) (
-        tracked
         group = "Motion"
         displayName = "Angular Velocity"
         doc = "The world-space angular velocity about the prim's origin, in degrees per second as UsdPhysics gives it."
     )
     float motion:blurScale = 1 (
-        tracked
         group = "Motion"
         displayName = "Blur Scale"
         min = 0
         doc = "Scales the motion blur of the prim and its descendants. 0 renders them sharp and 1 blurs them as they move. Rendering doesn't use it yet."
     )
     int motion:nonlinearSampleCount = 3 (
-        tracked
         group = "Motion"
         displayName = "Nonlinear Sample Count"
         min = 2
@@ -115,7 +103,6 @@ api class ThermalAPI (
     doc = "A gprim's temperature, which makes it glow in thermal cameras by its material's emissivity. A simulation may write it every step, and an ernie:temperature float primvar overrides it per vertex or face. Gprims without it don't emit heat."
 ) {
     float ernie:thermal:temperature = 293.15 (
-        tracked
         unit = kelvin
         group = "Thermal"
         displayName = "Temperature"
@@ -129,7 +116,6 @@ api class PrototypeAPI (
     doc = "Draws a prototype root's subtree at this prim's transform, as one copy that shares the prototype's geometry. USD's instanceable prims map onto it."
 ) {
     prim[] prototype (
-        tracked
         group = "Instancing"
         displayName = "Prototype"
         doc = "The prototype root to draw. Only the first target is used, and prims at or under it are drawn only through instancers."
@@ -140,26 +126,22 @@ abstract class Xformable : Imageable (
     doc = "A prim with a transform relative to its parent."
 ) {
     double3 xformOp:translate = (0, 0, 0) (
-        tracked
         unit = meters
         group = "Transform"
         displayName = "Translate"
         doc = "Translation from the parent."
     )
     quatd xformOp:orient = (0, 0, 0, 1) (
-        tracked
         group = "Transform"
         displayName = "Orient"
         doc = "Rotation as a unit quaternion in xyzw order."
     )
     float3 xformOp:scale = (1, 1, 1) (
-        tracked
         group = "Transform"
         displayName = "Scale"
         doc = "Scale along each local axis."
     )
     bool resetXformStack = false (
-        tracked
         group = "Transform"
         displayName = "Reset Transform Stack"
         doc = "Ignore the parent transforms, placing the prim in world space."
@@ -195,19 +177,16 @@ abstract class Gprim : Boundable (
         doc = "Opacity used without a bound material."
     )
     primvars primvars (
-        tracked
         group = "Primvars"
         displayName = "Primvars"
         doc = "Every other primvar, packed into one table: a count, a PrimvarEntry per primvar sorted by name, then their values and indices."
     )
     bool doubleSided = false (
-        tracked
         group = "Geometry"
         displayName = "Double Sided"
         doc = "Whether camera rays see the back of each face. Other rays always see both sides."
     )
     token orientation = rightHanded (
-        tracked
         allowed = [rightHanded, leftHanded]
         group = "Geometry"
         displayName = "Orientation"
@@ -310,7 +289,6 @@ api class CheckerboardAPI (
     doc = "Shades a plane with a checkerboard of two colors."
 ) {
     bool checkerboard = false (
-        tracked
         group = "Checkerboard"
         displayName = "Checkerboard"
         doc = "Shade the plane with a checkerboard rather than displayColor."
@@ -363,33 +341,28 @@ abstract class PointBased : Gprim (
     doc = "Geometry defined by a set of points."
 ) {
     point3f[] points (
-        tracked
         unit = meters
         group = "Geometry"
         displayName = "Points"
         doc = "Point positions in local space."
     )
     normal3f[] normals (
-        tracked
         group = "Geometry"
         displayName = "Normals"
         doc = "Shading normals, indexed as normalsInterpolation says."
     )
     vector3f[] velocities (
-        tracked
         unit = meters
         group = "Motion"
         displayName = "Velocities"
         doc = "The velocity of each point in local space, in meters per second, for motion blur. Empty leaves points still. Rendering doesn't use it yet."
     )
     vector3f[] accelerations (
-        tracked
         group = "Motion"
         displayName = "Accelerations"
         doc = "The acceleration of each point in local space, in meters per second squared, for motion blur. Empty leaves velocities constant. Rendering doesn't use it yet."
     )
     token normalsInterpolation = vertex (
-        tracked
         allowed = [
             constant
             uniform
@@ -408,25 +381,21 @@ class Mesh : PointBased (
     doc = "A polygon mesh."
 ) {
     int[] faceVertexIndices (
-        tracked
         group = "Geometry"
         displayName = "Face Vertex Indices"
         doc = "Point index of each face vertex."
     )
     int[] faceVertexCounts (
-        tracked
         group = "Geometry"
         displayName = "Face Vertex Counts"
         doc = "Number of vertices in each face."
     )
     int[] holeIndices (
-        tracked
         group = "Geometry"
         displayName = "Hole Indices"
         doc = "Faces that are not drawn, as indices into faceVertexCounts."
     )
     token subdivisionScheme = catmullClark (
-        tracked
         allowed = [catmullClark, loop, bilinear, none]
         group = "Geometry"
         displayName = "Subdivision Scheme"
@@ -439,20 +408,17 @@ class GeomSubset : Typed, MaterialBindingAPI (
     doc = "A set of faces of its parent mesh, which a material binding or semantic labels apply to. Subsets in the materialBind family bind materials to their faces, and subsets with semantic labels label their faces."
 ) {
     token elementType = face (
-        tracked
         allowed = [face, point, edge, segment, tetrahedron]
         group = "Subset"
         displayName = "Element Type"
         doc = "What indices name. Only face subsets are drawn differently from their mesh."
     )
     int[] indices (
-        tracked
         group = "Subset"
         displayName = "Indices"
         doc = "The faces in the subset, as indices into the mesh's faceVertexCounts."
     )
     token familyName (
-        tracked
         group = "Subset"
         displayName = "Family Name"
         doc = "The family the subset belongs to, such as materialBind for subsets that bind materials."
@@ -463,14 +429,12 @@ class Points : PointBased (
     doc = "Particles, each drawn at its point as wide as its width, as a sphere, or as a disk facing its normal when normals are authored."
 ) {
     float[] widths (
-        tracked
         unit = meters
         group = "Geometry"
         displayName = "Widths"
         doc = "The diameter of each point, or a single diameter for every point. Empty draws each point 1 wide, as Storm does, since USD leaves the fallback to the renderer."
     )
     int64[] ids (
-        tracked
         group = "Geometry"
         displayName = "Ids"
         doc = "A stable id per point, which the instance id output reports. Empty makes each point's index its id."
@@ -481,69 +445,58 @@ class PointInstancer : Boundable (
     doc = "Copies of prototype prims, one per entry of positions, each placed by its position, orientation and scale."
 ) {
     prim[] prototypes (
-        tracked
         group = "Instancing"
         displayName = "Prototypes"
         doc = "The prototype roots instances choose from by protoIndices. Prims at or under a prototype root are drawn only through instancers."
     )
     int[] protoIndices (
-        tracked
         group = "Instancing"
         displayName = "Prototype Indices"
         doc = "The prototype of each instance, as an index into prototypes. Instances with an index outside prototypes are not drawn."
     )
     point3f[] positions (
-        tracked
         unit = meters
         group = "Instancing"
         displayName = "Positions"
         doc = "The position of each instance in the instancer's space. Its length is the number of instances."
     )
     quath[] orientations (
-        tracked
         group = "Instancing"
         displayName = "Orientations"
         doc = "The rotation of each instance as an xyzw quaternion, stored in single precision. Empty leaves instances unrotated."
     )
     float3[] scales (
-        tracked
         group = "Instancing"
         displayName = "Scales"
         doc = "The scale of each instance along its prototype's axes. Empty leaves instances unscaled."
     )
     vector3f[] velocities (
-        tracked
         unit = meters
         group = "Motion"
         displayName = "Velocities"
         doc = "The velocity of each instance in meters per second, for motion blur. Rendering doesn't use it yet."
     )
     vector3f[] accelerations (
-        tracked
         group = "Motion"
         displayName = "Accelerations"
         doc = "The acceleration of each instance in meters per second squared, for motion blur. Rendering doesn't use it yet."
     )
     vector3f[] angularVelocities (
-        tracked
         group = "Motion"
         displayName = "Angular Velocities"
         doc = "The angular velocity of each instance in degrees per second, for motion blur. Rendering doesn't use it yet."
     )
     int64[] ids (
-        tracked
         group = "Instancing"
         displayName = "Ids"
         doc = "A stable id per instance, which invisibleIds and outputs use. Empty makes each instance's index its id."
     )
     int64[] invisibleIds (
-        tracked
         group = "Instancing"
         displayName = "Invisible Ids"
         doc = "Ids of instances that are not drawn."
     )
     primvars primvars (
-        tracked
         group = "Primvars"
         displayName = "Primvars"
         doc = "Primvars for the copies, packed as on gprims. A constant primvar applies to every copy, and any other interpolation holds one value per instance. Copies read them before their prototype's own, so displayColor here tints each instance."

@@ -19,7 +19,7 @@ set(_ernie_schema_units
     hertz
 )
 set(_ernie_schema_metadata_keys
-    "tracked|doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
+    "doc[ \t]*=|unit[ \t]*=|allowed[ \t]*=|enum[ \t]*=|group[ \t]*=|displayName[ \t]*=|enabledBy[ \t]*=|min[ \t]*=|max[ \t]*="
 )
 set(_ernie_schema_number "-?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
 
@@ -127,10 +127,7 @@ function(
     set(auto "")
     string(STRIP "${text}" text)
     while(NOT text STREQUAL "")
-        if(attribute AND text MATCHES "^(tracked)[ \t]*(,(.*))?$")
-            list(APPEND flags ${CMAKE_MATCH_1})
-            set(text "${CMAKE_MATCH_3}")
-        elseif(text MATCHES "^doc[ \t]*=[ \t]*\"([^\"\\\\]*)\"[ \t]*(,(.*))?$")
+        if(text MATCHES "^doc[ \t]*=[ \t]*\"([^\"\\\\]*)\"[ \t]*(,(.*))?$")
             set(doc "${CMAKE_MATCH_1}")
             set(text "${CMAKE_MATCH_3}")
         elseif(
@@ -230,7 +227,7 @@ function(
         else()
             message(
                 FATAL_ERROR
-                "${where}: expected tracked, doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
+                "${where}: expected doc, unit, allowed, enum, group, displayName, enabledBy, min, max, appliesTo or autoApplyTo, not ${text}"
             )
         endif()
         string(STRIP "${text}" text)
@@ -1446,7 +1443,6 @@ function(ernie_generate_schemas directory)
 
         set(count 1)
         set(first_column ${column_count})
-        set(stamps_gpu "")
         string(APPEND gpu_${family} "struct ${name}Data {\n")
         foreach(field IN LISTS columns)
             set(enabled ${enabled_${name}_${field}})
@@ -1480,16 +1476,10 @@ function(ernie_generate_schemas directory)
                 set(flags "ColumnFlags::None")
             endif()
             list(JOIN flags " | " flags)
-            set(stamp 0)
-            if("tracked" IN_LIST flags_${name}_${field})
-                string(APPEND stamps_gpu "    Paged<uint64_t> ${field}Stamp;\n")
-                set(stamp "offsetof(${name}Data, ${field}Stamp)")
-                math(EXPR count "${count} + 1")
-            endif()
             string(
                 APPEND columns_text
                 "    {\"${field}\", \"${attribute_${name}_${field}}\", ColumnType::${column}, ColumnRole::${role},\n"
-                "     ${flags}, offsetof(${name}Data, ${field}), ${stamp}, SchemaId::None,\n"
+                "     ${flags}, offsetof(${name}Data, ${field}), SchemaId::None,\n"
                 "     \"${doc_${name}_${field}}\", Unit::${unit_${name}_${field}}, ${tokens},\n"
                 "     \"${group_${name}_${field}}\", \"${display_${name}_${field}}\",\n"
                 "     float(${min_${name}_${field}}), float(${max_${name}_${field}}),\n"
@@ -1522,7 +1512,7 @@ function(ernie_generate_schemas directory)
         math(EXPR bytes "${count} * 8")
         string(
             APPEND gpu_${family}
-            "${stamps_gpu}    Paged<uint> prim;\n};\nERNIE_CHECK_SIZE(${name}Data, ${bytes});\n\n"
+            "    Paged<uint> prim;\n};\nERNIE_CHECK_SIZE(${name}Data, ${bytes});\n\n"
         )
         string(SUBSTRING "${name}" 0 1 first)
         string(SUBSTRING "${name}" 1 -1 others)

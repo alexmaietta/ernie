@@ -344,8 +344,6 @@ TEST(ColumnStoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
                   xformable.Pages(kXformableTranslate.index));
         EXPECT_EQ(data.schemas.xformable.prim.pages.address,
                   xformable.Pages(store.PrimsColumn(SchemaId::Xformable)));
-        EXPECT_EQ(data.schemas.xformable.translateStamp.pages.address,
-                  xformable.Pages(store.StampColumn(kXformableTranslate)));
         EXPECT_EQ(data.prims.world.pages.address, store.Prims().Pages(kPrimWorld));
     });
 }
@@ -353,6 +351,7 @@ TEST(ColumnStoreTest, SceneDataPointsEveryColumnAtItsPageTable) {
 TEST(ColumnStoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
     test::ForEachDevice([](device::Device& device) {
         ColumnStore store(device);
+        store.TrackRows(kXformableTranslate);
         store.SetCounts(4, 3);
         ColumnTable& prims = store.Prims();
         prims.Allocate(4);
@@ -385,12 +384,35 @@ TEST(ColumnStoreTest, ScatteredCellsStampTheirRowsAndWorlds) {
     });
 }
 
-TEST(ColumnStoreTest, UntrackedColumnsStampNothing) {
+TEST(ColumnStoreTest, ColumnsStampRowsOnlyOnceTracked) {
     test::ForEachDevice([](device::Device& device) {
         ColumnStore store(device);
         EXPECT_FALSE(store.Tracked(kSphereRadius));
         EXPECT_EQ(store.Stamps(kSphereRadius).stamps.address, 0u);
-        EXPECT_TRUE(store.Tracked(kXformableTranslate));
+        store.TrackRows(kSphereRadius);
+        store.TrackRows(kSphereRadius);
+        EXPECT_TRUE(store.Tracked(kSphereRadius));
+        EXPECT_FALSE(store.Tracked(kXformableTranslate));
+    });
+}
+
+TEST(ColumnStoreTest, TrackingAFilledTableKeepsItsCellsAndStampsEveryRowPublished) {
+    test::ForEachDevice([](device::Device& device) {
+        ColumnStore store(device);
+        ColumnTable& spheres = store.Schema(SchemaId::Sphere);
+        spheres.Allocate(300);
+        const std::vector<float> radii(300, 4.0f);
+        spheres.Stage(kSphereRadius.index, 0, Bytes(radii));
+        spheres.Flush();
+        const uint64_t layout = spheres.Layout();
+        store.SetStamp(7);
+        store.TrackRows(kSphereRadius);
+        EXPECT_NE(spheres.Layout(), layout);
+        EXPECT_EQ(Cells<float>(spheres.Read(kSphereRadius.index, 0, 300)), radii);
+        EXPECT_EQ(Cells<uint64_t>(spheres.Read(store.StampColumn(kSphereRadius), 0, 300)),
+                  std::vector<uint64_t>(300, 6));
+        EXPECT_EQ(store.Data().schemas.sphere.radius.pages.address,
+                  spheres.Pages(kSphereRadius.index));
     });
 }
 

@@ -115,16 +115,15 @@ void ResolveRows(uniform ResolveParams p) {
     uint at = row;
     for (uint depth = 0; at != kNoRow && depth < kMaxHierarchyDepth; ++depth) {
         const uint binding = BindingRow(scene, image.prim[at]);
-        inherited = inherited || Changed(image.visibilityStamp[at], p.since, p.until) ||
-                    Changed(image.purposeStamp[at], p.since, p.until) ||
-                    Changed(scene->schemas.materialBindingAPI.materialBindingStamp[binding],
-                            p.since, p.until);
+        inherited = inherited || Changed(p.visibilityStamps[at], p.since, p.until) ||
+                    Changed(p.purposeStamps[at], p.since, p.until) ||
+                    Changed(p.materialBindingStamps[binding], p.since, p.until);
         const uint x = p.tree.xform[at];
         if (!reset && x != kNoRow) {
-            transform = transform || Changed(xform.translateStamp[x], p.since, p.until) ||
-                        Changed(xform.orientStamp[x], p.since, p.until) ||
-                        Changed(xform.scaleStamp[x], p.since, p.until) ||
-                        Changed(xform.resetXformStackStamp[x], p.since, p.until);
+            transform = transform || Changed(p.translateStamps[x], p.since, p.until) ||
+                        Changed(p.orientStamps[x], p.since, p.until) ||
+                        Changed(p.scaleStamps[x], p.since, p.until) ||
+                        Changed(p.resetXformStackStamps[x], p.since, p.until);
             reset = xform.resetXformStack[x] != 0;
         }
         at = p.tree.parent[at];

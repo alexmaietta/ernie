@@ -2,44 +2,37 @@ api class LensDistortionAPI (
     doc = "How the lens bends rays away from the ideal projection. The camera's focal length, apertures and aperture offsets give the intrinsics, so only coefficients live here. An OpenCV calibration of a width by height image carries over with horizontalAperture = focalLength width / fx, verticalAperture = focalLength height / fy, horizontalApertureOffset = (width / 2 - cx) horizontalAperture / width and verticalApertureOffset = (cy - height / 2) verticalAperture / height."
 ) {
     token distortion:model = none (
-        tracked
         allowed = [none, brownConrady, kannalaBrandt, fTheta, lut]
         group = "Distortion"
         displayName = "Model"
         doc = "none keeps the ideal projection. brownConrady distorts a perspective image by its radius, as OpenCV's pinhole model does. kannalaBrandt maps the angle from the axis to the image radius, as OpenCV's fisheye model does, and reaches past 180 degrees. fTheta maps the angle from the axis to the image radius by a polynomial, as automotive f-theta lenses do, and also reaches past 180 degrees. lut reads every pixel's ray from lookup textures. Distortion bends perspective cameras only."
     )
     float4 distortion:radial = (0, 0, 0, 0) (
-        tracked
         group = "Distortion"
         displayName = "Radial"
         doc = "k1 to k4, scaling the radius by 1 + k1 x^2 + k2 x^4 + k3 x^6 + k4 x^8, where x is the undistorted image radius over the focal length under brownConrady, as in OpenCV's normalized coordinates, and the angle from the axis in radians under kannalaBrandt. OpenCV's pinhole model has no k4 here, so leave it 0."
     )
     float3 distortion:radialDivisor = (0, 0, 0) (
-        tracked
         group = "Distortion"
         displayName = "Radial Divisor"
         doc = "brownConrady's rational terms, dividing the radial scale by 1 + d1 r^2 + d2 r^4 + d3 r^6. They are OpenCV's k4, k5 and k6."
     )
     float2 distortion:tangential = (0, 0) (
-        tracked
         group = "Distortion"
         displayName = "Tangential"
         doc = "brownConrady's decentering coefficients p1 and p2."
     )
     float4 distortion:thinPrism = (0, 0, 0, 0) (
-        tracked
         group = "Distortion"
         displayName = "Thin Prism"
         doc = "brownConrady's thin-prism coefficients s1 to s4."
     )
     float[] distortion:fTheta (
-        tracked
         group = "Distortion"
         displayName = "F-Theta"
         doc = "fTheta's coefficients c0, c1, c2 and on, giving the image radius in millimeters as c0 + c1 a + c2 a^2 + ... for a ray at angle a in radians from the axis. The radius must grow with the angle up to maxFieldOfView. Empty is an equidistant lens, a radius of focalLength a."
     )
     float distortion:maxFieldOfView = 180 (
-        tracked
         unit = degrees
         group = "Distortion"
         displayName = "Max Field of View"
@@ -48,13 +41,11 @@ api class LensDistortionAPI (
         doc = "The widest kannalaBrandt and fTheta render. Film points mapping past it see nothing."
     )
     asset distortion:lutRayDirections = @@ (
-        tracked
         group = "Distortion"
         displayName = "Ray Directions"
         doc = "Under lut, an RGB image whose pixels hold the camera-space direction of the ray leaving the film there."
     )
     asset distortion:lutRayOrigins = @@ (
-        tracked
         group = "Distortion"
         displayName = "Ray Origins"
         doc = "Under lut, an RGB image whose red and green hold where on the film, from 0 to 1, the pixel's ray starts."
@@ -65,65 +56,55 @@ api class DetectorAPI (
     doc = "The camera's image sensor, what its pixels see of the spectrum and how they turn light into a signal. The values follow EMVA 1288, so a datasheet carries over one to one. Every camera has it built in, and only sensor pipelines whose nodes read them use them, so the display pipeline renders the same whatever they hold."
 ) {
     token detector:pattern = rgb (
-        tracked
         allowed = [mono, rgb, rggb, bggr, grbg, gbrg, rccb, rccc, bands]
         group = "Detector"
         displayName = "Pattern"
         doc = "The channels the pixels measure and how they're laid out. mono is one clear channel on every pixel. rgb is red, green and blue on every pixel, as an ideal or three-chip camera sees. rggb, bggr, grbg and gbrg are Bayer mosaics named by their top-left 2 by 2 block. rccb is red, clear and blue with clear on the diagonal, and rccc is red on one pixel of each block and clear on the rest, as automotive cameras use. bands is one channel per spectral band on every pixel, a multispectral camera."
     )
     float2 detector:spectralRange = (380, 780) (
-        tracked
         group = "Detector"
         displayName = "Spectral Range"
         doc = "The shortest and longest wavelengths in nanometers the camera renders, split evenly into its bands. Lights and materials are evaluated at the band centres."
     )
     float2[] detector:qe:red (
-        tracked
         group = "Quantum Efficiency"
         displayName = "Red"
         doc = "Wavelength and quantum efficiency pairs with increasing wavelengths in nanometers, the electrons a red pixel collects per photon reaching it, including its colour filter. Nothing is collected outside the first and last wavelength. Empty uses a typical Bayer red dye on silicon."
     )
     float2[] detector:qe:green (
-        tracked
         group = "Quantum Efficiency"
         displayName = "Green"
         doc = "Like red, for green pixels. Empty uses a typical Bayer green dye on silicon."
     )
     float2[] detector:qe:blue (
-        tracked
         group = "Quantum Efficiency"
         displayName = "Blue"
         doc = "Like red, for blue pixels. Empty uses a typical Bayer blue dye on silicon."
     )
     float2[] detector:qe:clear (
-        tracked
         group = "Quantum Efficiency"
         displayName = "Clear"
         doc = "Like red, for pixels without a colour filter, which mono, bands and the clear pixels of rccb and rccc have. Empty uses typical front-side illuminated silicon."
     )
     float detector:fullWell = 10000 (
-        tracked
         group = "Detector"
         displayName = "Full Well"
         min = 0
         doc = "The most electrons a pixel holds before it saturates, EMVA 1288's saturation capacity."
     )
     float detector:readNoise = 2 (
-        tracked
         group = "Noise"
         displayName = "Read Noise"
         min = 0
         doc = "The temporal dark noise in electrons rms, EMVA 1288's dark noise."
     )
     float detector:darkCurrent = 1 (
-        tracked
         group = "Noise"
         displayName = "Dark Current"
         min = 0
         doc = "Electrons per second a pixel collects in the dark at 20 degrees Celsius, EMVA 1288's dark current."
     )
     float detector:darkCurrentDoubling = 7 (
-        tracked
         unit = kelvin
         group = "Noise"
         displayName = "Dark Current Doubling"
@@ -131,7 +112,6 @@ api class DetectorAPI (
         doc = "How much warmer the sensor must get to double its dark current, EMVA 1288's doubling temperature."
     )
     float detector:temperature = 293.15 (
-        tracked
         unit = kelvin
         group = "Noise"
         displayName = "Temperature"
@@ -139,28 +119,24 @@ api class DetectorAPI (
         doc = "The sensor's temperature, which a simulation may write every step."
     )
     float detector:prnu = 0.005 (
-        tracked
         group = "Noise"
         displayName = "PRNU"
         min = 0
         doc = "The spread of the pixels' sensitivity as a fraction of their mean, EMVA 1288's photo response non-uniformity."
     )
     float detector:dsnu = 0.5 (
-        tracked
         group = "Noise"
         displayName = "DSNU"
         min = 0
         doc = "The spread of the pixels' dark signal in electrons, EMVA 1288's dark signal non-uniformity."
     )
     float detector:systemGain = 0.25 (
-        tracked
         group = "Conversion"
         displayName = "System Gain"
         min = 0
         doc = "Digital numbers per electron at ISO 100, EMVA 1288's overall system gain. exposure:iso scales it."
     )
     int detector:bitDepth = 12 (
-        tracked
         group = "Conversion"
         displayName = "Bit Depth"
         min = 1
@@ -168,14 +144,12 @@ api class DetectorAPI (
         doc = "The bits each digitized pixel has."
     )
     float detector:blackLevel = 0 (
-        tracked
         group = "Conversion"
         displayName = "Black Level"
         min = 0
         doc = "The digital numbers a pixel reads in the dark, EMVA 1288's dark signal offset."
     )
     int detector:seed = 0 (
-        tracked
         group = "Noise"
         displayName = "Seed"
         doc = "Picks which physical unit the fixed noise patterns come from. They follow the camera's stable id too, so two cameras differ unless they share both."
@@ -186,7 +160,6 @@ api class SensorAPI (
     doc = "When a sensor captures. A sensor with a frame rate captures at its start time and every period after, and Renderer::Step renders its products only in the steps that reach a capture. A sensor without one captures every step. Every sensor has it built in."
 ) {
     float sensor:frameRate = 0 (
-        tracked
         unit = hertz
         group = "Sensor"
         displayName = "Frame Rate"
@@ -194,7 +167,6 @@ api class SensorAPI (
         doc = "Captures per second of simulation time. 0 captures every step."
     )
     float sensor:startTime = 0 (
-        tracked
         unit = seconds
         group = "Sensor"
         displayName = "Start Time"
@@ -206,7 +178,6 @@ abstract class Sensor : Xformable, SensorAPI (
     doc = "A prim that captures the scene. Render products render sensors, and each kind of sensor shapes its own rays and outputs."
 ) {
     prim[] pipeline:binding (
-        tracked
         group = "Pipeline"
         displayName = "Pipeline"
         doc = "The SensorPipeline that processes this sensor's captures. Only the first target is used, and it isn't inherited by descendants. A camera without one runs the built-in display pipeline."
@@ -217,69 +188,59 @@ class Camera : Sensor, LensDistortionAPI, DetectorAPI (
     doc = "A camera looking down its local -z axis, with +y up, following UsdGeomCamera."
 ) {
     token projection = perspective (
-        tracked
         allowed = [perspective, orthographic, spherical]
         group = "Projection"
         displayName = "Projection"
         doc = "Perspective rays leave one point and spread by the focal length and apertures. Orthographic rays run parallel along -z from a film whose width and height are the apertures in tenths of a scene unit, as in USD. Spherical rays leave one point in an equirectangular grid, with the film's width spanning 360 degrees of azimuth and its height 180 degrees of elevation, so a 2 by 1 resolution keeps pixels square. Spherical ignores the focal length."
     )
     float focalLength = 50 (
-        tracked
         unit = millimeters
         group = "Projection"
         displayName = "Focal Length"
         doc = "Distance from the lens to the film. Orthographic cameras ignore it."
     )
     float horizontalAperture = 20.955 (
-        tracked
         unit = millimeters
         group = "Aperture"
         displayName = "Horizontal Aperture"
         doc = "Width of the film."
     )
     float verticalAperture = 15.2908 (
-        tracked
         unit = millimeters
         group = "Aperture"
         displayName = "Vertical Aperture"
         doc = "Height of the film."
     )
     float horizontalApertureOffset = 0 (
-        tracked
         unit = millimeters
         group = "Aperture"
         displayName = "Horizontal Aperture Offset"
         doc = "How far the film is shifted right of the lens axis, in the units of the aperture."
     )
     float verticalApertureOffset = 0 (
-        tracked
         unit = millimeters
         group = "Aperture"
         displayName = "Vertical Aperture Offset"
         doc = "How far the film is shifted up from the lens axis, in the units of the aperture."
     )
     float2 clippingRange = (1, 1000000) (
-        tracked
         unit = meters
         group = "Clipping"
         displayName = "Clipping Range"
         doc = "Nearest and farthest distances rendered along each ray, rather than USD's depth planes."
     )
     float4[] clippingPlanes (
-        tracked
         group = "Clipping"
         displayName = "Clipping Planes"
         doc = "Extra planes in camera space as (a, b, c, d). Points where a x + b y + c z + d is below 0 are clipped."
     )
     float fStop = 0 (
-        tracked
         group = "Depth of Field"
         displayName = "F-Stop"
         min = 0
         doc = "The lens aperture's f-number. 0 keeps everything in focus, as a pinhole does."
     )
     float focusDistance = 0 (
-        tracked
         unit = meters
         group = "Depth of Field"
         displayName = "Focus Distance"
@@ -287,21 +248,18 @@ class Camera : Sensor, LensDistortionAPI, DetectorAPI (
         doc = "Distance from the camera to the plane in sharpest focus."
     )
     float shutter:open = 0 (
-        tracked
         unit = seconds
         group = "Shutter"
         displayName = "Shutter Open"
         doc = "When the shutter opens, relative to the frame's time."
     )
     float shutter:close = 0 (
-        tracked
         unit = seconds
         group = "Shutter"
         displayName = "Shutter Close"
         doc = "When the shutter closes, relative to the frame's time. Equal to the opening, nothing blurs."
     )
     float shutter:readout = 0 (
-        tracked
         unit = seconds
         group = "Shutter"
         displayName = "Readout"
@@ -309,20 +267,17 @@ class Camera : Sensor, LensDistortionAPI, DetectorAPI (
         doc = "How long after the top row's exposure the bottom row's starts, as a rolling shutter reads rows in turn. Each row keeps the window from shutter:open to shutter:close, shifted by its share of the readout. 0 is a global shutter. Rendering doesn't move prims across the shutter yet, so it changes nothing."
     )
     float exposure = 0 (
-        tracked
         group = "Exposure"
         displayName = "Exposure"
         doc = "Exposure compensation in stops, scaling the image by 2 raised to it."
     )
     float exposure:iso = 100 (
-        tracked
         group = "Exposure"
         displayName = "ISO"
         min = 0
         doc = "The sensor's sensitivity, scaling the image by it over 100."
     )
     float exposure:time = 1 (
-        tracked
         unit = seconds
         group = "Exposure"
         displayName = "Exposure Time"
@@ -330,14 +285,12 @@ class Camera : Sensor, LensDistortionAPI, DetectorAPI (
         doc = "How long the sensor gathers light, scaling the image by it. Motion blur follows the shutter instead."
     )
     float exposure:fStop = 1 (
-        tracked
         group = "Exposure"
         displayName = "Exposure F-Stop"
         min = 0
         doc = "The f-number the exposure is computed with, scaling the image by one over its square. Depth of field follows fStop instead."
     )
     float exposure:responsivity = 1 (
-        tracked
         group = "Exposure"
         displayName = "Responsivity"
         min = 0
@@ -349,56 +302,48 @@ class Lidar : Sensor (
     doc = "A lidar firing a table of emitters, as ovrtx's generic lidar does. Each firing fires every emitter once at its own azimuth, elevation and time, and a scan is firingsPerScan firings. Like a camera it looks down -z with +y up. Azimuth turns from -z toward -x, counterclockwise seen from +y, and elevation tilts toward +y."
 ) {
     token scanType = rotary (
-        tracked
         allowed = [rotary, solidState]
         group = "Scan"
         displayName = "Scan Type"
         doc = "rotary turns the emitters across azimuthRange over a scan, so firings step evenly from its first azimuth to its second. solidState fires the emitters at their own azimuths every firing."
     )
     float2 azimuthRange = (-180, 180) (
-        tracked
         unit = degrees
         group = "Scan"
         displayName = "Azimuth Range"
         doc = "Where a rotary scan starts and ends. It turns counterclockwise when the second azimuth is larger and clockwise when it is smaller, so (-180, 180) is one full counterclockwise turn."
     )
     uint firingsPerScan = 1800 (
-        tracked
         group = "Scan"
         displayName = "Firings per Scan"
         min = 1
         doc = "Firings in one scan. A rotary lidar spreads them evenly across azimuthRange, so 1800 firings over a full turn step 0.2 degrees."
     )
     float[] emitter:elevations (
-        tracked
         unit = degrees
         group = "Emitters"
         displayName = "Elevations"
         doc = "Each emitter's elevation. Its length is the number of emitters."
     )
     float[] emitter:azimuths (
-        tracked
         unit = degrees
         group = "Emitters"
         displayName = "Azimuths"
         doc = "Each emitter's azimuth, added to the scan's azimuth on a rotary lidar. Emitters past its end fire at 0."
     )
     float[] emitter:fireTimes (
-        tracked
         unit = seconds
         group = "Emitters"
         displayName = "Fire Times"
         doc = "When each emitter fires, from the start of its firing. Emitters past its end fire at 0."
     )
     float2 range = (0.3, 120) (
-        tracked
         unit = meters
         group = "Returns"
         displayName = "Range"
         doc = "The nearest and farthest distances a return is reported at."
     )
     uint maxReturns = 1 (
-        tracked
         group = "Returns"
         displayName = "Max Returns"
         min = 1
@@ -406,14 +351,12 @@ class Lidar : Sensor (
         doc = "The most returns each emitter reports per firing, up to 4, as when its beam spreads across an edge and echoes off two surfaces. Each output holds this many returns per beam, with misses past the ones found."
     )
     token returnMode = strongest (
-        tracked
         allowed = [strongest, first, last, mean]
         group = "Returns"
         displayName = "Return Mode"
         doc = "Which returns a beam reports when it sees more than maxReturns. strongest keeps the most intense, first the nearest and last the farthest. mean averages every hit of the beam into one return."
     )
     float2 beam:divergence = (0, 0) (
-        tracked
         unit = degrees
         group = "Beam"
         displayName = "Divergence"
@@ -421,14 +364,12 @@ class Lidar : Sensor (
         doc = "The full horizontal and vertical angles each beam spreads over. 0 traces one ideal ray."
     )
     uint beam:samples = 1 (
-        tracked
         group = "Beam"
         displayName = "Samples"
         min = 1
         doc = "Rays traced across each beam's spread and merged into its returns."
     )
     float beam:wavelength = 905 (
-        tracked
         group = "Beam"
         displayName = "Wavelength"
         min = 1
@@ -440,7 +381,6 @@ class Radar : Sensor (
     doc = "A radar tracing a grid of rays across its field of view and reporting each hit's range, radial velocity and intensity. The intensity is the material's radar backscatter scaled by the cosine of the angle the ray strikes at. Radial velocity is how fast the hit point moves away from the radar, from the MotionAPI of both. Like a camera it looks down -z with +y up, and its rows run from the top of the field of view down while its columns run from left to right."
 ) {
     float2 fieldOfView = (120, 30) (
-        tracked
         unit = degrees
         group = "Scan"
         displayName = "Field of View"
@@ -448,20 +388,17 @@ class Radar : Sensor (
         doc = "The horizontal and vertical angles covered, centered on -z."
     )
     uint2 rays = (240, 60) (
-        tracked
         group = "Scan"
         displayName = "Rays"
         doc = "Rays traced across the field of view, horizontally and vertically. They set the shape of the radar's outputs."
     )
     float2 range = (0.5, 200) (
-        tracked
         unit = meters
         group = "Returns"
         displayName = "Range"
         doc = "The nearest and farthest distances a return is reported at."
     )
     float frequency = 77 (
-        tracked
         group = "Returns"
         displayName = "Frequency"
         min = 0.001

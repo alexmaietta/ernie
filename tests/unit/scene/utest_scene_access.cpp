@@ -64,6 +64,8 @@ std::vector<uint32_t> Interleaved(Structure& structure, uint32_t count) {
 template <class Test> void ForEachScene(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
+        store.TrackRows(kXformableTranslate);
+        store.TrackRows(kXformableOrient);
         Structure structure(store);
         test(device, store, structure);
     });

@@ -103,19 +103,16 @@ abstract class Connectable : Typed (
     doc = "A prim whose inputs and outputs can connect to other shading prims' outputs, as UsdShadeConnectableAPI does."
 ) {
     prim[] connections:sources (
-        tracked
         group = "Connections"
         displayName = "Sources"
         doc = "The shader each connection reads from, one per connected input."
     )
     token[] connections:inputs (
-        tracked
         group = "Connections"
         displayName = "Inputs"
         doc = "The input or output each connection drives, such as diffuseColor or surface, in the same order as sources."
     )
     token[] connections:outputs (
-        tracked
         group = "Connections"
         displayName = "Outputs"
         doc = "The output of the source each connection reads, such as rgb or r, in the same order as sources."
@@ -126,7 +123,6 @@ abstract class Shader : Connectable (
     doc = "A shading node. A built-in node names itself with info:id, and a node written in Slang also records the file and struct it came from."
 ) {
     token info:id (
-        tracked
         group = "Shader"
         displayName = "Shader Type"
         doc = "The node this shader runs."
@@ -160,7 +156,6 @@ class UsdUVTexture : Shader (
 ) {
     token info:id = UsdUVTexture
     asset inputs:file (
-        tracked
         group = "Texture"
         displayName = "File"
         doc = "The image to read."
@@ -171,7 +166,6 @@ class UsdUVTexture : Shader (
         doc = "The texture coordinate, usually connected to a primvar reader, a transform or a placement."
     )
     token inputs:wrapS = repeat (
-        tracked
         allowed = [repeat, mirror, clamp, black]
         enum = TextureWrapMode
         group = "Texture"
@@ -179,7 +173,6 @@ class UsdUVTexture : Shader (
         doc = "How coordinates outside 0 to 1 wrap horizontally. Black reads transparent black."
     )
     token inputs:wrapT = repeat (
-        tracked
         allowed = [repeat, mirror, clamp, black]
         enum = TextureWrapMode
         group = "Texture"
@@ -202,7 +195,6 @@ class UsdUVTexture : Shader (
         doc = "Added to each channel after scale. Normal maps use -1 and DirectX ones use 1 on green."
     )
     token inputs:sourceColorSpace = auto (
-        tracked
         allowed = [auto, raw, sRGB]
         enum = TextureColorSpace
         group = "Texture"
@@ -216,13 +208,11 @@ class SampledSpectrum : Shader (
 ) {
     token info:id = SampledSpectrum
     float[] inputs:wavelengths (
-        tracked
         group = "Spectrum"
         displayName = "Wavelengths"
         doc = "Increasing wavelengths in nanometers."
     )
     float[] inputs:values (
-        tracked
         group = "Spectrum"
         displayName = "Values"
         doc = "The value at each wavelength, a reflectance from 0 to 1 for surface colours."
@@ -234,7 +224,6 @@ class UsdPrimvarReader_float2 : Shader (
 ) {
     token info:id = UsdPrimvarReader_float2
     token inputs:varname = st (
-        tracked
         group = "Primvar"
         displayName = "Primvar"
         doc = "The primvar to read."
@@ -278,7 +267,6 @@ class ItuMaterial : Shader (
 ) {
     token info:id = ItuMaterial
     token inputs:material = concrete (
-        tracked
         allowed = [vacuum, concrete, brick, plasterboard, wood, glass, ceilingBoard, chipboard, plywood, marble, floorboard, metal, veryDryGround, mediumDryGround, wetGround]
         enum = ItuMaterialKind
         group = "Radar"
@@ -286,7 +274,6 @@ class ItuMaterial : Shader (
         doc = "The P.2040 material, whose permittivity and conductivity follow the radar's frequency."
     )
     float inputs:rmsHeight = 0.001 (
-        tracked
         unit = meters
         group = "Radar"
         displayName = "RMS Height"
@@ -294,7 +281,6 @@ class ItuMaterial : Shader (
         doc = "The surface's RMS height at radar scale."
     )
     float inputs:correlationLength = 0.01 (
-        tracked
         unit = meters
         group = "Radar"
         displayName = "Correlation Length"

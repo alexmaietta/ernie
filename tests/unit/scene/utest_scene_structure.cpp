@@ -47,6 +47,7 @@ std::vector<std::string> Paths(std::string_view prefix, uint32_t count) {
 template <class Test> void ForEachCatalog(Test test) {
     test::ForEachDevice([&](device::Device& device) {
         ColumnStore store(device);
+        store.TrackRows(kXformableTranslate);
         Structure structure(store);
         test(store, structure);
     });
@@ -108,7 +109,7 @@ TEST(StructureTest, BroadcastValuesLandOnEveryPrimWhetherStagedOrFilled) {
     });
 }
 
-TEST(StructureTest, DefiningStampsTrackedRowsAndTheirWorld) {
+TEST(StructureTest, DefiningStampsRowsAndTheirWorld) {
     ForEachCatalog([](ColumnStore& store, Structure& structure) {
         store.SetStamp(7);
         const std::vector<std::string> paths = Paths("/Ball", 3);

@@ -113,6 +113,7 @@ TEST(PublisherTest, OrdinalsOnlyMoveForward) {
 
 TEST(PublisherTest, ChangesHoldExactlyTheRowsWrittenBetweenOrdinals) {
     ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
+        structure.GetColumnStore().TrackRows(kXformableTranslate);
         const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 6));
         const View view(structure, SchemaId::Sphere, block);
         publisher.Publish(10);
@@ -139,6 +140,21 @@ TEST(PublisherTest, ChangesHoldExactlyTheRowsWrittenBetweenOrdinals) {
         const ChangeSet none = publisher.Changes(20, columns);
         EXPECT_TRUE(none.Rows(kXformableTranslate)->ToHost().empty());
         EXPECT_TRUE(none.worlds.empty());
+    });
+}
+
+TEST(PublisherTest, RowsTrackedLateCountAsChangedSinceAnyOrdinal) {
+    ForEachTimeline([](device::Device&, Structure& structure, Publisher& publisher) {
+        const PrimBlock block = structure.Define(SchemaId::Sphere, Paths("/Ball", 3));
+        publisher.Publish(10);
+        View(structure, SchemaId::Sphere, block).Get<float>(kSphereRadius).Set(2.0f);
+        publisher.Publish(20);
+        const std::vector<ColumnRef> columns = {kSphereRadius};
+        EXPECT_FALSE(structure.GetColumnStore().Tracked(kSphereRadius));
+        const ChangeSet late = publisher.Changes(10, columns);
+        EXPECT_TRUE(structure.GetColumnStore().Tracked(kSphereRadius));
+        ASSERT_NE(late.Rows(kSphereRadius), nullptr);
+        EXPECT_EQ(late.Rows(kSphereRadius)->ToHost().size(), 3u);
     });
 }
 
