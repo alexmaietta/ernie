@@ -72,6 +72,15 @@ struct TraceStack {
     }
 }
 
+uint4 LoadBvh(uint4* at) {
+    __target_switch {
+    case cuda:
+        __intrinsic_asm "__ldg((const uint4*)($0))";
+    default:
+        return loadAligned<16>(at);
+    }
+}
+
 uint NodeByte(uint low, uint high, uint slot) {
     return ((slot < 4 ? low : high) >> ((slot & 3) * 8)) & 0xFF;
 }
@@ -90,6 +99,28 @@ float SafeInverse(float d) {
     return 1.0f / (abs(d) < 1e-20f ? (d < 0 ? -1e-20f : 1e-20f) : d);
 }
 
+struct BvhSummary {
+    uint primitives;
+    uint nodeCount;
+    uint kind;
+    uint64_t leaves;
+
+    __init(BvhHeader* bvh) {
+        uint4* words = (uint4*)bvh;
+        const uint4 bounds = LoadBvh(words);
+        const uint4 offsets = LoadBvh(words + 2);
+        const uint4 counts = LoadBvh(words + 3);
+        primitives = bounds.w;
+        leaves = uint64_t(offsets.z) | uint64_t(offsets.w) << 32;
+        nodeCount = counts.x;
+        kind = counts.z;
+    }
+
+    bool Empty() {
+        return primitives == 0 || nodeCount == 0;
+    }
+}
+
 struct BvhLevel {
     uint4* nodes;
     uint4* records;
@@ -99,11 +130,11 @@ struct BvhLevel {
     bool3 flip;
     uint octant;
 
-    __init(BvhHeader* bvh, Ray ray) {
-        nodes = (uint4*)((uint*)bvh + uint(bvh.nodes / 4));
-        records = (uint4*)((uint*)bvh + uint(bvh.leaves / 4));
-        words = BvhRecordWords(bvh.kind);
-        kind = bvh.kind;
+    __init(BvhHeader* bvh, BvhSummary summary, Ray ray) {
+        nodes = (uint4*)((uint*)bvh + kBvhHeaderBytes / 4);
+        records = (uint4*)((uint*)bvh + uint(summary.leaves / 4));
+        words = BvhRecordWords(summary.kind);
+        kind = summary.kind;
         inverse = float3(SafeInverse(ray.direction.x), SafeInverse(ray.direction.y),
                          SafeInverse(ray.direction.z));
         flip = inverse < 0;
@@ -112,11 +143,11 @@ struct BvhLevel {
 
     void Test(uint node, Ray ray, float far, out uint internal, out uint leaves, out uint4 q1) {
         uint4* at = nodes + node * 5;
-        const uint4 q0 = loadAligned<16>(at);
-        q1 = loadAligned<16>(at + 1);
-        const uint4 q2 = loadAligned<16>(at + 2);
-        const uint4 q3 = loadAligned<16>(at + 3);
-        const uint4 q4 = loadAligned<16>(at + 4);
+        const uint4 q0 = LoadBvh(at);
+        q1 = LoadBvh(at + 1);
+        const uint4 q2 = LoadBvh(at + 2);
+        const uint4 q3 = LoadBvh(at + 3);
+        const uint4 q4 = LoadBvh(at + 4);
         const float3 scale = float3(NodeScale(q0.w, 0), NodeScale(q0.w, 1), NodeScale(q0.w, 2));
         const float3 step = scale * inverse;
         const float3 start = (asfloat(q0.xyz) - ray.origin) * inverse;
@@ -147,10 +178,10 @@ struct BvhLevel {
 }
 
 BvhInstance LoadInstance(uint4* record) {
-    const uint4 r0 = loadAligned<16>(record);
-    const uint4 r1 = loadAligned<16>(record + 1);
-    const uint4 r2 = loadAligned<16>(record + 2);
-    const uint4 r3 = loadAligned<16>(record + 3);
+    const uint4 r0 = LoadBvh(record);
+    const uint4 r1 = LoadBvh(record + 1);
+    const uint4 r2 = LoadBvh(record + 2);
+    const uint4 r3 = LoadBvh(record + 3);
     BvhInstance instance;
     instance.blas = uint64_t(r0.x) | uint64_t(r0.y) << 32;
     instance.toObject = { asfloat(r0.z), asfloat(r0.w), asfloat(r1.x), asfloat(r1.y),
@@ -195,9 +226,9 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
 
     [mutating]
     bool TestTriangle(uint4* record) {
-        const uint4 c = loadAligned<16>(record);
-        const uint4 b = loadAligned<16>(record + 1);
-        const uint4 a = loadAligned<16>(record + 2);
+        const uint4 c = LoadBvh(record);
+        const uint4 b = LoadBvh(record + 1);
+        const uint4 a = LoadBvh(record + 2);
         const float3 edgeC = asfloat(c.xyz);
         const float3 edgeB = asfloat(b.xyz);
         const TriangleTest test = IntersectTriangle(query.ray, asfloat(a.xyz), edgeB, edgeC);
@@ -260,11 +291,12 @@ struct SoftwareTracer : ITracer {
         BvhHeader* bvh = (BvhHeader*)accel;
         const TraceQuery<F, I> query = { ray, mask, filter, intersector };
         BlasVisitor<F, I> visitor = { query, 0, 0, Miss(query.ray), any };
-        if (bvh.primitives == 0 || bvh.nodeCount == 0) {
+        const BvhSummary top = BvhSummary(bvh);
+        if (top.Empty()) {
             return visitor.nearest;
         }
-        BvhLevel level = BvhLevel(bvh, query.ray);
-        const bool instanced = bvh.kind == kBvhInstances;
+        BvhLevel level = BvhLevel(bvh, top, query.ray);
+        const bool instanced = top.kind == kBvhInstances;
         TraceStack stack;
         uint depth = 0;
         uint floor = instanced ? kTopLevel : 0;
@@ -294,7 +326,7 @@ struct SoftwareTracer : ITracer {
             if (instanced && floor != kTopLevel && depth == floor) {
                 floor = kTopLevel;
                 visitor.query.ray = stack.RestoreRay(visitor.query.ray);
-                level = BvhLevel(bvh, visitor.query.ray);
+                level = BvhLevel(bvh, BvhSummary(bvh), visitor.query.ray);
             }
             if (depth == 0) {
                 return visitor.nearest;
@@ -314,19 +346,19 @@ struct SoftwareTracer : ITracer {
             }
             const BvhInstance instance = LoadInstance(level.records + record);
             BvhHeader* blas = (BvhHeader*)instance.blas;
-            if (((instance.custom >> 24) & query.mask) == 0 || blas.primitives == 0 ||
-                blas.nodeCount == 0) {
+            const BvhSummary inner = BvhSummary(blas);
+            if (((instance.custom >> 24) & query.mask) == 0 || inner.Empty()) {
                 continue;
             }
             visitor.instance = instance.custom & 0xFFFFFF;
             visitor.facing = instance.index >> 24;
             stack.SaveRay(visitor.query.ray);
             visitor.query.ray = ToObject(instance, visitor.query.ray);
-            level = BvhLevel(blas, visitor.query.ray);
+            level = BvhLevel(blas, inner, visitor.query.ray);
             floor = depth;
             node = 0;
-            visiting = blas.primitives > kBvhLeafSize;
-            if (!visiting && visitor.Visit(level.records, blas.primitives, level.kind)) {
+            visiting = inner.primitives > kBvhLeafSize;
+            if (!visiting && visitor.Visit(level.records, inner.primitives, level.kind)) {
                 return visitor.nearest;
             }
         }
