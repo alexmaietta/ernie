@@ -48,6 +48,33 @@ struct MotionParams {
 
 ERNIE_CHECK_SIZE(MotionParams, 24);
 
+struct FollowState {
+    Float3 high;
+    uint target;
+    Float3 low;
+    uint settled;
+    Float4 orient;
+};
+
+ERNIE_CHECK_SIZE(FollowState, 48);
+
+struct FollowParams {
+    HierarchyTree tree;
+    Ptr<AuthoredData> scene;
+    Ptr<WorldTransform> transforms;
+    Ptr<uint> rows;
+    Ptr<uint> owners;
+    Ptr<FollowState> states;
+    uint first;
+    uint count;
+    float dt;
+    uint snap;
+    uint zero;
+    uint padding;
+};
+
+ERNIE_CHECK_SIZE(FollowParams, 104);
+
 static const uint kHierarchyGroup = 64;
 static const uint kMaxHierarchyDepth = 256;
 

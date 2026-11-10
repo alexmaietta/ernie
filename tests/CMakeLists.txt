@@ -155,6 +155,7 @@ ernie_test(
         unit/scene/utest_scene_access.cpp
         unit/scene/utest_scene_attachment.cpp
         unit/scene/utest_scene_bounds.cpp
+        unit/scene/utest_scene_follow.cpp
         unit/scene/utest_scene_structure.cpp
         unit/scene/utest_scene_meshes.cpp
         unit/scene/utest_scene_points.cpp

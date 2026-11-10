@@ -67,7 +67,7 @@ std::string Rebased(const std::string& target, const std::string& from, std::str
 SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc)
     : m_scene(scene), m_device(&device), m_waitForKernels(desc.waitForKernels), m_store(device),
       m_structure(m_store), m_publisher(m_structure, &m_header),
-      m_builder(bvh::Builder::Create(device, desc.traversal)), m_transforms(m_structure),
+      m_builder(bvh::Builder::Create(device, desc.traversal)), m_transforms(m_structure, &m_clock),
       m_meshes(m_structure, *m_builder),
       m_points(m_structure, *m_builder, desc.maxRefits, desc.pointsPerBox),
       m_bounds(m_structure, m_header.Tables(), m_instances), m_tangents(m_structure, m_meshes),

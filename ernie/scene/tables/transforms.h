@@ -7,9 +7,11 @@
 #include <vector>
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/commands.h"
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/scene/records/transforms.h"
+#include "ernie/scene/tables/kernels/transforms.h"
 #include "ernie/scene/tables/regions.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
@@ -17,9 +19,11 @@
 
 namespace ernie {
 
+struct SimulationClock;
+
 class TransformTable : public RenderTable {
   public:
-    explicit TransformTable(Structure& structure);
+    explicit TransformTable(Structure& structure, const SimulationClock* clock = nullptr);
 
     std::string_view Name() const override {
         return "hierarchy";
@@ -31,6 +35,14 @@ class TransformTable : public RenderTable {
     void Hold(std::vector<Ref<const RefCounted>>& held) const override;
     void Prepare() override;
     void Run(const ChangeSet& changes, TableVersions& versions) override;
+
+    bool Pending() const override {
+        return m_follows.lagged;
+    }
+
+    uint32_t Followers() const {
+        return uint32_t(m_follows.frames.size());
+    }
 
     uint32_t Segments() const {
         return m_segments.Size();
@@ -53,12 +65,25 @@ class TransformTable : public RenderTable {
     }
 
   private:
+    struct FollowPlan {
+        std::vector<uint32_t> frames;
+        std::vector<uint32_t> frameStarts;
+        std::vector<uint32_t> owned;
+        std::vector<uint32_t> owners;
+        std::vector<uint32_t> ownedStarts;
+        std::vector<uint32_t> worlds;
+        bool lagged = false;
+    };
+
     void Rebuild();
+    void PlanFollows();
+    void RecordFollows(device::CommandEncoder& encoder, const ResolveParams& resolved);
     void WriteMotions(bool restructured);
     bool Apply(const ChangeSet& changes);
     uint32_t ParentRow(uint32_t prim) const;
 
     Structure& m_structure;
+    const SimulationClock* m_clock = nullptr;
     device::Program& Kernels();
 
     Ref<device::Program> m_program;
@@ -73,6 +98,14 @@ class TransformTable : public RenderTable {
     DeviceTable<ResolvedImageable> m_imageables{"imageables"};
     DeviceTable<MotionRecord> m_motions{"motion records"};
     uint64_t m_motionSeen = 0;
+    FollowPlan m_follows;
+    Ref<device::Buffer> m_followRows;
+    Ref<device::Buffer> m_followOwners;
+    DeviceTable<FollowState> m_followStates{"follow states"};
+    uint64_t m_followSeen = 0;
+    uint64_t m_clockSteps = 0;
+    uint64_t m_clockResets = 0;
+    double m_clockEnd = 0;
     bool m_built = false;
     uint64_t m_seen = 0;
     uint32_t m_dispatched = 0;

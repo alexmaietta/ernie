@@ -122,6 +122,97 @@ api class PrototypeAPI (
     )
 }
 
+api class FollowAPI (
+    appliesTo = [Xformable]
+    doc = "Places a prim by another prim's world transform instead of its parent's. The follow frame takes its position and orientation from the target, as the translate and rotate modes pick, then the offset, lag and weight apply, and the prim's own transform composes on top. Followers may follow followers, and a cycle of them follows nothing."
+) {
+    prim[] ernie:follow:target (
+        group = "Follow"
+        displayName = "Target"
+        doc = "The Xformable prim to follow. Only the first target is used, and without one the prim follows its parent as usual."
+    )
+    prim[] ernie:follow:lookAt (
+        group = "Follow"
+        displayName = "Look At"
+        doc = "The prim rotate mode lookAt aims at. Only the first target is used."
+    )
+    token ernie:follow:translate = inherit (
+        allowed = [inherit, none]
+        enum = FollowTranslate
+        group = "Follow"
+        displayName = "Translate"
+        doc = "Where the follow frame's position comes from. inherit takes the target's and none the parent's."
+    )
+    token ernie:follow:rotate = inherit (
+        allowed = [inherit, yaw, none, lookAt]
+        enum = FollowRotate
+        group = "Follow"
+        displayName = "Rotate"
+        doc = "Where the follow frame's orientation comes from. inherit takes the target's, yaw only its heading about world +z, none the parent's, and lookAt aims the frame's -z at lookAt with +y toward up."
+    )
+    token ernie:follow:up = world (
+        allowed = [world, target]
+        enum = FollowUp
+        group = "Follow"
+        displayName = "Up"
+        doc = "The up direction lookAt keeps. world is +z and target the target's own +z, so a rolling target rolls the aim."
+    )
+    bool ernie:follow:inheritScale = false (
+        group = "Follow"
+        displayName = "Inherit Scale"
+        doc = "Takes the target's scale instead of the parent's."
+    )
+    float3 ernie:follow:offset:translate = (0, 0, 0) (
+        unit = meters
+        group = "Follow Offset"
+        displayName = "Translate"
+        doc = "Where the follow frame sits in the target's frame, such as behind and above it for a chase camera. lookAt aims from here."
+    )
+    quatd ernie:follow:offset:orient = (0, 0, 0, 1) (
+        group = "Follow Offset"
+        displayName = "Orient"
+        doc = "A rotation after the follow frame's, as a unit quaternion in xyzw order."
+    )
+    float3 ernie:follow:offset:scale = (1, 1, 1) (
+        group = "Follow Offset"
+        displayName = "Scale"
+        doc = "Scale along each axis of the follow frame, times the scale it takes."
+    )
+    float3 ernie:follow:lookAtOffset:translate = (0, 0, 0) (
+        unit = meters
+        group = "Follow Offset"
+        displayName = "Look At Translate"
+        doc = "The point lookAt aims at, in the lookAt prim's own frame."
+    )
+    float3 ernie:follow:positionLag = (0, 0, 0) (
+        unit = seconds
+        group = "Follow Lag"
+        displayName = "Position Lag"
+        doc = "How long the position takes to close about 63% of the way to the follow frame along each of its axes. 0 follows rigidly."
+    )
+    float ernie:follow:rotationLag = 0 (
+        unit = seconds
+        group = "Follow Lag"
+        displayName = "Rotation Lag"
+        min = 0
+        doc = "How long the orientation takes to close about 63% of the way to the follow frame's. 0 follows rigidly."
+    )
+    float ernie:follow:lagMaxDistance = 0 (
+        unit = meters
+        group = "Follow Lag"
+        displayName = "Lag Max Distance"
+        min = 0
+        doc = "The farthest the lagging position trails the follow frame. 0 leaves it unlimited."
+    )
+    float ernie:follow:weight = 1 (
+        group = "Follow"
+        displayName = "Weight"
+        min = 0
+        max = 1
+        doc = "Blends from the parent's frame at 0 to the follow frame at 1."
+    )
+}
+
 abstract class Xformable : Imageable (
     doc = "A prim with a transform relative to its parent."
 ) {
