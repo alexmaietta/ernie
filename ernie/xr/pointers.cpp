@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <numbers>
 #include <vector>
 
@@ -50,32 +49,8 @@ template <class T> std::vector<T> Read(const device::Tensor& tensor) {
 
 }
 
-void RigState::MirrorParent() {
-    if (!parentPath) {
-        return;
-    }
-    if (readingParent && parentRead.Ready()) {
-        readingParent = false;
-        WorldTransform world;
-        std::memcpy(&world, parentRead.Bytes().data(), sizeof(world));
-        const auto axis = [](Float3 v) {
-            const double length =
-                std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z);
-            return length > 0 ? Double3{v.x / length, v.y / length, v.z / length}
-                              : Double3{0, 0, 0};
-        };
-        parentRotation = FromAxes(axis(world.x), axis(world.y), axis(world.z));
-        parentPosition = {double(world.high.x) + world.low.x, double(world.high.y) + world.low.y,
-                          double(world.high.z) + world.low.z};
-    }
-    if (!readingParent && scene->Published() > 0) {
-        parentRead = scene->ReadWorldTransformsAsync(std::vector<std::string>{*parentPath});
-        readingParent = true;
-    }
-}
-
 Quatd RigState::WorldRotation() const {
-    return Multiply(parentRotation, rootPose.orientation);
+    return Multiply(frameRotation, rootPose.orientation);
 }
 
 RayHits RigState::Cast(const std::vector<float>& origins, const std::vector<float>& steps,
@@ -250,7 +225,7 @@ Pose Rig::WorldPose(const Pose& pose) const {
         Add(state.rootPose.position,
             Scale(Rotate(state.rootPose.orientation, pose.position), state.userScale));
     Pose world = pose;
-    world.position = Add(state.parentPosition, Rotate(state.parentRotation, local));
+    world.position = Add(state.framePosition, Rotate(state.frameRotation, local));
     world.orientation = Multiply(state.WorldRotation(), pose.orientation);
     return world;
 }

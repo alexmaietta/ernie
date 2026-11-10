@@ -59,10 +59,17 @@ bool Rig::TeleportTo(const Frame& frame, const PointerHit& hit) {
     if (!hit.valid) {
         return false;
     }
+    RigState& state = *m_state;
+    const std::optional<Prim> onto = state.HitBody(hit);
+    const bool stays =
+        onto ? state.body && state.body->Index() == onto->Index() : !state.body.has_value();
+    if (!stays) {
+        state.Reframe(frame, hit, onto);
+        return true;
+    }
     const Double3 head = HeadPosition(frame);
-    m_state->ground.reset();
-    m_state->Offset(
-        {hit.localPosition.x - head.x, hit.localPosition.y - head.y, hit.localPosition.z});
+    state.ground.reset();
+    state.Offset({hit.localPosition.x - head.x, hit.localPosition.y - head.y, hit.localPosition.z});
     return true;
 }
 

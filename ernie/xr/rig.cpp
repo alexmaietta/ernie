@@ -77,8 +77,12 @@ void Rig::Update(const Frame& frame) {
         }
     }
     state.lastFrame = frame;
-    state.MirrorParent();
+    state.MirrorFrame();
     state.Land();
+    if (state.cameraPending) {
+        state.LandOnCamera(frame);
+    }
+    state.HoldHeight(frame);
     const bool any = state.wanted[kLaser][0] || state.wanted[kLaser][1] ||
                      state.wanted[kTeleport][0] || state.wanted[kTeleport][1];
     if (any) {

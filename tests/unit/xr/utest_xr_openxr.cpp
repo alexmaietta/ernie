@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include <gtest/gtest.h>
 
@@ -18,6 +20,10 @@ namespace ernie::xr {
 namespace {
 
 std::unique_ptr<Session> OpenRuntime() {
+    const char* wanted = std::getenv("ERNIE_TEST_OPENXR");
+    if (wanted == nullptr || std::string_view(wanted) != "1") {
+        return nullptr;
+    }
     SessionDesc desc;
     desc.backend = Backend::OpenXR;
     desc.resolutionScale = 0.1f;
@@ -53,7 +59,7 @@ Ref<Scene> BallAhead(device::Device& device) {
 TEST(OpenXrTest, PresentsFramesOnTheRuntimesDevice) {
     const std::unique_ptr<Session> session = OpenRuntime();
     if (!session) {
-        GTEST_SKIP() << "no OpenXR runtime with a headset is active";
+        GTEST_SKIP() << "set ERNIE_TEST_OPENXR=1 with an OpenXR runtime running";
     }
     const Ref<device::Device> device = session->CreateDevice();
     EXPECT_EQ(device->Adapter().backend, device::Backend::Vulkan);
@@ -74,7 +80,7 @@ TEST(OpenXrTest, PresentsFramesOnTheRuntimesDevice) {
 TEST(OpenXrTest, StagesEyesRenderedOnAnotherDevice) {
     const std::unique_ptr<Session> session = OpenRuntime();
     if (!session) {
-        GTEST_SKIP() << "no OpenXR runtime with a headset is active";
+        GTEST_SKIP() << "set ERNIE_TEST_OPENXR=1 with an OpenXR runtime running";
     }
     const Ref<device::Device> headset = session->CreateDevice();
     const Ref<device::Device> render =

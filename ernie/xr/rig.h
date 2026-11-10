@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,16 @@ struct LocomotionDesc {
     double speed = 1.5;
     double flySpeed = 3;
     bool floorAligned = true;
+    std::vector<Prim> bodies;
+};
+
+enum class Anchor : uint32_t { Origin, Camera, Prim, Follow, FollowSmoothed };
+
+struct AnchorDesc {
+    Anchor mode = Anchor::Origin;
+    std::string target;
+    float smoothing = 0.3f;
+    std::optional<double> fixedHeight;
 };
 
 class Session;
@@ -89,6 +100,10 @@ class ERNIE_XR_API Rig {
     void Move(const Frame& frame, Float2 stick, float rise = 0);
     void SetUserScale(double scale);
     double UserScale() const;
+
+    void SetAnchor(const AnchorDesc& desc);
+    const AnchorDesc& GetAnchor() const;
+    std::optional<Prim> Body() const;
 
   private:
     std::shared_ptr<RigState> m_state;

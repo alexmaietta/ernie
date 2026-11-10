@@ -59,10 +59,15 @@ struct RigState {
     double userScale = 1;
 
     std::optional<std::string> parentPath;
-    Quatd parentRotation;
-    Double3 parentPosition;
-    device::Download parentRead;
-    bool readingParent = false;
+    Quatd frameRotation;
+    Double3 framePosition;
+    device::Download frameRead;
+    std::string readingFrame;
+
+    AnchorDesc anchor;
+    std::optional<Prim> anchorTarget;
+    std::optional<Prim> body;
+    bool cameraPending = false;
 
     std::unique_ptr<RayCaster> caster;
     PointerDesc pointers;
@@ -73,7 +78,16 @@ struct RigState {
     std::optional<PointerBatch> latest;
     std::optional<GroundCast> ground;
 
-    void MirrorParent();
+    std::optional<std::string> FramePath() const;
+    bool FrameYaw() const;
+    void AdoptFrame(const WorldTransform& world);
+    void MirrorFrame();
+    void ReadFrame();
+    void Follow(const std::optional<Prim>& target, bool yaw, bool scaled, float lag);
+    void LandOnCamera(const Frame& frame);
+    void HoldHeight(const Frame& frame);
+    std::optional<Prim> HitBody(const PointerHit& hit) const;
+    void Reframe(const Frame& frame, const PointerHit& hit, const std::optional<Prim>& onto);
     Quatd WorldRotation() const;
     RayHits Cast(const std::vector<float>& origins, const std::vector<float>& steps,
                  RayOutput outputs);
