@@ -132,6 +132,9 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
+if(NOT ERNIE_BUILD_XR)
+    list(REMOVE_ITEM ernie_viewer_files ernie/app/viewer/panels/xr.cpp)
+endif()
 ernie_check_includes(ernie/app ${ernie_viewer_files})
 
 if(ERNIE_BUILD_PYTHON)
