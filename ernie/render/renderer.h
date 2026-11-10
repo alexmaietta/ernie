@@ -32,6 +32,7 @@ class ERNIE_API Renderer {
     Renderer& operator=(Renderer&&) noexcept;
 
     RenderOutput Step(Span<const std::string> products, double dt, Stream stream = Stream::None());
+    RenderOutput Step(std::string_view product, double dt, Stream stream = Stream::None());
 
     const Ref<Overlays>& GetOverlays() const;
 

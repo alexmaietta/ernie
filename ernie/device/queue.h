@@ -53,7 +53,6 @@ class ERNIE_API Queue {
     void Write(BufferRange dst, const void* data);
     BufferRange Upload(const void* data, uint64_t bytes);
 
-    // Uploads one whole level of dst from Texture::LevelBytes of tightly packed texels.
     void Write(Texture& dst, uint32_t level, const void* data);
 
     Download ReadAsync(BufferRange src);

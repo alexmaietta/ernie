@@ -193,13 +193,7 @@ Setup Prepare(const Mode& mode, Motion motion, const Shape& shape, device::Trave
         scene->Define<Camera>(fmt::format("/env_0/Cam_{}", c),
                               {.translate = eye, .orient = LookAt(eye, {0, 0, 0.5})});
     }
-    std::vector<std::string> targets;
-    for (uint32_t w = 1; w < shape.worlds; ++w) {
-        targets.push_back(fmt::format("/env_{}", w));
-    }
-    if (!targets.empty()) {
-        scene->Clone(*scene->Find("/env_0"), targets);
-    }
+    scene->Clone(*scene->Find("/env_0"), shape.worlds - 1);
     scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
     scene->Define<Scope>("/Render");
     for (const auto& [source, path] : kVars) {

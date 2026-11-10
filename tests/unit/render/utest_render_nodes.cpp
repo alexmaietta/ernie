@@ -81,7 +81,7 @@ Ref<Scene> LookingDown(Device& device, bool wait) {
 }
 
 Float3 Center(Renderer& renderer) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+    RenderOutput output = renderer.Step("/Render/View", 0);
     output.Wait();
     const std::vector<float> color =
         output["/Render/View"].frames.at(0).Source("HdrColor").tensor.ToHost<float>();

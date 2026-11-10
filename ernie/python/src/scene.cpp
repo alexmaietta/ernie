@@ -764,6 +764,20 @@ void RegisterScene(nb::module_& module) {
             nb::arg("source"), nb::arg("targets"), nb::kw_only(), nb::arg("move_source") = false,
             nb::arg("attachable") = false)
         .def(
+            "clone",
+            [](Ref<Scene> scene, const ScenePrim& source, uint32_t count, bool moveSource,
+               bool attachable) {
+                const PrimRange copies = scene->Clone(
+                    source.prim, count, {.moveSource = moveSource, .attachable = attachable});
+                std::vector<ScenePrim> roots;
+                for (uint32_t copy = 0; copy < copies.copies; ++copy) {
+                    roots.push_back({scene, scene->ByIndex(copies.Index(copy, 0))});
+                }
+                return roots;
+            },
+            nb::arg("source"), nb::arg("count"), nb::kw_only(), nb::arg("move_source") = false,
+            nb::arg("attachable") = false)
+        .def(
             "publish",
             [](Scene& scene, std::optional<Ordinal> ordinal, std::optional<uintptr_t> stream,
                bool wait, std::optional<double> dt) {

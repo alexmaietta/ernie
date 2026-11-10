@@ -948,6 +948,11 @@ RenderOutput Renderer::Step(Span<const std::string> products, double dt, Stream 
     return m_impl->Step(products, dt, stream);
 }
 
+RenderOutput Renderer::Step(std::string_view product, double dt, Stream stream) {
+    const std::string products[] = {std::string(product)};
+    return m_impl->Step(products, dt, stream);
+}
+
 const Ref<Overlays>& Renderer::GetOverlays() const {
     return m_impl->m_overlays;
 }

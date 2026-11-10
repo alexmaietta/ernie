@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <initializer_list>
 #include <string>
 #include <type_traits>
@@ -497,8 +499,35 @@ std::vector<Prim> Scene::Handles(const PrimRange& range) const {
 
 PrimRange Scene::Clone(Prim source, Span<const std::string> targets, const CloneDesc& desc) {
     m_impl->Check(source);
+    if (targets.empty()) {
+        return {};
+    }
     return m_impl->Range(m_impl->GetStructure().Clone(
         source.Index(), std::span(targets.data(), targets.size()), desc));
+}
+
+PrimRange Scene::Clone(Prim source, uint32_t count, const CloneDesc& desc) {
+    m_impl->Check(source);
+    const std::string path = source.Path();
+    const size_t slash = path.rfind('/');
+    const std::string_view name = std::string_view(path).substr(slash + 1);
+    const size_t digits = name.find_last_not_of("0123456789") + 1;
+    std::string_view stem = name;
+    uint64_t first = 1;
+    std::string separator = "_";
+    if (digits < name.size() &&
+        std::from_chars(name.data() + digits, name.data() + name.size(), first).ec == std::errc()) {
+        stem = name.substr(0, digits);
+        separator.clear();
+        ++first;
+    }
+    std::vector<std::string> targets;
+    targets.reserve(count);
+    for (uint64_t copy = first; copy < first + count; ++copy) {
+        targets.push_back(std::format("{}{}{}{}", std::string_view(path).substr(0, slash + 1), stem,
+                                      separator, copy));
+    }
+    return Clone(source, targets, desc);
 }
 
 std::optional<Prim> Scene::Find(std::string_view path) const {

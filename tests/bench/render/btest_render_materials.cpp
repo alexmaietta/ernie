@@ -323,10 +323,10 @@ void Shade(benchmark::State& state) {
                                 256, render);
             const Clock::time_point start = Clock::now();
             Renderer renderer(setup.scene);
-            renderer.Step(std::vector<std::string>{"/Render/View"}, 1.0 / 60).Wait();
+            renderer.Step("/Render/View", 1.0 / 60).Wait();
             const double first = Since(start);
             for (uint32_t i = 0; i < kWarmup; ++i) {
-                renderer.Step(std::vector<std::string>{"/Render/View"}, 1.0 / 60).Wait();
+                renderer.Step("/Render/View", 1.0 / 60).Wait();
             }
             return Rendered{std::move(setup), std::move(renderer), first};
         });

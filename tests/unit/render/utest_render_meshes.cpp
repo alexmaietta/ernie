@@ -43,7 +43,7 @@ void DefineCameras(Scene& scene, const std::vector<std::pair<std::string, Float3
 }
 
 template <class T> std::vector<T> Centers(Renderer& renderer, const char* source, uint32_t width) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 1.0 / 30);
+    RenderOutput output = renderer.Step("/Render/View", 1.0 / 30);
     output.Wait();
     const std::vector<T> values =
         output["/Render/View"].frames.at(0).Source(source).tensor.ToHost<T>();

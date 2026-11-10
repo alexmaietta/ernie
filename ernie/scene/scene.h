@@ -221,6 +221,7 @@ class ERNIE_API Scene : public RefCounted {
     PrimCopy Copy(Prim prim);
     Prim Paste(const PrimCopy& copy, std::string_view path);
     PrimRange Clone(Prim source, Span<const std::string> targets, const CloneDesc& desc = {});
+    PrimRange Clone(Prim source, uint32_t count, const CloneDesc& desc = {});
     ImportJob Import(std::string_view path, const std::filesystem::path& file);
     ImportJob Import(std::string_view path, const std::filesystem::path& file,
                      const ImportDesc& desc);

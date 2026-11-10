@@ -22,7 +22,7 @@ using test::ForEachDevice;
 constexpr uint32_t kSide = 3;
 
 float CenterVelocity(Renderer& renderer) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Scan"}, 1.0 / 30);
+    RenderOutput output = renderer.Step("/Render/Scan", 1.0 / 30);
     output.Wait();
     const std::vector<float> velocity =
         output["/Render/Scan"].frames.at(0).Source("RadialVelocity").tensor.ToHost<float>();
@@ -89,7 +89,7 @@ struct Colors {
 };
 
 Colors CenterColors(Renderer& renderer) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 1.0 / 30);
+    RenderOutput output = renderer.Step("/Render/View", 1.0 / 30);
     output.Wait();
     const std::vector<float> color =
         output["/Render/View"].frames.at(0).Source("HdrColor").tensor.ToHost<float>();
@@ -223,7 +223,7 @@ TEST(SurfaceTest, InstanceIdsFollowTheInstancersAuthoredIds) {
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
         Renderer renderer(scene);
         const auto ids = [&] {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            RenderOutput output = renderer.Step("/Render/View", 0);
             output.Wait();
             const std::vector<int64_t> values =
                 output["/Render/View"].frames.at(0).Source("InstanceId").tensor.ToHost<int64_t>();
@@ -251,7 +251,7 @@ TEST(SurfaceTest, InstanceIdsReportEachPointsIdOrIndex) {
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
         Renderer renderer(scene);
         const auto ids = [&] {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            RenderOutput output = renderer.Step("/Render/View", 0);
             output.Wait();
             const std::vector<int64_t> values =
                 output["/Render/View"].frames.at(0).Source("InstanceId").tensor.ToHost<int64_t>();
@@ -283,7 +283,7 @@ TEST(SurfaceTest, InstanceIdsReportEachPointsIdThroughBoxesOfPoints) {
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Ids"}});
         Renderer renderer(scene);
         const auto ids = [&] {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            RenderOutput output = renderer.Step("/Render/View", 0);
             output.Wait();
             const std::vector<int64_t> values =
                 output["/Render/View"].frames.at(0).Source("InstanceId").tensor.ToHost<int64_t>();

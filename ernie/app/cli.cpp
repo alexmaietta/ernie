@@ -3,10 +3,13 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <string_view>
 
@@ -16,7 +19,6 @@
 #include <dlfcn.h>
 #endif
 
-#include "ernie/app/render.h"
 #include "ernie/ernie.h"
 
 namespace ernie::app {
@@ -90,6 +92,199 @@ void PrintDevices() {
             adapter.features.presentation ? ", presents" : "",
             adapter.unsupported.empty() ? "" : ", unsupported: ", adapter.unsupported.c_str());
     }
+}
+
+constexpr double kStep = 1.0 / 60;
+
+std::string WorldPath(uint32_t world) {
+    return world == 0 ? std::string("/World") : std::format("/World_{}", world);
+}
+
+void PrintProfile() {
+    const profiler::Report report = profiler::Summarize(profiler::Frames());
+    std::fputs(profiler::ReportText(report).c_str(), stderr);
+}
+
+Ref<Scene> DefaultScene(device::Device& device, uint32_t worlds, bool waitForKernels) {
+    const Ref<Scene> scene = Scene::Create(device, {.waitForKernels = waitForKernels});
+    if (worlds > 1) {
+        scene->Define<World>("/World");
+    } else {
+        scene->Define<Xform>("/World");
+    }
+    scene->Define<Scope>("/World/Looks");
+    const std::pair<const char*, Float3> looks[] = {{"Red", {0.8f, 0.3f, 0.2f}},
+                                                    {"Blue", {0.2f, 0.5f, 0.8f}},
+                                                    {"Green", {0.3f, 0.7f, 0.3f}},
+                                                    {"Yellow", {0.9f, 0.7f, 0.2f}},
+                                                    {"Purple", {0.6f, 0.4f, 0.8f}}};
+    for (const auto& [name, color] : looks) {
+        const std::string look = std::format("/World/Looks/{}", name);
+        const Prim material = scene->Define<Material>(look);
+        const Prim surface = scene->Define<Shader>(look + "/Surface", {.id = "UsdPreviewSurface"});
+        surface.Set(UsdPreviewSurface::kDiffuseColor, color);
+        material.Connect("surface", surface, "surface");
+    }
+    scene->Define<Plane>("/World/Ground", {.checkerboard = true,
+                                           .checkerColorA = {0.6f, 0.6f, 0.6f},
+                                           .checkerColorB = {0.3f, 0.3f, 0.3f},
+                                           .width = 0,
+                                           .length = 0});
+    scene->Define<Cube>("/World/Cube",
+                        {.materialBinding = {"/World/Looks/Red"}, .translate = {-6, 0, 1}});
+    scene->Define<Sphere>("/World/Sphere",
+                          {.materialBinding = {"/World/Looks/Blue"}, .translate = {-3, 0, 1}});
+    scene->Define<Cylinder>("/World/Cylinder",
+                            {.materialBinding = {"/World/Looks/Green"}, .translate = {0, 0, 1}});
+    scene->Define<Cone>("/World/Cone",
+                        {.materialBinding = {"/World/Looks/Yellow"}, .translate = {3, 0, 1}});
+    scene->Define<Capsule>("/World/Capsule",
+                           {.materialBinding = {"/World/Looks/Purple"}, .translate = {6, 0, 1}});
+    scene->Define<DistantLight>("/World/Sun", {.orient = FromAzimuthElevation(146, 44)});
+
+    const Double3 eye{0, -15.6, 3.4};
+    scene->Define<Camera>("/World/Camera", {.translate = eye,
+                                            .orient = LookAt(eye, {0, 0, 1}),
+                                            .focalLength = 29,
+                                            .horizontalAperture = 24.0f * 16 / 9,
+                                            .verticalAperture = 24});
+
+    scene->Clone(*scene->Find("/World"), worlds - 1);
+    return scene;
+}
+
+std::string ChooseProduct(Scene& scene, const Command& command) {
+    if (!command.product.empty()) {
+        const std::optional<Prim> product = scene.Find(command.product);
+        if (!product || !product->IsA(SchemaId::RenderProduct)) {
+            throw Error("The scene has no render product {}", command.product);
+        }
+        return command.product;
+    }
+    const bool viewer = command.kind == Command::Kind::Viewer;
+    if (viewer && command.camera.empty() && command.preset.empty() && command.aovs.empty()) {
+        return {};
+    }
+
+    std::vector<std::string> cameras;
+    if (!command.camera.empty()) {
+        const std::optional<Prim> camera = scene.Find(command.camera);
+        if (!camera || !camera->IsA(SchemaId::Camera)) {
+            throw Error("The scene has no camera {}", command.camera);
+        }
+        cameras.push_back(command.camera);
+    } else {
+        for (uint32_t world = 0; world < command.worlds; ++world) {
+            cameras.push_back(WorldPath(world) + "/Camera");
+        }
+    }
+
+    scene.Define<Scope>("/Render");
+    std::vector<std::string> vars;
+    std::vector<std::string> names = {"LdrColor"};
+    names.insert(names.end(), command.aovs.begin(), command.aovs.end());
+    for (const std::string& name : names) {
+        const std::string path = "/Render/" + name;
+        if (std::ranges::find(vars, path) == vars.end()) {
+            if (!FindRenderVarSource(name)) {
+                throw Error("\"{}\" is no AOV; try LdrColor, HdrColor, DistanceToCamera or Normal",
+                            name);
+            }
+            scene.Define<RenderVar>(path, {.sourceName = name});
+            vars.push_back(path);
+        }
+    }
+    const std::string product = "/Render/Product";
+    scene.Define<RenderProduct>(
+        product,
+        {.renderMode = command.preset == "minimal" ? RenderMode::Minimal : RenderMode::RealTime,
+         .camera = cameras,
+         .resolution = {command.width, command.height},
+         .orderedVars = vars});
+    return product;
+}
+
+int RenderFrames(const Ref<Scene>& scene, const std::string& product, const Command& command) {
+    Renderer renderer(scene);
+    profiler::SetEnabled(command.profile);
+    const uint32_t frames = std::max(command.frames, 1u);
+    RenderOutput output;
+    for (uint32_t frame = 0; frame < frames; ++frame) {
+        profiler::BeginFrame();
+        output = renderer.Step(product, kStep);
+    }
+    output.Wait();
+    if (!command.output.empty()) {
+        for (const std::filesystem::path& written :
+             WriteFrame(command.output, output[product].frames.back())) {
+            Log(LogLevel::Info, "wrote {}", written.string());
+        }
+    }
+    if (command.profile) {
+        PrintProfile();
+    }
+    return 0;
+}
+
+int Benchmark(const Ref<Scene>& scene, const std::string& product, const Command& command) {
+    using Clock = std::chrono::steady_clock;
+    Renderer renderer(scene);
+    const uint32_t steps = command.frames > 0 ? command.frames : 100;
+    int64_t pixels = 0;
+    for (uint32_t step = 0; step < std::max(command.warmup, 1u); ++step) {
+        const RenderOutput output = renderer.Step(product, kStep);
+        output.Wait();
+        const ProductOutput& rendered = output[product];
+        if (!rendered.frames.empty() && !rendered.frames.front().renderVars.empty()) {
+            const Span<const int64_t> shape =
+                rendered.frames.front().renderVars.begin()->second.tensor.Shape();
+            pixels = shape.size() >= 3 ? shape[0] * shape[1] * shape[2] : 0;
+        }
+    }
+
+    profiler::SetEnabled(command.profile);
+    const Clock::time_point serialStart = Clock::now();
+    for (uint32_t step = 0; step < steps; ++step) {
+        profiler::BeginFrame();
+        renderer.Step(product, kStep).Wait();
+    }
+    const double latencyMs =
+        std::chrono::duration<double, std::milli>(Clock::now() - serialStart).count() / steps;
+
+    std::deque<RenderOutput> inFlight;
+    const Clock::time_point pipelinedStart = Clock::now();
+    for (uint32_t step = 0; step < steps; ++step) {
+        profiler::BeginFrame();
+        inFlight.push_back(renderer.Step(product, kStep));
+        if (inFlight.size() == 3) {
+            inFlight.front().Wait();
+            inFlight.pop_front();
+        }
+    }
+    for (const RenderOutput& output : inFlight) {
+        output.Wait();
+    }
+    const double seconds = std::chrono::duration<double>(Clock::now() - pipelinedStart).count();
+    const double fps = steps / seconds;
+    const double megapixels = double(pixels) * fps / 1e6;
+
+    if (command.json) {
+        std::printf("{\"product\": \"%s\", \"worlds\": %u, \"pixels\": %lld, \"warmup\": %u, "
+                    "\"steps\": %u, \"latency_ms\": %.4f, \"fps\": %.2f, "
+                    "\"megapixels_per_second\": %.2f}\n",
+                    product.c_str(), command.worlds, static_cast<long long>(pixels), command.warmup,
+                    steps, latencyMs, fps, megapixels);
+    } else {
+        std::printf("%s, %lld pixels a step\n", product.c_str(), static_cast<long long>(pixels));
+        std::printf("  one step at a time  %.3f ms\n", latencyMs);
+        std::printf("  three in flight     %.1f steps a second, %.1f megapixels a second\n", fps,
+                    megapixels);
+    }
+    std::fflush(stdout);
+    if (command.profile) {
+        PrintProfile();
+    }
+    return 0;
 }
 
 RunViewer FindViewer() {

@@ -89,10 +89,10 @@ TEST(ProductsTest, ABrokenProductFailsOnlyWhenSteppedAndRecoversOnceFixed) {
         scene->Define<RenderProduct>("/Render/Broken", {.orderedVars = {"/Render/Depth"}});
         Renderer renderer(scene);
         Step(renderer);
-        EXPECT_THROW(renderer.Step(std::vector<std::string>{"/Render/Broken"}, 0), Error);
+        EXPECT_THROW(renderer.Step("/Render/Broken", 0), Error);
         scene->Find("/Render/Broken")
             ->Set(RenderProduct::kCamera, std::vector<std::string>{"/Cam"});
-        RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Broken"}, 0);
+        RenderOutput output = renderer.Step("/Render/Broken", 0);
         output.Wait();
         EXPECT_EQ(output["/Render/Broken"].frames.size(), 1u);
     });

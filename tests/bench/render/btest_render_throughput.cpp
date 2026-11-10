@@ -174,13 +174,7 @@ Setup Prepare(const Mode& mode, uint32_t cameras, uint32_t worlds, uint32_t side
         scene->Define<Camera>(fmt::format("/env_0/Cam_{}", c),
                               {.translate = eye, .orient = LookAt(eye, {0, 0, 0.5})});
     }
-    std::vector<std::string> targets;
-    for (uint32_t w = 1; w < worlds; ++w) {
-        targets.push_back(fmt::format("/env_{}", w));
-    }
-    if (!targets.empty()) {
-        scene->Clone(*scene->Find("/env_0"), targets);
-    }
+    scene->Clone(*scene->Find("/env_0"), worlds - 1);
     scene->Define<DistantLight>("/Sun", {.orient = FromAzimuthElevation(60, 50)});
     scene->Define<Scope>("/Render");
     scene->Define<RenderVar>("/Render/Color", {.sourceName = "LdrColor"});

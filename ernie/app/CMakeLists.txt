@@ -1,10 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-ernie_object_library(
-    ernie_app
-    EXPORTS ernie_app_EXPORTS
-    cli.cpp
-    render.cpp
-)
+ernie_object_library(ernie_app EXPORTS ernie_app_EXPORTS cli.cpp)
 target_link_libraries(
     ernie_app
     PUBLIC
@@ -29,8 +24,6 @@ ernie_check_includes(
     ernie/app/cli.cpp
     ernie/app/cli.h
     ernie/app/main.cpp
-    ernie/app/render.cpp
-    ernie/app/render.h
 )
 
 if(ERNIE_BUILD_VIEWER)

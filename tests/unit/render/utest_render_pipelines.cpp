@@ -98,7 +98,7 @@ TEST(PipelinesTest, TracedRunsMatchStandaloneRunsOfTheirRates) {
         PipelineRunDesc run{.exposureTime = kExposureTime, .identity = HashPath("/Cam").words[0]};
         std::vector<float> previous;
         for (uint32_t capture = 0; capture < 2; ++capture) {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            RenderOutput output = renderer.Step("/Render/View", 0);
             output.Wait();
             const FrameOutput& frame = output["/Render/View"].frames.at(0);
             const RenderVarOutput& raw = frame.Source("raw");
@@ -138,7 +138,7 @@ TEST(PipelinesTest, GlobalNodesRunTracedAsTheyDoStandalone) {
                                       .resolution = {kWidth, kHeight},
                                       .orderedVars = {"/Render/Rate", "/Render/Raw"}});
         Renderer renderer(scene);
-        RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+        RenderOutput output = renderer.Step("/Render/View", 0);
         output.Wait();
         const FrameOutput& frame = output["/Render/View"].frames.at(0);
         const Pipeline loaded(scene, "/Pipes/Raw");
@@ -170,7 +170,7 @@ TEST(PipelinesTest, ValueEditsRerunThePipelineWithoutTracingAgain) {
                                       .orderedVars = {"/Render/Rate", "/Render/Raw"}});
         Renderer renderer(scene);
         const auto step = [&] {
-            RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/View"}, 0);
+            RenderOutput output = renderer.Step("/Render/View", 0);
             output.Wait();
             const FrameOutput& frame = output["/Render/View"].frames.at(0);
             return std::pair{frame.Source("ElectronRate").tensor.ToHost<float>(),

@@ -111,7 +111,7 @@ TEST(RendererTest, StepsAdvanceTimeUntilReset) {
         EXPECT_EQ(output.Size(), 1u);
         scene->SetTime(3);
         EXPECT_DOUBLE_EQ(scene->Time(), 3);
-        EXPECT_THROW(renderer.Step(std::vector<std::string>{"/Render/Nothing"}, 0.1), Error);
+        EXPECT_THROW(renderer.Step("/Render/Nothing", 0.1), Error);
     });
 }
 
@@ -146,7 +146,7 @@ std::vector<Float3> Roof(float ridge) {
 }
 
 Float3 CenterNormal(Renderer& renderer, uint32_t side) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Roof"}, 1.0 / 30);
+    RenderOutput output = renderer.Step("/Render/Roof", 1.0 / 30);
     output.Wait();
     const std::vector<float> normals =
         output["/Render/Roof"].frames.at(0).Source("Normal").tensor.ToHost<float>();
@@ -217,7 +217,7 @@ Lit RenderLitQuad(Device& device, Float3 tilt, RenderMode mode) {
         scene->Find("/Render/Roof")->Set(MinimalAPI::kMode, MinimalMode::Full);
     }
     Renderer renderer(scene);
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Roof"}, 1.0 / 30);
+    RenderOutput output = renderer.Step("/Render/Roof", 1.0 / 30);
     output.Wait();
     const FrameOutput& frame = output["/Render/Roof"].frames.at(0);
     const std::vector<float> normals = frame.Source("Normal").tensor.ToHost<float>();
@@ -259,7 +259,7 @@ TEST(RendererTest, NormalsHaveThreeChannelsAndMissesAreZero) {
             "/Render/Quad",
             {.camera = {"/Cam"}, .resolution = {kSide, kSide}, .orderedVars = {"/Render/Normal"}});
         Renderer renderer(scene);
-        RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Quad"}, 1.0 / 30);
+        RenderOutput output = renderer.Step("/Render/Quad", 1.0 / 30);
         output.Wait();
         const device::Tensor& tensor = output["/Render/Quad"].frames.at(0).Source("Normal").tensor;
         EXPECT_EQ(std::vector<int64_t>(tensor.Shape().begin(), tensor.Shape().end()),

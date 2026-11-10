@@ -215,7 +215,7 @@ Returns ReturnsWall(Device& device, float elevation) {
 }
 
 float LidarIntensity(Renderer& renderer) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Scan"}, 0);
+    RenderOutput output = renderer.Step("/Render/Scan", 0);
     output.Wait();
     const std::vector<float> values = output["/Render/Scan"]
                                           .frames.at(0)
@@ -226,7 +226,7 @@ float LidarIntensity(Renderer& renderer) {
 }
 
 float RadarIntensity(Renderer& renderer) {
-    RenderOutput output = renderer.Step(std::vector<std::string>{"/Render/Radar"}, 0);
+    RenderOutput output = renderer.Step("/Render/Radar", 0);
     output.Wait();
     const std::vector<float> values =
         output["/Render/Radar"].frames.at(0).Source("Intensity").tensor.ToHost<float>();

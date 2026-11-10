@@ -157,6 +157,14 @@ void RegisterRenderer(nb::module_& module) {
             nb::arg("overlays") = nb::none())
         .def(
             "step",
+            [](Renderer& renderer, const std::string& product, double dt,
+               std::optional<uintptr_t> stream) {
+                return renderer.Step(product, dt, ToStream(stream));
+            },
+            nb::arg("product"), nb::arg("dt") = 0.0, nb::arg("stream") = nb::none(),
+            nb::call_guard<nb::gil_scoped_release>())
+        .def(
+            "step",
             [](Renderer& renderer, const std::vector<std::string>& products, double dt,
                std::optional<uintptr_t> stream) {
                 return renderer.Step(products, dt, ToStream(stream));

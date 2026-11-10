@@ -106,6 +106,35 @@ TEST(SceneTest, ClonesFillNewWorlds) {
     });
 }
 
+TEST(SceneTest, ClonesByCountAreNamedAfterTheSource) {
+    ForEachScene([](Scene& scene) {
+        scene.Define<World>("/env_0");
+        scene.Define<Sphere>("/env_0/Ball");
+        const PrimRange envs = scene.Clone(*scene.Find("/env_0"), 2);
+        EXPECT_EQ(envs.copies, 2u);
+        EXPECT_EQ(scene.ByIndex(envs.Index(1, 0)).Path(), "/env_2");
+        EXPECT_TRUE(scene.Find("/env_1/Ball"));
+
+        scene.Clone(scene.Define<Xform>("/Robot"), 2);
+        EXPECT_TRUE(scene.Find("/Robot_1"));
+        EXPECT_TRUE(scene.Find("/Robot_2"));
+
+        scene.Define<Xform>("/Group");
+        scene.Clone(scene.Define<Xform>("/Group/Arm7"), 1);
+        EXPECT_TRUE(scene.Find("/Group/Arm8"));
+    });
+}
+
+TEST(SceneTest, CloningNothingChangesNothing) {
+    ForEachScene([](Scene& scene) {
+        const Prim robot = scene.Define<Xform>("/Robot");
+        const uint64_t version = scene.StructureVersion();
+        EXPECT_EQ(scene.Clone(robot, 0).Size(), 0u);
+        EXPECT_EQ(scene.Clone(robot, std::vector<std::string>{}).Size(), 0u);
+        EXPECT_EQ(scene.StructureVersion(), version);
+    });
+}
+
 TEST(SceneTest, SnapshotsCarryEverySystemsOutput) {
     ForEachScene([](Scene& scene) {
         scene.Define<World>("/Env0");
