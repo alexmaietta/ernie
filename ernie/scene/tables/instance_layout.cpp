@@ -470,7 +470,6 @@ void InstanceTable::WriteLayoutHeader() {
     m_header.records = m_records.Address();
     m_header.worldCount = m_worlds;
     m_header.displayColorName = m_structure.GetTokens().Intern("displayColor").id;
-    m_header.displayOpacityName = m_structure.GetTokens().Intern("displayOpacity").id;
     m_structure.GetColumnStore().GetDevice().GetQueue().Write(m_layout->Slice(0, sizeof(m_header)),
                                                               &m_header);
 }

@@ -20,6 +20,22 @@ SurfaceRecord DescribeSurface(SurfaceParams p, SlotHit hit) {
         surface.displayColor = scene->schemas.gprim.displayColor[gprimRow];
         surface.displayOpacity = scene->schemas.gprim.displayOpacity[gprimRow];
         surface.orientation = scene->schemas.gprim.orientation[gprimRow];
+        PrimvarEntry opacity;
+        if (FindPrimvarEntry(surface.primvars.address, surface.primvars.count,
+                             p.displayOpacityName, opacity)) {
+            const PrimvarType type = PrimvarType(opacity.type);
+            surface.opacities = surface.primvars.address + opacity.values * sizeof(uint);
+            surface.opacityCount = opacity.valueCount;
+            surface.opacityStride = PrimvarComponents(type) * opacity.elementSize;
+            surface.opacityFlags =
+                (Interpolation(opacity.interpolation) != Interpolation::Constant ? kOpacityPerPoint
+                                                                                 : 0) |
+                (PrimvarIsInt(type) ? kOpacityInteger : 0);
+            if (opacity.indexCount > 0) {
+                surface.opacityIndices = surface.primvars.address + opacity.indices * sizeof(uint);
+                surface.opacityIndexCount = opacity.indexCount;
+            }
+        }
     }
     if (schema == SchemaId::Mesh) {
         const uint meshRow = PrimRow(scene, prim, kSlotMesh);

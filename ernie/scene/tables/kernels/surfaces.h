@@ -17,7 +17,7 @@ struct SurfaceParams {
     Ptr<SurfaceRecord> surfaces;
     Ptr<uint> tlases;
     uint normalsName;
-    uint padding;
+    uint displayOpacityName;
 };
 
 ERNIE_CHECK_SIZE(SurfaceParams, 48);

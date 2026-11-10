@@ -102,12 +102,19 @@ float ShapeDistance(ShapeRecord record, Ptr<PointsRecord> points, uint primitive
     return hit.inside ? hit.t : kInfinity;
 }
 
-bool PointBlocks(SurfaceRecord surface, uint opacityName, uint point, Ray ray) {
+bool PointBlocks(Ptr<SurfaceRecord> surface, uint point, Ray ray) {
     float opacity = surface.displayOpacity;
-    float4 authored;
-    if (ReadPrimvar(FindPrimvarIn(surface.primvars, opacityName), SurfaceElement.Point(point),
-                    authored)) {
-        opacity = authored.x;
+    if (surface.opacities != 0) {
+        const uint flags = surface.opacityFlags;
+        uint at = (flags & kOpacityPerPoint) != 0 ? point : 0;
+        const uint indexCount = surface.opacityIndexCount;
+        if (indexCount > 0) {
+            at = at < indexCount ? Ptr<uint>(surface.opacityIndices)[at] : ~0u;
+        }
+        if (at < surface.opacityCount) {
+            const uint word = Ptr<uint>(surface.opacities)[at * surface.opacityStride];
+            opacity = (flags & kOpacityInteger) != 0 ? float(int(word)) : asfloat(word);
+        }
     }
     if (opacity >= 1) {
         return true;
@@ -131,8 +138,8 @@ struct ShapeIntersector : IIntersector {
         const uint slot = layout->firstInstances[tlas] + instance;
         const ShapeRecord shape = layout->shapes[slot];
         if (ShapeKind(shape.kind) == ShapeKind::Points) {
-            return IntersectPoints(tables->points[shape.row], tables->surfaces[slot],
-                                   layout->displayOpacityName, primitive, ray, t, attributes);
+            return IntersectPoints(tables->points[shape.row], tables->surfaces + slot, primitive, ray,
+                                   t, attributes);
         }
         const float distance = ShapeDistance(shape, tables->points, primitive, ray);
         if (distance >= t) {
@@ -142,8 +149,8 @@ struct ShapeIntersector : IIntersector {
         return true;
     }
 
-    bool IntersectPoints(PointsRecord cloud, SurfaceRecord surface, uint opacityName, uint box,
-                         Ray ray, inout float t, inout float2 attributes) {
+    bool IntersectPoints(PointsRecord cloud, Ptr<SurfaceRecord> surface, uint box, Ray ray,
+                         inout float t, inout float2 attributes) {
         const uint perBox = max(cloud.perBox, 1u);
         const uint start = box * perBox;
         const uint end = min(start + perBox, cloud.pointCount);
@@ -161,7 +168,7 @@ struct ShapeIntersector : IIntersector {
             }
             const uint point = perBox == 1 ? at : Ptr<uint>(cloud.order)[at];
             const ShapeHit hit = PointHit(cloud, point, ray);
-            if (!hit.inside || hit.t >= t || !PointBlocks(surface, opacityName, point, ray)) {
+            if (!hit.inside || hit.t >= t || !PointBlocks(surface, point, ray)) {
                 continue;
             }
             t = hit.t;

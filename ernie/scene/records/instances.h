@@ -14,6 +14,12 @@ struct SurfaceRecord {
     uint64_t normals;
     uint64_t normalIndices;
     uint64_t smooth;
+    uint64_t opacities;
+    uint64_t opacityIndices;
+    uint opacityCount;
+    uint opacityIndexCount;
+    uint opacityStride;
+    uint opacityFlags;
     uint normalsInterpolation;
     uint normalsCount;
     uint normalIndexCount;
@@ -27,7 +33,10 @@ struct SurfaceRecord {
     int64_t instanceId;
 };
 
-ERNIE_CHECK_SIZE(SurfaceRecord, 136);
+ERNIE_CHECK_SIZE(SurfaceRecord, 168);
+
+static const uint kOpacityPerPoint = 1u;
+static const uint kOpacityInteger = 2u;
 
 static const float kRenderOriginCell = 64;
 
@@ -152,8 +161,8 @@ struct InstanceLayout {
     Ptr<Float3> offsets;
     uint worldCount;
     uint displayColorName;
-    uint displayOpacityName;
-    uint padding;
+    uint padding0;
+    uint padding1;
 };
 
 ERNIE_CHECK_SIZE(InstanceLayout, 136);

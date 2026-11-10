@@ -69,6 +69,7 @@ void SurfaceTable::Run(const ChangeSet& changes, TableVersions&) {
     params.surfaces.address = m_surfaces.Address();
     params.tlases.address = list->Address();
     params.normalsName = m_structure.GetTokens().Intern("normals").id;
+    params.displayOpacityName = m_structure.GetTokens().Intern("displayOpacity").id;
     device::Queue& queue = device.GetQueue();
     static const profiler::ZoneId zone = profiler::ZoneId::Named("Surfaces/Write");
     device::CommandEncoder encoder = queue.CreateEncoder();
