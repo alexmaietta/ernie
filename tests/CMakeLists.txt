@@ -292,6 +292,18 @@ if(ERNIE_BUILD_VIEWER)
     )
 endif()
 
+if(ERNIE_BUILD_XR)
+    ernie_test(
+        ernie_xr_tests
+        LINK
+            ernie_xr_internal
+        SOURCES
+            unit/xr/utest_xr_openxr.cpp
+            unit/xr/utest_xr_rig.cpp
+            unit/xr/utest_xr_session.cpp
+    )
+endif()
+
 if(ERNIE_BUILD_PYTHON)
     find_package(Python COMPONENTS Interpreter REQUIRED)
     set(ernie_python_coverage)
