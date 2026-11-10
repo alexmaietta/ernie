@@ -42,15 +42,14 @@ ThreadPool& Readers() {
 
 Registry& Importers() {
     static Registry registry = [] {
-        const std::shared_ptr<Importer> gltf = CreateGltfImporter();
-        const std::shared_ptr<Importer> usd = CreateUsdImporter();
-        return Registry{.importers = {{".glb", gltf},
-                                      {".gltf", gltf},
-                                      {".obj", CreateObjImporter()},
-                                      {".usd", usd},
-                                      {".usda", usd},
-                                      {".usdc", usd},
-                                      {".usdz", usd}}};
+        std::map<std::string, std::shared_ptr<Importer>, std::less<>> importers;
+        for (const std::shared_ptr<Importer>& importer :
+             {CreateGltfImporter(), CreateObjImporter(), CreateUsdImporter()}) {
+            for (const std::string& extension : importer->Extensions()) {
+                importers[Lowercase(extension)] = importer;
+            }
+        }
+        return Registry{.importers = std::move(importers)};
     }();
     return registry;
 }

@@ -15,6 +15,7 @@
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"
 #include "support/devices.h"
+#include "support/support.h"
 
 namespace ernie {
 namespace {
@@ -129,7 +130,11 @@ f 1 3 4
 )";
         ImportSource source = Shapes(kTwoLooks);
         source.files["shapes.mtl"] = Bytes("newmtl red\nKd 1 0 0\nnewmtl blue\nKd 0 0 1\n");
+        const test::CapturedLog log(LogLevel::Warning);
         const Prim root = scene->Import("/Strip", source, {.synchronous = true}).Wait();
+        EXPECT_TRUE(std::ranges::any_of(log.Messages(), [](const auto& message) {
+            return message.second.ends_with("material [ 'none' ] not found in .mtl");
+        }));
         const std::vector<Prim> meshes = Meshes(root);
         ASSERT_EQ(meshes.size(), 1u);
         EXPECT_EQ(scene->Select(meshes[0]).GetArray<Float3>("points").Get(0).size(), 6u);
@@ -147,6 +152,66 @@ f 1 3 4
             const bool red = subset.MaterialBinding()[0].ends_with("red");
             EXPECT_EQ(subset.Indices(), (std::vector<int32_t>{red ? 0 : 1}));
         }
+    });
+}
+
+TEST(ImportTest, ObjSmoothingGroupsVertexColorsAndTextureOptions) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        constexpr std::string_view kFolded = R"(mtllib shapes.mtl
+o Folded
+v 0 0 0 1 0 0
+v 1 0 0 0 1 0
+v 1 1 0 0 0 1
+v 0 1 1 1 1 1
+usemtl tiled
+s 1
+f 1 2 3
+f 1 3 4
+o Flat
+v 0 0 2 1 0 0
+v 1 0 2 0 1 0
+v 0 1 2 0 0 1
+s off
+f 5 6 7
+)";
+        ImportSource source = Shapes(kFolded);
+        source.files["shapes.mtl"] =
+            Bytes("newmtl tiled\nmap_Kd -s 2 3 1 albedo.png\nmap_Pr -clamp on rough.png\n");
+        source.files["albedo.png"] = Bytes("albedo");
+        source.files["rough.png"] = Bytes("rough");
+        const Prim root = scene->Import("/Folded", source, {.synchronous = true}).Wait();
+        const std::vector<Prim> meshes = Meshes(root);
+        ASSERT_EQ(meshes.size(), 2u);
+
+        const std::vector<Float3> flat =
+            scene->Select(meshes[0]).GetArray<Float3>("normals").Get(0);
+        EXPECT_TRUE(flat.empty());
+        const std::vector<Float3> smooth =
+            scene->Select(meshes[1]).GetArray<Float3>("normals").Get(0);
+        ASSERT_EQ(smooth.size(), 6u);
+        EXPECT_EQ(smooth[0], smooth[3]);
+        EXPECT_EQ(smooth[2], smooth[4]);
+        EXPECT_NE(smooth[1], smooth[5]);
+
+        bool colored = false;
+        for (const Primvar& primvar : MeshPrim(meshes[1]).Primvars()) {
+            if (primvar.name == "displayColor") {
+                colored = true;
+                EXPECT_EQ(primvar.interpolation, Interpolation::Vertex);
+                EXPECT_EQ(primvar.Values<Float3>().at(1), (Float3{0, 1, 0}));
+            }
+        }
+        EXPECT_TRUE(colored);
+
+        const TexturePlacementPrim tiled(*scene->Find("/Folded/Looks/tiled/Placement"));
+        EXPECT_EQ(tiled.UvScale(), (Float2{2, 3}));
+        const TexturePlacementPrim plain(*scene->Find("/Folded/Looks/tiled/Placement_2"));
+        EXPECT_EQ(plain.UvScale(), (Float2{1, 1}));
+        EXPECT_EQ(UsdUVTexturePrim(*scene->Find("/Folded/Looks/tiled/DiffuseColorTexture")).WrapS(),
+                  TextureWrapMode::Repeat);
+        EXPECT_EQ(UsdUVTexturePrim(*scene->Find("/Folded/Looks/tiled/RoughnessTexture")).WrapS(),
+                  TextureWrapMode::Clamp);
     });
 }
 
