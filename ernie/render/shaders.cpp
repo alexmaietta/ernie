@@ -68,22 +68,22 @@ RuntimeColumnDesc Column(const device::ReflectedField& field) {
     return column;
 }
 
-NodeInputType InputType(device::FieldType type) {
+material::MaterialInputType InputType(device::FieldType type) {
     switch (type) {
     case device::FieldType::Bool:
-        return NodeInputType::Bool;
+        return material::MaterialInputType::Bool;
     case device::FieldType::Int:
-        return NodeInputType::Int;
+        return material::MaterialInputType::Int;
     case device::FieldType::Float2:
-        return NodeInputType::Float2;
+        return material::MaterialInputType::Float2;
     case device::FieldType::Float3:
-        return NodeInputType::Float3;
+        return material::MaterialInputType::Float3;
     case device::FieldType::Float4:
-        return NodeInputType::Float4;
+        return material::MaterialInputType::Float4;
     case device::FieldType::Spectral:
-        return NodeInputType::Spectral;
+        return material::MaterialInputType::Spectral;
     default:
-        return NodeInputType::Float;
+        return material::MaterialInputType::Float;
     }
 }
 
@@ -138,7 +138,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         return Error("{}", MapOrigins(error.what(), origins));
     };
     const device::Backend backend = scene.GetDevice().Adapter().backend;
-    auto sources = PrimitiveSources(Primitives());
+    auto sources = material::ClosurePrimitiveSources(material::ClosurePrimitives());
     sources[path] = source;
     device::ReflectedNodes reflection;
     try {
@@ -262,14 +262,16 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                         "and define primitives",
                         file.string());
         }
-        std::vector<std::shared_ptr<const PrimitiveDefinition>> candidates = Primitives();
+        std::vector<std::shared_ptr<const material::ClosurePrimitive>> candidates =
+            material::ClosurePrimitives();
         for (const device::ReflectedNode& reflected : nodes) {
-            auto definition = std::make_shared<const PrimitiveDefinition>(
-                PrimitiveDefinition{.name = reflected.name,
-                                    .kind = kFirstPrimitiveLobe + uint32_t(candidates.size()),
-                                    .file = file.string(),
-                                    .module = module,
-                                    .source = source});
+            auto definition =
+                std::make_shared<const material::ClosurePrimitive>(material::ClosurePrimitive{
+                    .name = reflected.name,
+                    .kind = material::kFirstPrimitiveLobe + uint32_t(candidates.size()),
+                    .file = file.string(),
+                    .module = module,
+                    .source = source});
             const auto known = std::ranges::find(candidates, reflected.name,
                                                  [](const auto& entry) { return entry->name; });
             if (known != candidates.end()) {
@@ -278,7 +280,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                 candidates.push_back(definition);
             }
         }
-        const auto checked = PrimitiveSources(candidates);
+        const auto checked = material::ClosurePrimitiveSources(candidates);
         try {
             device::ReflectMaterialNodes(backend, &kRenderKernels, {checked.begin(), checked.end()},
                                          "ernie.render.kernels.material.registered", file.string());
@@ -286,12 +288,12 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             throw mapped(error);
         }
         for (const device::ReflectedNode& reflected : nodes) {
-            RegisterPrimitive({.name = reflected.name,
-                               .file = file.string(),
-                               .module = module,
-                               .source = source});
+            material::RegisterClosurePrimitive({.name = reflected.name,
+                                                .file = file.string(),
+                                                .module = module,
+                                                .source = source});
             Log(LogLevel::Debug, "loaded closure primitive {} from {} as lobe kind {}",
-                reflected.name, file.string(), PrimitiveKind(reflected.name));
+                reflected.name, file.string(), material::ClosurePrimitiveKind(reflected.name));
             names.push_back(reflected.name);
         }
         nodes.clear();
@@ -304,22 +306,23 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             .inherited = {{"implementationSource", int32_t(ImplementationSource::SourceAsset)},
                           {"slangSourceAsset", file.string()},
                           {"slangSourceAssetSubIdentifier", reflected.name}}};
-        NodeDefinition node{.name = reflected.name,
-                            .role = reflected.role == device::NodeRole::Pattern ? NodeRole::Pattern
-                                    : reflected.role == device::NodeRole::Surface
-                                        ? NodeRole::Surface
-                                        : NodeRole::Material,
-                            .file = file.string(),
-                            .module = module,
-                            .source = source,
-                            .result = InputType(reflected.result)};
+        material::MaterialNodeDefinition node{.name = reflected.name,
+                                              .role = reflected.role == device::NodeRole::Pattern
+                                                          ? material::MaterialNodeRole::Pattern
+                                                      : reflected.role == device::NodeRole::Surface
+                                                          ? material::MaterialNodeRole::Surface
+                                                          : material::MaterialNodeRole::Material,
+                                              .file = file.string(),
+                                              .module = module,
+                                              .source = source,
+                                              .result = InputType(reflected.result)};
         for (const device::ReflectedParameter& parameter : reflected.parameters) {
             node.parameters.push_back(
                 {.source = parameter.source == device::ParameterSource::Context
-                               ? NodeParameter::Source::Context
+                               ? material::MaterialNodeParameter::Source::Context
                            : parameter.source == device::ParameterSource::Point
-                               ? NodeParameter::Source::Point
-                               : NodeParameter::Source::Input,
+                               ? material::MaterialNodeParameter::Source::Point
+                               : material::MaterialNodeParameter::Source::Input,
                  .input = parameter.input});
         }
         std::vector<std::string> inputs;
@@ -329,7 +332,8 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                 {.name = field.name, .type = InputType(field.type), .color = field.color});
             inputs.push_back(field.name);
         }
-        const std::shared_ptr<const NodeDefinition> previous = FindNode(reflected.name);
+        const std::shared_ptr<const material::MaterialNodeDefinition> previous =
+            material::FindMaterialNode(reflected.name);
         const bool reloading = previous && previous->file == file.string();
         const SchemaId schema = RegisterSchema(desc, reloading);
         if (reloading && SchemaId(previous->schema) != schema) {
@@ -338,7 +342,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             RetypePrims(scene, SchemaId(previous->schema), schema);
         }
         node.schema = uint32_t(schema);
-        RegisterNode(std::move(node));
+        material::RegisterMaterialNode(std::move(node));
         Log(LogLevel::Debug, "loaded {} {} from {} with inputs {}",
             reflected.role == device::NodeRole::Pattern   ? "pattern"
             : reflected.role == device::NodeRole::Surface ? "surface"

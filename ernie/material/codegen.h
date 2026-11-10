@@ -1,19 +1,59 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
-#include <string>
-
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "ernie/graph/graph.h"
-#include "ernie/material/definition.h"
 #include "ernie/material/node.h"
 
-namespace ernie {
+namespace ernie::material {
+
+inline constexpr uint32_t kFirstGeneratedDefinition = 4;
+
+struct MaterialDefinition {
+    uint32_t id = 0;
+    std::string type;
+    std::string module;
+    std::string source;
+    std::vector<std::pair<std::string, std::string>> files;
+    std::vector<std::pair<std::string, std::string>> origins;
+    uint32_t words = 0;
+    bool surface = false;
+};
+
+class MaterialDefinitionSet {
+  public:
+    explicit MaterialDefinitionSet(std::vector<MaterialDefinition> definitions = {},
+                                   std::map<std::string, std::string, std::less<>> files = {});
+
+    std::span<const MaterialDefinition> Definitions() const {
+        return m_definitions;
+    }
+
+    const std::map<std::string, std::string, std::less<>>& Files() const {
+        return m_files;
+    }
+
+    uint64_t Hash() const {
+        return m_hash;
+    }
+
+    bool Contains(uint32_t id) const;
+
+  private:
+    std::vector<MaterialDefinition> m_definitions;
+    std::map<std::string, std::string, std::less<>> m_files;
+    uint64_t m_hash = 0;
+};
+
+using MaterialDefinitionSetRef = std::shared_ptr<const MaterialDefinitionSet>;
 
 inline constexpr const char* kDispatchFile = "ernie/render/kernels/material/dispatch.slang";
 
@@ -29,7 +69,7 @@ struct InputBinding {
 };
 
 struct ShadingNode {
-    std::shared_ptr<const NodeDefinition> node;
+    std::shared_ptr<const MaterialNodeDefinition> node;
     std::vector<InputBinding> inputs;
 };
 
@@ -45,19 +85,20 @@ struct GraphLayout {
     uint32_t bytes = 0;
 };
 
-bool Texturable(NodeInputType type);
+bool Texturable(MaterialInputType type);
 
 GraphLayout LayOut(const ShadingGraph& graph);
 
-graph::ShapeKey DefinitionKey(const ShadingGraph& graph);
+graph::ShapeKey MaterialDefinitionKey(const ShadingGraph& graph);
 
-DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph);
+MaterialDefinition GenerateMaterialDefinition(uint32_t id, const ShadingGraph& graph);
 
 inline constexpr const char* kRegisteredFile = "ernie/render/kernels/material/registered.slang";
 
 std::map<std::string, std::string, std::less<>>
-PrimitiveSources(std::span<const std::shared_ptr<const PrimitiveDefinition>> primitives);
+ClosurePrimitiveSources(std::span<const std::shared_ptr<const ClosurePrimitive>> primitives);
 
-std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set);
+std::map<std::string, std::string, std::less<>>
+MaterialDispatchSources(const MaterialDefinitionSet& set);
 
 }

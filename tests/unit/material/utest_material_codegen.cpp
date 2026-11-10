@@ -3,12 +3,12 @@
 
 #include <gtest/gtest.h>
 
-namespace ernie {
+namespace ernie::material {
 namespace {
 
 TEST(MaterialCodegenTest, DispatchLinksOnlyTheBuiltinsWithoutGeneratedDefinitions) {
-    const DefinitionSet builtins;
-    const auto sources = DispatchSources(builtins);
+    const MaterialDefinitionSet builtins;
+    const auto sources = MaterialDispatchSources(builtins);
     ASSERT_EQ(sources.size(), 1u);
     const std::string& dispatch = sources.at(kDispatchFile);
     EXPECT_NE(dispatch.find("return definition < 4;"), std::string::npos);
@@ -18,11 +18,11 @@ TEST(MaterialCodegenTest, DispatchLinksOnlyTheBuiltinsWithoutGeneratedDefinition
 }
 
 TEST(MaterialCodegenTest, GeneratedDefinitionsAddAnImportACaseAndTheirModule) {
-    const DefinitionSet set({{.id = 5,
-                              .type = "Wet5",
-                              .module = "ernie.material.generated.d5",
-                              .source = "struct Wet5 {}"}});
-    const auto sources = DispatchSources(set);
+    const MaterialDefinitionSet set({{.id = 5,
+                                      .type = "Wet5",
+                                      .module = "ernie.material.generated.d5",
+                                      .source = "struct Wet5 {}"}});
+    const auto sources = MaterialDispatchSources(set);
     ASSERT_EQ(sources.size(), 2u);
     EXPECT_EQ(sources.at("ernie/material/generated/d5.slang"), "struct Wet5 {}");
     const std::string& dispatch = sources.at(kDispatchFile);
@@ -32,7 +32,7 @@ TEST(MaterialCodegenTest, GeneratedDefinitionsAddAnImportACaseAndTheirModule) {
               std::string::npos);
     EXPECT_TRUE(set.Contains(5));
     EXPECT_FALSE(set.Contains(6));
-    EXPECT_NE(set.Hash(), DefinitionSet().Hash());
+    EXPECT_NE(set.Hash(), MaterialDefinitionSet().Hash());
 }
 
 }

@@ -13,7 +13,7 @@
 #include "ernie/device/program.h"
 #include "ernie/device/ref.h"
 #include "ernie/graph/library.h"
-#include "ernie/material/definition.h"
+#include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
 #include "ernie/scene/records/materials.h"
 #include "ernie/scene/tables/connections.h"
@@ -45,7 +45,7 @@ class MaterialTable : public RenderTable {
     void Prepare() override;
 
     bool Pending() const override {
-        return m_nodeVersion != NodeVersion();
+        return m_nodeVersion != material::MaterialNodeVersion();
     }
 
     void Run(const ChangeSet& changes, TableVersions& versions) override;
@@ -64,7 +64,7 @@ class MaterialTable : public RenderTable {
         return m_resolves;
     }
 
-    const DefinitionSetRef& Definitions() const {
+    const material::MaterialDefinitionSetRef& Definitions() const {
         return m_definitions;
     }
 
@@ -92,7 +92,7 @@ class MaterialTable : public RenderTable {
     void ResolveMaterial(uint32_t material);
     void ResolvePreview(uint32_t material, uint32_t shader);
     void ResolveNode(uint32_t material, uint32_t shader,
-                     std::shared_ptr<const NodeDefinition> surface);
+                     std::shared_ptr<const material::MaterialNodeDefinition> surface);
     bool BindTexture(uint32_t shader, const Connection& connection, std::string_view input,
                      bool color, uint32_t slot, TextureChannel& channel);
     void CarryPrevious(const std::vector<MaterialRecord>& before);
@@ -121,16 +121,18 @@ class MaterialTable : public RenderTable {
     uint64_t m_writes = 0;
     std::vector<RadarLink> m_radarLinks;
     Ref<device::Buffer> m_carried;
-    graph::DefinitionLibrary<DefinitionModule> m_library{kFirstGeneratedDefinition};
+    graph::DefinitionLibrary<material::MaterialDefinition> m_library{
+        material::kFirstGeneratedDefinition};
     std::vector<uint32_t> m_generations;
     std::set<uint32_t> m_spectral;
     std::set<std::pair<uint64_t, uint64_t>> m_warned;
     mutable std::vector<ColumnRef> m_inputs;
     mutable uint32_t m_inputSchemas = 0;
-    uint64_t m_nodeVersion = NodeVersion();
+    uint64_t m_nodeVersion = material::MaterialNodeVersion();
     uint32_t m_wordCount = 0;
     uint32_t m_resolves = 0;
-    DefinitionSetRef m_definitions = std::make_shared<const DefinitionSet>();
+    material::MaterialDefinitionSetRef m_definitions =
+        std::make_shared<const material::MaterialDefinitionSet>();
     DeviceTable<CheckerRecord> m_checkers{"checkerboard records"};
     DeviceTable<float> m_temperatures{"temperatures"};
     uint32_t m_temperaturePrimvar = 0;

@@ -2,7 +2,6 @@
 ernie_object_library(
     ernie_material
     codegen.cpp
-    definition.cpp
     node.cpp
     uplift.cpp
 )

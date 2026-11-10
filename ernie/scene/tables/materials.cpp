@@ -397,26 +397,26 @@ void MaterialTable::Define(uint32_t material, uint32_t definition, uint32_t word
 }
 
 void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
-                                std::shared_ptr<const NodeDefinition> surface) {
+                                std::shared_ptr<const material::MaterialNodeDefinition> surface) {
     const Prims& prims = m_structure.GetPrims();
     const Paths& paths = m_structure.GetPaths();
 
     struct Reached {
         uint32_t prim = kNoPrim;
-        std::shared_ptr<const NodeDefinition> node;
-        std::vector<InputBinding> inputs;
+        std::shared_ptr<const material::MaterialNodeDefinition> node;
+        std::vector<material::InputBinding> inputs;
         std::vector<Connection> textures;
     };
 
     std::vector<Reached> reached = {{.prim = shader, .node = std::move(surface)}};
     for (uint32_t k = 0; k < reached.size(); ++k) {
         const uint32_t prim = reached[k].prim;
-        const std::shared_ptr<const NodeDefinition> node = reached[k].node;
+        const std::shared_ptr<const material::MaterialNodeDefinition> node = reached[k].node;
         const std::span<const Connection> connections = Connections(prim);
-        std::vector<InputBinding> inputs(node->inputs.size());
+        std::vector<material::InputBinding> inputs(node->inputs.size());
         std::vector<Connection> textures(node->inputs.size());
         for (uint32_t i = 0; i < node->inputs.size(); ++i) {
-            const NodeInput& input = node->inputs[i];
+            const material::MaterialNodeInput& input = node->inputs[i];
             const auto found = std::ranges::find(connections, input.name, &Connection::input);
             if (found == connections.end()) {
                 continue;
@@ -424,10 +424,10 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
             const uint32_t source = found->source;
             const SchemaId schema =
                 source == kNoPrim ? SchemaId::None : prims.Record(source).schema;
-            std::shared_ptr<const NodeDefinition> pattern =
-                IsRuntime(schema) ? FindNode(Info(schema).name) : nullptr;
+            std::shared_ptr<const material::MaterialNodeDefinition> pattern =
+                IsRuntime(schema) ? material::FindMaterialNode(Info(schema).name) : nullptr;
             if (schema == SchemaId::SampledSpectrum) {
-                if (input.type != NodeInputType::Spectral) {
+                if (input.type != material::MaterialInputType::Spectral) {
                     Log(LogLevel::Warning,
                         "{}'s {} connects to the spectrum {}, but only SpectralValue inputs take "
                         "spectra; the input keeps its value",
@@ -435,9 +435,11 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                 }
                 continue;
             }
-            const NodeInputType fed =
-                input.type == NodeInputType::Spectral ? NodeInputType::Float3 : input.type;
-            if (pattern && pattern->role == NodeRole::Pattern) {
+            const material::MaterialInputType fed =
+                input.type == material::MaterialInputType::Spectral
+                    ? material::MaterialInputType::Float3
+                    : input.type;
+            if (pattern && pattern->role == material::MaterialNodeRole::Pattern) {
                 if (pattern->result != fed) {
                     Log(LogLevel::Warning,
                         "{}'s {} connects to {}, whose result has another type; the input keeps "
@@ -450,10 +452,10 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                     reached.push_back({.prim = source, .node = std::move(pattern)});
                     at = reached.end() - 1;
                 }
-                inputs[i] = {BindingKind::Pattern, uint32_t(at - reached.begin())};
+                inputs[i] = {material::BindingKind::Pattern, uint32_t(at - reached.begin())};
                 continue;
             }
-            if (!Texturable(input.type)) {
+            if (!material::Texturable(input.type)) {
                 Log(LogLevel::Warning,
                     "{}'s {} connects to {}, but only float and float3 inputs take textures; "
                     "the input keeps its value",
@@ -462,9 +464,9 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                 continue;
             }
             TextureChannel channel = TextureChannel::Rgb;
-            if (BindTexture(prim, *found, input.name, input.type != NodeInputType::Float, kNoPrim,
-                            channel)) {
-                inputs[i] = {BindingKind::Texture, 0};
+            if (BindTexture(prim, *found, input.name,
+                            input.type != material::MaterialInputType::Float, kNoPrim, channel)) {
+                inputs[i] = {material::BindingKind::Texture, 0};
                 textures[i] = *found;
             }
         }
@@ -479,7 +481,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         }
         for (uint32_t k = 0; k < reached.size(); ++k) {
             for (uint32_t i = 0; i < reached[k].inputs.size(); ++i) {
-                if (reached[k].inputs[i].kind == BindingKind::Pattern) {
+                if (reached[k].inputs[i].kind == material::BindingKind::Pattern) {
                     patterns.Connect(k, i, reached[k].inputs[i].source, 0);
                 }
             }
@@ -490,8 +492,9 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
             break;
         }
         const uint32_t closing = ordering.cycle.back();
-        for (InputBinding& binding : reached[closing].inputs) {
-            if (binding.kind == BindingKind::Pattern && binding.source == ordering.cycle.front()) {
+        for (material::InputBinding& binding : reached[closing].inputs) {
+            if (binding.kind == material::BindingKind::Pattern &&
+                binding.source == ordering.cycle.front()) {
                 binding = {};
             }
         }
@@ -500,28 +503,30 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
     }
     order.resize(size_t(std::ranges::find(order, 0u) - order.begin()) + 1);
     std::vector<uint32_t> position(reached.size(), kNoPrim);
-    ShadingGraph graph;
+    material::ShadingGraph graph;
     for (const uint32_t k : order) {
         position[k] = uint32_t(graph.nodes.size());
         graph.nodes.push_back({reached[k].node, reached[k].inputs});
     }
-    for (ShadingNode& node : graph.nodes) {
-        for (InputBinding& binding : node.inputs) {
-            if (binding.kind == BindingKind::Pattern) {
+    for (material::ShadingNode& node : graph.nodes) {
+        for (material::InputBinding& binding : node.inputs) {
+            if (binding.kind == material::BindingKind::Pattern) {
                 binding.source = position[binding.source];
             }
         }
     }
-    const GraphLayout layout = LayOut(graph);
-    const uint32_t definition = m_library.Intern(DefinitionKey(graph), [&](uint32_t id) {
-        DefinitionModule module = GenerateDefinition(id, graph);
-        Log(LogLevel::Debug,
-            "new material definition {} for {} with {}, {} in {} words and {} bytes of generated "
-            "Slang",
-            id, graph.nodes.back().node->name, Counted(graph.nodes.size() - 1, "pattern"),
-            Counted(layout.textureCount, "texture"), Word(layout.bytes), module.source.size());
-        return module;
-    });
+    const material::GraphLayout layout = material::LayOut(graph);
+    const uint32_t definition =
+        m_library.Intern(material::MaterialDefinitionKey(graph), [&](uint32_t id) {
+            material::MaterialDefinition module = material::GenerateMaterialDefinition(id, graph);
+            Log(LogLevel::Debug,
+                "new material definition {} for {} with {}, {} in {} words and {} bytes of "
+                "generated "
+                "Slang",
+                id, graph.nodes.back().node->name, Counted(graph.nodes.size() - 1, "pattern"),
+                Counted(layout.textureCount, "texture"), Word(layout.bytes), module.source.size());
+            return module;
+        });
     m_wordCount = (m_wordCount + 1) & ~1u;
     const uint32_t base = m_wordCount;
     m_wordCount += Word(layout.bytes);
@@ -533,7 +538,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         const Span<const ColumnInfo> columns = Columns(schema);
         for (uint32_t i = 0; i < node.node->inputs.size(); ++i) {
             CopyCell({schema, &columns[i], i}, node.prim, base + Word(layout.cells[n][i]));
-            if (node.node->inputs[i].type == NodeInputType::Spectral) {
+            if (node.node->inputs[i].type == material::MaterialInputType::Spectral) {
                 uint32_t spectrum = kNoSpectrum;
                 for (const Connection& connection : Connections(node.prim)) {
                     if (connection.input == node.node->inputs[i].name &&
@@ -545,13 +550,13 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
                 }
                 m_pack.Literal(base + Word(layout.cells[n][i] + 12), spectrum);
             }
-            if (node.inputs[i].kind != BindingKind::Texture) {
+            if (node.inputs[i].kind != material::BindingKind::Texture) {
                 continue;
             }
             TextureChannel channel = TextureChannel::Rgb;
             BindTexture(node.prim, node.textures[i], node.node->inputs[i].name,
-                        node.node->inputs[i].type != NodeInputType::Float,
-                        base + Word(layout.textures[n][i] * kTextureInputBytes), channel);
+                        node.node->inputs[i].type != material::MaterialInputType::Float,
+                        base + Word(layout.textures[n][i] * material::kTextureInputBytes), channel);
             uint32_t read = kNoPrim;
             for (const Connection& connection : Connections(node.textures[i].source)) {
                 if (connection.input == "st") {
@@ -591,9 +596,9 @@ void MaterialTable::ResolveMaterial(uint32_t material) {
         return;
     }
     if (surface != kNoPrim && IsRuntime(prims.Record(surface).schema)) {
-        std::shared_ptr<const NodeDefinition> node =
-            FindNode(Info(prims.Record(surface).schema).name);
-        if (node && node->role != NodeRole::Pattern) {
+        std::shared_ptr<const material::MaterialNodeDefinition> node =
+            material::FindMaterialNode(Info(prims.Record(surface).schema).name);
+        if (node && node->role != material::MaterialNodeRole::Pattern) {
             ResolveNode(material, surface, std::move(node));
             return;
         }
@@ -668,7 +673,7 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
         if (id == kDefinitionPreviewConstant || id == kDefinitionPreviewTextured) {
             return Word(sizeof(PreviewParams));
         }
-        const std::shared_ptr<const DefinitionModule> found = library->Find(id);
+        const std::shared_ptr<const material::MaterialDefinition> found = library->Find(id);
         return found ? found->words : 0;
     };
     for (uint32_t prim = 0; prim < prims.Size(); ++prim) {
@@ -677,7 +682,7 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
         }
         generations[prim] = prims.Generation(prim) + 1;
         MaterialRecord record = m_records.Row(prim);
-        if (record.definition < kFirstGeneratedDefinition) {
+        if (record.definition < material::kFirstGeneratedDefinition) {
             record.previousDefinition = kDefinitionPlaceholder;
             record.previousWords = 0;
             m_records.Set(prim, record);
@@ -719,14 +724,14 @@ void MaterialTable::CarryPrevious(const std::vector<MaterialRecord>& before) {
     } else if (m_carries.empty()) {
         m_carried = nullptr;
     }
-    std::vector<DefinitionModule> definitions;
+    std::vector<material::MaterialDefinition> definitions;
     for (const auto& entry : library->Entries()) {
         if (used.contains(entry.id)) {
             definitions.push_back(*entry.definition);
         }
     }
-    auto set = std::make_shared<const DefinitionSet>(std::move(definitions),
-                                                     PrimitiveSources(Primitives()));
+    auto set = std::make_shared<const material::MaterialDefinitionSet>(
+        std::move(definitions), material::ClosurePrimitiveSources(material::ClosurePrimitives()));
     if (set->Hash() != m_definitions->Hash()) {
         Log(LogLevel::Debug, "the scene now uses {}",
             Counted(set->Definitions().size(), "generated material definition"));
@@ -833,10 +838,10 @@ void MaterialTable::Run(const ChangeSet& changes, TableVersions&) {
     ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     const uint64_t writes = store.WriteSequence();
-    const bool resolve =
-        Restructured(changes) || !m_records.Buffer() || m_nodeVersion != NodeVersion();
+    const bool resolve = Restructured(changes) || !m_records.Buffer() ||
+                         m_nodeVersion != material::MaterialNodeVersion();
     if (resolve) {
-        m_nodeVersion = NodeVersion();
+        m_nodeVersion = material::MaterialNodeVersion();
         Resolve(changes);
     }
     const uint32_t prims = m_structure.GetPrims().Size();

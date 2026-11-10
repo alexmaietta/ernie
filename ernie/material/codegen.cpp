@@ -3,16 +3,25 @@
 
 #include <algorithm>
 #include <format>
+#include <string_view>
 
 #include "ernie/util/text.h"
 
-namespace ernie {
+namespace ernie::material {
 
 namespace {
 
-std::string Cases(const DefinitionSet& set, std::string_view standard, std::string_view surface) {
+uint64_t Mix(uint64_t hash, std::string_view bytes) {
+    for (const char byte : bytes) {
+        hash = (hash ^ uint8_t(byte)) * 0x100000001b3ull;
+    }
+    return hash;
+}
+
+std::string Cases(const MaterialDefinitionSet& set, std::string_view standard,
+                  std::string_view surface) {
     std::string cases;
-    for (const DefinitionModule& definition : set.Definitions()) {
+    for (const MaterialDefinition& definition : set.Definitions()) {
         const std::string_view call = definition.surface ? surface : standard;
         cases +=
             std::format("    }} else if (context.definition == {}) {{\n        {}\n", definition.id,
@@ -21,10 +30,10 @@ std::string Cases(const DefinitionSet& set, std::string_view standard, std::stri
     return cases;
 }
 
-std::string Dispatch(const DefinitionSet& set) {
+std::string Dispatch(const MaterialDefinitionSet& set) {
     std::string imports;
     std::string linked;
-    for (const DefinitionModule& definition : set.Definitions()) {
+    for (const MaterialDefinition& definition : set.Definitions()) {
         imports += std::format("import {};\n", definition.module);
         linked += std::format(" || definition == {}", definition.id);
     }
@@ -82,41 +91,41 @@ Spectrum AlbedoDefinition<Spectrum : ISpectrum>(inout ShadeContext context) {{
               "return {}<Spectrum>.Albedo(context);"));
 }
 
-std::string_view CellType(NodeInputType type) {
+std::string_view CellType(MaterialInputType type) {
     switch (type) {
-    case NodeInputType::Bool:
+    case MaterialInputType::Bool:
         return "uint";
-    case NodeInputType::Int:
+    case MaterialInputType::Int:
         return "int";
-    case NodeInputType::Float:
+    case MaterialInputType::Float:
         return "float";
-    case NodeInputType::Float2:
+    case MaterialInputType::Float2:
         return "Float2";
-    case NodeInputType::Float3:
+    case MaterialInputType::Float3:
         return "Float3";
-    case NodeInputType::Float4:
+    case MaterialInputType::Float4:
         return "Float4";
-    case NodeInputType::Spectral:
+    case MaterialInputType::Spectral:
         return "Float3";
     }
     return "float";
 }
 
-std::string_view SlangType(NodeInputType type) {
+std::string_view SlangType(MaterialInputType type) {
     switch (type) {
-    case NodeInputType::Bool:
+    case MaterialInputType::Bool:
         return "bool";
-    case NodeInputType::Int:
+    case MaterialInputType::Int:
         return "int";
-    case NodeInputType::Float:
+    case MaterialInputType::Float:
         return "float";
-    case NodeInputType::Float2:
+    case MaterialInputType::Float2:
         return "float2";
-    case NodeInputType::Float3:
+    case MaterialInputType::Float3:
         return "float3";
-    case NodeInputType::Float4:
+    case MaterialInputType::Float4:
         return "float4";
-    case NodeInputType::Spectral:
+    case MaterialInputType::Spectral:
         return "SpectralValue";
     }
     return "float";
@@ -125,8 +134,8 @@ std::string_view SlangType(NodeInputType type) {
 std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node,
                        uint32_t input) {
     const InputBinding& binding = graph.nodes[node].inputs[input];
-    const NodeInput& declared = graph.nodes[node].node->inputs[input];
-    const bool spectral = declared.type == NodeInputType::Spectral;
+    const MaterialNodeInput& declared = graph.nodes[node].node->inputs[input];
+    const bool spectral = declared.type == MaterialInputType::Spectral;
     if (binding.kind == BindingKind::Pattern) {
         return spectral ? std::format("SpectralValue.Rgb(r{})", binding.source)
                         : std::format("r{}", binding.source);
@@ -136,7 +145,7 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
         const std::string sampled =
             std::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]",
                         layout.textures[node][input]);
-        if (declared.type == NodeInputType::Float) {
+        if (declared.type == MaterialInputType::Float) {
             return std::format("TexturedFloat({}, {})", cell, sampled);
         }
         const std::string color = std::format("TexturedColor({}, {})", cell, sampled);
@@ -148,11 +157,11 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
                            cell);
     }
     switch (declared.type) {
-    case NodeInputType::Bool:
+    case MaterialInputType::Bool:
         return cell + " != 0";
-    case NodeInputType::Float2:
-    case NodeInputType::Float3:
-    case NodeInputType::Float4:
+    case MaterialInputType::Float2:
+    case MaterialInputType::Float3:
+    case MaterialInputType::Float4:
         return cell + ".Vector()";
     default:
         return cell;
@@ -160,18 +169,18 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
 }
 
 std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node) {
-    const NodeDefinition& definition = *graph.nodes[node].node;
+    const MaterialNodeDefinition& definition = *graph.nodes[node].node;
     std::string arguments;
-    for (const NodeParameter& parameter : definition.parameters) {
+    for (const MaterialNodeParameter& parameter : definition.parameters) {
         arguments += arguments.empty() ? "" : ", ";
         switch (parameter.source) {
-        case NodeParameter::Source::Context:
+        case MaterialNodeParameter::Source::Context:
             arguments += "context";
             break;
-        case NodeParameter::Source::Point:
+        case MaterialNodeParameter::Source::Point:
             arguments += "context.point";
             break;
-        case NodeParameter::Source::Input:
+        case MaterialNodeParameter::Source::Input:
             arguments += Expression(graph, layout, node, parameter.input);
             break;
         }
@@ -182,9 +191,9 @@ std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t 
 
 }
 
-bool Texturable(NodeInputType type) {
-    return type == NodeInputType::Float || type == NodeInputType::Float3 ||
-           type == NodeInputType::Spectral;
+bool Texturable(MaterialInputType type) {
+    return type == MaterialInputType::Float || type == MaterialInputType::Float3 ||
+           type == MaterialInputType::Spectral;
 }
 
 GraphLayout LayOut(const ShadingGraph& graph) {
@@ -203,16 +212,16 @@ GraphLayout LayOut(const ShadingGraph& graph) {
     }
     for (const ShadingNode& node : graph.nodes) {
         std::vector<uint32_t>& cells = layout.cells.emplace_back();
-        for (const NodeInput& input : node.node->inputs) {
+        for (const MaterialNodeInput& input : node.node->inputs) {
             cells.push_back(offset);
-            offset += NodeInputBytes(input.type);
+            offset += MaterialInputBytes(input.type);
         }
     }
     layout.bytes = offset;
     return layout;
 }
 
-graph::ShapeKey DefinitionKey(const ShadingGraph& shading) {
+graph::ShapeKey MaterialDefinitionKey(const ShadingGraph& shading) {
     graph::Graph graph;
     std::vector<uint32_t> order;
     for (size_t node = 0; node < shading.nodes.size(); ++node) {
@@ -236,25 +245,25 @@ graph::ShapeKey DefinitionKey(const ShadingGraph& shading) {
     });
 }
 
-DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
+MaterialDefinition GenerateMaterialDefinition(uint32_t id, const ShadingGraph& graph) {
     const GraphLayout layout = LayOut(graph);
     const std::string type = std::format("Definition{}", id);
     const uint32_t surface = uint32_t(graph.nodes.size() - 1);
-    const NodeDefinition& top = *graph.nodes[surface].node;
+    const MaterialNodeDefinition& top = *graph.nodes[surface].node;
     std::string fields;
     if (layout.textureCount > 0) {
         fields += std::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
                               layout.textureCount);
     }
     std::string imports;
-    DefinitionModule module{
+    MaterialDefinition module{
         .id = id, .type = type, .words = layout.bytes / uint32_t(sizeof(uint32_t))};
     std::string body;
     for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
-        const NodeDefinition& definition = *graph.nodes[node].node;
-        for (const NodeInput& input : definition.inputs) {
+        const MaterialNodeDefinition& definition = *graph.nodes[node].node;
+        for (const MaterialNodeInput& input : definition.inputs) {
             fields += std::format("    {} n{}_{};\n", CellType(input.type), node, input.name);
-            if (input.type == NodeInputType::Spectral) {
+            if (input.type == MaterialInputType::Spectral) {
                 fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
             }
         }
@@ -282,7 +291,7 @@ DefinitionModule GenerateDefinition(uint32_t id, const ShadingGraph& graph) {
                           "context, &p.mapping, &p.textures[0]);\n",
                           layout.textureCount);
     module.module = std::format("ernie.material.generated.d{}", id);
-    module.surface = top.role == NodeRole::Surface;
+    module.surface = top.role == MaterialNodeRole::Surface;
     const std::string header = std::format(
         R"(// SPDX-License-Identifier: BSD-3-Clause
 // Generated by ernie/material/codegen.cpp for {1}; do not edit.
@@ -335,7 +344,7 @@ struct {0} : IStandardMaterial {{
 }
 
 std::map<std::string, std::string, std::less<>>
-PrimitiveSources(std::span<const std::shared_ptr<const PrimitiveDefinition>> primitives) {
+ClosurePrimitiveSources(std::span<const std::shared_ptr<const ClosurePrimitive>> primitives) {
     std::map<std::string, std::string, std::less<>> sources;
     if (primitives.empty()) {
         return sources;
@@ -347,7 +356,7 @@ PrimitiveSources(std::span<const std::shared_ptr<const PrimitiveDefinition>> pri
     std::string evaluate;
     std::string pdf;
     std::string direction;
-    for (const std::shared_ptr<const PrimitiveDefinition>& primitive : primitives) {
+    for (const std::shared_ptr<const ClosurePrimitive>& primitive : primitives) {
         sources[ModulePath(primitive->module)] = primitive->source;
         imports += std::format("import {};\n", primitive->module);
         kinds += std::format("static const uint kLobe{} = {};\n", primitive->name, primitive->kind);
@@ -423,16 +432,42 @@ float3 PrimitiveDirection(uint kind, float alpha, LobeParams params, float3 outg
     return sources;
 }
 
-std::map<std::string, std::string, std::less<>> DispatchSources(const DefinitionSet& set) {
+std::map<std::string, std::string, std::less<>>
+MaterialDispatchSources(const MaterialDefinitionSet& set) {
     std::map<std::string, std::string, std::less<>> sources(set.Files().begin(), set.Files().end());
     sources[kDispatchFile] = Dispatch(set);
-    for (const DefinitionModule& definition : set.Definitions()) {
+    for (const MaterialDefinition& definition : set.Definitions()) {
         sources[ModulePath(definition.module)] = definition.source;
         for (const auto& [path, source] : definition.files) {
             sources[path] = source;
         }
     }
     return sources;
+}
+
+MaterialDefinitionSet::MaterialDefinitionSet(std::vector<MaterialDefinition> definitions,
+                                             std::map<std::string, std::string, std::less<>> files)
+    : m_definitions(std::move(definitions)), m_files(std::move(files)),
+      m_hash(0xcbf29ce484222325ull) {
+    for (const auto& [path, source] : m_files) {
+        m_hash = Mix(m_hash, path);
+        m_hash = Mix(m_hash, source);
+    }
+    std::ranges::sort(m_definitions, {}, &MaterialDefinition::id);
+    for (const MaterialDefinition& definition : m_definitions) {
+        m_hash = Mix(m_hash, std::to_string(definition.id));
+        m_hash = Mix(m_hash, definition.type);
+        m_hash = Mix(m_hash, definition.source);
+        for (const auto& [path, source] : definition.files) {
+            m_hash = Mix(m_hash, path);
+            m_hash = Mix(m_hash, source);
+        }
+    }
+}
+
+bool MaterialDefinitionSet::Contains(uint32_t id) const {
+    return id < kFirstGeneratedDefinition ||
+           std::ranges::binary_search(m_definitions, id, {}, &MaterialDefinition::id);
 }
 
 }

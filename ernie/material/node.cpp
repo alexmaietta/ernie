@@ -8,13 +8,13 @@
 #include "ernie/graph/library.h"
 #include "ernie/util/error.h"
 
-namespace ernie {
+namespace ernie::material {
 
 namespace {
 
 struct Nodes {
-    std::map<std::string, std::shared_ptr<const NodeDefinition>, std::less<>> byName;
-    std::vector<std::shared_ptr<const PrimitiveDefinition>> primitives;
+    std::map<std::string, std::shared_ptr<const MaterialNodeDefinition>, std::less<>> byName;
+    std::vector<std::shared_ptr<const ClosurePrimitive>> primitives;
     uint64_t version = 0;
 };
 
@@ -25,7 +25,7 @@ graph::Published<Nodes>& Registry() {
 
 }
 
-void RegisterNode(NodeDefinition node) {
+void RegisterMaterialNode(MaterialNodeDefinition node) {
     Registry().Update([&](Nodes& nodes) {
         const auto found = nodes.byName.find(node.name);
         if (found != nodes.byName.end() && found->second->file != node.file) {
@@ -38,19 +38,19 @@ void RegisterNode(NodeDefinition node) {
         }
         nodes.version += found != nodes.byName.end() ? 1 : 0;
         const std::string name = node.name;
-        nodes.byName[name] = std::make_shared<const NodeDefinition>(std::move(node));
+        nodes.byName[name] = std::make_shared<const MaterialNodeDefinition>(std::move(node));
     });
 }
 
-std::shared_ptr<const NodeDefinition> FindNode(std::string_view name) {
+std::shared_ptr<const MaterialNodeDefinition> FindMaterialNode(std::string_view name) {
     const std::shared_ptr<const Nodes> nodes = Registry().Get();
     const auto found = nodes->byName.find(name);
     return found == nodes->byName.end() ? nullptr : found->second;
 }
 
-uint32_t PrimitiveKind(std::string_view name) {
+uint32_t ClosurePrimitiveKind(std::string_view name) {
     const std::shared_ptr<const Nodes> nodes = Registry().Get();
-    for (const std::shared_ptr<const PrimitiveDefinition>& primitive : nodes->primitives) {
+    for (const std::shared_ptr<const ClosurePrimitive>& primitive : nodes->primitives) {
         if (primitive->name == name) {
             return primitive->kind;
         }
@@ -58,9 +58,9 @@ uint32_t PrimitiveKind(std::string_view name) {
     return kFirstPrimitiveLobe + uint32_t(nodes->primitives.size());
 }
 
-void RegisterPrimitive(PrimitiveDefinition primitive) {
+void RegisterClosurePrimitive(ClosurePrimitive primitive) {
     Registry().Update([&](Nodes& nodes) {
-        for (std::shared_ptr<const PrimitiveDefinition>& known : nodes.primitives) {
+        for (std::shared_ptr<const ClosurePrimitive>& known : nodes.primitives) {
             if (known->name != primitive.name) {
                 continue;
             }
@@ -70,34 +70,33 @@ void RegisterPrimitive(PrimitiveDefinition primitive) {
             }
             if (known->source != primitive.source) {
                 primitive.kind = known->kind;
-                known = std::make_shared<const PrimitiveDefinition>(std::move(primitive));
+                known = std::make_shared<const ClosurePrimitive>(std::move(primitive));
                 ++nodes.version;
             }
             return;
         }
         primitive.kind = kFirstPrimitiveLobe + uint32_t(nodes.primitives.size());
-        nodes.primitives.push_back(
-            std::make_shared<const PrimitiveDefinition>(std::move(primitive)));
+        nodes.primitives.push_back(std::make_shared<const ClosurePrimitive>(std::move(primitive)));
         ++nodes.version;
     });
 }
 
-std::vector<std::shared_ptr<const PrimitiveDefinition>> Primitives() {
+std::vector<std::shared_ptr<const ClosurePrimitive>> ClosurePrimitives() {
     return Registry().Get()->primitives;
 }
 
-uint64_t NodeVersion() {
+uint64_t MaterialNodeVersion() {
     return Registry().Get()->version;
 }
 
-uint32_t NodeInputBytes(NodeInputType type) {
+uint32_t MaterialInputBytes(MaterialInputType type) {
     switch (type) {
-    case NodeInputType::Float2:
+    case MaterialInputType::Float2:
         return 8;
-    case NodeInputType::Float3:
+    case MaterialInputType::Float3:
         return 12;
-    case NodeInputType::Float4:
-    case NodeInputType::Spectral:
+    case MaterialInputType::Float4:
+    case MaterialInputType::Spectral:
         return 16;
     default:
         return 4;

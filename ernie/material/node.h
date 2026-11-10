@@ -7,46 +7,46 @@
 #include <string_view>
 #include <vector>
 
-namespace ernie {
+namespace ernie::material {
 
-enum class NodeInputType { Bool, Int, Float, Float2, Float3, Float4, Spectral };
+enum class MaterialInputType { Bool, Int, Float, Float2, Float3, Float4, Spectral };
 
-struct NodeInput {
+struct MaterialNodeInput {
     std::string name;
-    NodeInputType type = NodeInputType::Float;
+    MaterialInputType type = MaterialInputType::Float;
     bool color = false;
 };
 
-enum class NodeRole { Material, Surface, Pattern };
+enum class MaterialNodeRole { Material, Surface, Pattern };
 
-struct NodeParameter {
+struct MaterialNodeParameter {
     enum class Source { Input, Context, Point };
 
     Source source = Source::Input;
     uint32_t input = 0;
 };
 
-struct NodeDefinition {
+struct MaterialNodeDefinition {
     std::string name;
-    NodeRole role = NodeRole::Material;
+    MaterialNodeRole role = MaterialNodeRole::Material;
     uint32_t schema = 0;
     std::string file;
     std::string module;
     std::string source;
-    std::vector<NodeInput> inputs;
-    NodeInputType result = NodeInputType::Float;
-    std::vector<NodeParameter> parameters;
+    std::vector<MaterialNodeInput> inputs;
+    MaterialInputType result = MaterialInputType::Float;
+    std::vector<MaterialNodeParameter> parameters;
 };
 
-void RegisterNode(NodeDefinition node);
+void RegisterMaterialNode(MaterialNodeDefinition node);
 
-std::shared_ptr<const NodeDefinition> FindNode(std::string_view name);
+std::shared_ptr<const MaterialNodeDefinition> FindMaterialNode(std::string_view name);
 
-uint64_t NodeVersion();
+uint64_t MaterialNodeVersion();
 
 inline constexpr uint32_t kFirstPrimitiveLobe = 3;
 
-struct PrimitiveDefinition {
+struct ClosurePrimitive {
     std::string name;
     uint32_t kind = 0;
     std::string file;
@@ -54,12 +54,12 @@ struct PrimitiveDefinition {
     std::string source;
 };
 
-uint32_t PrimitiveKind(std::string_view name);
+uint32_t ClosurePrimitiveKind(std::string_view name);
 
-void RegisterPrimitive(PrimitiveDefinition primitive);
+void RegisterClosurePrimitive(ClosurePrimitive primitive);
 
-std::vector<std::shared_ptr<const PrimitiveDefinition>> Primitives();
+std::vector<std::shared_ptr<const ClosurePrimitive>> ClosurePrimitives();
 
-uint32_t NodeInputBytes(NodeInputType type);
+uint32_t MaterialInputBytes(MaterialInputType type);
 
 }

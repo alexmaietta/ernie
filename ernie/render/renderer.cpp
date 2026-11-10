@@ -48,15 +48,17 @@ RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
     : m_scene(scene ? std::move(scene) : throw Error("A renderer of no scene")),
       m_maxPixelsPerLaunch(std::clamp<uint64_t>(desc.maxPixelsPerLaunch, 1, ~uint32_t(0))),
       m_overlays(desc.overlays ? desc.overlays : Overlays::Create(m_scene->GetDevice())) {
-    const DefinitionSetRef& definitions = SceneImpl::Get(*m_scene).GetMaterials().Definitions();
+    const material::MaterialDefinitionSetRef& definitions =
+        SceneImpl::Get(*m_scene).GetMaterials().Definitions();
     m_renderProgram = CreateRenderProgram(*definitions);
     m_renderHash = definitions->Hash();
     Log(LogLevel::Debug, "created a renderer: at most {} per launch",
         Counted(m_maxPixelsPerLaunch, "pixel"));
 }
 
-Ref<device::Program> RendererImpl::CreateRenderProgram(const DefinitionSet& definitions) const {
-    const auto sources = DispatchSources(definitions);
+Ref<device::Program>
+RendererImpl::CreateRenderProgram(const material::MaterialDefinitionSet& definitions) const {
+    const auto sources = material::MaterialDispatchSources(definitions);
     return m_scene->GetDevice().CreateProgram(
         {.modules = {"ernie.render.kernels.render.render"},
          .library = &kRenderKernels,
@@ -91,7 +93,8 @@ device::Kernel& RendererImpl::RenderEntry(std::string_view name) {
 }
 
 void RendererImpl::UpdateRenderProgram() {
-    const DefinitionSetRef& definitions = SceneImpl::Get(*m_scene).GetMaterials().Definitions();
+    const material::MaterialDefinitionSetRef& definitions =
+        SceneImpl::Get(*m_scene).GetMaterials().Definitions();
     const uint64_t hash = definitions->Hash();
     if (hash == m_renderHash || hash == m_failedHash) {
         m_pendingProgram = nullptr;
@@ -126,7 +129,7 @@ void RendererImpl::UpdateRenderProgram() {
         }
     } catch (const std::exception& error) {
         std::string message = error.what();
-        for (const DefinitionModule& definition : m_pendingDefinitions->Definitions()) {
+        for (const material::MaterialDefinition& definition : m_pendingDefinitions->Definitions()) {
             message = MapOrigins(std::move(message), definition.origins);
         }
         Log(LogLevel::Error,

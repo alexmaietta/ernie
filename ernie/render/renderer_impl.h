@@ -20,7 +20,7 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/program.h"
 #include "ernie/device/queue.h"
-#include "ernie/material/definition.h"
+#include "ernie/material/codegen.h"
 #include "ernie/overlay/overlay_impl.h"
 #include "ernie/render/kernels/render/render.h"
 #include "ernie/render/renderer.h"
@@ -113,14 +113,15 @@ class RendererImpl {
     Ref<Scene> m_scene;
     uint64_t m_maxPixelsPerLaunch;
     Ref<Overlays> m_overlays;
-    Ref<device::Program> CreateRenderProgram(const DefinitionSet& definitions) const;
+    Ref<device::Program>
+    CreateRenderProgram(const material::MaterialDefinitionSet& definitions) const;
     void UpdateRenderProgram();
     device::Kernel& RenderEntry(std::string_view name);
 
     Ref<device::Program> m_renderProgram;
     uint64_t m_renderHash = 0;
     Ref<device::Program> m_pendingProgram;
-    DefinitionSetRef m_pendingDefinitions;
+    material::MaterialDefinitionSetRef m_pendingDefinitions;
     std::chrono::steady_clock::time_point m_pendingStart;
     std::set<std::string, std::less<>> m_usedEntries;
     uint64_t m_failedHash = 0;
