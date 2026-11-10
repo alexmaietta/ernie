@@ -288,6 +288,10 @@ uint First(LbvhParams p, uint ref) {
     return (ref & kLbvhLeaf) != 0 ? ref & ~kLbvhLeaf : p.nodes[ref * kLbvhNodeWords + kLbvhFirst];
 }
 
+uint LeafSize(LbvhParams p) {
+    return p.kind == kBvhInstances ? 1 : kBvhLeafSize;
+}
+
 BvhBox Box(LbvhParams p, uint ref) {
     if ((ref & kLbvhLeaf) != 0) {
         return LeafBox(p, ref & ~kLbvhLeaf);
@@ -308,7 +312,7 @@ struct Children {
 [ForceInline]
 Children GatherChildren(LbvhParams p, uint task) {
     Children children;
-    if (Count(p, task) <= kBvhLeafSize) {
+    if (Count(p, task) <= LeafSize(p)) {
         children.refs[0] = task;
         children.count = 1;
         return children;
@@ -320,7 +324,7 @@ Children GatherChildren(LbvhParams p, uint task) {
         int largest = -1;
         float area = -1;
         for (uint i = 0; i < children.count; ++i) {
-            if (Count(p, children.refs[i]) > kBvhLeafSize) {
+            if (Count(p, children.refs[i]) > LeafSize(p)) {
                 const float a = BvhArea(Box(p, children.refs[i]));
                 if (a > area) {
                     area = a;
@@ -358,7 +362,7 @@ void LinkChildren(LbvhParams p, inout BvhNode node, uint segment, Children child
     uint records = 0;
     for (uint i = 0; i < children.count; ++i) {
         const uint primitives = Count(p, children.refs[i]);
-        if (primitives > kBvhLeafSize) {
+        if (primitives > LeafSize(p)) {
             ++internal;
         } else {
             records += primitives;
@@ -388,7 +392,7 @@ void LinkChildren(LbvhParams p, inout BvhNode node, uint segment, Children child
         const uint child = children.refs[slots.child[slot]];
         const uint primitives = Count(p, child);
         uint meta;
-        if (primitives > kBvhLeafSize) {
+        if (primitives > LeafSize(p)) {
             imask |= 1u << slot;
             meta = BvhInternalMeta(slot);
             Enqueue(p, child, segment, nextChild++);

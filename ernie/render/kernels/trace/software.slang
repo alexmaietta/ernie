@@ -304,7 +304,10 @@ struct SoftwareTracer : ITracer {
             level = BvhLevel(blas, visitor.query.ray);
             floor = depth;
             node = 0;
-            visiting = true;
+            visiting = blas.primitives > kBvhLeafSize;
+            if (!visiting && visitor.Visit(level.records, blas.primitives, level.kind)) {
+                return visitor.nearest;
+            }
         }
     }
 }
