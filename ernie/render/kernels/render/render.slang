@@ -74,6 +74,7 @@ void RenderPixel<P : IPattern, R : IResponse<P>>(RenderParams params) {
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
+[MaxRegisters(96)]
 void RenderMinimalData(uniform RenderParams params) {
     CapturePixel pixel;
     if (FindPixel(params, pixel)) {
@@ -83,6 +84,7 @@ void RenderMinimalData(uniform RenderParams params) {
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
+[MaxRegisters(96)]
 void RenderMinimalDisplayColor(uniform RenderParams params) {
     CapturePixel pixel;
     if (FindPixel(params, pixel)) {
@@ -92,6 +94,7 @@ void RenderMinimalDisplayColor(uniform RenderParams params) {
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
+[MaxRegisters(96)]
 void RenderMinimalTextureDiffuse(uniform RenderParams params) {
     CapturePixel pixel;
     if (FindPixel(params, pixel)) {
@@ -101,6 +104,7 @@ void RenderMinimalTextureDiffuse(uniform RenderParams params) {
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
+[MaxRegisters(96)]
 void RenderMinimalFull(uniform RenderParams params) {
     CapturePixel pixel;
     if (FindPixel(params, pixel)) {

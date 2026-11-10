@@ -6,6 +6,11 @@ using namespace ernie;
 
 uniform DeviceGlobals Device;
 
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct MaxRegistersAttribute {
+    int count;
+};
+
 public static const float kPi = 3.14159265358979f;
 public static const float kInfinity = asfloat(0x7F800000u);
 

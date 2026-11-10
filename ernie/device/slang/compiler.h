@@ -25,6 +25,7 @@ using SourceFiles = std::map<std::string, std::string, std::less<>>;
 struct KernelShape {
     Size3 groupSize;
     uint32_t paramBytes = 0;
+    uint32_t maxRegisters = 0;
     bool foldable = true;
 };
 

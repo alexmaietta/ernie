@@ -171,6 +171,14 @@ void Reflect(slang::EntryPointReflection& reflected, slang::ProgramLayout& layou
     kernel.shape.groupSize = {uint32_t(std::max<SlangUInt>(groupSize[0], 1)),
                               uint32_t(std::max<SlangUInt>(groupSize[1], 1)),
                               uint32_t(std::max<SlangUInt>(groupSize[2], 1))};
+    if (slang::FunctionReflection* function = reflected.getFunction()) {
+        int count = 0;
+        slang::Attribute* limit = function->findAttributeByName(&GlobalSession(), "MaxRegisters");
+        if (limit != nullptr && SLANG_SUCCEEDED(limit->getArgumentValueInt(0, &count)) &&
+            count > 0) {
+            kernel.shape.maxRegisters = uint32_t(count);
+        }
+    }
 
     int uniforms = 0;
     for (unsigned i = 0; i < reflected.getParameterCount(); ++i) {
@@ -777,9 +785,9 @@ bool Unchanged(const KernelLibrary* library, const SourceFiles& sources,
 }
 
 std::string KernelCode::Encode() const {
-    std::string entry = fmt::format("{} {} {} {} {} {} {}\n", shape.groupSize.x, shape.groupSize.y,
-                                    shape.groupSize.z, shape.paramBytes, shape.foldable ? 1 : 0,
-                                    strings.size(), files.size());
+    std::string entry = fmt::format(
+        "{} {} {} {} {} {} {} {}\n", shape.groupSize.x, shape.groupSize.y, shape.groupSize.z,
+        shape.paramBytes, shape.maxRegisters, shape.foldable ? 1 : 0, strings.size(), files.size());
     for (const std::string& text : strings) {
         AppendField(entry, text);
     }
@@ -800,7 +808,8 @@ std::optional<KernelCode> KernelCode::Decode(std::string_view entry) {
     if (!ReadNumber(entry, at, ' ', shape.groupSize.x) ||
         !ReadNumber(entry, at, ' ', shape.groupSize.y) ||
         !ReadNumber(entry, at, ' ', shape.groupSize.z) ||
-        !ReadNumber(entry, at, ' ', shape.paramBytes) || !ReadNumber(entry, at, ' ', foldable) ||
+        !ReadNumber(entry, at, ' ', shape.paramBytes) ||
+        !ReadNumber(entry, at, ' ', shape.maxRegisters) || !ReadNumber(entry, at, ' ', foldable) ||
         !ReadNumber(entry, at, ' ', strings) || !ReadNumber(entry, at, '\n', files)) {
         return std::nullopt;
     }

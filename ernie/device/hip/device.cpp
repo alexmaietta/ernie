@@ -273,7 +273,7 @@ std::string_view Traits::Prelude() {
 }
 
 std::vector<std::string> Traits::CompileOptions(const std::string& architecture, Size3 groupSize,
-                                                bool lineInfo) {
+                                                uint32_t, bool lineInfo) {
     const uint32_t threads = groupSize.x * groupSize.y * groupSize.z;
     std::vector<std::string> options = {"--offload-arch=" + architecture, "-O3", "-std=c++17",
                                         "--gpu-max-threads-per-block=" + std::to_string(threads),

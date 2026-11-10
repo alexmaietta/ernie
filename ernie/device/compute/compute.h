@@ -125,7 +125,9 @@ concept ComputeTraits =
 
         { T::RuntimeCompiler() } -> std::same_as<const RuntimeCompiler&>;
         { T::Prelude() } -> std::same_as<std::string_view>;
-        { T::CompileOptions(binary, groups, flag) } -> std::same_as<std::vector<std::string>>;
+        {
+            T::CompileOptions(binary, groups, value, flag)
+        } -> std::same_as<std::vector<std::string>>;
         { T::LoadModule(api, binary) } -> std::same_as<typename T::Module>;
         { T::UnloadModule(api, module) } -> std::same_as<void>;
         { T::Symbol(api, module, binary.c_str()) } -> std::same_as<std::pair<uint64_t, size_t>>;
@@ -359,8 +361,8 @@ template <ComputeTraits Traits> class ComputeKernel : public Kernel {
                      const DeviceGlobals& globals) override {
         const RuntimeCompiler& compiler = Traits::RuntimeCompiler();
         const std::string& architecture = m_owner.Adapter().architecture;
-        const std::vector<std::string> options =
-            Traits::CompileOptions(architecture, code.shape.groupSize, code.debugInfo);
+        const std::vector<std::string> options = Traits::CompileOptions(
+            architecture, code.shape.groupSize, code.shape.maxRegisters, code.debugInfo);
         const SourceHeader prelude{kPreludeHeader, Traits::Prelude()};
         const RuntimeCompiler::Compiled binary =
             compiler.CompileCached(code.code, {&prelude, 1}, options,

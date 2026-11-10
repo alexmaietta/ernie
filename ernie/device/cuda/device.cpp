@@ -279,10 +279,13 @@ std::string_view Traits::Prelude() {
 }
 
 std::vector<std::string> Traits::CompileOptions(const std::string& architecture, Size3,
-                                                bool lineInfo) {
+                                                uint32_t maxRegisters, bool lineInfo) {
     std::vector<std::string> options = {
         "--gpu-architecture=" + architecture, "--std=c++17",     "-default-device",
         "-DSLANG_CUDA_ENABLE_FAST_MATH=1",    "-prec-div=false", "-prec-sqrt=false"};
+    if (maxRegisters > 0) {
+        options.push_back("-maxrregcount=" + std::to_string(maxRegisters));
+    }
     if (lineInfo) {
         options.emplace_back("-lineinfo");
     }

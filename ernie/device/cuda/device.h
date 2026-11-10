@@ -121,7 +121,7 @@ struct Traits {
     static const compute::RuntimeCompiler& RuntimeCompiler();
     static std::string_view Prelude();
     static std::vector<std::string> CompileOptions(const std::string& architecture, Size3 groupSize,
-                                                   bool lineInfo);
+                                                   uint32_t maxRegisters, bool lineInfo);
     static CUmodule LoadModule(const Api& cuda, const std::string& binary);
     static void UnloadModule(const Api& cuda, CUmodule module);
     static std::pair<uint64_t, size_t> Symbol(const Api& cuda, CUmodule module, const char* name);

@@ -115,7 +115,7 @@ struct Traits {
     static const compute::RuntimeCompiler& RuntimeCompiler();
     static std::string_view Prelude();
     static std::vector<std::string> CompileOptions(const std::string& architecture, Size3 groupSize,
-                                                   bool lineInfo);
+                                                   uint32_t maxRegisters, bool lineInfo);
     static hipModule_t LoadModule(const Api& hip, const std::string& binary);
     static void UnloadModule(const Api& hip, hipModule_t module);
     static std::pair<uint64_t, size_t> Symbol(const Api& hip, hipModule_t module, const char* name);
