@@ -42,6 +42,8 @@ Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, c
 Panel CreatePropertiesPanel(Ref<Scene> scene, Selection& selection, Editor& editor,
                             FileDialog& dialog, const Theme& theme);
 
+void AddXrPanel(Viewer& viewer, Ref<Scene> scene);
+
 void DrawControls(bool& open, const Theme& theme);
 
 void DrawAbout(bool& open, device::Device& device);

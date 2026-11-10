@@ -71,6 +71,17 @@ TEST_F(OffscreenViewerTest, FramesTheWholeSceneWhenItOpens) {
     EXPECT_TRUE(Inside(viewer.WorldToScreen({6, 0, 1}), viewer));
 }
 
+#ifdef ERNIE_VIEWER_XR
+TEST_F(OffscreenViewerTest, OffersAnXrPanelThatDrawsUntilStarted) {
+    Viewer viewer(Row(*s_device), {.width = kWidth, .height = kHeight, .offscreen = true});
+    viewer.ShowPanel("XR", true);
+    for (int frame = 0; frame < 4; ++frame) {
+        viewer.Frame();
+    }
+    EXPECT_EQ(viewer.Viewports(), (std::vector<std::string>{"Viewport"}));
+}
+#endif
+
 bool Drawing(const Viewer& viewer, const std::string& overlay) {
     const std::vector<std::string> names = viewer.GetRenderer()->GetOverlays()->Names();
     return std::ranges::find(names, overlay) != names.end();

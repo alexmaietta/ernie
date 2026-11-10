@@ -64,6 +64,12 @@ target_link_options(
 )
 target_compile_definitions(ernie_xr_internal INTERFACE ERNIE_XR_STATIC_DEFINE)
 
+ernie_public_files(
+    frame.h
+    rig.h
+    session.h
+)
+
 file(
     GLOB ernie_xr_files
     RELATIVE "${PROJECT_SOURCE_DIR}"

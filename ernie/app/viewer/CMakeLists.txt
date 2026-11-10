@@ -41,6 +41,11 @@ ernie_object_library(
     widgets/widgets.cpp
 )
 ernie_embed(ernie_viewer_objects FILE "${ernie_viewport_spirv}" SYMBOL ernie_viewport_spirv)
+if(ERNIE_BUILD_XR)
+    target_sources(ernie_viewer_objects PRIVATE panels/xr.cpp)
+    target_compile_definitions(ernie_viewer_objects PRIVATE ERNIE_VIEWER_XR)
+    target_link_libraries(ernie_viewer_objects PRIVATE ernie_xr)
+endif()
 target_compile_definitions(
     ernie_viewer_objects
     PRIVATE
@@ -62,6 +67,7 @@ target_link_libraries(
 ernie_shared_library(
     ernie_viewer
     ernie_viewer_objects
+    $<$<BOOL:${ERNIE_BUILD_XR}>:ernie_xr>
     ernie_imgui
     ernie_imgui_backends
     ernie_fonts
@@ -102,6 +108,7 @@ target_link_libraries(
         ernie_imgui_backends
         ernie_fonts
         ernie
+        $<$<BOOL:${ERNIE_BUILD_XR}>:ernie_xr>
 )
 target_link_options(
     ernie_viewer_internal

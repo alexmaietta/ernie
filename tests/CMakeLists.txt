@@ -291,6 +291,9 @@ if(ERNIE_BUILD_VIEWER)
             unit/app/viewer/utest_viewer_orbit_camera.cpp
             unit/app/viewer/utest_viewer_viewport.cpp
     )
+    if(ERNIE_BUILD_XR)
+        target_compile_definitions(ernie_viewer_tests PRIVATE ERNIE_VIEWER_XR)
+    endif()
 endif()
 
 if(ERNIE_BUILD_XR)

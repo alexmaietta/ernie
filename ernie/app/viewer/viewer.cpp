@@ -1381,7 +1381,13 @@ Viewer::Viewer(Ref<device::Device> device, const ViewerDesc& desc)
     : m_impl(std::make_unique<ViewerImpl>(std::move(device), nullptr, desc)) {}
 
 Viewer::Viewer(Ref<Scene> scene, const ViewerDesc& desc)
-    : m_impl(std::make_unique<ViewerImpl>(DisplayDevice(scene->GetDevice()), scene, desc)) {}
+    : m_impl(std::make_unique<ViewerImpl>(DisplayDevice(scene->GetDevice()), scene, desc)) {
+#ifdef ERNIE_VIEWER_XR
+    if (desc.ui && desc.builtinPanels) {
+        AddXrPanel(*this, scene);
+    }
+#endif
+}
 
 Viewer::~Viewer() = default;
 

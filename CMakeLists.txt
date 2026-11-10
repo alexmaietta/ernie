@@ -72,10 +72,10 @@ include(cmake/third_party/cgltf.cmake)
 include(cmake/third_party/tinyusd.cmake)
 
 add_subdirectory(ernie)
-add_subdirectory(ernie/app)
 if(ERNIE_BUILD_XR)
     add_subdirectory(ernie/xr)
 endif()
+add_subdirectory(ernie/app)
 
 if(ERNIE_BUILD_TESTS OR ERNIE_BUILD_BENCHMARKS)
     enable_testing()
