@@ -159,7 +159,7 @@ TEST(SensorPipelinesTest, GlobalNodesRunTracedAsTheyDoStandalone) {
     });
 }
 
-TEST(SensorPipelinesTest, ValueEditsRerunThePipelineWithoutTracingAgain) {
+TEST(SensorPipelinesTest, StepsTraceAgainAndValueEditsRerunThePipeline) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Sky(device, DetectorPattern::Rgb);
         DefineRaw(*scene);
@@ -192,8 +192,8 @@ TEST(SensorPipelinesTest, ValueEditsRerunThePipelineWithoutTracingAgain) {
         profiler::BeginFrame();
         step();
         const auto [rates, raw] = step();
-        EXPECT_EQ(traces([] {}), 0);
-        EXPECT_EQ(traces([&] { scene->Find("/Pipes/Raw/Gain")->Set(Gain::kGain, 4.0f); }), 0);
+        EXPECT_GT(traces([] {}), 0);
+        EXPECT_GT(traces([&] { scene->Find("/Pipes/Raw/Gain")->Set(Gain::kGain, 4.0f); }), 0);
         const auto [kept, raised] = step();
         EXPECT_EQ(kept, rates);
         EXPECT_NE(raised, raw);

@@ -72,7 +72,6 @@ class RendererImpl {
         std::vector<OwnedVar> vars;
         std::vector<OwnedOverlay> overlays;
         std::vector<OwnedCloud> clouds;
-        std::map<uint32_t, std::pair<uint64_t, uint64_t>> traced;
         std::map<uint32_t, uint64_t> rates;
         std::vector<Ref<device::Buffer>> rateBuffers;
         Ref<device::Buffer> arena;
@@ -103,8 +102,7 @@ class RendererImpl {
     uint64_t AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
                           const ResolvedProduct& product, const ResolvedVar& var, uint64_t next);
     device::Operation Trace(const ProductPlan& plan, OutputSet& set, const std::set<uint32_t>& due,
-                            const std::set<uint32_t>& stale, const Snapshot& snapshot,
-                            std::span<const SensorPipelineRun> runs);
+                            const Snapshot& snapshot, std::span<const SensorPipelineRun> runs);
     std::vector<SensorPipelineRun> PrepareRuns(const ProductPlan& plan,
                                                const std::set<uint32_t>& due);
     void RecordRuns(device::CommandEncoder& encoder, const ProductPlan& plan, OutputSet& set,
@@ -125,7 +123,6 @@ class RendererImpl {
     std::chrono::steady_clock::time_point m_pendingStart;
     std::set<std::string, std::less<>> m_usedEntries;
     uint64_t m_failedHash = 0;
-    uint64_t m_kernels = 0;
 
     std::unique_ptr<algorithms::Scan> m_scan;
     uint32_t m_scanCapacity = 0;

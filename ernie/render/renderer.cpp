@@ -111,7 +111,6 @@ void RendererImpl::UpdateRenderProgram() {
     if (!m_pendingProgram) {
         return;
     }
-    ++m_kernels;
     if (m_usedEntries.empty()) {
         return;
     }
@@ -241,28 +240,7 @@ RenderOutput RendererImpl::Step(std::span<const std::string> products, double dt
             frames[0].overlay = overlay.tensor;
         }
     }
-    const uint64_t pipelineTableRuns = snapshot.Version("pipelines");
-    const SensorPipelineTable& pipelines = SceneImpl::Get(*m_scene).GetSensorPipelines();
-    std::set<uint32_t> stale;
-    for (const std::shared_ptr<const ResolvedProduct>& product : planned.products) {
-        if (!due.contains(product->prim)) {
-            continue;
-        }
-        const std::shared_ptr<const SensorPipelineInstance> instance =
-            product->pipeline == kNoPrim ? nullptr : pipelines.Find(product->pipeline);
-        const bool returns =
-            instance && std::ranges::any_of(instance->resolved.values, [](const auto& value) {
-                return value.type == sensor_pipeline::SignalType::Returns;
-            });
-        const std::pair<uint64_t, uint64_t> runs = {
-            snapshot.Version() - (returns ? 0 : pipelineTableRuns), m_kernels};
-        if (const auto traced = set.traced.find(product->prim);
-            traced == set.traced.end() || traced->second != runs) {
-            stale.insert(product->prim);
-            set.traced[product->prim] = runs;
-        }
-    }
-    result.m_done = Trace(planned, set, due, stale, snapshot, pipelineRuns);
+    result.m_done = Trace(planned, set, due, snapshot, pipelineRuns);
     m_scene->Release(snapshot);
     return result;
 }
@@ -464,8 +442,7 @@ uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::s
 }
 
 device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
-                                      const std::set<uint32_t>& due,
-                                      const std::set<uint32_t>& stale, const Snapshot& snapshot,
+                                      const std::set<uint32_t>& due, const Snapshot& snapshot,
                                       std::span<const SensorPipelineRun> runs) {
     static const profiler::ZoneId traceZone = profiler::ZoneId::Named("Render/Trace");
     RenderParams params{};
@@ -479,7 +456,7 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
         std::vector<Capture> captures;
         uint64_t pixelCount = 0;
         for (Capture capture : set.captures[entry]) {
-            if (stale.contains(capture.plan.product)) {
+            if (due.contains(capture.plan.product)) {
                 capture.plan.firstPixel = pixelCount;
                 pixelCount += uint64_t(capture.plan.width) * capture.plan.height;
                 captures.push_back(capture);
@@ -512,13 +489,13 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
             return !cloud.output.empty() &&
                    std::ranges::find(run.products, cloud.index) != run.products.end();
         });
-        if (!returns || (read && stale.contains(plan.products[run.products.front()]->prim))) {
+        if (!returns || read) {
             traced.push_back(run);
         }
     }
     RecordRuns(encoder, plan, set, traced, snapshot);
     for (const OwnedCloud& cloud : set.clouds) {
-        if (!stale.contains(cloud.product)) {
+        if (!due.contains(cloud.product)) {
             continue;
         }
         if (cloud.slots > m_scanCapacity) {
