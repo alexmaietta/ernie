@@ -27,7 +27,7 @@ namespace ernie::xr {
 
 enum class Backend : uint32_t { OpenXR, Simulated };
 
-enum class BlendMode : uint32_t { Opaque, Additive };
+enum class BlendMode : uint32_t { Opaque, Additive, AlphaBlend };
 
 enum class ReferenceSpace : uint32_t { Stage, Local };
 
@@ -95,6 +95,7 @@ struct SimulatedOffers {
     bool refreshRates = true;
     bool depthLayer = true;
     bool additive = true;
+    bool alphaBlend = true;
     bool performanceMetrics = true;
     bool handTracking = true;
     bool eyeGaze = true;

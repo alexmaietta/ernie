@@ -109,6 +109,7 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
             desc.backend = m_backend;
             desc.resolutionScale = m_resolutionScale;
             desc.depthLayer = m_depthLayer;
+            desc.blendMode = m_blend;
             desc.simulated.realTime = true;
             const std::shared_ptr<Desk> desk = m_desk;
             desc.simulated.script = [desk](uint64_t, double time, xr::SimulatedInput& input) {
@@ -175,6 +176,11 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
         }
         ImGui::SliderFloat("Resolution scale", &m_resolutionScale, 0.1f, 1.0f, "%.2f");
         ImGui::Checkbox("Depth layer", &m_depthLayer);
+        const char* blends[] = {"Opaque", "Additive", "Passthrough"};
+        int blend = int(m_blend);
+        if (ImGui::Combo("Blend", &blend, blends, 3)) {
+            m_blend = xr::BlendMode(blend);
+        }
         if (ImGui::Button("Start")) {
             Start();
         }
@@ -291,6 +297,7 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
     xr::Backend m_backend = xr::Backend::Simulated;
     float m_resolutionScale = 0.5f;
     bool m_depthLayer = true;
+    xr::BlendMode m_blend = xr::BlendMode::Opaque;
     xr::RigVisuals m_visuals;
     std::shared_ptr<Desk> m_desk = std::make_shared<Desk>();
     std::unique_ptr<xr::Session> m_session;

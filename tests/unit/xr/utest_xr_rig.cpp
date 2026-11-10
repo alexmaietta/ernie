@@ -124,6 +124,33 @@ TEST(RigTest, SubmitsEachEyesDepthFromNearToFar) {
     EXPECT_FALSE(without.Status().depthLayer);
 }
 
+TEST(RigTest, AlphaBlendingPresentsCoverageInTheAlpha) {
+    device::Device* device = RenderDevice();
+    if (device == nullptr) {
+        GTEST_SKIP() << "no supported adapter";
+    }
+    SessionDesc desc = Simulated();
+    desc.blendMode = BlendMode::AlphaBlend;
+    Session session(desc);
+    EXPECT_EQ(session.Status().blendMode, BlendMode::AlphaBlend);
+    const Ref<Scene> scene = BallAhead(*device);
+    Rig rig(scene, session, {.overlays = {}});
+    Renderer renderer(scene);
+    RunFrames(session, rig, renderer, 1);
+    const std::vector<uint8_t> pixels = session.Presented().ToHost<uint8_t>();
+    bool covered = false;
+    bool clear = false;
+    for (size_t at = 3; at < pixels.size(); at += 4) {
+        covered = covered || pixels[at] == 255;
+        clear = clear || pixels[at] == 0;
+    }
+    EXPECT_TRUE(covered);
+    EXPECT_TRUE(clear);
+
+    desc.simulated.offers.alphaBlend = false;
+    EXPECT_EQ(Session(desc).Status().blendMode, BlendMode::Opaque);
+}
+
 TEST(RigTest, DrawsItsVisualsIntoTheEyes) {
     device::Device* device = RenderDevice();
     if (device == nullptr) {

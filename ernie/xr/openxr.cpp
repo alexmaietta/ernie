@@ -360,6 +360,10 @@ class OpenXrRuntime final : public Runtime {
                 views[eye].subImage.imageRect = {{0, 0}, rect};
             }
             layer.space = m_space;
+            if (m_blendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) {
+                layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+                                   XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+            }
             layer.viewCount = 2;
             layer.views = views;
             layers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&layer));
@@ -633,19 +637,21 @@ class OpenXrRuntime final : public Runtime {
         Check(xrEnumerateEnvironmentBlendModes(m_instance, m_system, kStereo, count, &count,
                                                modes.data()),
               "xrEnumerateEnvironmentBlendModes");
-        const XrEnvironmentBlendMode wanted = m_desc.blendMode == BlendMode::Additive
-                                                  ? XR_ENVIRONMENT_BLEND_MODE_ADDITIVE
-                                                  : XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        const XrEnvironmentBlendMode wanted =
+            m_desc.blendMode == BlendMode::Additive     ? XR_ENVIRONMENT_BLEND_MODE_ADDITIVE
+            : m_desc.blendMode == BlendMode::AlphaBlend ? XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND
+                                                        : XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
         if (std::ranges::find(modes, wanted) != modes.end()) {
             m_blendMode = wanted;
         } else {
             if (wanted != XR_ENVIRONMENT_BLEND_MODE_OPAQUE) {
-                Log(LogLevel::Warning, "the headset doesn't blend additively, so it's opaque");
+                Log(LogLevel::Warning, "the headset doesn't offer that blend mode, so it's opaque");
             }
             m_blendMode = modes.empty() ? XR_ENVIRONMENT_BLEND_MODE_OPAQUE : modes.front();
         }
-        m_blend = m_blendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE ? BlendMode::Additive
-                                                                    : BlendMode::Opaque;
+        m_blend = m_blendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE      ? BlendMode::Additive
+                  : m_blendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ? BlendMode::AlphaBlend
+                                                                         : BlendMode::Opaque;
     }
 
     template <class Function> void Load(const char* name, Function& function) {

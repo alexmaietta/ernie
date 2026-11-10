@@ -263,7 +263,8 @@ void BindSession(nb::module_& module) {
         .value("SIMULATED", Backend::Simulated);
     nb::enum_<BlendMode>(module, "BlendMode")
         .value("OPAQUE", BlendMode::Opaque)
-        .value("ADDITIVE", BlendMode::Additive);
+        .value("ADDITIVE", BlendMode::Additive)
+        .value("ALPHA_BLEND", BlendMode::AlphaBlend);
     nb::enum_<ReferenceSpace>(module, "ReferenceSpace")
         .value("STAGE", ReferenceSpace::Stage)
         .value("LOCAL", ReferenceSpace::Local);
@@ -340,6 +341,7 @@ void BindSession(nb::module_& module) {
         .def_rw("refresh_rates", &SimulatedOffers::refreshRates)
         .def_rw("depth_layer", &SimulatedOffers::depthLayer)
         .def_rw("additive", &SimulatedOffers::additive)
+        .def_rw("alpha_blend", &SimulatedOffers::alphaBlend)
         .def_rw("performance_metrics", &SimulatedOffers::performanceMetrics)
         .def_rw("hand_tracking", &SimulatedOffers::handTracking)
         .def_rw("eye_gaze", &SimulatedOffers::eyeGaze);

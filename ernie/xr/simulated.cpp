@@ -61,8 +61,10 @@ class SimulatedRuntime final : public Runtime {
         : m_desc(desc.simulated),
           m_depthLayer(desc.depthLayer && desc.simulated.offers.depthLayer) {
         const SimulatedOffers& offers = m_desc.offers;
-        m_blend = desc.blendMode == BlendMode::Additive && offers.additive ? BlendMode::Additive
-                                                                           : BlendMode::Opaque;
+        const bool offered = desc.blendMode == BlendMode::Opaque ||
+                             (desc.blendMode == BlendMode::Additive && offers.additive) ||
+                             (desc.blendMode == BlendMode::AlphaBlend && offers.alphaBlend);
+        m_blend = offered ? desc.blendMode : BlendMode::Opaque;
         const SimulatedProfile& profile = m_desc.profile;
         if (profile.refreshRates.empty() || profile.resolution.x == 0 ||
             profile.resolution.y == 0) {
