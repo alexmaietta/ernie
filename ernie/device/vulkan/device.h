@@ -79,9 +79,12 @@ std::optional<ComputeFamily> ComputeQueueFamily(VkPhysicalDevice device,
 
 std::vector<AdapterInfo> ListAdapters();
 
+std::array<uint8_t, 16> DeviceUuid(VkPhysicalDevice device);
+
 class VulkanDevice : public Device {
   public:
-    VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, Traversal traversal);
+    VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, Traversal traversal,
+                 OwnedInstance instance = {});
     ~VulkanDevice() override;
 
     VkInstance InstanceHandle() const {
@@ -194,6 +197,7 @@ class VulkanDevice : public Device {
     void ReleaseSpares();
     void CreateSamplers();
 
+    OwnedInstance m_ownedInstance;
     VkInstance m_instance = VK_NULL_HANDLE;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;

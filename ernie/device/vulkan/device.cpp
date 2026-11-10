@@ -20,14 +20,13 @@
 #include "ernie/device/queue.h"
 #include "ernie/device/slang/compiler.h"
 #include "ernie/device/vulkan/interop.h"
+#include "ernie/device/vulkan/native.h"
 #include "ernie/util/disk_cache.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
 #include "ernie/util/text.h"
 
 namespace ernie::device::vulkan {
-
-namespace {
 
 std::array<uint8_t, 16> DeviceUuid(VkPhysicalDevice device) {
     VkPhysicalDeviceIDProperties id{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
@@ -38,7 +37,7 @@ std::array<uint8_t, 16> DeviceUuid(VkPhysicalDevice device) {
     return uuid;
 }
 
-}
+namespace {}
 
 std::optional<ComputeFamily> ComputeQueueFamily(VkPhysicalDevice device, VkQueueFlags flags) {
     const std::vector<VkQueueFamilyProperties> families = Enumerate<VkQueueFamilyProperties>(
@@ -181,7 +180,8 @@ DeviceExtensions ChooseExtensions(VkPhysicalDevice device, const AdapterInfo& ad
 
 VkDevice CreateLogicalDevice(VkPhysicalDevice physicalDevice, uint32_t queueFamily,
                              uint32_t queueCount, const DeviceExtensions& extensions, bool hardware,
-                             bool textures, bool blockCompression, bool anisotropy) {
+                             bool textures, bool blockCompression, bool anisotropy,
+                             const Creator* creator) {
     const std::vector<const char*>& names = extensions.names;
     FeatureChain enabled;
     enabled.Link([&](const char* name) {
@@ -219,6 +219,13 @@ VkDevice CreateLogicalDevice(VkPhysicalDevice physicalDevice, uint32_t queueFami
     info.enabledExtensionCount = uint32_t(names.size());
     info.ppEnabledExtensionNames = names.data();
     VkDevice device = VK_NULL_HANDLE;
+    if (creator != nullptr) {
+        device = creator->createDevice(vkGetInstanceProcAddr, physicalDevice, info);
+        if (device == VK_NULL_HANDLE) {
+            throw Error("the Vulkan creator made no device");
+        }
+        return device;
+    }
     Check(vkCreateDevice(physicalDevice, &info, nullptr, &device), "vkCreateDevice");
     return device;
 }
@@ -249,12 +256,14 @@ std::string PipelineCacheKey(const AdapterInfo& adapter) {
 
 }
 
-VulkanDevice::VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, Traversal traversal)
-    : Device(adapter, desc, traversal) {
+VulkanDevice::VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, Traversal traversal,
+                           OwnedInstance instance)
+    : Device(adapter, desc, traversal), m_ownedInstance(std::move(instance)) {
     GetApi();
     try {
         m_labels = Extensions().Has(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        m_instance = vulkan::Instance(desc.validation);
+        m_instance = m_ownedInstance.Get() != VK_NULL_HANDLE ? m_ownedInstance.Get()
+                                                             : vulkan::Instance(desc.validation);
         m_physicalDevice = FindPhysicalDevice(m_instance, adapter);
         const VkQueueFlags flags =
             VK_QUEUE_COMPUTE_BIT | (desc.presentation ? VK_QUEUE_GRAPHICS_BIT : 0);
@@ -281,9 +290,10 @@ VulkanDevice::VulkanDevice(const AdapterInfo& adapter, const DeviceDesc& desc, T
 
         const bool textures = GetSampling() == Sampling::Hardware;
         const uint32_t queueCount = desc.presentation && family->properties.queueCount > 1 ? 2 : 1;
-        m_device = CreateLogicalDevice(m_physicalDevice, m_queueFamily, queueCount, extensions,
-                                       hardware, textures, adapter.features.blockCompression,
-                                       adapter.features.anisotropicFiltering);
+        m_device = CreateLogicalDevice(
+            m_physicalDevice, m_queueFamily, queueCount, extensions, hardware, textures,
+            adapter.features.blockCompression, adapter.features.anisotropicFiltering,
+            m_ownedInstance.Get() != VK_NULL_HANDLE ? desc.creator.get() : nullptr);
         LoadDeviceFunctions(m_functions, m_device);
         if (extensions.calibrated != nullptr) {
             m_calibratedTimestamps = std::string_view(extensions.calibrated).starts_with("VK_KHR")
@@ -472,6 +482,7 @@ void VulkanDevice::Destroy() {
         m_functions.vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
     }
+    m_ownedInstance = {};
 }
 
 VkBufferUsageFlags VulkanDevice::UsageFlags(BufferUsage usage) const {

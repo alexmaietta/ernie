@@ -58,6 +58,10 @@ enum class AccelLevel : uint8_t;
 
 using AccelInput = std::variant<AccelTriangles, AccelBoxes, AccelInstances>;
 
+namespace vulkan {
+struct Creator;
+}
+
 struct DeviceDesc {
     std::optional<Backend> backend;
     std::string adapter;
@@ -69,6 +73,7 @@ struct DeviceDesc {
     bool synchronous = false;
     bool presentation = false;
     std::filesystem::path cacheDirectory;
+    std::shared_ptr<const vulkan::Creator> creator;
 };
 
 struct MemoryUse {

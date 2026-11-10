@@ -52,6 +52,32 @@ class Extensions {
 
 VkInstance Instance(bool validation);
 
+struct Creator;
+
+class OwnedInstance {
+  public:
+    OwnedInstance() = default;
+
+    OwnedInstance(VkInstance instance, VkDebugUtilsMessengerEXT messenger)
+        : m_instance(instance), m_messenger(messenger) {}
+
+    OwnedInstance(OwnedInstance&& other) noexcept;
+    OwnedInstance& operator=(OwnedInstance&& other) noexcept;
+    ~OwnedInstance();
+
+    VkInstance Get() const {
+        return m_instance;
+    }
+
+  private:
+    void Destroy() noexcept;
+
+    VkInstance m_instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT m_messenger = VK_NULL_HANDLE;
+};
+
+OwnedInstance CreateInstance(bool validation, const Creator& creator);
+
 bool ValidationEnabled();
 
 uint64_t ValidationMessageCount();

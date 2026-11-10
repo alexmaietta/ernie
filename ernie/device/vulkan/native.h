@@ -20,6 +20,15 @@ namespace ernie::device::vulkan {
 
 enum class QueueRole : uint8_t { Render, Display };
 
+struct Creator {
+    std::function<VkInstance(PFN_vkGetInstanceProcAddr, const VkInstanceCreateInfo& info)>
+        createInstance;
+    std::function<VkPhysicalDevice(VkInstance instance)> pickAdapter;
+    std::function<VkDevice(PFN_vkGetInstanceProcAddr, VkPhysicalDevice adapter,
+                           const VkDeviceCreateInfo& info)>
+        createDevice;
+};
+
 struct Native {
     PFN_vkGetInstanceProcAddr getInstanceProcAddr = nullptr;
     VkInstance instance = VK_NULL_HANDLE;
@@ -27,6 +36,7 @@ struct Native {
     VkDevice device = VK_NULL_HANDLE;
     uint32_t apiVersion = 0;
     uint32_t queueFamily = 0;
+    uint32_t queueIndex = 0;
     bool displaySharesRender = true;
 };
 

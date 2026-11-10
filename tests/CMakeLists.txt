@@ -94,6 +94,7 @@ ernie_test(
     SOURCES
         unit/device/utest_device_buffer.cpp
         unit/device/utest_device_commands.cpp
+        unit/device/utest_device_creator.cpp
         unit/device/utest_device_device.cpp
         unit/device/utest_device_hip.cpp
         unit/device/utest_device_program.cpp

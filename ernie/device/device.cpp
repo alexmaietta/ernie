@@ -22,6 +22,7 @@
 #include "ernie/device/slang/compiler.h"
 #include "ernie/device/slang/debug.h"
 #include "ernie/device/vulkan/device.h"
+#include "ernie/device/vulkan/native.h"
 #include "ernie/util/disk_cache.h"
 #include "ernie/util/environment.h"
 #include "ernie/util/error.h"
@@ -339,14 +340,45 @@ std::vector<AdapterInfo> EnumerateAdapters() {
 }
 
 Ref<Device> Device::Create(const DeviceDesc& requested) {
-    const DeviceDesc desc = WithEnvironment(requested);
+    DeviceDesc desc = WithEnvironment(requested);
+    if (desc.creator) {
+        if (desc.backend && *desc.backend != Backend::Vulkan) {
+            throw Error("a Vulkan creator needs a Vulkan device, not a {} one",
+                        BackendName(*desc.backend));
+        }
+        desc.backend = Backend::Vulkan;
+    }
     const std::vector<AdapterInfo> adapters = FindAdapters(desc);
-    const AdapterInfo& adapter = ChooseAdapter(adapters, desc);
+    vulkan::OwnedInstance instance;
+    DeviceDesc chosen = desc;
+    if (desc.creator) {
+        instance = vulkan::CreateInstance(desc.validation, *desc.creator);
+        if (desc.creator->pickAdapter) {
+            const std::array<uint8_t, 16> uuid =
+                vulkan::DeviceUuid(desc.creator->pickAdapter(instance.Get()));
+            const auto picked = std::ranges::find_if(
+                adapters, [&](const AdapterInfo& adapter) { return adapter.uuid == uuid; });
+            if (picked == adapters.end()) {
+                throw UnsupportedError(
+                    "the Vulkan creator picked an adapter Ernie doesn't list. {}",
+                    Describe(adapters));
+            }
+            if (!desc.adapter.empty() && !Matches(*picked, desc.adapter)) {
+                throw Error("the Vulkan creator picked {}, not the adapter \"{}\" asked for",
+                            picked->alias, desc.adapter);
+            }
+            chosen.adapter = picked->alias;
+        }
+    }
+    const AdapterInfo& adapter = ChooseAdapter(adapters, chosen);
     const Traversal traversal = ResolveTraversal(adapter, desc.traversal);
     DeviceDesc resolved = desc;
     resolved.sampling = ResolveSampling(adapter, desc.sampling);
 
-    Ref<Device> device = Implement(adapter.backend).create(adapter, resolved, traversal);
+    Ref<Device> device = desc.creator
+                             ? Ref<Device>(new vulkan::VulkanDevice(adapter, resolved, traversal,
+                                                                    std::move(instance)))
+                             : Implement(adapter.backend).create(adapter, resolved, traversal);
     device->CreateGlobals();
 
     Log(LogLevel::Info, "using {} ({}), with {} ray traversal and {} texture sampling",

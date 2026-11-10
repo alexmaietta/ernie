@@ -6,10 +6,12 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <variant>
 
 #include <volk.h>
 
+#include "ernie/device/vulkan/native.h"
 #include "ernie/util/error.h"
 #include "ernie/util/library.h"
 #include "ernie/util/log.h"
@@ -133,7 +135,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ReportValidation(VkDebugUtilsMessageSeverityFlagB
     return VK_FALSE;
 }
 
-void CreateValidationMessenger(VkInstance instance) {
+VkDebugUtilsMessengerEXT CreateValidationMessenger(VkInstance instance) {
     VkDebugUtilsMessengerCreateInfoEXT info{
         VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
     info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -143,6 +145,7 @@ void CreateValidationMessenger(VkInstance instance) {
     VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
     Check(vkCreateDebugUtilsMessengerEXT(instance, &info, nullptr, &messenger),
           "vkCreateDebugUtilsMessengerEXT");
+    return messenger;
 }
 
 std::vector<const char*> ValidationLayers(bool validation, bool debugUtils) {
@@ -163,7 +166,8 @@ std::vector<const char*> ValidationLayers(bool validation, bool debugUtils) {
     return {kValidationLayer};
 }
 
-VkInstance CreateInstance(bool validation) {
+VkInstance CreateInstance(bool validation, const Creator* creator,
+                          VkDebugUtilsMessengerEXT& messenger) {
     VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     application.pApplicationName = "Ernie";
     application.pEngineName = "Ernie";
@@ -192,11 +196,18 @@ VkInstance CreateInstance(bool validation) {
     info.enabledExtensionCount = uint32_t(extensions.size());
     info.ppEnabledExtensionNames = extensions.data();
     VkInstance instance = VK_NULL_HANDLE;
-    Check(vkCreateInstance(&info, nullptr, &instance), "vkCreateInstance");
-    volkLoadInstanceOnly(instance);
+    if (creator != nullptr) {
+        instance = creator->createInstance(vkGetInstanceProcAddr, info);
+        if (instance == VK_NULL_HANDLE) {
+            throw Error("the Vulkan creator made no instance");
+        }
+    } else {
+        Check(vkCreateInstance(&info, nullptr, &instance), "vkCreateInstance");
+        volkLoadInstanceOnly(instance);
+    }
 
     if (!layers.empty()) {
-        CreateValidationMessenger(instance);
+        messenger = CreateValidationMessenger(instance);
         g_validationEnabled.store(true, std::memory_order_relaxed);
     }
     return instance;
@@ -209,9 +220,48 @@ VkInstance Instance(bool validation) {
     const std::lock_guard lock(g_volkMutex);
     VkInstance& instance = instances[validation ? 1 : 0];
     if (instance == VK_NULL_HANDLE) {
-        instance = CreateInstance(validation);
+        VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+        instance = CreateInstance(validation, nullptr, messenger);
     }
     return instance;
+}
+
+OwnedInstance::OwnedInstance(OwnedInstance&& other) noexcept
+    : m_instance(std::exchange(other.m_instance, VK_NULL_HANDLE)),
+      m_messenger(std::exchange(other.m_messenger, VK_NULL_HANDLE)) {}
+
+OwnedInstance& OwnedInstance::operator=(OwnedInstance&& other) noexcept {
+    if (this != &other) {
+        Destroy();
+        m_instance = std::exchange(other.m_instance, VK_NULL_HANDLE);
+        m_messenger = std::exchange(other.m_messenger, VK_NULL_HANDLE);
+    }
+    return *this;
+}
+
+OwnedInstance::~OwnedInstance() {
+    Destroy();
+}
+
+void OwnedInstance::Destroy() noexcept {
+    if (m_messenger != VK_NULL_HANDLE) {
+        vkDestroyDebugUtilsMessengerEXT(m_instance, m_messenger, nullptr);
+        m_messenger = VK_NULL_HANDLE;
+    }
+    if (m_instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(m_instance, nullptr);
+        m_instance = VK_NULL_HANDLE;
+    }
+}
+
+OwnedInstance CreateInstance(bool validation, const Creator& creator) {
+    if (!creator.createInstance || !creator.createDevice) {
+        throw Error("a Vulkan creator needs both createInstance and createDevice");
+    }
+    Instance(false);
+    VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+    const VkInstance instance = CreateInstance(validation, &creator, messenger);
+    return {instance, messenger};
 }
 
 bool ValidationEnabled() {
