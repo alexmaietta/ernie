@@ -28,7 +28,7 @@ class HipTest : public testing::Test {
             GTEST_SKIP() << error.what();
         }
         const std::vector<std::string> options =
-            Traits::CompileOptions(m_device->Adapter().architecture, Size3{1, 1, 1}, false);
+            Traits::CompileOptions(m_device->Adapter().architecture, Size3{1, 1, 1}, 0, false);
         const std::string binary = GetHiprtc().Compile(kNothingSource, {}, options, "Nothing");
         m_scope.emplace(GetApi(), hipDevice_t(m_device->Adapter().ordinal));
         m_module = Traits::LoadModule(GetApi(), binary);

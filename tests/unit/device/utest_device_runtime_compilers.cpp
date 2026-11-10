@@ -136,13 +136,13 @@ void CompileEveryKernel(Backend backend, Load load, std::span<const char* const>
                 }
                 SCOPED_TRACE(target);
                 std::string object;
-                EXPECT_NO_THROW(
-                    object = compiler
-                                 ->CompileCached(
-                                     code.code, {&prelude, 1},
-                                     Traits::CompileOptions(target, code.shape.groupSize, false),
-                                     entry, cache)
-                                 .code);
+                EXPECT_NO_THROW(object = compiler
+                                             ->CompileCached(code.code, {&prelude, 1},
+                                                             Traits::CompileOptions(
+                                                                 target, code.shape.groupSize,
+                                                                 code.shape.maxRegisters, false),
+                                                             entry, cache)
+                                             .code);
                 EXPECT_FALSE(object.empty());
             }
             first = false;
