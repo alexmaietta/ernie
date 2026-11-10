@@ -5,6 +5,7 @@ ernie_object_library(
     ernie_xr_objects
     EXPORTS ernie_xr_EXPORTS
     anchors.cpp
+    draw.cpp
     locomotion.cpp
     openxr.cpp
     pointers.cpp

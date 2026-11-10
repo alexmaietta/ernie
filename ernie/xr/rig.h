@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "ernie/device/ref.h"
+#include "ernie/overlay/overlay.h"
 #include "ernie/scene/scene.h"
 #include "ernie/stage/schema/ids.h"
 #include "ernie/stage/schema/types.h"
@@ -19,6 +20,18 @@ namespace ernie::xr {
 struct RigDesc {
     std::string path = "/XR";
     std::vector<std::string> extraVars;
+    std::vector<std::string> overlays = {"*"};
+};
+
+struct RigVisuals {
+    bool controllers = true;
+    bool hands = true;
+    bool lasers = true;
+    bool teleport = false;
+    bool playArea = true;
+    Float4 color = {0.3f, 0.75f, 1, 0.9f};
+    Float4 invalidColor = {0.95f, 0.3f, 0.25f, 0.9f};
+    std::string layer = "xr";
 };
 
 struct PointerDesc {
@@ -100,6 +113,8 @@ class ERNIE_XR_API Rig {
     void Move(const Frame& frame, Float2 stick, float rise = 0);
     void SetUserScale(double scale);
     double UserScale() const;
+
+    void Draw(Overlays& overlays, const Frame& frame, const RigVisuals& visuals = {});
 
     void SetAnchor(const AnchorDesc& desc);
     const AnchorDesc& GetAnchor() const;

@@ -124,6 +124,28 @@ TEST(RigTest, SubmitsEachEyesDepthFromNearToFar) {
     EXPECT_FALSE(without.Status().depthLayer);
 }
 
+TEST(RigTest, DrawsItsVisualsIntoTheEyes) {
+    device::Device* device = RenderDevice();
+    if (device == nullptr) {
+        GTEST_SKIP() << "no supported adapter";
+    }
+    Session session(Simulated());
+    const Ref<Scene> scene = BallAhead(*device);
+    Rig rig(scene, session);
+    Renderer renderer(scene);
+    const Frame frame = session.BeginFrame();
+    rig.Update(frame);
+    rig.Draw(*renderer.GetOverlays(), frame, {.teleport = true});
+    EXPECT_EQ(renderer.GetOverlays()->Names(), (std::vector<std::string>{"xr"}));
+    RenderOutput output = renderer.Step(rig.Product(), frame.deltaTime);
+    session.EndFrame(frame, output);
+    const std::vector<uint8_t> raw =
+        output[rig.Product()].frames.back().RenderVar(rig.ColorVar()).tensor.ToHost<uint8_t>();
+    const std::vector<uint8_t> shown = session.Presented().ToHost<uint8_t>();
+    ASSERT_EQ(raw.size(), shown.size());
+    EXPECT_NE(raw, shown);
+}
+
 TEST(RigTest, AimsEachEyeAlongItsViewAndMovesTheHands) {
     device::Device* device = RenderDevice();
     if (device == nullptr) {

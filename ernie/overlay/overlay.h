@@ -350,6 +350,7 @@ class ERNIE_API Overlays : public RefCounted {
 
 ERNIE_API device::Tensor CompositeOverlay(const device::Tensor& color,
                                           const device::Tensor& overlay,
-                                          const device::Operation& after = {});
+                                          const device::Operation& after = {},
+                                          device::Operation* done = nullptr);
 
 }

@@ -55,6 +55,7 @@ struct RigState {
     std::string depthVar;
     std::vector<std::string> vars;
     Uint2 recommended;
+    Float2 playArea;
     Pose rootPose{{0, 0, 0}, {0, 0, 0, 1}, true};
     double userScale = 1;
 

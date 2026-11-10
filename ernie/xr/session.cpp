@@ -149,6 +149,9 @@ class SessionImpl {
             m_runtime->Start(*m_device);
             m_started = true;
         }
+        SessionStatus status;
+        m_runtime->FillStatus(status);
+        rig->playArea = status.playArea;
         m_rig = rig;
     }
 
@@ -193,18 +196,22 @@ class SessionImpl {
         if (product.frames.empty()) {
             throw Error("the rig's product {} rendered no frame", m_rig->product);
         }
-        const device::Tensor& color = product.frames.back().RenderVar(m_rig->colorVar).tensor;
+        const FrameOutput& eyeFrame = product.frames.back();
+        device::Tensor color = eyeFrame.RenderVar(m_rig->colorVar).tensor;
+        device::Operation ready = output.Done();
+        if (!eyeFrame.overlay.Empty()) {
+            color = CompositeOverlay(color, eyeFrame.overlay, ready, &ready);
+        }
         const Span<const int64_t> shape = color.Shape();
         if (shape.size() != 4 || shape[0] != 2) {
             throw Error("the rig's color isn't two eyes' images");
         }
-        m_stats->End(frame, &output.Done());
-        m_inFlight.push_back(output.Done());
-        const FrameOutput& eyeFrame = product.frames.back();
+        m_stats->End(frame, &ready);
+        m_inFlight.push_back(ready);
         const EyeImages eyes{color,
                              m_rig->depthVar.empty() ? device::Tensor()
                                                      : eyeFrame.RenderVar(m_rig->depthVar).tensor,
-                             output.Done()};
+                             ready};
         m_runtime->EndFrame(frame, &eyes);
         ++m_presented;
         m_stats->SetMetrics(m_runtime->Metrics(m_stats->Stats()));
@@ -489,7 +496,8 @@ Rig::Rig(Ref<Scene> scene, Session& session, const RigDesc& desc)
         {.camera = {path + "/LeftEye", path + "/RightEye"},
          .resolution = state.recommended,
          .aspectRatioConformPolicy = AspectRatioConformPolicy::AdjustPixelAspectRatio,
-         .orderedVars = state.vars});
+         .orderedVars = state.vars,
+         .overlays = desc.overlays});
     impl.Adopt(m_state);
 }
 

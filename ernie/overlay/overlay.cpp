@@ -2102,7 +2102,7 @@ void OverlayPass::RecordGroups(device::CommandEncoder& encoder) {
 }
 
 device::Tensor CompositeOverlay(const device::Tensor& color, const device::Tensor& overlay,
-                                const device::Operation& after) {
+                                const device::Operation& after, device::Operation* done) {
     const auto check = [](const device::Tensor& image, const char* what) {
         const Span<const int64_t> shape = image.Shape();
         if (image.Empty() || image.Type() != device::DType::UInt8 || shape.size() < 3 ||
@@ -2149,8 +2149,12 @@ device::Tensor CompositeOverlay(const device::Tensor& color, const device::Tenso
         BlendParams{
             {color.Address()}, {overlay.Address()}, {blended.Address()}, uint32_t(pixels), 0},
         {.x = device::GroupCount(pixels, kOverlayGroup)});
+    const device::Operation blending = queue.Submit(encoder.Finish());
     queue.Retire(std::make_shared<std::pair<device::Tensor, device::Tensor>>(color, overlay),
-                 queue.Submit(encoder.Finish()));
+                 blending);
+    if (done != nullptr) {
+        *done = blending;
+    }
     return blended;
 }
 
