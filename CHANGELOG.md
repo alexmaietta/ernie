@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A renderer writes each step's outputs into the same buffers it used for the last step of those products, so a `RenderOutput` holds valid data until the next step of the same products. Copy a frame to keep it. Holding earlier outputs no longer makes each step allocate another set of buffers.
 - Meshes whose `subdivisionScheme` is `none` and that have no normals, and every `bilinear` mesh, shade faceted with each face's own normal. They used to shade with smooth normals, which only `catmullClark` and `loop` meshes do now. OBJ files without normals import as faceted meshes.
 - The `Normal` render var is the surface normal from the geometry, interpolated from its normals before materials and normal maps, in every render mode. Real-time products used to report the normal-mapped normal, and products without color outputs didn't.
 - The `Normal` render var has three float channels instead of four. Misses write a zero normal in place of the old fourth channel, and `ColorizeNormals` shows them as transparent.

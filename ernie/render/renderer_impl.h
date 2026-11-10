@@ -93,7 +93,7 @@ class RendererImpl {
 
     struct StepPlan {
         std::shared_ptr<const ProductPlan> plan;
-        std::vector<OutputSet> sets;
+        std::optional<OutputSet> set;
     };
 
     StepPlan& PlanProducts(std::span<const std::string> products);

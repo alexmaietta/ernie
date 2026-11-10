@@ -50,30 +50,42 @@ TEST(InFlightTest, EachFrameSeesTheSceneItWasSteppedWith) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = BallScene(device);
         Renderer renderer(scene);
+        for (const double y : {0.0, 1.0, 2.0}) {
+            MoveBall(*scene, y);
+            RenderOutput output = renderer.Step(kProducts, 1.0 / 30);
+            EXPECT_NEAR(CenterDepth(output), 4 + y, 1e-3);
+        }
+    });
+}
+
+TEST(InFlightTest, HeldOutputsShowTheLatestStep) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = BallScene(device);
+        Renderer renderer(scene);
         std::vector<RenderOutput> outputs;
         for (const double y : {0.0, 1.0, 2.0}) {
             MoveBall(*scene, y);
             outputs.push_back(renderer.Step(kProducts, 1.0 / 30));
         }
-        EXPECT_NEAR(CenterDepth(outputs[0]), 4, 1e-3);
-        EXPECT_NEAR(CenterDepth(outputs[1]), 5, 1e-3);
-        EXPECT_NEAR(CenterDepth(outputs[2]), 6, 1e-3);
+        for (RenderOutput& output : outputs) {
+            EXPECT_NEAR(CenterDepth(output), 6, 1e-3);
+        }
     });
 }
 
-TEST(InFlightTest, RelayoutsWhileAFrameIsInFlightLeaveBothFramesRight) {
+TEST(InFlightTest, RelayoutsBetweenFramesLeaveEachFrameRight) {
     ForEachDevice([](Device& device) {
         const Ref<Scene> scene = BallScene(device);
         Renderer renderer(scene);
         RenderOutput before = renderer.Step(kProducts, 1.0 / 30);
+        EXPECT_NEAR(CenterDepth(before), 4, 1e-3);
         scene->Define<World>("/Env0");
         scene->Define<Sphere>("/Env0/Ball", {.radius = 1});
         scene->Define<Sphere>("/Near", {.translate = {0, -2, 0}, .radius = 0.5});
         RenderOutput after = renderer.Step(kProducts, 1.0 / 30);
+        EXPECT_NEAR(CenterDepth(after), 2.5, 1e-3);
         scene->Remove(*scene->Find("/Near"));
         RenderOutput removed = renderer.Step(kProducts, 1.0 / 30);
-        EXPECT_NEAR(CenterDepth(before), 4, 1e-3);
-        EXPECT_NEAR(CenterDepth(after), 2.5, 1e-3);
         EXPECT_NEAR(CenterDepth(removed), 4, 1e-3);
     });
 }

@@ -40,8 +40,6 @@ constexpr uint64_t PointCloud::* kPointFields[] = {
     &PointCloud::echo,        &PointCloud::radialVelocity,
     &PointCloud::instanceId,  &PointCloud::radialVelocityVector};
 
-constexpr size_t kHeldOutputsWarning = 8;
-
 }
 
 RendererImpl::RendererImpl(Ref<Scene> scene, const RendererDesc& desc)
@@ -272,16 +270,8 @@ RendererImpl::StepPlan& RendererImpl::PlanProducts(std::span<const std::string> 
 
 RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
     const bool outlined = OverlaysImpl::Get(*m_overlays).Outlined();
-    for (OutputSet& set : plan.sets) {
-        if (set.outlined == outlined &&
-            std::ranges::all_of(
-                set.vars,
-                [](const OwnedVar& var) { return var.tensor.GetBuffer().RefCount() == 1; }) &&
-            std::ranges::all_of(set.overlays, [](const OwnedOverlay& overlay) {
-                return overlay.tensor.GetBuffer().RefCount() == 1;
-            })) {
-            return set;
-        }
+    if (plan.set && plan.set->outlined == outlined) {
+        return *plan.set;
     }
 
     ERNIE_ZONE("Render/AcquireSet");
@@ -375,15 +365,9 @@ RendererImpl::OutputSet& RendererImpl::AcquireSet(StepPlan& plan) {
         set.captureBuffers[entry] = device.CreateBuffer({.label = "render captures"}, captures);
         set.captures[entry] = std::move(captures);
     }
-    plan.sets.push_back(std::move(set));
-    if (plan.sets.size() == kHeldOutputsWarning) {
-        Log(LogLevel::Warning,
-            "{} render outputs are held at once, so each step allocates more; drop outputs "
-            "once they're used",
-            kHeldOutputsWarning);
-    }
-    Log(LogLevel::Debug, "allocated render output set {}", plan.sets.size());
-    return plan.sets.back();
+    Log(LogLevel::Debug, "allocated render outputs for plan {}", planned.id);
+    plan.set = std::move(set);
+    return *plan.set;
 }
 
 uint64_t RendererImpl::AcquireCloud(OutputSet& set, uint32_t index, const std::string& path,
