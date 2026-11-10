@@ -1,0 +1,11 @@
+
+struct {{type}} : IStandardMaterial {
+    static void Material(inout ShadeContext context, inout SurfaceInputs inputs) {
+        {{type}}Params* p = context.materials.Params<{{type}}Params>(context.words);
+{{body}}        node.Material(inputs, context);
+    }
+
+    static SpectralValue Albedo(inout ShadeContext context) {
+        return StandardAlbedo<{{type}}>(context);
+    }
+}

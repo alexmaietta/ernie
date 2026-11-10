@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include "ernie/util/error.h"
+
 namespace ernie {
 namespace {
 
@@ -93,6 +95,15 @@ TEST(TextTest, ModulePathsAndErrorOriginsMapGeneratedFilesToTheirSource) {
                          "ernie/material/nodes/n12.slang(4): note",
                          origins),
               "/home/user/wet.slang(3): error, /home/user/wet.slang(4): note");
+}
+
+TEST(TextTest, TemplatesFillTheirPlaceholdersAndRejectUnknownOnes) {
+    EXPECT_EQ(
+        FillTemplate("void {{entry}}() {\n{{body}}}\n", {{"entry", "Run"}, {"body", "    x;\n"}}),
+        "void Run() {\n    x;\n}\n");
+    EXPECT_EQ(FillTemplate("{{a}}{{a}}", {{"a", "{{b}}"}}), "{{b}}{{b}}");
+    EXPECT_THROW(FillTemplate("{{missing}}", {}), Error);
+    EXPECT_THROW(FillTemplate("{{open", {}), Error);
 }
 
 }

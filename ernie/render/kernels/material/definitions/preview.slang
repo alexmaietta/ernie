@@ -130,3 +130,7 @@ struct PreviewMaterial : IStandardMaterial {
         }
     }
 }
+
+bool IsPreviewDefinition(uint definition) {
+    return definition == kDefinitionPreviewTextured || definition == kDefinitionPreviewConstant;
+}

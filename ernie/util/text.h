@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
@@ -27,6 +28,10 @@ inline constexpr uint64_t kFnvBasis = 0xcbf29ce484222325ull;
 uint64_t Fnv1a(std::string_view bytes, uint64_t hash = kFnvBasis);
 
 std::string Digest(std::string_view bytes);
+
+std::string
+FillTemplate(std::string_view text,
+             std::initializer_list<std::pair<std::string_view, std::string_view>> values);
 
 std::string Replaced(std::string text, std::string_view from, std::string_view to);
 

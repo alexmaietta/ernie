@@ -68,3 +68,9 @@ struct StandardDefinition<M : IStandardMaterial, Spectrum : ISpectrum>
         return M.Albedo(context).Evaluate<Spectrum>();
     }
 }
+
+SpectralValue StandardAlbedo<M : IStandardMaterial>(inout ShadeContext context) {
+    SurfaceInputs inputs = SurfaceInputs();
+    M.Material(context, inputs);
+    return inputs.baseColor;
+}

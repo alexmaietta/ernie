@@ -7,6 +7,8 @@
 
 #include <fmt/format.h>
 
+#include "ernie/util/error.h"
+
 namespace ernie {
 
 std::string Lowercase(std::string_view text) {
@@ -91,6 +93,33 @@ uint64_t Fnv1a(std::string_view bytes, uint64_t hash) {
 
 std::string Digest(std::string_view bytes) {
     return fmt::format("{:016x}", Fnv1a(bytes));
+}
+
+std::string
+FillTemplate(std::string_view text,
+             std::initializer_list<std::pair<std::string_view, std::string_view>> values) {
+    std::string filled;
+    size_t at = 0;
+    while (true) {
+        const size_t open = text.find("{{", at);
+        if (open == std::string_view::npos) {
+            filled += text.substr(at);
+            return filled;
+        }
+        const size_t close = text.find("}}", open + 2);
+        if (close == std::string_view::npos) {
+            throw Error("A template opens a placeholder at byte {} and never closes it", open);
+        }
+        const std::string_view name = text.substr(open + 2, close - open - 2);
+        const auto found =
+            std::ranges::find(values, name, &std::pair<std::string_view, std::string_view>::first);
+        if (found == values.end()) {
+            throw Error("A template uses {{{{{}}}}}, which nothing fills", name);
+        }
+        filled += text.substr(at, open - at);
+        filled += found->second;
+        at = close + 2;
+    }
 }
 
 std::string Replaced(std::string text, std::string_view from, std::string_view to) {

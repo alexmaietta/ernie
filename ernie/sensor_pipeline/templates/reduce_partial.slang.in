@@ -1,0 +1,6 @@
+    CaptureStat sum = CaptureStat.Zero();
+    for (uint index = group.first; index < group.count; index += group.stride) {
+        const SensorPipelineElement element = ElementAt(group.capture, index);
+        sum = sum.Add({{type}}.Contribute({{context}}, ReadSignal<{{signal}}>(p, element, {{input}})));
+    }
+    group.Store(p, {{slot}}, sum);

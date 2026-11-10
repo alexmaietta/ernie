@@ -1,0 +1,10 @@
+
+[shader("compute")]
+[numthreads(kPipelineGroup, 1, 1)]
+void {{entry}}(uniform SensorPipelineParams p) {
+    SensorPipelineCapture* capture;
+    if (!FindCapture(p, capture)) {
+        return;
+    }
+    const SensorPipelineElement element = ElementAt(capture, 0);
+{{body}}}

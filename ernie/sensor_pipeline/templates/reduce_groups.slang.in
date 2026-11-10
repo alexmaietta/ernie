@@ -1,0 +1,9 @@
+
+[shader("compute")]
+[numthreads(kPipelineGroup, 1, 1)]
+void {{entry}}(uniform SensorPipelineParams p) {
+    ReduceGroup group;
+    if (!ReduceGroup.Find(p, group)) {
+        return;
+    }
+{{body}}}

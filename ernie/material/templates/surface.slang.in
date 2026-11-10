@@ -1,0 +1,11 @@
+
+struct {{type}}<Spectrum : ISpectrum> : IMaterialDefinition<Spectrum> {
+    static void Shade(inout ShadeContext context, inout OpticalClosure<Spectrum> closure) {
+        {{type}}Params* p = context.materials.Params<{{type}}Params>(context.words);
+{{body}}        node.Shade<Spectrum>(context, closure);
+    }
+
+    static Spectrum Albedo(inout ShadeContext context) {
+        return ClosureAlbedo<Spectrum, {{type}}<Spectrum>>(context);
+    }
+}
