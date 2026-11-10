@@ -91,11 +91,12 @@ struct BvhLevel {
     }
 
     void Test(uint node, Ray ray, float far, out uint internal, out uint leaves, out uint4 q1) {
-        const uint4 q0 = nodes[node * 5];
-        q1 = nodes[node * 5 + 1];
-        const uint4 q2 = nodes[node * 5 + 2];
-        const uint4 q3 = nodes[node * 5 + 3];
-        const uint4 q4 = nodes[node * 5 + 4];
+        uint4* at = nodes + node * 5;
+        const uint4 q0 = loadAligned<16>(at);
+        q1 = loadAligned<16>(at + 1);
+        const uint4 q2 = loadAligned<16>(at + 2);
+        const uint4 q3 = loadAligned<16>(at + 3);
+        const uint4 q4 = loadAligned<16>(at + 4);
         const float3 scale = float3(NodeScale(q0.w, 0), NodeScale(q0.w, 1), NodeScale(q0.w, 2));
         const float3 step = scale * inverse;
         const float3 start = (asfloat(q0.xyz) - ray.origin) * inverse;
@@ -125,6 +126,21 @@ struct BvhLevel {
     }
 }
 
+BvhInstance LoadInstance(uint4* record) {
+    const uint4 r0 = loadAligned<16>(record);
+    const uint4 r1 = loadAligned<16>(record + 1);
+    const uint4 r2 = loadAligned<16>(record + 2);
+    const uint4 r3 = loadAligned<16>(record + 3);
+    BvhInstance instance;
+    instance.blas = uint64_t(r0.x) | uint64_t(r0.y) << 32;
+    instance.toObject = { asfloat(r0.z), asfloat(r0.w), asfloat(r1.x), asfloat(r1.y),
+                          asfloat(r1.z), asfloat(r1.w), asfloat(r2.x), asfloat(r2.y),
+                          asfloat(r2.z), asfloat(r2.w), asfloat(r3.x), asfloat(r3.y) };
+    instance.custom = r3.z;
+    instance.index = r3.w;
+    return instance;
+}
+
 Ray ToObject(BvhInstance instance, Ray ray) {
     const float m[12] = instance.toObject;
     Ray moved = ray;
@@ -147,8 +163,9 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
     [mutating]
     bool Visit(uint4* records, uint count, uint kind) {
         for (uint i = 0; i < count; ++i) {
-            const bool kept = kind == kBvhBoxes ? TestBox(((BvhBoxRecord*)records)[i])
-                                                : TestTriangle(((BvhTriangle*)records)[i]);
+            const bool kept = kind == kBvhBoxes
+                                  ? TestBox(((uint*)records)[i * (kBvhBoxBytes / 4) + 3])
+                                  : TestTriangle(records + i * (kBvhTriangleBytes / 16));
             if (kept && any) {
                 return true;
             }
@@ -157,11 +174,13 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
     }
 
     [mutating]
-    bool TestTriangle(BvhTriangle record) {
-        const float3 edgeC = float3(record.edgeC[0], record.edgeC[1], record.edgeC[2]);
-        const float3 edgeB = float3(record.edgeB[0], record.edgeB[1], record.edgeB[2]);
-        const float3 a = float3(record.a[0], record.a[1], record.a[2]);
-        const TriangleTest test = IntersectTriangle(query.ray, a, edgeB, edgeC);
+    bool TestTriangle(uint4* record) {
+        const uint4 c = loadAligned<16>(record);
+        const uint4 b = loadAligned<16>(record + 1);
+        const uint4 a = loadAligned<16>(record + 2);
+        const float3 edgeC = asfloat(c.xyz);
+        const float3 edgeB = asfloat(b.xyz);
+        const TriangleTest test = IntersectTriangle(query.ray, asfloat(a.xyz), edgeB, edgeC);
         if (!test.inside || test.t < query.ray.tMin || test.t >= nearest.t) {
             return false;
         }
@@ -170,7 +189,7 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
             (facing & kInstanceFacingCullDisable) == 0) {
             return false;
         }
-        const Hit candidate = Candidate(test.t, test.barycentrics, record.index, false);
+        const Hit candidate = Candidate(test.t, test.barycentrics, a.w, false);
         if (!F.AcceptsAll() && !query.filter.Accept(query.ray, candidate)) {
             return false;
         }
@@ -179,14 +198,14 @@ struct BlasVisitor<F : IHitFilter, I : IIntersector> {
     }
 
     [mutating]
-    bool TestBox(BvhBoxRecord record) {
+    bool TestBox(uint index) {
         float t = nearest.t;
         float2 attributes;
-        if (!query.intersector.Intersect(query.ray, instance, 0, record.index, t, attributes) ||
+        if (!query.intersector.Intersect(query.ray, instance, 0, index, t, attributes) ||
             t < query.ray.tMin || t >= nearest.t) {
             return false;
         }
-        const Hit candidate = Candidate(t, attributes, record.index, true);
+        const Hit candidate = Candidate(t, attributes, index, true);
         if (!F.AcceptsAll() && !query.filter.Accept(query.ray, candidate)) {
             return false;
         }
@@ -273,7 +292,7 @@ struct SoftwareTracer : ITracer {
             } else {
                 --depth;
             }
-            const BvhInstance instance = *(BvhInstance*)(level.records + record);
+            const BvhInstance instance = LoadInstance(level.records + record);
             BvhHeader* blas = (BvhHeader*)instance.blas;
             if (((instance.custom >> 24) & query.mask) == 0 || blas.primitives == 0 ||
                 blas.nodeCount == 0) {
