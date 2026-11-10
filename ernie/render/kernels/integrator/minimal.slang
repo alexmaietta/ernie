@@ -129,6 +129,7 @@ void RenderMinimalPixel<let Mode : MinimalMode>(RenderParams params, CapturePixe
         WritePrimId(pixel, kNoPrim);
         Write(pixel, RenderVarSource::DistanceToCamera, plan.missDistance);
         Write(pixel, RenderVarSource::DistanceToImagePlane, plan.missDistance);
+        Write(pixel, RenderVarSource::NormalizedDepth, 1.0f);
         WriteNormal(pixel, float3(0));
         Write(pixel, RenderVarSource::DiffuseAlbedo, PackSrgb(float3(0), false));
         WriteSegmentation(params, pixel, kNoPrim);
@@ -149,9 +150,12 @@ void RenderMinimalPixel<let Mode : MinimalMode>(RenderParams params, CapturePixe
     const SurfacePoint point = ComputeSurfacePoint(query, ray, primHit, spread);
     WritePrimId(pixel, point.prim);
     Write(pixel, RenderVarSource::DistanceToCamera, point.distance);
-    if (Wants(pixel, RenderVarSource::DistanceToImagePlane)) {
-        Write(pixel, RenderVarSource::DistanceToImagePlane,
-              -LoadSensorFrame(tables, plan.sensor).ToLocal(point.position).z);
+    if (Wants(pixel, RenderVarSource::DistanceToImagePlane) ||
+        Wants(pixel, RenderVarSource::NormalizedDepth)) {
+        const float planeDistance = -LoadSensorFrame(tables, plan.sensor).ToLocal(point.position).z;
+        Write(pixel, RenderVarSource::DistanceToImagePlane, planeDistance);
+        Write(pixel, RenderVarSource::NormalizedDepth,
+              NormalizedDepth(planeDistance, view.clipping.Vector()));
     }
     WriteNormal(pixel, point.shadingNormal);
     WriteSegmentation(params, pixel, point.part);

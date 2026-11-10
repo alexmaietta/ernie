@@ -29,9 +29,10 @@ ERNIE_ENUM(RenderVarSource) {
     InstanceId,
     InstancerStableId,
     ElectronRate,
+    NormalizedDepth,
 };
 
-static const uint kRenderVarSourceCount = 18;
+static const uint kRenderVarSourceCount = 19;
 
 #ifndef __SLANG__
 
@@ -54,6 +55,7 @@ inline constexpr std::string_view kRenderVarSourceTokens[kRenderVarSourceCount] 
     "InstanceId",
     "InstancerStableId",
     "ElectronRate",
+    "NormalizedDepth",
 };
 
 inline std::optional<RenderVarSource> FindRenderVarSource(std::string_view name) {

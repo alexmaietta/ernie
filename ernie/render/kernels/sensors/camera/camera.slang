@@ -190,6 +190,15 @@ struct CameraAperture {
     }
 }
 
+float NormalizedDepth(float planeDistance, float2 clipping) {
+    const float near = clipping.x;
+    const float far = clipping.y;
+    if (!(planeDistance < far)) {
+        return 1;
+    }
+    return clamp(far * (planeDistance - near) / (planeDistance * (far - near)), 0.0f, 1.0f);
+}
+
 struct CameraClipping {
     float near;
     float far;

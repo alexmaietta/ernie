@@ -76,6 +76,27 @@ TEST(CameraTest, PerspectiveImagePlaneDistanceIsDepthAlongTheAxis) {
     });
 }
 
+TEST(CameraTest, NormalizedDepthMapsTheClippingRangeOntoZeroToOne) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = FacingWall(device, {.focalLength = 10, .clippingRange = {1, 10}});
+        scene->Define<RenderVar>("/Render/Normalized", {.sourceName = "NormalizedDepth"});
+        scene->Find("/Render/View")
+            ->Set(RenderProduct::kOrderedVars,
+                  std::vector<std::string>{"/Render/Depth", "/Render/Normalized"});
+        Renderer renderer(scene);
+        const float expected = 10 * (kWallDistance - 1) / (kWallDistance * 9);
+        const std::vector<float> depth = Distances(renderer, "NormalizedDepth");
+        ASSERT_EQ(depth.size(), kSize * kSize);
+        for (const float value : depth) {
+            EXPECT_NEAR(value, expected, 1e-4);
+        }
+        scene->Find("/Wall")->Set(Xformable::kTranslate, Double3{0, 0, -20});
+        for (const float value : Distances(renderer, "NormalizedDepth")) {
+            EXPECT_EQ(value, 1);
+        }
+    });
+}
+
 TEST(CameraTest, OrthographicRaysRunParallelToTheAxis) {
     ForEachDevice([](Device& device) {
         Renderer renderer(FacingWall(device, {.projection = Projection::Orthographic}));

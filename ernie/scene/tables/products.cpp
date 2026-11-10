@@ -90,6 +90,7 @@ VarFormat SourceFormat(RenderVarSource source) {
         return {device::DType::Float32, 4};
     case RenderVarSource::DistanceToCamera:
     case RenderVarSource::DistanceToImagePlane:
+    case RenderVarSource::NormalizedDepth:
     case RenderVarSource::Intensity:
     case RenderVarSource::RadialVelocity:
         return {device::DType::Float32, 1};

@@ -122,7 +122,8 @@ void WriteLabels(const std::filesystem::path& path, const IdMap& map, bool singl
 }
 
 template <class T> T Viewable(std::string_view source, device::DType type, const T& image) {
-    if (source == "DistanceToCamera" || source == "DistanceToImagePlane") {
+    if (source == "DistanceToCamera" || source == "DistanceToImagePlane" ||
+        source == "NormalizedDepth") {
         return ColorizeScalars(image, kDepthColors);
     }
     if (source == "Intensity") {
