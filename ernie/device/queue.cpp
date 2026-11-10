@@ -336,7 +336,9 @@ Operation Queue::SubmitCommands(const CommandBuffer& commands) {
         Collect(Finished());
     }
 
-    if (m_state->batches > 0 && !m_device.m_synchronous) {
+    if (m_state->batches > 0 && !m_device.m_synchronous && commands.m_reusable) {
+        Run(CommandBuffer(*this, true));
+    } else if (m_state->batches > 0 && !m_device.m_synchronous) {
         {
             const std::lock_guard lock(m_state->mutex);
             m_state->queued.Append(commands);

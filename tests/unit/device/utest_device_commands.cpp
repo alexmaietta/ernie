@@ -97,6 +97,31 @@ TEST(CommandsTest, ReusableBuffersRunEachTimeTheyAreSubmitted) {
     });
 }
 
+TEST(CommandsTest, ReusableBuffersInABatchRunBetweenTheWorkAroundThem) {
+    ForEachDevice([](Device& device) {
+        Queue& queue = device.GetQueue();
+        const Ref<Buffer> source = device.CreateBuffer({.label = "source"}, std::vector{0u});
+        const Ref<Buffer> copied = device.CreateBuffer({.label = "copied"}, std::vector{0u});
+        CommandEncoder recorder = queue.CreateEncoder();
+        recorder.Copy(*source, *copied);
+        const CommandBuffer reused = recorder.Finish({.reusable = true});
+
+        for (const uint32_t value : {3u, 7u}) {
+            queue.BeginBatch();
+            CommandEncoder before = queue.CreateEncoder();
+            before.Fill(*source, value);
+            queue.Submit(before.Finish());
+            queue.Submit(reused);
+            CommandEncoder after = queue.CreateEncoder();
+            after.Fill(*source, 0);
+            queue.Submit(after.Finish());
+            queue.EndBatch().Wait();
+            EXPECT_EQ(Download<uint32_t>(device, *copied, 1), std::vector{value});
+            EXPECT_EQ(Download<uint32_t>(device, *source, 1), std::vector{0u});
+        }
+    });
+}
+
 TEST(CommandsTest, RejectUpdatesTooLargeToInline) {
     ForEachDevice([](Device& device) {
         const Ref<Buffer> buffer =
