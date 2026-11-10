@@ -4,7 +4,9 @@ include("${PROJECT_SOURCE_DIR}/cmake/third_party/openxr.cmake")
 ernie_object_library(
     ernie_xr_objects
     EXPORTS ernie_xr_EXPORTS
+    locomotion.cpp
     openxr.cpp
+    pointers.cpp
     profiles.cpp
     rig.cpp
     session.cpp

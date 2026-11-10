@@ -2,6 +2,7 @@
 #include "ernie/xr/rig.h"
 
 #include <cmath>
+#include <utility>
 
 #include "ernie/util/profiler.h"
 #include "ernie/xr/rig_state.h"
@@ -75,14 +76,25 @@ void Rig::Update(const Frame& frame) {
             Place(Hand(side), controller.pose);
         }
     }
+    state.lastFrame = frame;
+    state.MirrorParent();
+    state.Land();
+    const bool any = state.wanted[kLaser][0] || state.wanted[kLaser][1] ||
+                     state.wanted[kTeleport][0] || state.wanted[kTeleport][1];
+    if (any) {
+        if (state.pending && state.pending->Done()) {
+            state.latest = std::move(state.pending);
+        }
+        state.pending = state.Queue(frame, state.wanted);
+    }
 }
 
 void Rig::SetRootPose(const Pose& pose) {
     RigState& state = *m_state;
     state.rootPose = pose;
     state.rootPose.valid = true;
-    state.root.SetTranslate(pose.position);
-    state.root.SetOrient(pose.orientation);
+    state.ground.reset();
+    state.WriteRoot();
 }
 
 Pose Rig::RootPose() const {

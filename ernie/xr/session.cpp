@@ -456,6 +456,12 @@ Rig::Rig(Ref<Scene> scene, Session& session, const RigDesc& desc)
     state.scene = scene;
     state.recommended = impl.Resolution();
     state.root = scene->Define<Xform>(path);
+    for (std::optional<Prim> parent = state.root.Parent(); parent; parent = parent->Parent()) {
+        if (parent->IsA<Xformable>()) {
+            state.parentPath = parent->Path();
+            break;
+        }
+    }
     state.head = scene->Define<Xform>(path + "/Head");
     state.leftEye = scene->Define<Camera>(path + "/LeftEye",
                                           {.focalLength = kFocalLength, .clippingRange = planes});

@@ -14,21 +14,12 @@
 #include "ernie/scene/scene.h"
 #include "ernie/util/error.h"
 #include "ernie/xr/session.h"
+#include "xr_device.h"
 
 namespace ernie::xr {
 namespace {
 
-device::Device* RenderDevice() {
-    static const std::optional<Ref<device::Device>> device =
-        []() -> std::optional<Ref<device::Device>> {
-        try {
-            return device::Device::Create();
-        } catch (const UnsupportedError&) {
-            return std::nullopt;
-        }
-    }();
-    return device ? device->Get() : nullptr;
-}
+using test::RenderDevice;
 
 SessionDesc Simulated() {
     SessionDesc desc;

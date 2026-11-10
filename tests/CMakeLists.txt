@@ -298,6 +298,7 @@ if(ERNIE_BUILD_XR)
         LINK
             ernie_xr_internal
         SOURCES
+            unit/xr/utest_xr_locomotion.cpp
             unit/xr/utest_xr_openxr.cpp
             unit/xr/utest_xr_rig.cpp
             unit/xr/utest_xr_session.cpp
