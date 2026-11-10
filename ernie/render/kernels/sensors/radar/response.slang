@@ -81,7 +81,7 @@ struct RadarResponse : IResponse<RadarPattern> {
         radialVelocity = dot(velocity - sensorVelocity, ray.ray.direction);
         normal = point.shadingNormal;
         prim = point.part;
-        instance = HitInstanceId(tables, point);
+        instance = HitInstanceId(tables, point.slot, point.element.face);
     }
 
     void Write(SensorContext context, RadarPattern pattern, CapturePixel pixel) {

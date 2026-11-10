@@ -4,13 +4,16 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "ernie/device/operation.h"
 #include "ernie/device/ref.h"
 #include "ernie/device/stream.h"
 #include "ernie/device/tensor.h"
 #include "ernie/export.h"
+#include "ernie/scene/prim.h"
 #include "ernie/stage/schema/ids.h"
 
 namespace ernie {
@@ -23,6 +26,7 @@ enum class RayOutput : uint32_t {
     Prim = 1u << 1,
     Normal = 1u << 2,
     Position = 1u << 3,
+    InstanceId = 1u << 4,
 };
 
 constexpr RayOutput operator|(RayOutput a, RayOutput b) {
@@ -44,6 +48,7 @@ struct ERNIE_API Rays {
     float minDistance = 0;
     float maxDistance = std::numeric_limits<float>::infinity();
     uint32_t world = kGlobalWorld;
+    std::optional<Prim> space;
 };
 
 struct ERNIE_API RayHits {
@@ -52,6 +57,7 @@ struct ERNIE_API RayHits {
     device::Tensor prim;
     device::Tensor normal;
     device::Tensor position;
+    device::Tensor instance;
     device::Operation done;
 };
 
@@ -59,6 +65,7 @@ struct ERNIE_API RayCastDesc {
     RayCastMode mode = RayCastMode::Closest;
     RayOutput outputs = RayOutput::Distance | RayOutput::Prim;
     std::string label = "RayCast";
+    std::vector<Prim> ignore;
 };
 
 class ERNIE_API RayCaster {

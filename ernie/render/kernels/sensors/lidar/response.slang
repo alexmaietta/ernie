@@ -119,7 +119,7 @@ struct LidarResponse : IResponse<LidarPattern> {
         candidate.intensity = Intensity(point, ray.ray.direction);
         candidate.normal = point.shadingNormal;
         candidate.prim = point.part;
-        candidate.instance = HitInstanceId(tables, point);
+        candidate.instance = HitInstanceId(tables, point.slot, point.element.face);
         if (mode == ReturnMode::Mean) {
             ++hits;
             positionSum += candidate.position;

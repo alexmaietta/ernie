@@ -35,10 +35,19 @@ bool LoadRay(RayCastParams params, uint index, out HitQuery query, out Ray ray,
     const RenderOrigin origin = TlasOrigin(params.tables, query.world);
     offset.high = origin.high.Vector();
     offset.low = origin.low.Vector();
-    const float3 start = Load3(params.origins, index);
+    float3 start = Load3(params.origins, index);
+    float3 direction = Load3(params.directions, index);
     const float tMin = params.tMins != nullptr ? params.tMins[index] : params.minDistance;
     const float tMax = params.tMaxes != nullptr ? params.tMaxes[index] : params.maxDistance;
-    ray = Ray((start - offset.high) - offset.low, Load3(params.directions, index), tMin, tMax, 0);
+    if (params.spaceRow != kNoRow) {
+        const WorldTransform space = params.tables->transforms[params.spaceRow];
+        start = space.Apply(start) + ((space.high.Vector() - offset.high) +
+                                      (space.low.Vector() - offset.low));
+        direction = space.Apply(direction);
+    } else {
+        start = (start - offset.high) - offset.low;
+    }
+    ray = Ray(start, direction, tMin, tMax, 0);
     return world == kGlobalWorld || world < layout->worldCount;
 }
 
@@ -55,7 +64,12 @@ void CastClosest(uniform RayCastParams params) {
     PrimHit found;
     found.prim = kNoPrim;
     if (LoadRay(params, index, query, ray, offset)) {
-        found = query.Intersect(ray);
+        if (params.ignoredCount == 0) {
+            found = query.Intersect(ray);
+        } else {
+            found = query.Intersect(ray, kGeometryMask,
+                                    query.Ignoring(params.ignored, params.ignoredCount));
+        }
     }
     const bool hit = found.prim != kNoPrim;
     params.hits[index] = hit ? 1 : 0;
@@ -65,12 +79,19 @@ void CastClosest(uniform RayCastParams params) {
     if (params.prims != nullptr) {
         params.prims[index] = found.prim;
     }
-    if (params.normals == nullptr && params.positions == nullptr) {
+    if (params.normals == nullptr && params.positions == nullptr && params.instances == nullptr) {
         return;
     }
     SurfacePoint point = SurfacePoint.Miss();
     if (hit) {
         point = ComputeSurfacePoint(query, ray, found, 0);
+    }
+    if (params.instances != nullptr) {
+        int64_t instance = -1;
+        if (hit) {
+            instance = HitInstanceId(query.tables, point.slot, point.element.face);
+        }
+        params.instances[index] = instance;
     }
     if (params.normals != nullptr) {
         Store3(params.normals, index, point.geometricNormal);
@@ -90,6 +111,13 @@ void CastAny(uniform RayCastParams params) {
     HitQuery query;
     Ray ray;
     WorldOffset offset;
-    const bool valid = LoadRay(params, index, query, ray, offset);
-    params.hits[index] = valid && query.Occluded(ray) ? 1 : 0;
+    bool occluded = false;
+    if (LoadRay(params, index, query, ray, offset)) {
+        if (params.ignoredCount == 0) {
+            occluded = query.Occluded(ray);
+        } else {
+            occluded = query.Occluded(ray, query.Ignoring(params.ignored, params.ignoredCount));
+        }
+    }
+    params.hits[index] = occluded ? 1 : 0;
 }

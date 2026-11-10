@@ -22,13 +22,17 @@ struct RayCastParams {
     Ptr<uint> prims;
     Ptr<float> normals;
     Ptr<float> positions;
+    Ptr<int64_t> instances;
+    Ptr<uint> ignored;
     float minDistance;
     float maxDistance;
     uint world;
     uint count;
+    uint ignoredCount;
+    uint spaceRow;
 };
 
-ERNIE_CHECK_SIZE(RayCastParams, 104);
+ERNIE_CHECK_SIZE(RayCastParams, 128);
 
 static const uint kRayCastGroup = 64;
 

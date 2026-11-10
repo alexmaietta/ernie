@@ -81,6 +81,52 @@ struct LinkFilter : IHitFilter {
     }
 }
 
+struct IgnoreFilter : IHitFilter {
+    static const uint kRayFlags = 0;
+
+    Ptr<SlotHit> hits;
+    uint first;
+    Ptr<uint> ignored;
+    uint count;
+
+    static bool AcceptsAll() {
+        return false;
+    }
+
+    bool Opaque() {
+        return false;
+    }
+
+    bool Ignored(uint prim) {
+        uint low = 0;
+        uint high = count;
+        while (low < high) {
+            const uint middle = (low + high) / 2;
+            if (ignored[middle] < prim) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return low < count && ignored[low] == prim;
+    }
+
+    bool Accept(Ray ray, Hit candidate) {
+        const SlotHit drawn = hits[first + candidate.instance];
+        return !Ignored(drawn.prim) && (drawn.instancer == kNoPrim || !Ignored(drawn.instancer));
+    }
+}
+
+int64_t HitInstanceId(RenderTables* tables, uint slot, uint face) {
+    const ShapeRecord shape = tables->instances->shapes[slot];
+    if (ShapeKind(shape.kind) == ShapeKind::Points) {
+        const PointsRecord cloud = tables->points[shape.row];
+        return cloud.idCount == cloud.pointCount ? Ptr<int64_t>(cloud.ids)[face] : int64_t(face);
+    }
+    return tables->instances->hits[slot].instancer == kNoPrim ? int64_t(-1)
+                                                              : tables->surfaces[slot].instanceId;
+}
+
 struct HitQuery {
     RenderTables* tables;
     InstanceLayout* layout;
@@ -109,8 +155,12 @@ struct HitQuery {
     }
 
     PrimHit Intersect(Ray ray, uint mask) {
+        return Intersect(ray, mask, AcceptAll());
+    }
+
+    PrimHit Intersect<Filter : IHitFilter>(Ray ray, uint mask, Filter filter) {
         PrimHit primHit;
-        primHit.hit = Tracer.Closest(layout->handles[tlas], ray, mask, AcceptAll(), Intersector());
+        primHit.hit = Tracer.Closest(layout->handles[tlas], ray, mask, filter, Intersector());
         primHit.prim = kNoPrim;
         primHit.instancer = kNoPrim;
         primHit.instance = 0;
@@ -132,7 +182,20 @@ struct HitQuery {
     }
 
     bool Occluded(Ray ray) {
-        return Tracer.Any(layout->handles[tlas], ray, kGeometryMask, AcceptAll(), Intersector());
+        return Occluded(ray, AcceptAll());
+    }
+
+    bool Occluded<Filter : IHitFilter>(Ray ray, Filter filter) {
+        return Tracer.Any(layout->handles[tlas], ray, kGeometryMask, filter, Intersector());
+    }
+
+    IgnoreFilter Ignoring(Ptr<uint> ignored, uint count) {
+        IgnoreFilter filter;
+        filter.hits = layout->hits;
+        filter.first = layout->firstInstances[tlas];
+        filter.ignored = ignored;
+        filter.count = count;
+        return filter;
     }
 
     LinkFilter Links(uint row) {

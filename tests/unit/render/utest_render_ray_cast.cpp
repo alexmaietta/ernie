@@ -12,6 +12,7 @@
 
 #include "ernie/device/queue.h"
 #include "ernie/scene/records/points.h"
+#include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
 #include "ernie/stage/primvar.h"
 #include "ernie/util/error.h"
@@ -518,6 +519,85 @@ TEST(RayCastTest, InstancedMeshCopiesHitAtTheirOwnPlaces) {
         EXPECT_NEAR(position[3], 10.5f, 1e-4);
         EXPECT_NEAR(position[5], 3, 1e-4);
         EXPECT_NEAR(normal[5], 1, 1e-4);
+    });
+}
+
+TEST(RayCastTest, CastsRaysInThePrimSpaceTheyName) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<Sphere>("/Ball", {.translate = {0, 6, 0}, .radius = 1});
+        const Prim rig = scene->Define<Xform>(
+            "/Rig",
+            {.translate = {0, 1, 0}, .orient = FromAxisAngle({0, 0, 1}, 90), .scale = {2, 2, 2}});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0, 0, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0}, 3);
+        rays.space = rig;
+        const auto cast = [&] {
+            return caster.Cast(rays, {.outputs = RayOutput::Distance | RayOutput::Position});
+        };
+        RayHits hits = cast();
+        EXPECT_NEAR(hits.distance.ToHost<float>()[0], 2, 1e-4);
+        EXPECT_NEAR(hits.position.ToHost<float>()[1], 5, 1e-4);
+
+        rig.Set(Xformable::kTranslate, Double3{0, 2, 0});
+        hits = cast();
+        EXPECT_NEAR(hits.distance.ToHost<float>()[0], 1.5, 1e-4);
+        EXPECT_THROW(caster.Cast({.origins = rays.origins,
+                                  .directions = rays.directions,
+                                  .space = scene->Define<Scope>("/Flat")}),
+                     Error);
+    });
+}
+
+TEST(RayCastTest, IgnoresPrimsAndEverythingUnderThem) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim group = scene->Define<Xform>("/Group");
+        const Prim near =
+            scene->Define<Sphere>("/Group/Near", {.translate = {3, 0, 0}, .radius = 1});
+        const Prim far = scene->Define<Sphere>("/Far", {.translate = {6, 0, 0}, .radius = 0.5});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0, 0, 0}, 3);
+        rays.directions = Floats(device, {1, 0, 0}, 3);
+        const auto cast = [&](std::vector<Prim> ignore, RayCastMode mode) {
+            return caster.Cast(rays, {.mode = mode,
+                                      .outputs = RayOutput::Distance | RayOutput::Prim,
+                                      .ignore = std::move(ignore)});
+        };
+        EXPECT_EQ(cast({}, RayCastMode::Closest).prim.ToHost<uint32_t>()[0], near.Index());
+        const RayHits past = cast({near}, RayCastMode::Closest);
+        EXPECT_NEAR(past.distance.ToHost<float>()[0], 5.5, 1e-4);
+        EXPECT_EQ(past.prim.ToHost<uint32_t>()[0], far.Index());
+        EXPECT_NEAR(cast({group}, RayCastMode::Closest).distance.ToHost<float>()[0], 5.5, 1e-4);
+        EXPECT_EQ(cast({group, far}, RayCastMode::Closest).hit.ToHost<uint32_t>()[0], 0u);
+        EXPECT_EQ(cast({group, far}, RayCastMode::Any).hit.ToHost<uint32_t>()[0], 0u);
+        EXPECT_EQ(cast({group}, RayCastMode::Any).hit.ToHost<uint32_t>()[0], 1u);
+    });
+}
+
+TEST(RayCastTest, ReportsTheInstanceIdOfEachCopyHit) {
+    ForEachDevice([](Device& device) {
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<PointInstancer>("/Inst", {.prototypes = {"/Inst/Protos/Tile"},
+                                                .protoIndices = {0, 0},
+                                                .positions = {{0, 0, 0}, {10, 0, 3}},
+                                                .ids = {7, 9}});
+        scene->Define<Scope>("/Inst/Protos");
+        scene->Define<Mesh>("/Inst/Protos/Tile",
+                            {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                             .faceVertexIndices = {0, 1, 2, 3},
+                             .faceVertexCounts = {4}});
+        scene->Define<Sphere>("/Ball", {.translate = {20, 0, 0}, .radius = 1});
+        RayCaster caster(scene);
+        Rays rays;
+        rays.origins = Floats(device, {0.5f, 0.5f, 5, 10.5f, -0.5f, 5, 20, 0, 5, 30, 0, 5}, 3);
+        rays.directions = Floats(device, {0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1}, 3);
+        const RayHits hits = caster.Cast(rays, {.outputs = RayOutput::InstanceId});
+        EXPECT_EQ(hits.instance.ToHost<int64_t>(), (std::vector<int64_t>{7, 9, -1, -1}));
+        EXPECT_TRUE(hits.distance.Empty());
     });
 }
 

@@ -56,6 +56,23 @@ uint64_t InputAddress(device::Device& device, const device::Tensor& tensor, int6
     return tensor.Address();
 }
 
+void Collect(const Prim& prim, std::vector<uint32_t>& prims) {
+    prims.push_back(prim.Index());
+    for (const Prim& child : prim.Children()) {
+        Collect(child, prims);
+    }
+}
+
+std::vector<uint32_t> IgnoredPrims(const std::vector<Prim>& ignore) {
+    std::vector<uint32_t> prims;
+    for (const Prim& prim : ignore) {
+        Collect(prim, prims);
+    }
+    std::ranges::sort(prims);
+    prims.erase(std::unique(prims.begin(), prims.end()), prims.end());
+    return prims;
+}
+
 uint64_t Output(device::Device& device, device::Tensor& tensor, bool wanted, device::DType type,
                 std::vector<int64_t> shape) {
     if (!wanted) {
@@ -134,6 +151,9 @@ device::Operation RayCaster::Cast(const Rays& rays, RayHits& hits, const RayCast
                device::DType::Float32, rows(1));
     params.prims.address = Output(device, hits.prim, closest && desc.outputs & RayOutput::Prim,
                                   device::DType::UInt32, rows(1));
+    params.instances.address =
+        Output(device, hits.instance, closest && desc.outputs & RayOutput::InstanceId,
+               device::DType::Int64, rows(1));
     params.normals.address =
         Output(device, hits.normal, closest && desc.outputs & RayOutput::Normal,
                device::DType::Float32, rows(3));
@@ -141,7 +161,22 @@ device::Operation RayCaster::Cast(const Rays& rays, RayHits& hits, const RayCast
         Output(device, hits.position, closest && desc.outputs & RayOutput::Position,
                device::DType::Float32, rows(3));
 
+    params.spaceRow = kNoRow;
+    if (rays.space) {
+        if (!rays.space->IsA<Xformable>()) {
+            throw Error("rays are cast in the space of {}, which has no transform",
+                        rays.space->Path());
+        }
+    }
+    const std::vector<uint32_t> ignored = IgnoredPrims(desc.ignore);
+    params.ignoredCount = uint32_t(ignored.size());
+
     const device::Operation published = scene.Publish({}, stream);
+    if (rays.space) {
+        const uint32_t prim = rays.space->Index();
+        params.spaceRow = SceneImpl::Get(scene).GetStructure().GetPrims().Rows(
+            std::span<const uint32_t>(&prim, 1), SchemaId::Xformable)[0];
+    }
     if (count == 0) {
         hits.done = published;
         return hits.done;
@@ -149,6 +184,10 @@ device::Operation RayCaster::Cast(const Rays& rays, RayHits& hits, const RayCast
     const Snapshot snapshot = scene.Acquire();
     params.tables.address = snapshot.tables;
     device::Queue& queue = device.GetQueue();
+    if (!ignored.empty()) {
+        params.ignored.address =
+            queue.Upload(ignored.data(), ignored.size() * sizeof(uint32_t)).Address();
+    }
     queue.Follow(stream);
     device::CommandEncoder encoder = queue.CreateEncoder();
     encoder.BeginZone(profiler::ZoneId::Named(desc.label));
