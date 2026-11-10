@@ -783,7 +783,8 @@ ViewerImpl::ViewerImpl(Ref<device::Device> device, Ref<Scene> scene, const Viewe
             CreateLogPanel(m_theme), CreateProfilerPanel(), CreateMemoryPanel(m_device),
             CreateCapturePanel(m_capture)};
         if (m_scene) {
-            builtins.push_back(CreateStagePanel(m_scene, m_selection, m_editor, m_theme));
+            builtins.push_back(CreateStagePanel(m_scene, m_selection, m_editor, m_theme,
+                                                [this] { DrawCreateMenu(); }));
             builtins.push_back(
                 CreatePropertiesPanel(m_scene, m_selection, m_editor, m_fileDialog, m_theme));
         }

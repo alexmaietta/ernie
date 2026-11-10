@@ -623,77 +623,85 @@ void Toolbar::DrawHudMenu() {
         ImGui::EndMenu();
     }
     ViewportGuides& guides = m_viewport.guides;
-    ImGui::SeparatorText("Show By Type");
-    ImGui::MenuItem("Cameras", nullptr, &guides.cameras);
-    ImGui::SetItemTooltip("Each scene camera's frustum, but the one looked through");
-    ImGui::MenuItem("Lights", nullptr, &guides.lights);
-    ImGui::SetItemTooltip("Each light's shape and direction");
-    ImGui::SeparatorText("Sensor Clouds");
-    const std::pair<const char*, SensorClouds> clouds[] = {
-        {"Off", SensorClouds::Off},
-        {"Selected Sensors", SensorClouds::Selected},
-        {"All Sensors", SensorClouds::All}};
-    for (const auto& [label, mode] : clouds) {
-        if (ImGui::MenuItem(label, nullptr, guides.sensorClouds == mode)) {
-            guides.sensorClouds = mode;
-        }
+    if (ImGui::BeginMenu("Show By Type")) {
+        ImGui::MenuItem("Cameras", nullptr, &guides.cameras);
+        ImGui::SetItemTooltip("Each scene camera's frustum, but the one looked through");
+        ImGui::MenuItem("Lights", nullptr, &guides.lights);
+        ImGui::SetItemTooltip("Each light's shape and direction");
+        ImGui::EndMenu();
     }
-    ImGui::SetItemTooltip("Each lidar's and radar's latest point cloud in the shown worlds, from "
-                          "the selected sensors or all of them. Selecting a pipeline node also "
-                          "draws that stage's cloud for the sensors that bind its pipeline");
-    ImGui::BeginDisabled(guides.sensorClouds == SensorClouds::Off);
-    ImGui::Indent();
-    const char* colors[] = {"Sensor", "Intensity", "Range", "Height", "Radial Velocity"};
-    int color = int(guides.cloudColor);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
-    if (ImGui::Combo("Color", &color, colors, int(std::size(colors)))) {
-        guides.cloudColor = CloudColor(color);
-    }
-    ImGui::SetItemTooltip("What colors each point. Height is along the sensor's up axis, and "
-                          "radial velocity colors radars only");
-    ImGui::MenuItem("Field of View", nullptr, &guides.sensorFields);
-    ImGui::MenuItem("Range Rings", nullptr, &guides.rangeRings);
-    ImGui::SetItemTooltip("Rings at a quarter, half, three quarters and all of each sensor's "
-                          "range, in its horizontal plane");
-    ImGui::MenuItem("Through Geometry", nullptr, &guides.cloudsThroughGeometry);
-    ImGui::SetItemTooltip("Draw points and arrows over the surfaces in front of them, such as "
-                          "returns on the far side of an object");
-    ImGui::MenuItem("Velocity Arrows", nullptr, &guides.velocityArrows);
-    ImGui::SetItemTooltip("An arrow along each radar return's beam, as far as the return moves "
-                          "in half a second, colored by radial velocity");
-    ImGui::Unindent();
-    ImGui::EndDisabled();
-    ImGui::SeparatorText("Guides");
-    ImGui::MenuItem("Selection Outline", nullptr, &guides.outline);
-    ImGui::MenuItem("Selection Bounds", nullptr, &guides.bounds);
-    ImGui::MenuItem("Selection Axes", nullptr, &guides.frames);
-    ImGui::SetItemTooltip("Each selected prim's x, y and z axes at its origin");
-    ImGui::MenuItem("All Bounds", nullptr, &guides.allBounds);
-    ImGui::SetItemTooltip("Every geometry prim's bounding box, a color a prim");
-    ImGui::MenuItem("Grid", nullptr, &guides.grid.shown);
-    ImGui::MenuItem("Axis Indicator", nullptr, &guides.axes);
-    ImGui::SetItemTooltip("The world's axes as the camera sees them, in the bottom left corner");
-    ImGui::SeparatorText("Overlays");
-    bool overlays = m_viewport.SceneOverlaysShown();
-    if (ImGui::MenuItem("Scene Overlays", nullptr, &overlays)) {
-        m_viewport.ShowSceneOverlays(overlays);
-    }
-    ImGui::SetItemTooltip("Draw the renderer's overlays from the scene or a simulation over the "
-                          "image, beside the guides above");
-    ImGui::BeginDisabled(!overlays);
-    ImGui::Indent();
-    for (const std::string& name : m_viewport.SceneOverlayNames()) {
-        bool shown = !m_viewport.hiddenOverlays.contains(name);
-        if (ImGui::MenuItem(name.c_str(), nullptr, &shown)) {
-            if (shown) {
-                m_viewport.hiddenOverlays.erase(name);
-            } else {
-                m_viewport.hiddenOverlays.insert(name);
+    if (ImGui::BeginMenu("Sensor Clouds")) {
+        const std::pair<const char*, SensorClouds> clouds[] = {
+            {"Off", SensorClouds::Off},
+            {"Selected Sensors", SensorClouds::Selected},
+            {"All Sensors", SensorClouds::All}};
+        for (const auto& [label, mode] : clouds) {
+            if (ImGui::MenuItem(label, nullptr, guides.sensorClouds == mode)) {
+                guides.sensorClouds = mode;
             }
         }
+        ImGui::SetItemTooltip("Each lidar's and radar's latest point cloud in the shown worlds, "
+                              "from the selected sensors or all of them. Selecting a pipeline "
+                              "node also draws that stage's cloud for the sensors that bind its "
+                              "pipeline");
+        ImGui::Separator();
+        ImGui::BeginDisabled(guides.sensorClouds == SensorClouds::Off);
+        const char* colors[] = {"Sensor", "Intensity", "Range", "Height", "Radial Velocity"};
+        int color = int(guides.cloudColor);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
+        if (ImGui::Combo("Color", &color, colors, int(std::size(colors)))) {
+            guides.cloudColor = CloudColor(color);
+        }
+        ImGui::SetItemTooltip("What colors each point. Height is along the sensor's up axis, and "
+                              "radial velocity colors radars only");
+        ImGui::MenuItem("Field of View", nullptr, &guides.sensorFields);
+        ImGui::MenuItem("Range Rings", nullptr, &guides.rangeRings);
+        ImGui::SetItemTooltip("Rings at a quarter, half, three quarters and all of each sensor's "
+                              "range, in its horizontal plane");
+        ImGui::MenuItem("Through Geometry", nullptr, &guides.cloudsThroughGeometry);
+        ImGui::SetItemTooltip("Draw points and arrows over the surfaces in front of them, such "
+                              "as returns on the far side of an object");
+        ImGui::MenuItem("Velocity Arrows", nullptr, &guides.velocityArrows);
+        ImGui::SetItemTooltip("An arrow along each radar return's beam, as far as the return "
+                              "moves in half a second, colored by radial velocity");
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
     }
-    ImGui::Unindent();
-    ImGui::EndDisabled();
+    if (ImGui::BeginMenu("Guides")) {
+        ImGui::MenuItem("Selection Outline", nullptr, &guides.outline);
+        ImGui::MenuItem("Selection Bounds", nullptr, &guides.bounds);
+        ImGui::MenuItem("Selection Axes", nullptr, &guides.frames);
+        ImGui::SetItemTooltip("Each selected prim's x, y and z axes at its origin");
+        ImGui::MenuItem("All Bounds", nullptr, &guides.allBounds);
+        ImGui::SetItemTooltip("Every geometry prim's bounding box, a color a prim");
+        ImGui::MenuItem("Grid", nullptr, &guides.grid.shown);
+        ImGui::MenuItem("Axis Indicator", nullptr, &guides.axes);
+        ImGui::SetItemTooltip("The world's axes as the camera sees them, in the bottom left "
+                              "corner");
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Scene Overlays")) {
+        bool overlays = m_viewport.SceneOverlaysShown();
+        if (ImGui::MenuItem("Show", nullptr, &overlays)) {
+            m_viewport.ShowSceneOverlays(overlays);
+        }
+        ImGui::SetItemTooltip("Draw the renderer's overlays from the scene or a simulation over "
+                              "the image, beside the guides");
+        ImGui::Separator();
+        ImGui::BeginDisabled(!overlays);
+        for (const std::string& name : m_viewport.SceneOverlayNames()) {
+            bool shown = !m_viewport.hiddenOverlays.contains(name);
+            if (ImGui::MenuItem(name.c_str(), nullptr, &shown)) {
+                if (shown) {
+                    m_viewport.hiddenOverlays.erase(name);
+                } else {
+                    m_viewport.hiddenOverlays.insert(name);
+                }
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
     ImGui::PopItemFlag();
 }
 

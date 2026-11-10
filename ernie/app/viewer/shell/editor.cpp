@@ -4,7 +4,10 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <fmt/format.h>
 
@@ -125,6 +128,53 @@ std::string Editor::Create(SchemaId type, const Double3& at, const Quatd& orient
                   },
                   define});
     return path;
+}
+
+void Editor::ApplyApi(SchemaId api, const std::string& instance) {
+    std::vector<std::string> paths;
+    for (const std::string& path : m_selection.paths) {
+        const std::optional<Prim> prim = m_scene->Find(path);
+        if (!prim || !AppliesTo(api, prim->Schema())) {
+            continue;
+        }
+        const std::vector<std::string> instances = prim->Instances(api);
+        const bool applied = instance.empty()
+                                 ? prim->HasApi(api)
+                                 : std::ranges::find(instances, instance) != instances.end();
+        if (!applied) {
+            paths.push_back(path);
+        }
+    }
+    if (paths.empty()) {
+        return;
+    }
+    const auto run = [scene = m_scene, api, instance, paths](bool apply) {
+        std::vector<Prim> prims;
+        for (const std::string& path : paths) {
+            if (const std::optional<Prim> prim = scene->Find(path)) {
+                prims.push_back(*prim);
+            }
+        }
+        try {
+            if (apply && instance.empty()) {
+                scene->Apply(prims, api);
+            } else if (apply) {
+                scene->Apply(prims, api, instance);
+            } else if (instance.empty()) {
+                scene->Unapply(prims, api);
+            } else {
+                scene->Unapply(prims, api, instance);
+            }
+        } catch (const std::exception& error) {
+            Log(LogLevel::Warning, "{} {}: {}", apply ? "Apply" : "Unapply", Info(api).name,
+                error.what());
+        }
+    };
+    std::string name = std::format("Apply {}", Info(api).name);
+    if (!instance.empty()) {
+        name += ":" + instance;
+    }
+    m_history.Do({std::move(name), [run] { run(false); }, [run] { run(true); }});
 }
 
 void Editor::SetVisible(const std::string& path, bool visible) {

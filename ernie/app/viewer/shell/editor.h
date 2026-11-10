@@ -30,6 +30,7 @@ class Editor {
 
     std::string Create(SchemaId type, const Double3& at, const Quatd& orient);
     void SetVisible(const std::string& path, bool visible);
+    void ApplyApi(SchemaId api, const std::string& instance = {});
     void SetCells(std::string name, Target target, ColumnRef column, std::vector<std::byte> before,
                   std::vector<std::byte> after);
     void SetTargets(std::string name, Target target, ColumnRef column,

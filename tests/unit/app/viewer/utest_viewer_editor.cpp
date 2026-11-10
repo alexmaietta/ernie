@@ -197,5 +197,33 @@ TEST_F(EditorTest, SetsRelationshipTargetsWithUndo) {
     }
 }
 
+TEST_F(EditorTest, AppliesApisToTheSelectedPrimsTheyApplyToWithUndo) {
+    {
+        Session session(*s_device);
+        session.scene->Define<Sphere>("/Ball");
+        session.scene->Define<SphereLight>("/Lamp");
+        session.selection.paths = {"/Ball", "/Lamp"};
+
+        session.editor.ApplyApi(SchemaId::ShapingAPI);
+        EXPECT_FALSE(session.scene->Find("/Ball")->HasApi(SchemaId::ShapingAPI));
+        EXPECT_TRUE(session.scene->Find("/Lamp")->HasApi(SchemaId::ShapingAPI));
+        EXPECT_EQ(*session.history.NextUndo(), "Apply ShapingAPI");
+        session.history.Undo();
+        EXPECT_FALSE(session.scene->Find("/Lamp")->HasApi(SchemaId::ShapingAPI));
+        session.history.Redo();
+        EXPECT_TRUE(session.scene->Find("/Lamp")->HasApi(SchemaId::ShapingAPI));
+
+        session.history.Clear();
+        session.editor.ApplyApi(SchemaId::ShapingAPI);
+        EXPECT_EQ(session.history.NextUndo(), nullptr);
+
+        session.editor.ApplyApi(SchemaId::SemanticsLabelsAPI, "class");
+        EXPECT_EQ(session.scene->Find("/Ball")->Instances(SchemaId::SemanticsLabelsAPI),
+                  std::vector<std::string>{"class"});
+        session.history.Undo();
+        EXPECT_TRUE(session.scene->Find("/Ball")->Instances(SchemaId::SemanticsLabelsAPI).empty());
+    }
+}
+
 }
 }

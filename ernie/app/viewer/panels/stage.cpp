@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <set>
@@ -64,8 +65,10 @@ void DrawEye(ImDrawList& draw, ImVec2 center, float size, bool shown, ImU32 colo
 
 class Stage {
   public:
-    Stage(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme)
-        : m_scene(std::move(scene)), m_selection(selection), m_editor(editor), m_theme(theme) {}
+    Stage(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme,
+          std::function<void()> drawCreate)
+        : m_scene(std::move(scene)), m_selection(selection), m_editor(editor), m_theme(theme),
+          m_drawCreate(std::move(drawCreate)) {}
 
     void Draw() {
         if (!m_scene) {
@@ -110,6 +113,18 @@ class Stage {
                         DrawRow(prim, m_prims[prim].path, 0, false);
                     }
                 }
+            }
+            if (ImGui::BeginPopupContextWindow("##stage empty",
+                                               ImGuiPopupFlags_MouseButtonRight |
+                                                   ImGuiPopupFlags_NoOpenOverItems)) {
+                if (ImGui::IsWindowAppearing()) {
+                    m_selection.Clear();
+                }
+                if (ImGui::BeginMenu("Create")) {
+                    m_drawCreate();
+                    ImGui::EndMenu();
+                }
+                ImGui::EndPopup();
             }
             ImGui::EndTable();
         }
@@ -451,6 +466,15 @@ class Stage {
             Expand(prim);
         }
         ImGui::Separator();
+        if (ImGui::BeginMenu("Create")) {
+            m_drawCreate();
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Apply API")) {
+            DrawApplyMenu();
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
         if (ImGui::MenuItem("Rename", "F2", false, m_selection.paths.size() == 1)) {
             StartRename(entry.path);
         }
@@ -466,6 +490,60 @@ class Stage {
         ImGui::Separator();
         if (ImGui::MenuItem("Copy Path")) {
             ImGui::SetClipboardText(entry.path.c_str());
+        }
+    }
+
+    void DrawApplyMenu() {
+        std::vector<Prim> prims;
+        for (const std::string& path : m_selection.paths) {
+            if (const std::optional<Prim> prim = m_scene->Find(path)) {
+                prims.push_back(*prim);
+            }
+        }
+        std::vector<SchemaId> apis;
+        for (uint32_t id = 0; id < SchemaCount(); ++id) {
+            const SchemaId api = SchemaId(id);
+            if (IsApi(api) && std::ranges::any_of(prims, [&](const Prim& prim) {
+                    return AppliesTo(api, prim.Schema());
+                })) {
+                apis.push_back(api);
+            }
+        }
+        std::ranges::sort(apis, {}, [](SchemaId api) { return Info(api).name; });
+        if (apis.empty()) {
+            ImGui::TextDisabled("No API applies to the selection");
+        }
+        for (const SchemaId api : apis) {
+            const std::string name(Info(api).name);
+            if (IsMultipleApi(api)) {
+                if (ImGui::BeginMenu(name.c_str())) {
+                    if (ImGui::IsWindowAppearing()) {
+                        m_instance.clear();
+                        ImGui::SetKeyboardFocusHere();
+                    }
+                    ImGui::SetNextItemWidth(10.0f * ImGui::GetFontSize());
+                    const bool entered =
+                        ImGui::InputTextWithHint("##instance", "Instance name", &m_instance,
+                                                 ImGuiInputTextFlags_EnterReturnsTrue);
+                    ImGui::SameLine();
+                    ImGui::BeginDisabled(m_instance.empty());
+                    if ((ImGui::Button("Apply") || entered) && !m_instance.empty()) {
+                        m_editor.ApplyApi(api, m_instance);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::EndMenu();
+                }
+                ImGui::SetItemTooltip("%s", std::string(Info(api).doc).c_str());
+                continue;
+            }
+            const bool applied = std::ranges::all_of(prims, [&](const Prim& prim) {
+                return !AppliesTo(api, prim.Schema()) || prim.HasApi(api);
+            });
+            if (ImGui::MenuItem(name.c_str(), nullptr, applied, !applied)) {
+                m_editor.ApplyApi(api);
+            }
+            ImGui::SetItemTooltip("%s", std::string(Info(api).doc).c_str());
         }
     }
 
@@ -518,6 +596,8 @@ class Stage {
     Selection& m_selection;
     Editor& m_editor;
     const Theme& m_theme;
+    std::function<void()> m_drawCreate;
+    std::string m_instance;
     std::vector<Entry> m_prims;
     std::vector<uint32_t> m_roots;
     std::optional<uint32_t> m_session;
@@ -541,8 +621,10 @@ class Stage {
 
 }
 
-Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme) {
-    auto stage = std::make_shared<Stage>(std::move(scene), selection, editor, theme);
+Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme,
+                       std::function<void()> drawCreate) {
+    auto stage =
+        std::make_shared<Stage>(std::move(scene), selection, editor, theme, std::move(drawCreate));
     return {"Stage", Dock::Right, [stage] { stage->Draw(); }};
 }
 

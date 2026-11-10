@@ -36,7 +36,8 @@ Panel CreateProfilerPanel();
 
 Panel CreateMemoryPanel(Ref<device::Device> device);
 
-Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme);
+Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, const Theme& theme,
+                       std::function<void()> drawCreate);
 
 Panel CreatePropertiesPanel(Ref<Scene> scene, Selection& selection, Editor& editor,
                             FileDialog& dialog, const Theme& theme);
