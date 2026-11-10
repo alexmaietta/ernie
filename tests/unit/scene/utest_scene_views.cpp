@@ -86,7 +86,7 @@ TEST(ViewsTest, ViewsHoldEachCamerasConformedPinholeTerms) {
     });
 }
 
-TEST(ViewsTest, OnlyUndistortedUnclippedPerspectiveCamerasArePinholes) {
+TEST(ViewsTest, OnlyUndistortedPerspectiveCamerasArePinholes) {
     test::ForEachDevice([](device::Device& device) {
         const Ref<Scene> scene = Scene::Create(device);
         scene->Define<Scope>("/Render");
@@ -109,8 +109,10 @@ TEST(ViewsTest, OnlyUndistortedUnclippedPerspectiveCamerasArePinholes) {
         EXPECT_EQ(views[a].flags, kViewPinhole);
         EXPECT_EQ(views[a + 1].flags, 0u);
         EXPECT_EQ(views[b].flags, 0u);
-        EXPECT_EQ(views[b + 1].flags, 0u);
+        EXPECT_EQ(views[b + 1].flags, kViewPinhole);
+        EXPECT_EQ(views[b + 1].clippingPlanes.count, 1u);
         EXPECT_EQ(views[b + 2].flags, kViewPinhole);
+        EXPECT_EQ(views[b + 2].clippingPlanes.count, 0u);
     });
 }
 

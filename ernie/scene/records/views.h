@@ -19,9 +19,10 @@ struct ViewRecord {
     float exposure;
     uint flags;
     uint padding;
+    ArrayRef clippingPlanes;
 };
 
-ERNIE_CHECK_SIZE(ViewRecord, 48);
+ERNIE_CHECK_SIZE(ViewRecord, 64);
 
 ERNIE_SHARED Float2 ConformAperture(Float2 aperture, ProductRecord product) {
     const float image = float(product.width) * product.pixelAspect / float(max(product.height, 1u));

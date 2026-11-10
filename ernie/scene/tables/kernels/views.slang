@@ -33,10 +33,8 @@ void WriteViews(uniform ViewParams p) {
         view.readout = camera.readout;
         view.spread = aperture.y / (float(max(product.height, 1u)) * focal);
         view.exposure = camera.exposure;
-        view.flags = projection == Projection::Perspective && undistorted &&
-                             camera.clippingPlanes.count == 0
-                         ? kViewPinhole
-                         : 0;
+        view.clippingPlanes = camera.clippingPlanes;
+        view.flags = projection == Projection::Perspective && undistorted ? kViewPinhole : 0;
     }
     p.views[index] = view;
 }
