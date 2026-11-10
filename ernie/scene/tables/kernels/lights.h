@@ -23,6 +23,7 @@ struct LightParams {
     Ptr<Float3> spectra;
     Ptr<CollectionRecord> collections;
     Ptr<LightShapeRecord> shapes;
+    Ptr<MinimalLightRecord> minimal;
     uint tlasCount;
     uint lightLink;
     uint shadowLink;
@@ -31,7 +32,7 @@ struct LightParams {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(LightParams, 120);
+ERNIE_CHECK_SIZE(LightParams, 128);
 
 #ifdef __SLANG__
 

@@ -45,6 +45,10 @@ class LightTable : public RenderTable {
         return m_records;
     }
 
+    const Ref<device::Buffer>& MinimalLights() const {
+        return m_minimal;
+    }
+
     std::span<const uint32_t> Counts() const {
         return m_counts;
     }
@@ -68,6 +72,7 @@ class LightTable : public RenderTable {
     const RenderTables& m_tables;
     Ref<device::Program> m_program;
     Ref<device::Buffer> m_layout;
+    Ref<device::Buffer> m_minimal;
     Ref<device::Buffer> m_records;
     Ref<device::Buffer> m_cdf;
     Ref<device::Buffer> m_maps;

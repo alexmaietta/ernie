@@ -154,6 +154,47 @@ Float3 CenterNormal(Renderer& renderer, uint32_t side) {
     return {normals[center], normals[center + 1], normals[center + 2]};
 }
 
+TEST(RendererTest, MinimalModeLightsEachWorldWithItsOwnDistantLightFirst) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kSide = 8;
+        const Ref<Scene> scene = Scene::Create(device);
+        const Prim sun = scene->Define<DistantLight>("/Sun");
+        for (const char* world : {"/env_0", "/env_1"}) {
+            scene->Define<World>(world);
+            scene->Define<Camera>(std::string(world) + "/Cam",
+                                  {.translate = {0, 0, 5},
+                                   .orient = LookAt({0, 0, 5}, {0, 0, 0}, {0, 1, 0}),
+                                   .focalLength = 400});
+            scene->Define<Mesh>(std::string(world) + "/Ground",
+                                {.points = {{-1, -1, 0}, {1, -1, 0}, {1, 1, 0}, {-1, 1, 0}},
+                                 .faceVertexIndices = {0, 1, 2, 3},
+                                 .faceVertexCounts = {4}});
+        }
+        scene->Define<DistantLight>("/env_1/Under", {.orient = FromAxisAngle({1, 0, 0}, 180)});
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
+        scene->Define<RenderProduct>("/Render/View", {.camera = {"/env_0/Cam", "/env_1/Cam"},
+                                                      .resolution = {kSide, kSide},
+                                                      .orderedVars = {"/Render/Color"}});
+        scene->Find("/Render/View")->Set(MinimalAPI::kMode, MinimalMode::DisplayColor);
+        Renderer renderer(scene);
+        const auto red = [&](uint32_t camera) {
+            RenderOutput output = renderer.Step(kProducts, 1.0 / 30);
+            output.Wait();
+            const std::vector<float> colors =
+                output["/Render/View"].frames.at(0).Source("HdrColor").tensor.ToHost<float>();
+            return colors[((camera * kSide + kSide / 2) * kSide + kSide / 2) * 4];
+        };
+        const float above = red(0);
+        const float under = red(1);
+        EXPECT_GT(above, under);
+
+        sun.Set(LightAPI::kIntensity, 2 * sun.Get(LightAPI::kIntensity));
+        EXPECT_NEAR(red(0), 2 * above, 1e-3f * above);
+        EXPECT_FLOAT_EQ(red(1), under);
+    });
+}
+
 TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
     ForEachDevice([](Device& device) {
         constexpr uint32_t kSide = 9;

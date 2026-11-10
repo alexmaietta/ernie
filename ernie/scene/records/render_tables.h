@@ -35,6 +35,7 @@ struct RenderTables {
     Ptr<uint64_t> textureBindings;
     Ptr<InstanceLayout> instances;
     Ptr<LightLayout> lights;
+    Ptr<MinimalLightRecord> minimalLights;
     Ptr<CollectionRecord> collections;
     Ptr<LightShapeRecord> lightShapes;
     Ptr<RenderOrigin> origins;
@@ -58,6 +59,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 400);
+ERNIE_CHECK_SIZE(RenderTables, 408);
 
 }

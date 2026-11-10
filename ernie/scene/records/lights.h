@@ -87,6 +87,19 @@ struct LightLayout {
 
 ERNIE_CHECK_SIZE(LightLayout, 88);
 
+struct MinimalLightRecord {
+    Float3 direction;
+    uint headlight;
+    Float3 radiance;
+    float diffuse;
+    float specular;
+    uint padding0;
+    uint padding1;
+    uint padding2;
+};
+
+ERNIE_CHECK_SIZE(MinimalLightRecord, 48);
+
 static const uint kDomeMapWidth = 256;
 static const uint kDomeMapHeight = 128;
 static const uint kDomeMapCells = kDomeMapWidth * kDomeMapHeight;

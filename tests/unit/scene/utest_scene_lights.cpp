@@ -12,6 +12,7 @@
 #include "ernie/device/device.h"
 #include "ernie/device/queue.h"
 #include "ernie/io/image.h"
+#include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/scene/schema/columns.h"
@@ -112,6 +113,71 @@ TEST(LightsTest, WorldsListTheirOwnLightsThenGlobalOnes) {
         EXPECT_EQ(lights.Written(), 2u);
         EXPECT_FLOAT_EQ(edited[2].radiance.x, 5);
         EXPECT_FLOAT_EQ(edited[0].radiance.x, 3);
+    });
+}
+
+std::vector<MinimalLightRecord> MinimalLights(Scene& scene, device::Device& device) {
+    scene.Publish({.wait = true});
+    const LightTable& lights = SceneImpl::Get(scene).GetLights();
+    std::vector<MinimalLightRecord> records(lights.Counts().size());
+    device.GetQueue().Read(*lights.MinimalLights(), records.data());
+    return records;
+}
+
+TEST(LightsTest, MinimalLightsTakeEachWorldsFirstDistantLight) {
+    ForEachScene([](Scene& scene, device::Device& device) {
+        const Prim sun = scene.Define<DistantLight>(
+            "/Sun", {.intensity = 2, .color = {1, 0.5f, 0.25f}, .angle = 2});
+        scene.Define<World>("/Lit");
+        scene.Define<SphereLight>("/Lit/Lamp");
+        scene.Define<DistantLight>("/Lit/Moon",
+                                   {.orient = FromAxisAngle({1, 0, 0}, 90), .intensity = 3});
+        scene.Define<World>("/Plain");
+        scene.Define<SphereLight>("/Plain/Lamp");
+        const std::vector<LightRecord> records = Records(scene, device);
+        const std::vector<MinimalLightRecord> minimal = MinimalLights(scene, device);
+        ASSERT_EQ(minimal.size(), 3u);
+
+        const auto solidAngle = [](const LightRecord& record) {
+            return record.spread > 0 ? 2 * kPi * record.spread : 1.0f;
+        };
+        const LightRecord moon = Find(records, *scene.Find("/Lit/Moon"));
+        EXPECT_EQ(minimal[0].headlight, 0u);
+        EXPECT_FLOAT_EQ(minimal[0].radiance.x, moon.radiance.x * solidAngle(moon));
+        EXPECT_NEAR(minimal[0].direction.y, moon.axisZ.y, 1e-6);
+        EXPECT_NEAR(minimal[0].direction.z, moon.axisZ.z, 1e-6);
+
+        const LightRecord distant = Find(records, sun);
+        ASSERT_GT(distant.spread, 0);
+        for (const uint32_t tlas : {1u, 2u}) {
+            EXPECT_EQ(minimal[tlas].headlight, 0u);
+            EXPECT_FLOAT_EQ(minimal[tlas].radiance.x, distant.radiance.x * solidAngle(distant));
+            EXPECT_FLOAT_EQ(minimal[tlas].radiance.z, distant.radiance.z * solidAngle(distant));
+            EXPECT_FLOAT_EQ(minimal[tlas].direction.z, 1);
+            EXPECT_FLOAT_EQ(minimal[tlas].diffuse, distant.diffuse);
+        }
+
+        sun.Set(LightAPI::kIntensity, 4.0f);
+        const std::vector<MinimalLightRecord> brighter = MinimalLights(scene, device);
+        EXPECT_FLOAT_EQ(brighter[1].radiance.x, 2 * minimal[1].radiance.x);
+        EXPECT_FLOAT_EQ(brighter[0].radiance.x, minimal[0].radiance.x);
+
+        scene.Remove(sun);
+        const std::vector<MinimalLightRecord> dark = MinimalLights(scene, device);
+        EXPECT_EQ(dark[0].headlight, 0u);
+        EXPECT_EQ(dark[1].headlight, 1u);
+        EXPECT_EQ(dark[2].headlight, 1u);
+    });
+}
+
+TEST(LightsTest, MinimalLightsAreHeadlightsWithoutLights) {
+    ForEachScene([](Scene& scene, device::Device& device) {
+        scene.Define<World>("/Env");
+        scene.Define<Sphere>("/Env/Ball");
+        const std::vector<MinimalLightRecord> minimal = MinimalLights(scene, device);
+        ASSERT_EQ(minimal.size(), 2u);
+        EXPECT_EQ(minimal[0].headlight, 1u);
+        EXPECT_EQ(minimal[1].headlight, 1u);
     });
 }
 

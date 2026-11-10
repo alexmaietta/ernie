@@ -566,6 +566,31 @@ void WriteLightCdf(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
 
 [shader("compute")]
 [numthreads(kLightGroup, 1, 1)]
+void WriteMinimalLights(uniform LightParams p, uint3 id: SV_DispatchThreadID) {
+    if (id.x >= p.tlasCount) {
+        return;
+    }
+    LightLayout* layout = p.layout;
+    const uint tlas = p.tlases[id.x];
+    MinimalLightRecord minimal = {};
+    minimal.headlight = 1;
+    for (uint i = layout->firstLights[tlas]; i < layout->firstLights[tlas + 1]; ++i) {
+        const LightRecord record = layout->records[i];
+        if (LightType(record.type) == LightType::Distant) {
+            const float solidAngle = record.spread > 0 ? 2 * kPi * record.spread : 1;
+            minimal.direction = record.axisZ;
+            minimal.headlight = 0;
+            minimal.radiance = Float3(record.radiance.Vector() * solidAngle);
+            minimal.diffuse = record.diffuse;
+            minimal.specular = record.specular;
+            break;
+        }
+    }
+    p.minimal[tlas] = minimal;
+}
+
+[shader("compute")]
+[numthreads(kLightGroup, 1, 1)]
 void WriteCollections(uniform LightParams p) {
     const uint row = LinearThreadIndex();
     if (row >= p.collectionRows) {

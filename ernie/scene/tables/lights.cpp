@@ -195,13 +195,14 @@ std::span<const ColumnRef> LightTable::Inputs() const {
 
 void LightTable::Describe(RenderTables& tables) const {
     tables.lights.address = m_layout ? m_layout->Address() : 0;
+    tables.minimalLights.address = m_minimal ? m_minimal->Address() : 0;
     tables.collections.address = m_collections.Address();
     tables.lightShapes.address = m_shapes.Address();
 }
 
 void LightTable::Hold(std::vector<Ref<const RefCounted>>& held) const {
-    HoldBuffers(held, {m_layout, m_records, m_cdf, m_maps, m_spectra, m_collections.Buffer(),
-                       m_shapes.Buffer()});
+    HoldBuffers(held, {m_layout, m_minimal, m_records, m_cdf, m_maps, m_spectra,
+                       m_collections.Buffer(), m_shapes.Buffer()});
 }
 
 void LightTable::Prepare() {
@@ -361,6 +362,9 @@ void LightTable::Relayout() {
     layout.domeCount = m_domes;
     std::memcpy(words.data(), &layout, sizeof(layout));
     device.GetQueue().Write(*m_layout, words.data());
+    const std::vector<MinimalLightRecord> headlights(m_worlds + 1, {.headlight = 1});
+    m_minimal = device.CreateBuffer({.label = "minimal lights"},
+                                    std::span<const MinimalLightRecord>(headlights));
 }
 
 void LightTable::Run(const ChangeSet& changes, TableVersions&) {
@@ -412,6 +416,7 @@ void LightTable::Run(const ChangeSet& changes, TableVersions&) {
     params.textureBindings = m_tables.textureBindings;
     params.tlases.address = tlases->Address();
     params.spectra.address = Spectra()->Address();
+    params.minimal.address = m_minimal->Address();
     params.tlasCount = uint32_t(dirty.size());
     params.lightLink = m_structure.GetTokens().Intern("lightLink").id;
     params.shadowLink = m_structure.GetTokens().Intern("shadowLink").id;
@@ -432,6 +437,8 @@ void LightTable::Run(const ChangeSet& changes, TableVersions&) {
                      {.x = device::GroupCount(widest, kLightGroup), .y = uint32_t(dirty.size())});
     encoder.Barrier();
     encoder.Dispatch(Kernels().Entry("WriteLightCdf"), params,
+                     {.x = device::GroupCount(uint32_t(dirty.size()), kLightGroup)});
+    encoder.Dispatch(Kernels().Entry("WriteMinimalLights"), params,
                      {.x = device::GroupCount(uint32_t(dirty.size()), kLightGroup)});
     queue.Submit(encoder.Finish());
 }
@@ -466,7 +473,8 @@ device::Program& LightTable::Kernels() {
             {.modules = {"ernie.scene.tables.kernels.lights"},
              .library = &kSceneKernels,
              .entries = {"WriteDomeMaps", "WriteDomeRows", "WriteDomeMarginals", "WriteLights",
-                         "WriteLightCdf", "WriteCollections", "WriteLightShapes"},
+                         "WriteLightCdf", "WriteMinimalLights", "WriteCollections",
+                         "WriteLightShapes"},
              .label = "lights"});
     }
     return *m_program;

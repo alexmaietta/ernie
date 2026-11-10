@@ -30,7 +30,7 @@ struct MinimalLighting {
     float3 ground;
     bool hemispheric;
 
-    static MinimalLighting Load(HitQuery query, uint row, LightLayout* lights) {
+    static MinimalLighting Load(HitQuery query, uint row) {
         ProductRecord* product = &query.tables->products[row];
         MinimalLighting lighting;
         lighting.castShadows = product.castShadows != 0;
@@ -38,23 +38,15 @@ struct MinimalLighting {
         lighting.ambient = product.ambient.Vector();
         lighting.ground = product.ground.Vector();
         lighting.hemispheric = product.hemispheric != 0;
-        lighting.headlight = true;
-        lighting.light = DistantLight<RgbSpectrum>(
-            float3(0, 0, 1), RgbSpectrum.Constant(kHeadlightIrradiance), 1, 1);
-        const uint first = lights->firstLights[query.tlas];
-        const uint last = lights->firstLights[query.tlas + 1];
-        for (uint i = first; i < last; ++i) {
-            const LightRecord record = lights->records[i];
-            if (LightType(record.type) == LightType::Distant) {
-                const DistantLight<RgbSpectrum> sun = DistantLight<RgbSpectrum>.Load(
-                    LightContext(query.tables, lights, query.tlas), record);
-                const float spread = sun.spread > 0 ? sun.SolidAngle() : 1;
-                lighting.light = DistantLight<RgbSpectrum>(
-                    sun.direction, sun.radiance.Scale(spread), sun.diffuse, sun.specular);
-                lighting.headlight = false;
-                break;
-            }
-        }
+        const MinimalLightRecord record = query.tables->minimalLights[query.tlas];
+        lighting.headlight = record.headlight != 0;
+        lighting.light =
+            lighting.headlight
+                ? DistantLight<RgbSpectrum>(float3(0, 0, 1),
+                                            RgbSpectrum.Constant(kHeadlightIrradiance), 1, 1)
+                : DistantLight<RgbSpectrum>(record.direction.Vector(),
+                                            RgbSpectrum(record.radiance.Vector()), record.diffuse,
+                                            record.specular);
         return lighting;
     }
 
@@ -89,7 +81,6 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
     HitQuery query;
     uint row;
     uint product;
-    LightLayout* lights;
 
     static MinimalIntegrator<Mode> Load(SensorContext context) {
         const uint product = context.capture->plan.product;
@@ -97,7 +88,6 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
         integrator.query = context.query;
         integrator.row = PrimRow(context.query.tables, product, kSlotRenderProduct);
         integrator.product = product;
-        integrator.lights = context.params.tables->lights;
         return integrator;
     }
 
@@ -113,7 +103,7 @@ struct MinimalIntegrator<let Mode : MinimalMode> : IIntegrator {
             return result;
         }
 
-        const MinimalLighting lighting = MinimalLighting.Load(query, row, lights);
+        const MinimalLighting lighting = MinimalLighting.Load(query, row);
         MinimalShade shade;
         if (Mode == MinimalMode::DisplayColor) {
             const float3 color = SurfaceDisplayColor(query.tables, point.slot, point.element);
