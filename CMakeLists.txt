@@ -67,6 +67,8 @@ include(cmake/third_party/stb.cmake)
 include(cmake/third_party/fonts.cmake)
 include(cmake/third_party/openexr.cmake)
 include(cmake/third_party/tinyobjloader.cmake)
+include(cmake/third_party/cgltf.cmake)
+include(cmake/third_party/tinyusd.cmake)
 
 add_subdirectory(ernie)
 add_subdirectory(ernie/app)

@@ -17,7 +17,9 @@
 
 #include <fmt/format.h>
 
+#include "ernie/import/gltf.h"
 #include "ernie/import/obj.h"
+#include "ernie/import/usd.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_impl.h"
 #include "ernie/util/error.h"
@@ -39,7 +41,17 @@ ThreadPool& Readers() {
 }
 
 Registry& Importers() {
-    static Registry registry{.importers = {{".obj", CreateObjImporter()}}};
+    static Registry registry = [] {
+        const std::shared_ptr<Importer> gltf = CreateGltfImporter();
+        const std::shared_ptr<Importer> usd = CreateUsdImporter();
+        return Registry{.importers = {{".glb", gltf},
+                                      {".gltf", gltf},
+                                      {".obj", CreateObjImporter()},
+                                      {".usd", usd},
+                                      {".usda", usd},
+                                      {".usdc", usd},
+                                      {".usdz", usd}}};
+    }();
     return registry;
 }
 
