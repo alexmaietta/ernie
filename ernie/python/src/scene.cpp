@@ -268,8 +268,8 @@ void AssignArrays(SceneSelection& source, UntypedAttribute& target, std::string_
                                       .c_str());
         }
         for (uint32_t index = 0; index < count; ++index) {
-            const nb::object rows = array[nb::int_(index)];
-            SetArray(target, index, rows);
+            const nb::object items = array[nb::int_(index)];
+            SetArray(target, index, items);
         }
         return;
     }

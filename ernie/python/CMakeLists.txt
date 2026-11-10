@@ -184,3 +184,64 @@ if(ERNIE_BUILD_VIEWER)
         COMPONENT python
     )
 endif()
+
+if(ERNIE_BUILD_XR)
+    nanobind_add_module(
+        _xr
+        STABLE_ABI
+        NB_STATIC
+        src/xr.cpp
+    )
+    target_link_libraries(
+        _xr
+        PRIVATE
+            ernie_xr
+            ernie
+    )
+    ernie_warnings(_xr)
+    target_include_directories(_xr PRIVATE src)
+    target_include_directories(_xr SYSTEM PRIVATE ${Python_INCLUDE_DIRS})
+    set_target_properties(
+        _xr
+        PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY
+                "$<1:${ernie_python_dir}>"
+            DEBUG_POSTFIX
+                ""
+            INSTALL_RPATH
+                "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
+    )
+    if(WIN32)
+        add_custom_command(
+            TARGET _xr
+            POST_BUILD
+            COMMAND
+                "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:ernie_xr>"
+                "${ernie_python_dir}"
+        )
+    endif()
+    configure_file(ernie/xr.py "${ernie_python_dir}/xr.py" COPYONLY)
+    nanobind_add_stub(
+        ernie_python_stubs_xr
+        MODULE ernie._xr
+        OUTPUT "${ernie_python_dir}/_xr.pyi"
+        PYTHON_PATH "${ernie_python_root}"
+        DEPENDS
+            _xr
+            _ernie
+    )
+    install(
+        TARGETS
+            _xr
+        LIBRARY
+            DESTINATION ernie
+            COMPONENT python
+    )
+    install(
+        FILES
+            ernie/xr.py
+            "${ernie_python_dir}/_xr.pyi"
+        DESTINATION ernie
+        COMPONENT python
+    )
+endif()
