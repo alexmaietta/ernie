@@ -43,8 +43,9 @@ void SensorTable::Describe(RenderTables& tables) const {
     tables.radars.address = m_radars.Address();
 }
 
-void SensorTable::Run(const ChangeSet&, TableVersions&) {
+void SensorTable::Run(const ChangeSet&, TableVersions& versions) {
     ERNIE_ZONE("Sensors/Run");
+    versions.Record(TableId::Cameras, std::vector<uint32_t>{kGlobalWorld});
     ColumnStore& store = m_structure.GetColumnStore();
     device::Device& device = store.GetDevice();
     SensorParams params{};

@@ -289,28 +289,8 @@ struct CameraModel : IDifferentiable {
         if (product == kNoPrim || camera.lens.projection == Projection::Spherical) {
             return camera;
         }
-        const Ptr<ProductRecord> record = tables->products + PrimRow(tables, product, kSlotRenderProduct);
-        const float image = float(record->width) * record->pixelAspect / float(max(record->height, 1));
-        const float2 aperture = camera.sensor.aperture;
-        const float2 wide = float2(aperture.y * image, aperture.y);
-        const float2 tall = float2(aperture.x, aperture.x / image);
-        const bool wider = aperture.x > aperture.y * image;
-        switch (AspectRatioConformPolicy(record->conform)) {
-        case AspectRatioConformPolicy::ExpandAperture:
-            camera.sensor.aperture = wider ? tall : wide;
-            break;
-        case AspectRatioConformPolicy::CropAperture:
-            camera.sensor.aperture = wider ? wide : tall;
-            break;
-        case AspectRatioConformPolicy::AdjustApertureWidth:
-            camera.sensor.aperture = wide;
-            break;
-        case AspectRatioConformPolicy::AdjustApertureHeight:
-            camera.sensor.aperture = tall;
-            break;
-        default:
-            break;
-        }
+        const ProductRecord record = tables->products[PrimRow(tables, product, kSlotRenderProduct)];
+        camera.sensor.aperture = ConformAperture(Float2(camera.sensor.aperture), record).Vector();
         return camera;
     }
 

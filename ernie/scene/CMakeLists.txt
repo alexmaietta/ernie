@@ -26,6 +26,7 @@ ernie_object_library(
     tables/tangents.cpp
     tables/textures.cpp
     tables/transforms.cpp
+    tables/views.cpp
     "${ernie_scene_defines}"
 )
 target_link_libraries(

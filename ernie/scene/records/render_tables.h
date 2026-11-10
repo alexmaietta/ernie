@@ -15,6 +15,7 @@
 #include "ernie/scene/records/tangents.h"
 #include "ernie/scene/records/textures.h"
 #include "ernie/scene/records/transforms.h"
+#include "ernie/scene/records/views.h"
 #include "ernie/stage/schema/ids.h"
 #include "ernie/stage/schema/schema.h"
 
@@ -46,6 +47,8 @@ struct RenderTables {
     Ptr<LidarRecord> lidars;
     Ptr<RadarRecord> radars;
     Ptr<ProductRecord> products;
+    Ptr<ViewRecord> views;
+    Ptr<uint> viewStarts;
     Ptr<MaterialRecord> materials;
     Ptr<uint> materialWords;
     Ptr<CheckerRecord> checkers;
@@ -59,6 +62,6 @@ struct RenderTables {
     uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderTables, 408);
+ERNIE_CHECK_SIZE(RenderTables, 424);
 
 }

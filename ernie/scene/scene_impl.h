@@ -31,6 +31,7 @@
 #include "ernie/scene/tables/tangents.h"
 #include "ernie/scene/tables/textures.h"
 #include "ernie/scene/tables/transforms.h"
+#include "ernie/scene/tables/views.h"
 #include "ernie/stage/columns/column_store.h"
 #include "ernie/stage/publish/publisher.h"
 #include "ernie/stage/structure/structure.h"
@@ -172,6 +173,10 @@ class SceneImpl {
         return m_products;
     }
 
+    const ViewTable& GetViews() const {
+        return m_views;
+    }
+
     const SensorPipelineTable& GetSensorPipelines() const {
         return m_pipelines;
     }
@@ -224,6 +229,7 @@ class SceneImpl {
     InstanceTable m_instances;
     SurfaceTable m_surfaces;
     LightTable m_lights;
+    ViewTable m_views;
     std::vector<std::function<bool()>> m_commitSteps;
 };
 

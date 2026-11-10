@@ -78,7 +78,8 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
       m_spectra(m_structure),
       m_instances(m_structure, m_header.Tables(), *m_builder, desc.maxRefits),
       m_surfaces(m_structure, m_header.Tables(), m_instances),
-      m_lights(m_structure, m_header.Tables(), m_instances) {
+      m_lights(m_structure, m_header.Tables(), m_instances),
+      m_views(m_structure, m_header.Tables(), m_products) {
     m_publisher.Add(m_transforms);
     m_publisher.Add(m_meshes);
     m_publisher.Add(m_points);
@@ -95,11 +96,13 @@ SceneImpl::SceneImpl(Scene& scene, device::Device& device, const SceneDesc& desc
     m_publisher.Add(m_surfaces);
     m_publisher.Add(m_bounds);
     m_publisher.Add(m_lights);
+    m_publisher.Add(m_views);
     m_store.Prepare();
     m_builder->Prepare();
     for (Table* system : std::initializer_list<Table*>{
              &m_transforms, &m_meshes, &m_points, &m_bounds, &m_tangents, &m_textures, &m_semantics,
-             &m_subsets, &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights}) {
+             &m_subsets, &m_sensors, &m_materials, &m_instances, &m_surfaces, &m_lights,
+             &m_views}) {
         system->Prepare();
     }
     if (desc.waitForKernels) {

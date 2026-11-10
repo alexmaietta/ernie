@@ -181,6 +181,7 @@ ernie_test(
         unit/scene/utest_scene_products.cpp
         unit/scene/utest_scene_tokens.cpp
         unit/scene/utest_scene_updates.cpp
+        unit/scene/utest_scene_views.cpp
 )
 
 ernie_test(

@@ -24,6 +24,12 @@ class SensorTable : public RenderTable {
     }
 
     std::span<const ColumnRef> Inputs() const override;
+
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Cameras};
+        return kTables;
+    }
+
     void Prepare() override;
     void Run(const ChangeSet& changes, TableVersions& versions) override;
     void Describe(RenderTables& tables) const override;

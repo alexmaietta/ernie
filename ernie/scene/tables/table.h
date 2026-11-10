@@ -22,6 +22,8 @@ enum class TableId : uint32_t {
     Textures,
     Instances,
     Slots,
+    Cameras,
+    Products,
 };
 
 class RenderTable : public Table {

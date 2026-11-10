@@ -128,6 +128,11 @@ class ProductTable : public RenderTable {
 
     std::span<const ColumnRef> Inputs() const override;
 
+    std::span<const TableId> TableOutputs() const override {
+        static constexpr TableId kTables[] = {TableId::Products};
+        return kTables;
+    }
+
     void Run(const ChangeSet& changes, TableVersions& versions) override;
     void Describe(RenderTables& tables) const override;
 

@@ -545,7 +545,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
     return product;
 }
 
-void ProductTable::Run(const ChangeSet& changes, TableVersions&) {
+void ProductTable::Run(const ChangeSet& changes, TableVersions& versions) {
     ERNIE_ZONE("Products/Run");
     ColumnStore& store = m_structure.GetColumnStore();
     const bool edited = changes.resync || changes.structure || !changes.apis.empty() ||
@@ -557,6 +557,7 @@ void ProductTable::Run(const ChangeSet& changes, TableVersions&) {
     m_pipelineVersion = m_pipelines.Version();
     if (edited) {
         Resolve();
+        versions.Record(TableId::Products, std::vector<uint32_t>{kGlobalWorld});
     }
 }
 
