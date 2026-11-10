@@ -485,11 +485,9 @@ Viewport::Pending Viewport::Receive(const device::Tensor& pixels, const device::
         }
     }
     Pending pending{pixels, ready, overlay};
-    if (&pixels.GetDevice() != m_device.Get()) {
-        pending.pixels = Staging(pixels.Shape());
-        pending.ready = m_device->Copy(pixels, pending.pixels, pending.ready);
-    }
-    if (!overlay.Empty() && &overlay.GetDevice() != m_device.Get()) {
+    pending.pixels = Staging(pixels.Shape());
+    pending.ready = m_device->Copy(pixels, pending.pixels, pending.ready);
+    if (!overlay.Empty()) {
         pending.overlay = Staging(overlay.Shape(), pending.pixels.Address());
         pending.ready = m_device->Copy(overlay, pending.overlay, pending.ready);
     }
