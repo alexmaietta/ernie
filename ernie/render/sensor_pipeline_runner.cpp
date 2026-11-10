@@ -257,12 +257,12 @@ SensorPipelineOutputs SensorPipelineRunner::Run(const SensorPipelineRunDesc& des
     std::vector<SensorPipelineCapture> records;
     const Ref<device::Buffer> wordBuffer = device.CreateBuffer({.label = "pipeline words"}, words);
     const uint64_t stateBytes = std::max<uint64_t>(
-        uint64_t(definition.stateWords) * captures * sizeof(float), sizeof(float));
+        uint64_t(definition.initialState.size()) * captures * sizeof(float), sizeof(float));
     if (state.Empty() || state.GetBuffer().Bytes() != stateBytes) {
-        const std::vector<float> initial = sensor_pipeline::InitialState(definition, registry);
         std::vector<float> states;
         for (int64_t capture = 0; capture < captures; ++capture) {
-            states.insert(states.end(), initial.begin(), initial.end());
+            states.insert(states.end(), definition.initialState.begin(),
+                          definition.initialState.end());
         }
         states.resize(stateBytes / sizeof(float));
         state = device::Tensor(device.CreateBuffer({.label = "pipeline state"}, states), 0,
@@ -276,15 +276,16 @@ SensorPipelineOutputs SensorPipelineRunner::Run(const SensorPipelineRunDesc& des
                 uint64_t(capture) * (stat ? 1 : perCapture) * value.channels * sizeof(float);
             slots.push_back(value);
         }
-        records.push_back({.firstElement = uint64_t(capture) * perCapture,
-                           .words = {wordBuffer->Address()},
-                           .width = uint32_t(width),
-                           .height = uint32_t(height),
-                           .capture = desc.capture,
-                           .identity = desc.identity + uint32_t(capture),
-                           .firstValue = uint32_t(capture * values.size()),
-                           .state = {state.Address() +
-                                     uint64_t(capture) * definition.stateWords * sizeof(float)}});
+        records.push_back(
+            {.firstElement = uint64_t(capture) * perCapture,
+             .words = {wordBuffer->Address()},
+             .width = uint32_t(width),
+             .height = uint32_t(height),
+             .capture = desc.capture,
+             .identity = desc.identity + uint32_t(capture),
+             .firstValue = uint32_t(capture * values.size()),
+             .state = {state.Address() +
+                       uint64_t(capture) * definition.initialState.size() * sizeof(float)}});
     }
     const Ref<device::Buffer> cameras =
         device.CreateBuffer({.label = "pipeline camera"}, std::vector<CameraRecord>{camera});

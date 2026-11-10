@@ -474,8 +474,8 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
     std::vector<uint32_t> order;
     while (true) {
         graph::Graph patterns;
-        for (const Reached& node : reached) {
-            patterns.Add(node.prim, 0);
+        for (size_t node = 0; node < reached.size(); ++node) {
+            patterns.Add(0);
         }
         for (uint32_t k = 0; k < reached.size(); ++k) {
             for (uint32_t i = 0; i < reached[k].inputs.size(); ++i) {

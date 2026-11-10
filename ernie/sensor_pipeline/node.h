@@ -89,7 +89,6 @@ enum class LayoutRule : uint8_t {
     Detector,
     FullChannels,
     Color,
-    Scalar,
     Stat,
     Returns,
 };

@@ -17,11 +17,11 @@ uint32_t Position(const std::vector<uint32_t>& order, uint32_t node) {
 
 TEST(GraphTest, OrdersEverySourceBeforeTheNodesReadingIt) {
     Graph graph;
-    const uint32_t output = graph.Add(10, 0);
-    const uint32_t adc = graph.Add(11, 1);
-    const uint32_t noise = graph.Add(12, 2);
-    const uint32_t signal = graph.Add(13, 3);
-    const uint32_t loose = graph.Add(14, 4);
+    const uint32_t output = graph.Add(0);
+    const uint32_t adc = graph.Add(1);
+    const uint32_t noise = graph.Add(2);
+    const uint32_t signal = graph.Add(3);
+    const uint32_t loose = graph.Add(4);
     graph.Connect(output, 0, adc, 0);
     graph.Connect(adc, 0, noise, 0);
     graph.Connect(adc, 1, signal, 0);
@@ -33,16 +33,14 @@ TEST(GraphTest, OrdersEverySourceBeforeTheNodesReadingIt) {
     EXPECT_LT(Position(ordering.order, noise), Position(ordering.order, adc));
     EXPECT_LT(Position(ordering.order, adc), Position(ordering.order, output));
     EXPECT_NE(Position(ordering.order, loose), 5u);
-    EXPECT_EQ(graph.Find(12), noise);
-    EXPECT_EQ(graph.Find(99), kNoNode);
 }
 
 TEST(GraphTest, ReportsTheNodesOfACycle) {
     Graph graph;
-    const uint32_t a = graph.Add(1, 0);
-    const uint32_t b = graph.Add(2, 0);
-    const uint32_t c = graph.Add(3, 0);
-    const uint32_t d = graph.Add(4, 0);
+    const uint32_t a = graph.Add(0);
+    const uint32_t b = graph.Add(0);
+    const uint32_t c = graph.Add(0);
+    const uint32_t d = graph.Add(0);
     graph.Connect(a, 0, b, 0);
     graph.Connect(b, 0, c, 0);
     graph.Connect(c, 0, b, 0);
@@ -56,8 +54,8 @@ TEST(GraphTest, ReportsTheNodesOfACycle) {
 
 TEST(GraphTest, AnInputTakesOneConnection) {
     Graph graph;
-    const uint32_t a = graph.Add(1, 0);
-    const uint32_t b = graph.Add(2, 0);
+    const uint32_t a = graph.Add(0);
+    const uint32_t b = graph.Add(0);
     graph.Connect(a, 0, b, 0);
     EXPECT_THROW(graph.Connect(a, 0, b, 1), Error);
     EXPECT_THROW(graph.Connect(a, 1, 7, 0), Error);

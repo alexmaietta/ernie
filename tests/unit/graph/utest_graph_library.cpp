@@ -13,7 +13,6 @@ namespace ernie::graph {
 namespace {
 
 struct Chain {
-    uint32_t firstPrim = 0;
     uint32_t noiseKind = 2;
     uint32_t input = 0;
     uint32_t shot = 0;
@@ -21,9 +20,9 @@ struct Chain {
 
 ShapeKey ChainShape(const Chain& chain) {
     Graph graph;
-    const uint32_t output = graph.Add(chain.firstPrim, 0);
-    const uint32_t noise = graph.Add(chain.firstPrim + 1, chain.noiseKind);
-    const uint32_t signal = graph.Add(chain.firstPrim + 2, 3);
+    const uint32_t output = graph.Add(0);
+    const uint32_t noise = graph.Add(chain.noiseKind);
+    const uint32_t signal = graph.Add(3);
     graph.Connect(output, 0, noise, 0);
     graph.Connect(noise, chain.input, signal, 0);
     const Ordering ordering = graph.Order();
@@ -34,13 +33,13 @@ ShapeKey ChainShape(const Chain& chain) {
     });
 }
 
-TEST(ShapeTest, KeysFollowKindsConnectionsAndUniformsButNotPrims) {
+TEST(ShapeTest, KeysFollowKindsConnectionsAndUniforms) {
     const ShapeKey key = ChainShape({});
-    EXPECT_EQ(ChainShape({.firstPrim = 40}), key);
+    EXPECT_EQ(ChainShape({}), key);
     EXPECT_NE(ChainShape({.noiseKind = 5}), key);
     EXPECT_NE(ChainShape({.input = 1}), key);
     EXPECT_NE(ChainShape({.shot = 1}), key);
-    EXPECT_EQ(ChainShape({.firstPrim = 40}).Hash(), key.Hash());
+    EXPECT_EQ(ChainShape({}).Hash(), key.Hash());
 }
 
 TEST(DefinitionLibraryTest, InternsEachShapeOnceWithGrowingIds) {
@@ -52,7 +51,7 @@ TEST(DefinitionLibraryTest, InternsEachShapeOnceWithGrowingIds) {
     };
     const uint32_t first = library.Intern(ChainShape({}), make);
     EXPECT_EQ(first, 4u);
-    EXPECT_EQ(library.Intern(ChainShape({.firstPrim = 9}), make), first);
+    EXPECT_EQ(library.Intern(ChainShape({}), make), first);
     EXPECT_EQ(made, 1u);
 
     const auto before = library.Snapshot();

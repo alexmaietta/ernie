@@ -154,7 +154,7 @@ class Resolver {
         graph::Graph graph;
         m_graphNode.assign(m_desc.nodes.size(), graph::kNoNode);
         for (const uint32_t node : nodes) {
-            m_graphNode[node] = graph.Add(m_desc.nodes[node].prim, m_defs[node]);
+            m_graphNode[node] = graph.Add(m_defs[node]);
         }
         for (const uint32_t node : nodes) {
             const NodeDesc& desc = m_desc.nodes[node];
@@ -293,9 +293,6 @@ std::vector<SignalLayout> PropagateLayouts(const ResolvedSensorPipeline& pipelin
             break;
         case LayoutRule::Color:
             layout = SignalLayout{.channels = 3};
-            break;
-        case LayoutRule::Scalar:
-            layout = SignalLayout{};
             break;
         case LayoutRule::Stat:
             layout = SignalLayout{.channels = kStatStorageWords, .perCapture = true};

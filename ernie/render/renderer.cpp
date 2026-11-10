@@ -770,7 +770,7 @@ void RendererImpl::RecordRuns(device::CommandEncoder& encoder, const ProductPlan
                 Log(LogLevel::Debug, "{} restarts its state on {} with a new definition",
                     run.instance->path, m_scene->ByIndex(planned.sensor).Path());
             }
-            std::vector<float> initial = sensor_pipeline::InitialState(definition, registry);
+            std::vector<float> initial = definition.initialState;
             initial.resize(std::max<size_t>(initial.size(), 1));
             state = {definition.id, 0, device.CreateBuffer({.label = "pipeline state"}, initial)};
         }

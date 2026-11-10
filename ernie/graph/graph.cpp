@@ -8,8 +8,8 @@
 
 namespace ernie::graph {
 
-uint32_t Graph::Add(uint32_t prim, uint32_t kind) {
-    m_nodes.push_back({.prim = prim, .kind = kind});
+uint32_t Graph::Add(uint32_t kind) {
+    m_nodes.push_back({.kind = kind});
     return uint32_t(m_nodes.size() - 1);
 }
 
@@ -22,11 +22,6 @@ void Graph::Connect(uint32_t node, uint32_t input, uint32_t source, uint32_t out
         throw Error("Node {}'s input {} is already connected", node, input);
     }
     inputs.push_back({input, source, output});
-}
-
-uint32_t Graph::Find(uint32_t prim) const {
-    const auto found = std::ranges::find(m_nodes, prim, &Node::prim);
-    return found == m_nodes.end() ? kNoNode : uint32_t(found - m_nodes.begin());
 }
 
 Ordering Graph::Order() const {

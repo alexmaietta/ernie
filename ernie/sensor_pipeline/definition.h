@@ -12,7 +12,7 @@
 
 namespace ernie::sensor_pipeline {
 
-inline constexpr uint32_t kBeforeSegments = ~0u;
+inline constexpr int32_t kBeforeSegments = -1;
 inline constexpr uint64_t kNotStored = ~uint64_t(0);
 inline constexpr uint64_t kArenaAlignment = 256;
 
@@ -23,8 +23,8 @@ struct Segment {
 
 struct StoredValue {
     uint32_t value = kNoValue;
-    uint32_t first = kBeforeSegments;
-    uint32_t last = 0;
+    int32_t first = kBeforeSegments;
+    int32_t last = 0;
 };
 
 struct SegmentPlan {
@@ -55,7 +55,7 @@ struct SensorPipelineDefinition {
     std::vector<uint32_t> parameterOffsets;
     uint32_t parameterWords = 0;
     std::vector<uint32_t> stateOffsets;
-    uint32_t stateWords = 0;
+    std::vector<float> initialState;
 };
 
 using SensorPipelineLibrary = graph::DefinitionLibrary<SensorPipelineDefinition>;
@@ -64,9 +64,6 @@ using SensorPipelineSet = graph::DefinitionSet<SensorPipelineDefinition>;
 SensorPipelineDefinition BuildDefinition(uint32_t id, const ResolvedSensorPipeline& pipeline,
                                          const NodeRegistry& registry,
                                          Fusion fusion = Fusion::Fused);
-
-std::vector<float> InitialState(const SensorPipelineDefinition& definition,
-                                const NodeRegistry& registry);
 
 std::vector<uint32_t> PackWords(const SensorPipelineDefinition& definition,
                                 const ResolvedSensorPipeline& instance,

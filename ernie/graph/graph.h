@@ -20,7 +20,6 @@ struct Edge {
 };
 
 struct Node {
-    uint32_t prim = 0;
     uint32_t kind = 0;
     std::vector<Edge> inputs;
 };
@@ -32,7 +31,7 @@ struct Ordering {
 
 class Graph {
   public:
-    uint32_t Add(uint32_t prim, uint32_t kind);
+    uint32_t Add(uint32_t kind);
     void Connect(uint32_t node, uint32_t input, uint32_t source, uint32_t output);
 
     std::span<const Node> Nodes() const {
@@ -43,7 +42,6 @@ class Graph {
         return m_nodes[node];
     }
 
-    uint32_t Find(uint32_t prim) const;
     Ordering Order() const;
 
   private:

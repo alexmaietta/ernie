@@ -216,7 +216,7 @@ graph::ShapeKey DefinitionKey(const ShadingGraph& shading) {
     graph::Graph graph;
     std::vector<uint32_t> order;
     for (size_t node = 0; node < shading.nodes.size(); ++node) {
-        order.push_back(graph.Add(0, 0));
+        order.push_back(graph.Add(0));
     }
     for (uint32_t node = 0; node < shading.nodes.size(); ++node) {
         for (uint32_t input = 0; input < shading.nodes[node].inputs.size(); ++input) {
