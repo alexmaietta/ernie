@@ -80,9 +80,11 @@ struct RenderParams {
     uint64_t firstPixel;
     uint captureCount;
     uint pixelCount;
+    uint capturePixels;
+    uint padding;
 };
 
-ERNIE_CHECK_SIZE(RenderParams, 32);
+ERNIE_CHECK_SIZE(RenderParams, 40);
 
 struct ScatterParams {
     Ptr<PointCloud> cloud;

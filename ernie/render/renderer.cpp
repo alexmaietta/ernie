@@ -471,6 +471,12 @@ device::Operation RendererImpl::Trace(const ProductPlan& plan, OutputSet& set,
                 ? set.captureBuffers[entry]->Address()
                 : queue.Upload(captures.data(), captures.size() * sizeof(Capture)).Address();
         params.captureCount = uint32_t(captures.size());
+        const uint64_t capturePixels = pixelCount / captures.size();
+        const bool uniform =
+            capturePixels <= UINT32_MAX && std::ranges::all_of(captures, [&](const Capture& c) {
+                return uint64_t(c.plan.width) * c.plan.height == capturePixels;
+            });
+        params.capturePixels = uniform ? uint32_t(capturePixels) : 0;
         for (uint64_t first = 0; first < pixelCount; first += m_maxPixelsPerLaunch) {
             params.firstPixel = first;
             params.pixelCount = uint32_t(std::min(m_maxPixelsPerLaunch, pixelCount - first));

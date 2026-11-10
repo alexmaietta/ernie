@@ -25,6 +25,10 @@ bool FindPixel(RenderParams params, out CapturePixel pixel) {
     const uint64_t flat = params.firstPixel + thread;
     uint low = 0;
     uint high = params.captureCount;
+    if (params.capturePixels != 0) {
+        low = uint(flat / params.capturePixels);
+        high = low + 1;
+    }
     while (high - low > 1) {
         const uint middle = (low + high) / 2;
         if (params.captures[middle].plan.firstPixel <= flat) {
