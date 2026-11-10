@@ -121,21 +121,20 @@ bool PointBlocks(SurfaceRecord surface, uint opacityName, uint point, Ray ray) {
 }
 
 struct ShapeIntersector : IIntersector {
-    Ptr<ShapeRecord> shapes;
-    Ptr<PointsRecord> points;
-    Ptr<SurfaceRecord> surfaces;
-    uint first;
-    uint opacityName;
+    RenderTables* tables;
+    uint tlas;
 
     bool Intersect(Ray ray, uint instance, uint geometry, uint primitive, inout float t,
                    out float2 attributes) {
         attributes = float2(0);
-        const uint slot = first + instance;
-        const ShapeRecord shape = shapes[slot];
+        InstanceLayout* layout = tables->instances;
+        const uint slot = layout->firstInstances[tlas] + instance;
+        const ShapeRecord shape = layout->shapes[slot];
         if (ShapeKind(shape.kind) == ShapeKind::Points) {
-            return IntersectPoints(points[shape.row], surfaces[slot], primitive, ray, t, attributes);
+            return IntersectPoints(tables->points[shape.row], tables->surfaces[slot],
+                                   layout->displayOpacityName, primitive, ray, t, attributes);
         }
-        const float distance = ShapeDistance(shape, points, primitive, ray);
+        const float distance = ShapeDistance(shape, tables->points, primitive, ray);
         if (distance >= t) {
             return false;
         }
@@ -143,8 +142,8 @@ struct ShapeIntersector : IIntersector {
         return true;
     }
 
-    bool IntersectPoints(PointsRecord cloud, SurfaceRecord surface, uint box, Ray ray,
-                         inout float t, inout float2 attributes) {
+    bool IntersectPoints(PointsRecord cloud, SurfaceRecord surface, uint opacityName, uint box,
+                         Ray ray, inout float t, inout float2 attributes) {
         const uint perBox = max(cloud.perBox, 1u);
         const uint start = box * perBox;
         const uint end = min(start + perBox, cloud.pointCount);
