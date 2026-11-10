@@ -17,8 +17,28 @@ static const uint kTraceStackSize = 32;
 static const uint kRecordEntry = 1u << 31;
 static const uint kTopLevel = ~0u;
 
+static const uint kSavedRay = kTraceStackSize;
+
 struct TraceStack {
-    uint entries[kTraceStackSize];
+    uint entries[kTraceStackSize + 6];
+
+    [mutating]
+    void SaveRay(Ray ray) {
+        entries[kSavedRay] = asuint(ray.origin.x);
+        entries[kSavedRay + 1] = asuint(ray.origin.y);
+        entries[kSavedRay + 2] = asuint(ray.origin.z);
+        entries[kSavedRay + 3] = asuint(ray.direction.x);
+        entries[kSavedRay + 4] = asuint(ray.direction.y);
+        entries[kSavedRay + 5] = asuint(ray.direction.z);
+    }
+
+    Ray RestoreRay(Ray moved) {
+        Ray ray = moved;
+        ray.origin = asfloat(uint3(entries[kSavedRay], entries[kSavedRay + 1], entries[kSavedRay + 2]));
+        ray.direction =
+            asfloat(uint3(entries[kSavedRay + 3], entries[kSavedRay + 4], entries[kSavedRay + 5]));
+        return ray;
+    }
 
     [mutating]
     void Push(inout uint depth, uint node, uint children) {
@@ -273,8 +293,8 @@ struct SoftwareTracer : ITracer {
             }
             if (instanced && floor != kTopLevel && depth == floor) {
                 floor = kTopLevel;
-                visitor.query.ray = query.ray;
-                level = BvhLevel(bvh, query.ray);
+                visitor.query.ray = stack.RestoreRay(visitor.query.ray);
+                level = BvhLevel(bvh, visitor.query.ray);
             }
             if (depth == 0) {
                 return visitor.nearest;
@@ -300,7 +320,8 @@ struct SoftwareTracer : ITracer {
             }
             visitor.instance = instance.custom & 0xFFFFFF;
             visitor.facing = instance.index >> 24;
-            visitor.query.ray = ToObject(instance, query.ray);
+            stack.SaveRay(visitor.query.ray);
+            visitor.query.ray = ToObject(instance, visitor.query.ray);
             level = BvhLevel(blas, visitor.query.ray);
             floor = depth;
             node = 0;
