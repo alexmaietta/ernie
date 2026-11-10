@@ -24,7 +24,7 @@ ernie_embed(
     ROOTS
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/render/kernels/|*.slang"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernels|ernie/render/kernels/|*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/language|ernie/|*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/imports|ernie/|*.slang"
 )
 
 ernie_static_library(
