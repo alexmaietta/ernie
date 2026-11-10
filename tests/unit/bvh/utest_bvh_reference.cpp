@@ -36,6 +36,18 @@ TEST(ReferenceTest, BuildsWellFormedBvhsOfTriangles) {
     }
 }
 
+TEST(ReferenceTest, CollapsesIntoNearlyFullNodes) {
+    for (const std::vector<Triangle>& mesh : {test::Grid(32), test::Points(5000)}) {
+        SCOPED_TRACE(mesh.size());
+        const Inspection found = Inspect(BuildReference(mesh));
+        ASSERT_TRUE(found.errors.empty()) << found.errors.front();
+        EXPECT_GT(found.childrenPerNode, 7.5);
+        EXPECT_LT(found.nodes, mesh.size() / 12);
+        EXPECT_LT(found.nodeCost, found.sahCost);
+        EXPECT_DOUBLE_EQ(found.nodeCost + found.recordCost, found.sahCost);
+    }
+}
+
 TEST(ReferenceTest, BuildsWellFormedBvhsOfBoxes) {
     const std::vector<BvhBox> boxes = test::Boxes(300, 4);
     ExpectWellFormed(BuildReference(boxes), 300, kBvhBoxes);

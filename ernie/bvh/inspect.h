@@ -18,6 +18,8 @@ struct Inspection {
     uint32_t records = 0;
     uint32_t depth = 0;
     double sahCost = 0;
+    double nodeCost = 0;
+    double recordCost = 0;
     double childrenPerNode = 0;
     double recordsPerLeaf = 0;
 };

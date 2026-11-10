@@ -90,6 +90,7 @@ class Walker {
             m_slack = float(extent * 1e-5);
 
             m_found.sahCost = 1;
+            m_found.nodeCost = 1;
             m_pending.push_back({0, bounds, 1});
             while (!m_pending.empty()) {
                 const Pending next = m_pending.back();
@@ -189,6 +190,7 @@ class Walker {
                     continue;
                 }
                 m_found.sahCost += weight;
+                m_found.nodeCost += weight;
                 m_pending.push_back({node.firstChild + internal++, inside, depth + 1});
                 continue;
             }
@@ -208,6 +210,7 @@ class Walker {
             }
             ++m_found.leaves;
             m_found.sahCost += weight * count;
+            m_found.recordCost += weight * count;
             for (uint32_t i = 0; i < count; ++i) {
                 VisitRecord(index, node.firstLeaf + m_words * ((meta & 31) + i), inside);
             }

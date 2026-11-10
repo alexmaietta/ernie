@@ -18,6 +18,8 @@ namespace {
 using Point = std::array<float, 3>;
 
 constexpr int kBins = 16;
+constexpr double kNodeCost = 1;
+constexpr double kRecordCost = 0.3;
 
 void Grow(BvhBox& box, const BvhBox& other) {
     box = BvhUnion(box, other);
@@ -54,6 +56,7 @@ template <class Record, class MakeRecord> class ReferenceBuilder {
         header.nodes = sizeof(BvhHeader);
         if (!m_boxes.empty()) {
             BuildBinary();
+            Collapse();
             Encode();
             for (int i = 0; i < 3; ++i) {
                 header.lower[i] = m_binary[0].box.lower[i];
@@ -197,29 +200,75 @@ template <class Record, class MakeRecord> class ReferenceBuilder {
         return at > 0 ? std::min(kBins - 1, int(std::min(at, float(kBins)))) : 0;
     }
 
+    void Collapse() {
+        const auto count = uint32_t(m_binary.size());
+        m_first.assign(count, 0);
+        m_count.assign(count, 0);
+        m_costs.assign(count, {});
+        m_splits.assign(count, {});
+        m_leaf.assign(count, false);
+        constexpr double kNever = std::numeric_limits<double>::infinity();
+        const double floor = std::max(double(BvhArea(m_binary[0].box)) * 1e-6, 1e-30);
+        for (uint32_t n = count; n-- > 0;) {
+            const Binary& node = m_binary[n];
+            const double area = BvhArea(node.box) + floor;
+            std::array<double, kBvhWidth + 1>& costs = m_costs[n];
+            std::array<uint8_t, kBvhWidth + 1>& splits = m_splits[n];
+            if (node.count > 0) {
+                m_first[n] = node.first;
+                m_count[n] = node.count;
+                m_leaf[n] = true;
+                costs.fill(kRecordCost * area * node.count);
+                continue;
+            }
+            m_first[n] = std::min(m_first[node.left], m_first[node.right]);
+            m_count[n] = m_count[node.left] + m_count[node.right];
+            const auto& left = m_costs[node.left];
+            const auto& right = m_costs[node.right];
+            const auto best = [&](uint32_t slots) {
+                std::pair<double, uint8_t> found = {kNever, 0};
+                for (uint32_t k = 1; k < slots; ++k) {
+                    found = std::min(found, {left[k] + right[slots - k], uint8_t(k)});
+                }
+                return found;
+            };
+            const auto [inside, split] = best(kBvhWidth);
+            splits[0] = split;
+            const double leaf =
+                m_count[n] <= kBvhLeafSize ? kRecordCost * area * m_count[n] : kNever;
+            m_leaf[n] = leaf <= kNodeCost * area + inside;
+            costs[1] = std::min(leaf, kNodeCost * area + inside);
+            for (uint32_t slots = 2; slots <= kBvhWidth; ++slots) {
+                const auto [cost, k] = best(slots);
+                costs[slots] = std::min(costs[slots - 1], cost);
+                splits[slots] = cost < costs[slots - 1] ? k : 0;
+            }
+        }
+    }
+
+    void Gather(uint32_t index, uint32_t slots, std::vector<uint32_t>& children) const {
+        const Binary& node = m_binary[index];
+        while (slots > 1 && node.count == 0 && m_splits[index][slots] == 0) {
+            --slots;
+        }
+        if (slots == 1 || node.count > 0) {
+            children.push_back(index);
+            return;
+        }
+        const uint32_t k = m_splits[index][slots];
+        Gather(node.left, k, children);
+        Gather(node.right, slots - k, children);
+    }
+
     std::vector<uint32_t> Children(uint32_t index) const {
         const Binary& node = m_binary[index];
         if (node.count > 0) {
             return {index};
         }
-        std::vector<uint32_t> children = {node.left, node.right};
-        while (children.size() < kBvhWidth) {
-            int largest = -1;
-            for (size_t i = 0; i < children.size(); ++i) {
-                const Binary& child = m_binary[children[i]];
-                if (child.count == 0 &&
-                    (largest < 0 ||
-                     BvhArea(child.box) > BvhArea(m_binary[children[largest]].box))) {
-                    largest = int(i);
-                }
-            }
-            if (largest < 0) {
-                break;
-            }
-            const Binary& opened = m_binary[children[largest]];
-            children[largest] = opened.left;
-            children.push_back(opened.right);
-        }
+        std::vector<uint32_t> children;
+        const uint32_t k = m_splits[index][0];
+        Gather(node.left, k, children);
+        Gather(node.right, kBvhWidth - k, children);
         return children;
     }
 
@@ -246,9 +295,8 @@ template <class Record, class MakeRecord> class ReferenceBuilder {
                     continue;
                 }
                 const uint32_t index = children[slots.child[slot]];
-                const Binary& child = m_binary[index];
                 uint32_t meta;
-                if (child.count == 0) {
+                if (!m_leaf[index]) {
                     if (internal++ == 0) {
                         node.firstChild = uint32_t(m_nodes.size());
                     }
@@ -260,9 +308,9 @@ template <class Record, class MakeRecord> class ReferenceBuilder {
                     if (records == 0) {
                         node.firstLeaf = uint32_t(m_records.size() * sizeof(Record) / 16);
                     }
-                    meta = BvhLeafMeta(child.count, records);
-                    records += child.count;
-                    for (uint32_t i = child.first; i < child.first + child.count; ++i) {
+                    meta = BvhLeafMeta(m_count[index], records);
+                    records += m_count[index];
+                    for (uint32_t i = m_first[index]; i < m_first[index] + m_count[index]; ++i) {
                         m_records.push_back(m_makeRecord(m_order[i]));
                     }
                 }
@@ -279,6 +327,11 @@ template <class Record, class MakeRecord> class ReferenceBuilder {
     std::vector<Point> m_centers;
     std::vector<uint32_t> m_order;
     std::vector<Binary> m_binary;
+    std::vector<uint32_t> m_first;
+    std::vector<uint32_t> m_count;
+    std::vector<std::array<double, kBvhWidth + 1>> m_costs;
+    std::vector<std::array<uint8_t, kBvhWidth + 1>> m_splits;
+    std::vector<bool> m_leaf;
     std::vector<BvhNode> m_nodes;
     std::vector<Record> m_records;
 };
