@@ -39,6 +39,13 @@ void Tlas::SetHandles(Device& device, std::vector<uint64_t> handles) {
     device.GetQueue().Write(*m_table, m_handles.data());
 }
 
+void Builder::SubmitRefit(device::CommandEncoder&& encoder, Tlas& tlas,
+                          device::BufferRange instances, std::optional<device::BufferRange> counts,
+                          std::span<const uint32_t> worlds) {
+    Refit(encoder, tlas, instances, counts, worlds);
+    m_device.GetQueue().Submit(encoder.Finish());
+}
+
 std::unique_ptr<Builder> Builder::Create(Device& device, Traversal format) {
     if (format == Traversal::Auto) {
         format = device.GetTraversal();

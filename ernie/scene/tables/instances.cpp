@@ -231,10 +231,11 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
     if (!built.empty()) {
         m_builder.Build(encoder, *m_tlas, *m_records.Buffer(), counts, built);
     }
-    if (!refit.empty()) {
-        m_builder.Refit(encoder, *m_tlas, *m_records.Buffer(), counts, refit);
+    if (refit.empty()) {
+        queue.Submit(encoder.Finish());
+        return;
     }
-    queue.Submit(encoder.Finish());
+    m_builder.SubmitRefit(std::move(encoder), *m_tlas, *m_records.Buffer(), counts, refit);
 }
 
 std::set<uint32_t> InstanceTable::Tlases(uint32_t world) const {

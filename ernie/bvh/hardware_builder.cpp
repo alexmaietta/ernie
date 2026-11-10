@@ -144,6 +144,29 @@ class HardwareBuilder final : public Builder {
         BuildWorlds("Refit", encoder, tlas, instances, counts, worlds, true);
     }
 
+    void SubmitRefit(CommandEncoder&& encoder, Tlas& structure, BufferRange instances,
+                     std::optional<BufferRange> counts, std::span<const uint32_t> worlds) override {
+        const auto& tlas = RequireFormat<HardwareTlas>("Refit", structure);
+        const std::vector<uint32_t> selected =
+            PrepareWorlds("Refit", encoder, tlas, instances, counts, worlds, true);
+        device::Queue& queue = m_device.GetQueue();
+        queue.Submit(encoder.Finish());
+        const std::vector<BufferRange> scratch = WorldScratches(tlas, selected, true);
+        std::vector<const Accel*> accels;
+        for (const uint32_t w : selected) {
+            accels.push_back(&tlas.GetAccel(w));
+        }
+        const uint64_t scratchAddress = scratch.empty() ? 0 : scratch.front().Address();
+        if (!m_refit || m_refit->accels != accels || m_refit->scratch != scratchAddress) {
+            m_refit.reset();
+            CommandEncoder recorder = queue.CreateEncoder();
+            EmitBuilds(recorder, tlas, selected, scratch, true);
+            m_refit =
+                CachedRefit{std::move(accels), scratchAddress, recorder.Finish({.reusable = true})};
+        }
+        queue.Submit(m_refit->commands);
+    }
+
   private:
     void BuildBlases(const char* what, CommandEncoder& encoder, std::span<const Ref<Blas>> blases,
                      bool update) {
@@ -180,12 +203,21 @@ class HardwareBuilder final : public Builder {
     void BuildWorlds(const char* what, CommandEncoder& encoder, const Tlas& structure,
                      BufferRange instances, std::optional<BufferRange> counts,
                      std::span<const uint32_t> worlds, bool update) {
+        const auto& tlas = RequireFormat<HardwareTlas>(what, structure);
+        const std::vector<uint32_t> selected =
+            PrepareWorlds(what, encoder, tlas, instances, counts, worlds, update);
+        EmitBuilds(encoder, tlas, selected, WorldScratches(tlas, selected, update), update);
+    }
+
+    std::vector<uint32_t> PrepareWorlds(const char* what, CommandEncoder& encoder,
+                                        const HardwareTlas& tlas, BufferRange instances,
+                                        std::optional<BufferRange> counts,
+                                        std::span<const uint32_t> worlds, bool update) {
         ERNIE_ZONE("Bvh/HardwareTlas");
         static const profiler::ZoneId buildZone = profiler::ZoneId::Named("Bvh/TlasBuild");
         static const profiler::ZoneId refitZone = profiler::ZoneId::Named("Bvh/TlasRefit");
-        const auto& tlas = RequireFormat<HardwareTlas>(what, structure);
         RequireInstances(what, tlas, instances);
-        const std::vector<uint32_t> selected = SelectWorlds(what, tlas, worlds);
+        std::vector<uint32_t> selected = SelectWorlds(what, tlas, worlds);
         const std::vector<uint32_t> offsets = Offsets(tlas.Capacities());
         const uint64_t total = Total(tlas.Capacities());
         Log(LogLevel::Debug, "{} {} of {} hardware TLAS worlds", update ? "refitting" : "building",
@@ -217,13 +249,22 @@ class HardwareBuilder final : public Builder {
             }
         }
 
+        return selected;
+    }
+
+    std::vector<BufferRange> WorldScratches(const HardwareTlas& tlas,
+                                            std::span<const uint32_t> selected, bool update) {
         std::vector<uint64_t> sizes;
         for (const uint32_t w : selected) {
             const device::AccelSizes& accel = tlas.GetAccel(w).Sizes();
             sizes.push_back(update ? accel.updateScratch : accel.scratch);
         }
+        return Scratches(sizes);
+    }
 
-        const std::vector<BufferRange> scratch = Scratches(sizes);
+    void EmitBuilds(CommandEncoder& encoder, const HardwareTlas& tlas,
+                    std::span<const uint32_t> selected, std::span<const BufferRange> scratch,
+                    bool update) {
         encoder.Barrier();
         encoder.Concurrent(true);
         for (uint32_t i = 0; i < selected.size(); ++i) {
@@ -265,8 +306,15 @@ class HardwareBuilder final : public Builder {
         return *m_masking;
     }
 
+    struct CachedRefit {
+        std::vector<const Accel*> accels;
+        uint64_t scratch = 0;
+        device::CommandBuffer commands;
+    };
+
     Ref<Buffer> m_scratch;
     Ref<device::Program> m_masking;
+    std::optional<CachedRefit> m_refit;
 };
 
 }

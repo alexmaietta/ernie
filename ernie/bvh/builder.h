@@ -98,6 +98,10 @@ class ERNIE_API Builder {
     virtual void Refit(device::CommandEncoder& encoder, Tlas& tlas, device::BufferRange instances,
                        std::optional<device::BufferRange> counts = std::nullopt,
                        std::span<const uint32_t> worlds = {}) = 0;
+    virtual void SubmitRefit(device::CommandEncoder&& encoder, Tlas& tlas,
+                             device::BufferRange instances,
+                             std::optional<device::BufferRange> counts = std::nullopt,
+                             std::span<const uint32_t> worlds = {});
 
   protected:
     explicit Builder(device::Device& device) : m_device(device) {}
