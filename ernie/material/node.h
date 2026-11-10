@@ -11,10 +11,29 @@ namespace ernie::material {
 
 enum class MaterialInputType { Bool, Int, Float, Float2, Float3, Float4, Spectral };
 
+struct MaterialInputInfo {
+    std::string_view cellType;
+    std::string_view slangType;
+    uint32_t bytes = 4;
+};
+
+inline constexpr MaterialInputInfo kMaterialInputs[] = {
+    {"uint", "bool", 4},
+    {"int", "int", 4},
+    {"float", "float", 4},
+    {"Float2", "float2", 8},
+    {"Float3", "float3", 12},
+    {"Float4", "float4", 16},
+    {"Float3", "SpectralValue", 16},
+};
+
+inline const MaterialInputInfo& InputInfo(MaterialInputType type) {
+    return kMaterialInputs[uint32_t(type)];
+}
+
 struct MaterialNodeInput {
     std::string name;
     MaterialInputType type = MaterialInputType::Float;
-    bool color = false;
 };
 
 enum class MaterialNodeRole { Material, Surface, Pattern };
@@ -54,12 +73,13 @@ struct ClosurePrimitive {
     std::string source;
 };
 
-uint32_t ClosurePrimitiveKind(std::string_view name);
+using ClosurePrimitiveList = std::vector<std::shared_ptr<const ClosurePrimitive>>;
+
+ClosurePrimitiveList WithClosurePrimitive(ClosurePrimitiveList primitives,
+                                          ClosurePrimitive primitive);
 
 void RegisterClosurePrimitive(ClosurePrimitive primitive);
 
-std::vector<std::shared_ptr<const ClosurePrimitive>> ClosurePrimitives();
-
-uint32_t MaterialInputBytes(MaterialInputType type);
+ClosurePrimitiveList ClosurePrimitives();
 
 }

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
 #include <span>
 #include <string>
@@ -88,11 +89,22 @@ class MaterialTable : public RenderTable {
         uint32_t row = 0;
     };
 
+    struct Reached {
+        uint32_t prim = kNoPrim;
+        std::shared_ptr<const material::MaterialNodeDefinition> node;
+        std::vector<material::InputBinding> inputs;
+        std::vector<Connection> textures;
+        std::vector<uint32_t> spectra;
+    };
+
     void Resolve(const ChangeSet& changes);
     void ResolveMaterial(uint32_t material);
     void ResolvePreview(uint32_t material, uint32_t shader);
     void ResolveNode(uint32_t material, uint32_t shader,
                      std::shared_ptr<const material::MaterialNodeDefinition> surface);
+    std::vector<Reached>
+    ReachNodes(uint32_t shader, std::shared_ptr<const material::MaterialNodeDefinition> surface);
+    std::vector<uint32_t> OrderPatterns(std::vector<Reached>& reached) const;
     bool BindTexture(uint32_t shader, const Connection& connection, std::string_view input,
                      bool color, uint32_t slot, TextureChannel& channel);
     void CarryPrevious(const std::vector<MaterialRecord>& before);

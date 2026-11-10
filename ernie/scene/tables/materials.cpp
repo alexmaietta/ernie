@@ -396,18 +396,11 @@ void MaterialTable::Define(uint32_t material, uint32_t definition, uint32_t word
                              .previousWords = 0});
 }
 
-void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
-                                std::shared_ptr<const material::MaterialNodeDefinition> surface) {
+std::vector<MaterialTable::Reached>
+MaterialTable::ReachNodes(uint32_t shader,
+                          std::shared_ptr<const material::MaterialNodeDefinition> surface) {
     const Prims& prims = m_structure.GetPrims();
     const Paths& paths = m_structure.GetPaths();
-
-    struct Reached {
-        uint32_t prim = kNoPrim;
-        std::shared_ptr<const material::MaterialNodeDefinition> node;
-        std::vector<material::InputBinding> inputs;
-        std::vector<Connection> textures;
-    };
-
     std::vector<Reached> reached = {{.prim = shader, .node = std::move(surface)}};
     for (uint32_t k = 0; k < reached.size(); ++k) {
         const uint32_t prim = reached[k].prim;
@@ -415,6 +408,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         const std::span<const Connection> connections = Connections(prim);
         std::vector<material::InputBinding> inputs(node->inputs.size());
         std::vector<Connection> textures(node->inputs.size());
+        std::vector<uint32_t> spectra(node->inputs.size(), kNoPrim);
         for (uint32_t i = 0; i < node->inputs.size(); ++i) {
             const material::MaterialNodeInput& input = node->inputs[i];
             const auto found = std::ranges::find(connections, input.name, &Connection::input);
@@ -427,7 +421,9 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
             std::shared_ptr<const material::MaterialNodeDefinition> pattern =
                 IsRuntime(schema) ? material::FindMaterialNode(Info(schema).name) : nullptr;
             if (schema == SchemaId::SampledSpectrum) {
-                if (input.type != material::MaterialInputType::Spectral) {
+                if (input.type == material::MaterialInputType::Spectral) {
+                    spectra[i] = source;
+                } else {
                     Log(LogLevel::Warning,
                         "{}'s {} connects to the spectrum {}, but only SpectralValue inputs take "
                         "spectra; the input keeps its value",
@@ -472,7 +468,13 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         }
         reached[k].inputs = std::move(inputs);
         reached[k].textures = std::move(textures);
+        reached[k].spectra = std::move(spectra);
     }
+    return reached;
+}
+
+std::vector<uint32_t> MaterialTable::OrderPatterns(std::vector<Reached>& reached) const {
+    const Paths& paths = m_structure.GetPaths();
     std::vector<uint32_t> order;
     while (true) {
         graph::Graph patterns;
@@ -502,6 +504,15 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
             paths.Path(reached[ordering.cycle.front()].prim), paths.Path(reached[closing].prim));
     }
     order.resize(size_t(std::ranges::find(order, 0u) - order.begin()) + 1);
+    return order;
+}
+
+void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
+                                std::shared_ptr<const material::MaterialNodeDefinition> surface) {
+    const Prims& prims = m_structure.GetPrims();
+    const Paths& paths = m_structure.GetPaths();
+    std::vector<Reached> reached = ReachNodes(shader, std::move(surface));
+    const std::vector<uint32_t> order = OrderPatterns(reached);
     std::vector<uint32_t> position(reached.size(), kNoPrim);
     material::ShadingGraph graph;
     for (const uint32_t k : order) {
@@ -540,13 +551,9 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
             CopyCell({schema, &columns[i], i}, node.prim, base + Word(layout.cells[n][i]));
             if (node.node->inputs[i].type == material::MaterialInputType::Spectral) {
                 uint32_t spectrum = kNoSpectrum;
-                for (const Connection& connection : Connections(node.prim)) {
-                    if (connection.input == node.node->inputs[i].name &&
-                        connection.source != kNoPrim &&
-                        prims.Record(connection.source).schema == SchemaId::SampledSpectrum) {
-                        spectrum = prims.Row(connection.source, SchemaId::SampledSpectrum);
-                        m_spectral.insert(material);
-                    }
+                if (node.spectra[i] != kNoPrim) {
+                    spectrum = prims.Row(node.spectra[i], SchemaId::SampledSpectrum);
+                    m_spectral.insert(material);
                 }
                 m_pack.Literal(base + Word(layout.cells[n][i] + 12), spectrum);
             }

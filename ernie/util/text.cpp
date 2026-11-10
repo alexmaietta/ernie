@@ -82,12 +82,15 @@ bool Glob(std::string_view pattern, std::string_view text) {
     return p == pattern.size();
 }
 
-std::string Digest(std::string_view bytes) {
-    uint64_t hash = 0xcbf29ce484222325ull;
+uint64_t Fnv1a(std::string_view bytes, uint64_t hash) {
     for (const char byte : bytes) {
         hash = (hash ^ uint8_t(byte)) * 0x100000001b3ull;
     }
-    return fmt::format("{:016x}", hash);
+    return hash;
+}
+
+std::string Digest(std::string_view bytes) {
+    return fmt::format("{:016x}", Fnv1a(bytes));
 }
 
 std::string Replaced(std::string text, std::string_view from, std::string_view to) {

@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "ernie/util/error.h"
+#include "ernie/util/text.h"
 
 namespace ernie::graph {
 
@@ -70,11 +71,7 @@ Ordering Graph::Order() const {
 }
 
 uint64_t ShapeKey::Hash() const {
-    uint64_t hash = 0xcbf29ce484222325ull;
-    for (const char byte : m_bytes) {
-        hash = (hash ^ uint8_t(byte)) * 0x100000001b3ull;
-    }
-    return hash;
+    return Fnv1a(m_bytes);
 }
 
 void ShapeWriter::Add(uint32_t value) {

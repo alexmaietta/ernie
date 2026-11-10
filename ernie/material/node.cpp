@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/material/node.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -14,7 +15,7 @@ namespace {
 
 struct Nodes {
     std::map<std::string, std::shared_ptr<const MaterialNodeDefinition>, std::less<>> byName;
-    std::vector<std::shared_ptr<const ClosurePrimitive>> primitives;
+    ClosurePrimitiveList primitives;
     uint64_t version = 0;
 };
 
@@ -48,59 +49,43 @@ std::shared_ptr<const MaterialNodeDefinition> FindMaterialNode(std::string_view 
     return found == nodes->byName.end() ? nullptr : found->second;
 }
 
-uint32_t ClosurePrimitiveKind(std::string_view name) {
-    const std::shared_ptr<const Nodes> nodes = Registry().Get();
-    for (const std::shared_ptr<const ClosurePrimitive>& primitive : nodes->primitives) {
-        if (primitive->name == name) {
-            return primitive->kind;
-        }
+ClosurePrimitiveList WithClosurePrimitive(ClosurePrimitiveList primitives,
+                                          ClosurePrimitive primitive) {
+    const auto known = std::ranges::find(primitives, primitive.name,
+                                         [](const auto& entry) { return entry->name; });
+    if (known == primitives.end()) {
+        primitive.kind = kFirstPrimitiveLobe + uint32_t(primitives.size());
+        primitives.push_back(std::make_shared<const ClosurePrimitive>(std::move(primitive)));
+        return primitives;
     }
-    return kFirstPrimitiveLobe + uint32_t(nodes->primitives.size());
+    if ((*known)->file != primitive.file) {
+        throw Error("A closure primitive called {} is already loaded from {}", primitive.name,
+                    (*known)->file);
+    }
+    if ((*known)->source != primitive.source) {
+        primitive.kind = (*known)->kind;
+        *known = std::make_shared<const ClosurePrimitive>(std::move(primitive));
+    }
+    return primitives;
 }
 
 void RegisterClosurePrimitive(ClosurePrimitive primitive) {
     Registry().Update([&](Nodes& nodes) {
-        for (std::shared_ptr<const ClosurePrimitive>& known : nodes.primitives) {
-            if (known->name != primitive.name) {
-                continue;
-            }
-            if (known->file != primitive.file) {
-                throw Error("A closure primitive called {} is already loaded from {}",
-                            primitive.name, known->file);
-            }
-            if (known->source != primitive.source) {
-                primitive.kind = known->kind;
-                known = std::make_shared<const ClosurePrimitive>(std::move(primitive));
-                ++nodes.version;
-            }
-            return;
+        ClosurePrimitiveList primitives =
+            WithClosurePrimitive(nodes.primitives, std::move(primitive));
+        if (primitives != nodes.primitives) {
+            nodes.primitives = std::move(primitives);
+            ++nodes.version;
         }
-        primitive.kind = kFirstPrimitiveLobe + uint32_t(nodes.primitives.size());
-        nodes.primitives.push_back(std::make_shared<const ClosurePrimitive>(std::move(primitive)));
-        ++nodes.version;
     });
 }
 
-std::vector<std::shared_ptr<const ClosurePrimitive>> ClosurePrimitives() {
+ClosurePrimitiveList ClosurePrimitives() {
     return Registry().Get()->primitives;
 }
 
 uint64_t MaterialNodeVersion() {
     return Registry().Get()->version;
-}
-
-uint32_t MaterialInputBytes(MaterialInputType type) {
-    switch (type) {
-    case MaterialInputType::Float2:
-        return 8;
-    case MaterialInputType::Float3:
-        return 12;
-    case MaterialInputType::Float4:
-    case MaterialInputType::Spectral:
-        return 16;
-    default:
-        return 4;
-    }
 }
 
 }

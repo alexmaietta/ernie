@@ -262,23 +262,13 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                         "and define primitives",
                         file.string());
         }
-        std::vector<std::shared_ptr<const material::ClosurePrimitive>> candidates =
-            material::ClosurePrimitives();
+        material::ClosurePrimitiveList candidates = material::ClosurePrimitives();
         for (const device::ReflectedNode& reflected : nodes) {
-            auto definition =
-                std::make_shared<const material::ClosurePrimitive>(material::ClosurePrimitive{
-                    .name = reflected.name,
-                    .kind = material::kFirstPrimitiveLobe + uint32_t(candidates.size()),
-                    .file = file.string(),
-                    .module = module,
-                    .source = source});
-            const auto known = std::ranges::find(candidates, reflected.name,
-                                                 [](const auto& entry) { return entry->name; });
-            if (known != candidates.end()) {
-                *known = definition;
-            } else {
-                candidates.push_back(definition);
-            }
+            candidates =
+                material::WithClosurePrimitive(std::move(candidates), {.name = reflected.name,
+                                                                       .file = file.string(),
+                                                                       .module = module,
+                                                                       .source = source});
         }
         const auto checked = material::ClosurePrimitiveSources(candidates);
         try {
@@ -292,8 +282,10 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                                                 .file = file.string(),
                                                 .module = module,
                                                 .source = source});
+            const auto loaded = std::ranges::find(candidates, reflected.name,
+                                                  [](const auto& entry) { return entry->name; });
             Log(LogLevel::Debug, "loaded closure primitive {} from {} as lobe kind {}",
-                reflected.name, file.string(), material::ClosurePrimitiveKind(reflected.name));
+                reflected.name, file.string(), (*loaded)->kind);
             names.push_back(reflected.name);
         }
         nodes.clear();
@@ -328,8 +320,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         std::vector<std::string> inputs;
         for (const device::ReflectedField& field : reflected.fields) {
             desc.columns.push_back(Column(field));
-            node.inputs.push_back(
-                {.name = field.name, .type = InputType(field.type), .color = field.color});
+            node.inputs.push_back({.name = field.name, .type = InputType(field.type)});
             inputs.push_back(field.name);
         }
         const std::shared_ptr<const material::MaterialNodeDefinition> previous =

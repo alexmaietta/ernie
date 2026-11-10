@@ -11,13 +11,6 @@ namespace ernie::material {
 
 namespace {
 
-uint64_t Mix(uint64_t hash, std::string_view bytes) {
-    for (const char byte : bytes) {
-        hash = (hash ^ uint8_t(byte)) * 0x100000001b3ull;
-    }
-    return hash;
-}
-
 std::string Cases(const MaterialDefinitionSet& set, std::string_view standard,
                   std::string_view surface) {
     std::string cases;
@@ -91,46 +84,6 @@ Spectrum AlbedoDefinition<Spectrum : ISpectrum>(inout ShadeContext context) {{
               "return {}<Spectrum>.Albedo(context);"));
 }
 
-std::string_view CellType(MaterialInputType type) {
-    switch (type) {
-    case MaterialInputType::Bool:
-        return "uint";
-    case MaterialInputType::Int:
-        return "int";
-    case MaterialInputType::Float:
-        return "float";
-    case MaterialInputType::Float2:
-        return "Float2";
-    case MaterialInputType::Float3:
-        return "Float3";
-    case MaterialInputType::Float4:
-        return "Float4";
-    case MaterialInputType::Spectral:
-        return "Float3";
-    }
-    return "float";
-}
-
-std::string_view SlangType(MaterialInputType type) {
-    switch (type) {
-    case MaterialInputType::Bool:
-        return "bool";
-    case MaterialInputType::Int:
-        return "int";
-    case MaterialInputType::Float:
-        return "float";
-    case MaterialInputType::Float2:
-        return "float2";
-    case MaterialInputType::Float3:
-        return "float3";
-    case MaterialInputType::Float4:
-        return "float4";
-    case MaterialInputType::Spectral:
-        return "SpectralValue";
-    }
-    return "float";
-}
-
 std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node,
                        uint32_t input) {
     const InputBinding& binding = graph.nodes[node].inputs[input];
@@ -170,23 +123,76 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
 
 std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t node) {
     const MaterialNodeDefinition& definition = *graph.nodes[node].node;
-    std::string arguments;
+    std::vector<std::string> arguments;
     for (const MaterialNodeParameter& parameter : definition.parameters) {
-        arguments += arguments.empty() ? "" : ", ";
         switch (parameter.source) {
         case MaterialNodeParameter::Source::Context:
-            arguments += "context";
+            arguments.emplace_back("context");
             break;
         case MaterialNodeParameter::Source::Point:
-            arguments += "context.point";
+            arguments.emplace_back("context.point");
             break;
         case MaterialNodeParameter::Source::Input:
-            arguments += Expression(graph, layout, node, parameter.input);
+            arguments.push_back(Expression(graph, layout, node, parameter.input));
             break;
         }
     }
-    return std::format("        const {} r{} = {}({});\n", SlangType(definition.result), node,
-                       definition.name, arguments);
+    return std::format("        const {} r{} = {}({});\n", InputInfo(definition.result).slangType,
+                       node, definition.name, Join(arguments));
+}
+
+std::string ParamsFields(const ShadingGraph& graph, const GraphLayout& layout) {
+    std::string fields;
+    if (layout.textureCount > 0) {
+        fields += std::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
+                              layout.textureCount);
+    }
+    for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
+        for (const MaterialNodeInput& input : graph.nodes[node].node->inputs) {
+            fields +=
+                std::format("    {} n{}_{};\n", InputInfo(input.type).cellType, node, input.name);
+            if (input.type == MaterialInputType::Spectral) {
+                fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
+            }
+        }
+    }
+    return fields;
+}
+
+std::string AddImports(const ShadingGraph& graph, MaterialDefinition& module) {
+    std::string imports;
+    for (const ShadingNode& node : graph.nodes) {
+        const MaterialNodeDefinition& definition = *node.node;
+        const std::string file = ModulePath(definition.module);
+        if (module.files.contains(file)) {
+            continue;
+        }
+        imports += std::format("import {};\n", definition.module);
+        module.files.emplace(file, definition.source);
+        module.origins.emplace_back(file, definition.file);
+        module.origins.emplace_back(definition.module + ".slang", definition.file);
+    }
+    return imports;
+}
+
+std::string Body(const ShadingGraph& graph, const GraphLayout& layout) {
+    const auto surface = uint32_t(graph.nodes.size() - 1);
+    const MaterialNodeDefinition& top = *graph.nodes[surface].node;
+    std::string body;
+    if (layout.textureCount > 0) {
+        body += std::format("        const SurfaceTexels<{0}> texels = SampleNodeTextures<{0}>("
+                            "context, &p.mapping, &p.textures[0]);\n",
+                            layout.textureCount);
+    }
+    for (uint32_t node = 0; node < surface; ++node) {
+        body += Call(graph, layout, node);
+    }
+    body += std::format("        {} node;\n", top.name);
+    for (uint32_t input = 0; input < top.inputs.size(); ++input) {
+        body += std::format("        node.{} = {};\n", top.inputs[input].name,
+                            Expression(graph, layout, surface, input));
+    }
+    return body;
 }
 
 }
@@ -214,84 +220,42 @@ GraphLayout LayOut(const ShadingGraph& graph) {
         std::vector<uint32_t>& cells = layout.cells.emplace_back();
         for (const MaterialNodeInput& input : node.node->inputs) {
             cells.push_back(offset);
-            offset += MaterialInputBytes(input.type);
+            offset += InputInfo(input.type).bytes;
         }
     }
     layout.bytes = offset;
     return layout;
 }
 
-graph::ShapeKey MaterialDefinitionKey(const ShadingGraph& shading) {
-    graph::Graph graph;
-    std::vector<uint32_t> order;
-    for (size_t node = 0; node < shading.nodes.size(); ++node) {
-        order.push_back(graph.Add(0));
-    }
-    for (uint32_t node = 0; node < shading.nodes.size(); ++node) {
-        for (uint32_t input = 0; input < shading.nodes[node].inputs.size(); ++input) {
-            const InputBinding& binding = shading.nodes[node].inputs[input];
+graph::ShapeKey MaterialDefinitionKey(const ShadingGraph& graph) {
+    graph::ShapeWriter writer;
+    writer.Add(uint32_t(graph.nodes.size()));
+    for (const ShadingNode& node : graph.nodes) {
+        writer.Add(node.node->module);
+        writer.Add(node.node->name);
+        writer.Add(uint32_t(node.inputs.size()));
+        for (const InputBinding& binding : node.inputs) {
+            writer.Add(uint32_t(binding.kind));
             if (binding.kind == BindingKind::Pattern) {
-                graph.Connect(node, input, binding.source, 0);
+                writer.Add(binding.source);
             }
         }
     }
-    return graph::GraphShape(graph, order, [&](uint32_t node, graph::ShapeWriter& writer) {
-        const ShadingNode& each = shading.nodes[node];
-        writer.Add(each.node->module);
-        writer.Add(each.node->name);
-        for (const InputBinding& binding : each.inputs) {
-            writer.Add(uint32_t(binding.kind));
-        }
-    });
+    return std::move(writer).Finish();
 }
 
 MaterialDefinition GenerateMaterialDefinition(uint32_t id, const ShadingGraph& graph) {
     const GraphLayout layout = LayOut(graph);
-    const std::string type = std::format("Definition{}", id);
-    const uint32_t surface = uint32_t(graph.nodes.size() - 1);
-    const MaterialNodeDefinition& top = *graph.nodes[surface].node;
-    std::string fields;
-    if (layout.textureCount > 0) {
-        fields += std::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
-                              layout.textureCount);
-    }
-    std::string imports;
-    MaterialDefinition module{
-        .id = id, .type = type, .words = layout.bytes / uint32_t(sizeof(uint32_t))};
-    std::string body;
-    for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
-        const MaterialNodeDefinition& definition = *graph.nodes[node].node;
-        for (const MaterialNodeInput& input : definition.inputs) {
-            fields += std::format("    {} n{}_{};\n", CellType(input.type), node, input.name);
-            if (input.type == MaterialInputType::Spectral) {
-                fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
-            }
-        }
-        const std::string file = ModulePath(definition.module);
-        if (std::ranges::find(module.files, file, &std::pair<std::string, std::string>::first) ==
-            module.files.end()) {
-            imports += std::format("import {};\n", definition.module);
-            module.files.emplace_back(file, definition.source);
-            module.origins.emplace_back(file, definition.file);
-            module.origins.emplace_back(definition.module + ".slang", definition.file);
-        }
-        if (node != surface) {
-            body += Call(graph, layout, node);
-        }
-    }
-    body += std::format("        {} node;\n", top.name);
-    for (uint32_t input = 0; input < top.inputs.size(); ++input) {
-        body += std::format("        node.{} = {};\n", top.inputs[input].name,
-                            Expression(graph, layout, surface, input));
-    }
-    const std::string sampling =
-        layout.textureCount == 0
-            ? std::string()
-            : std::format("        const SurfaceTexels<{0}> texels = SampleNodeTextures<{0}>("
-                          "context, &p.mapping, &p.textures[0]);\n",
-                          layout.textureCount);
-    module.module = std::format("ernie.material.generated.d{}", id);
-    module.surface = top.role == MaterialNodeRole::Surface;
+    const MaterialNodeDefinition& top = *graph.nodes.back().node;
+    MaterialDefinition module{.id = id,
+                              .type = std::format("Definition{}", id),
+                              .module = std::format("ernie.material.generated.d{}", id),
+                              .words = layout.bytes / uint32_t(sizeof(uint32_t)),
+                              .surface = top.role == MaterialNodeRole::Surface};
+    const std::string& type = module.type;
+    const std::string imports = AddImports(graph, module);
+    const std::string fields = ParamsFields(graph, layout);
+    const std::string body = Body(graph, layout);
     const std::string header = std::format(
         R"(// SPDX-License-Identifier: BSD-3-Clause
 // Generated by ernie/material/codegen.cpp for {1}; do not edit.
@@ -311,7 +275,7 @@ struct {0}Params {{
 struct {0}<Spectrum : ISpectrum> : IMaterialDefinition<Spectrum> {{
     static void Shade(inout ShadeContext context, inout OpticalClosure<Spectrum> closure) {{
         {0}Params* p = context.materials.Params<{0}Params>(context.words);
-{1}{2}        node.Shade<Spectrum>(context, closure);
+{1}        node.Shade<Spectrum>(context, closure);
     }}
 
     static Spectrum Albedo(inout ShadeContext context) {{
@@ -321,14 +285,14 @@ struct {0}<Spectrum : ISpectrum> : IMaterialDefinition<Spectrum> {{
     }}
 }}
 )",
-                                     type, sampling, body);
+                                     type, body);
     } else {
         module.source = header + std::format(
                                      R"(
 struct {0} : IStandardMaterial {{
     static void Material(inout ShadeContext context, inout SurfaceInputs inputs) {{
         {0}Params* p = context.materials.Params<{0}Params>(context.words);
-{1}{2}        node.Material(inputs, context);
+{1}        node.Material(inputs, context);
     }}
 
     static SpectralValue Albedo(inout ShadeContext context) {{
@@ -338,7 +302,7 @@ struct {0} : IStandardMaterial {{
     }}
 }}
 )",
-                                     type, sampling, body);
+                                     type, body);
     }
     return module;
 }
@@ -447,20 +411,19 @@ MaterialDispatchSources(const MaterialDefinitionSet& set) {
 
 MaterialDefinitionSet::MaterialDefinitionSet(std::vector<MaterialDefinition> definitions,
                                              std::map<std::string, std::string, std::less<>> files)
-    : m_definitions(std::move(definitions)), m_files(std::move(files)),
-      m_hash(0xcbf29ce484222325ull) {
+    : m_definitions(std::move(definitions)), m_files(std::move(files)), m_hash(kFnvBasis) {
     for (const auto& [path, source] : m_files) {
-        m_hash = Mix(m_hash, path);
-        m_hash = Mix(m_hash, source);
+        m_hash = Fnv1a(path, m_hash);
+        m_hash = Fnv1a(source, m_hash);
     }
     std::ranges::sort(m_definitions, {}, &MaterialDefinition::id);
     for (const MaterialDefinition& definition : m_definitions) {
-        m_hash = Mix(m_hash, std::to_string(definition.id));
-        m_hash = Mix(m_hash, definition.type);
-        m_hash = Mix(m_hash, definition.source);
+        m_hash = Fnv1a(std::to_string(definition.id), m_hash);
+        m_hash = Fnv1a(definition.type, m_hash);
+        m_hash = Fnv1a(definition.source, m_hash);
         for (const auto& [path, source] : definition.files) {
-            m_hash = Mix(m_hash, path);
-            m_hash = Mix(m_hash, source);
+            m_hash = Fnv1a(path, m_hash);
+            m_hash = Fnv1a(source, m_hash);
         }
     }
 }

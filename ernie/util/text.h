@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
@@ -20,6 +21,10 @@ std::pair<std::string_view, std::string_view> SplitLast(std::string_view text, c
 bool IsIdentifier(std::string_view text);
 
 bool Glob(std::string_view pattern, std::string_view text);
+
+inline constexpr uint64_t kFnvBasis = 0xcbf29ce484222325ull;
+
+uint64_t Fnv1a(std::string_view bytes, uint64_t hash = kFnvBasis);
 
 std::string Digest(std::string_view bytes);
 

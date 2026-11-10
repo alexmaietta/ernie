@@ -22,7 +22,7 @@ struct MaterialDefinition {
     std::string type;
     std::string module;
     std::string source;
-    std::vector<std::pair<std::string, std::string>> files;
+    std::map<std::string, std::string, std::less<>> files;
     std::vector<std::pair<std::string, std::string>> origins;
     uint32_t words = 0;
     bool surface = false;

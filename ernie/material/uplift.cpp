@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <thread>
 
 #include "ernie/util/log.h"
@@ -88,8 +89,7 @@ std::array<float, 3> Residual(const std::array<float, 3>& c, const std::array<fl
     const Weights& weights = RgbWeights();
     std::array<float, 3> sum{};
     for (uint32_t i = 0; i < kSamples; ++i) {
-        const float t = Normalized(weights.nanometers[i]);
-        const float value = Sigmoid((c[0] * t + c[1]) * t + c[2]);
+        const float value = SigmoidValue(c, weights.nanometers[i]);
         for (int k = 0; k < 3; ++k) {
             sum[k] += value * weights.rgb[i][k];
         }
@@ -97,25 +97,46 @@ std::array<float, 3> Residual(const std::array<float, 3>& c, const std::array<fl
     return {sum[0] - rgb[0], sum[1] - rgb[1], sum[2] - rgb[2]};
 }
 
-bool Solve(const std::array<std::array<float, 3>, 3>& a, const std::array<float, 3>& b,
-           std::array<float, 3>& x) {
-    const auto det3 = [](const std::array<std::array<float, 3>, 3>& m) {
-        return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-    };
-    const float det = det3(a);
-    if (std::abs(det) < 1e-20f) {
-        return false;
-    }
-    for (int k = 0; k < 3; ++k) {
-        std::array<std::array<float, 3>, 3> m = a;
-        for (int r = 0; r < 3; ++r) {
-            m[r][k] = b[r];
+template <size_t N>
+std::optional<std::array<double, N>> Solve(std::array<std::array<double, N + 1>, N> m) {
+    for (size_t pivot = 0; pivot < N; ++pivot) {
+        size_t best = pivot;
+        for (size_t r = pivot + 1; r < N; ++r) {
+            best = std::abs(m[r][pivot]) > std::abs(m[best][pivot]) ? r : best;
         }
-        x[k] = det3(m) / det;
+        std::swap(m[pivot], m[best]);
+        if (std::abs(m[pivot][pivot]) < 1e-30) {
+            return std::nullopt;
+        }
+        for (size_t r = 0; r < N; ++r) {
+            if (r == pivot) {
+                continue;
+            }
+            const double factor = m[r][pivot] / m[pivot][pivot];
+            for (size_t c = pivot; c <= N; ++c) {
+                m[r][c] -= factor * m[pivot][c];
+            }
+        }
     }
-    return true;
+    std::array<double, N> x{};
+    for (size_t r = 0; r < N; ++r) {
+        x[r] = m[r][N] / m[r][r];
+    }
+    return x;
+}
+
+size_t TableIndex(uint32_t l, uint32_t zi, uint32_t y, uint32_t x) {
+    constexpr size_t n = kSigmoidResolution;
+    return (((l * n + zi) * n + y) * n + x) * 3;
+}
+
+std::array<float, 3> TableColor(uint32_t l, float z, uint32_t y, uint32_t x) {
+    constexpr float last = float(kSigmoidResolution - 1);
+    std::array<float, 3> rgb{};
+    rgb[l] = z;
+    rgb[(l + 1) % 3] = float(x) / last * z;
+    rgb[(l + 2) % 3] = float(y) / last * z;
+    return rgb;
 }
 
 }
@@ -129,20 +150,23 @@ std::array<float, 3> FitSigmoid(std::array<float, 3> rgb, std::array<float, 3> c
     };
     std::array<float, 3> r = Residual(c, rgb);
     for (int iteration = 0; iteration < 50 && norm(r) > 1e-14f; ++iteration) {
-        std::array<std::array<float, 3>, 3> jacobian{};
+        std::array<std::array<double, 4>, 3> system{};
         for (int k = 0; k < 3; ++k) {
             std::array<float, 3> moved = c;
             const float delta = 1e-3f * std::max(1.0f, std::abs(c[k]));
             moved[k] += delta;
             const std::array<float, 3> shifted = Residual(moved, rgb);
             for (int row = 0; row < 3; ++row) {
-                jacobian[row][k] = (shifted[row] - r[row]) / delta;
+                system[row][k] = (shifted[row] - r[row]) / delta;
+                system[row][3] = r[row];
             }
         }
-        std::array<float, 3> step{};
-        if (!Solve(jacobian, r, step)) {
+        const std::optional<std::array<double, 3>> solved = Solve<3>(system);
+        if (!solved) {
             break;
         }
+        const std::array<float, 3> step = {float((*solved)[0]), float((*solved)[1]),
+                                           float((*solved)[2])};
         bool improved = false;
         for (float scale = 1; scale > 1e-4f; scale *= 0.5f) {
             const std::array<float, 3> tried = {c[0] - scale * step[0], c[1] - scale * step[1],
@@ -168,8 +192,7 @@ float SigmoidValue(const std::array<float, 3>& c, float nanometers) {
 }
 
 std::array<float, 3> SigmoidRgb(const std::array<float, 3>& c) {
-    const std::array<float, 3> r = Residual(c, {0, 0, 0});
-    return r;
+    return Residual(c, {0, 0, 0});
 }
 
 std::vector<std::array<float, 3>> LinearUplift() {
@@ -181,13 +204,8 @@ std::vector<std::array<float, 3>> LinearUplift() {
         for (uint32_t zi = 0; zi < n; ++zi) {
             for (uint32_t y = 0; y < n; ++y) {
                 for (uint32_t x = 0; x < n; ++x) {
-                    const float z = table.scales[zi];
-                    std::array<float, 3> rgb{};
-                    rgb[l] = z;
-                    rgb[(l + 1) % 3] = float(x) / float(n - 1) * z;
-                    rgb[(l + 2) % 3] = float(y) / float(n - 1) * z;
-                    const size_t at = (((size_t(l) * n + zi) * n + y) * n + x) * 3;
-                    colours.push_back(rgb);
+                    const size_t at = TableIndex(l, zi, y, x);
+                    colours.push_back(TableColor(l, table.scales[zi], y, x));
                     coefficients.push_back({table.coefficients[at], table.coefficients[at + 1],
                                             table.coefficients[at + 2]});
                 }
@@ -197,7 +215,7 @@ std::vector<std::array<float, 3>> LinearUplift() {
     std::vector<std::array<float, 3>> weights;
     for (uint32_t k = 0; k < kLinearUpliftSamples; ++k) {
         const float nanometers = kLinearUpliftFirstNm + float(k) * kLinearUpliftStepNm;
-        double m[4][5] = {};
+        std::array<std::array<double, 5>, 4> m{};
         for (size_t i = 0; i < colours.size(); ++i) {
             const double value = SigmoidValue(coefficients[i], nanometers);
             for (int r = 0; r < 3; ++r) {
@@ -212,24 +230,8 @@ std::vector<std::array<float, 3>> LinearUplift() {
             m[3][r] = 1;
         }
         m[3][4] = 1;
-        for (int pivot = 0; pivot < 4; ++pivot) {
-            int best = pivot;
-            for (int r = pivot + 1; r < 4; ++r) {
-                best = std::abs(m[r][pivot]) > std::abs(m[best][pivot]) ? r : best;
-            }
-            std::swap(m[pivot], m[best]);
-            for (int r = 0; r < 4; ++r) {
-                if (r == pivot) {
-                    continue;
-                }
-                const double factor = m[r][pivot] / m[pivot][pivot];
-                for (int c = pivot; c < 5; ++c) {
-                    m[r][c] -= factor * m[pivot][c];
-                }
-            }
-        }
-        weights.push_back(
-            {float(m[0][4] / m[0][0]), float(m[1][4] / m[1][1]), float(m[2][4] / m[2][2])});
+        const std::array<double, 4> solved = Solve<4>(m).value_or(std::array<double, 4>{});
+        weights.push_back({float(solved[0]), float(solved[1]), float(solved[2])});
     }
     return weights;
 }
@@ -248,21 +250,13 @@ const SigmoidTable& Sigmoids() {
         std::vector<std::thread> workers;
         for (uint32_t l = 0; l < 3; ++l) {
             workers.emplace_back([&made, l, n] {
-                const auto store = [&](uint32_t zi, uint32_t y, uint32_t x,
-                                       const std::array<float, 3>& c) {
-                    const size_t at = (((size_t(l) * n + zi) * n + y) * n + x) * 3;
-                    std::copy(c.begin(), c.end(), made.coefficients.begin() + ptrdiff_t(at));
-                };
                 for (uint32_t y = 0; y < n; ++y) {
                     for (uint32_t x = 0; x < n; ++x) {
                         const auto fit = [&](uint32_t zi, std::array<float, 3> c) {
-                            const float z = made.scales[zi];
-                            std::array<float, 3> rgb{};
-                            rgb[l] = z;
-                            rgb[(l + 1) % 3] = float(x) / float(n - 1) * z;
-                            rgb[(l + 2) % 3] = float(y) / float(n - 1) * z;
-                            c = FitSigmoid(rgb, c);
-                            store(zi, y, x, c);
+                            c = FitSigmoid(TableColor(l, made.scales[zi], y, x), c);
+                            std::copy(c.begin(), c.end(),
+                                      made.coefficients.begin() +
+                                          ptrdiff_t(TableIndex(l, zi, y, x)));
                             return c;
                         };
                         const uint32_t middle = n / 5;
@@ -287,5 +281,4 @@ const SigmoidTable& Sigmoids() {
     }();
     return table;
 }
-
 }
