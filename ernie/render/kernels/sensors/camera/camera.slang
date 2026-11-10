@@ -326,3 +326,19 @@ struct CameraModel : IDifferentiable {
         return lens.Spread(filmStep * 0.5f * sensor.aperture);
     }
 }
+
+CameraRay PinholeRay(SensorFrame pose, ViewRecord view, float2 coord, float2 resolution) {
+    const float2 ndc = (coord + 0.5f) / resolution * 2.0f - 1.0f;
+    const float3 local =
+        float3(float2(ndc.x, -ndc.y) * view.scale.Vector() + view.bias.Vector(), -1);
+    const CameraClipping clipping = { view.clipping.x, view.clipping.y, view.clippingPlanes };
+    const float2 interval = clipping.Clip(float3(0), local);
+    const float3 world = pose.ToWorld(local);
+    const float scale = length(world);
+    const float row = coord.y / max(resolution.y - 1, 1.0f);
+    CameraRay result;
+    result.ray = Ray(pose.position, world / scale, interval.x * scale, interval.y * scale,
+                     view.shutter + view.readout * row);
+    result.weight = interval.x < interval.y ? 1.0f : 0.0f;
+    return result;
+}

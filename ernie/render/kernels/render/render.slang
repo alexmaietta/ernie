@@ -71,25 +71,37 @@ void RenderPixel<P : IPattern, R : IResponse<P>>(RenderParams params) {
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalData(uniform RenderParams params) {
-    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::Data>>>(params);
+    CapturePixel pixel;
+    if (FindPixel(params, pixel)) {
+        RenderMinimalPixel<MinimalMode::Data>(params, pixel);
+    }
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalDisplayColor(uniform RenderParams params) {
-    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::DisplayColor>>>(params);
+    CapturePixel pixel;
+    if (FindPixel(params, pixel)) {
+        RenderMinimalPixel<MinimalMode::DisplayColor>(params, pixel);
+    }
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalTextureDiffuse(uniform RenderParams params) {
-    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::TextureDiffuse>>>(params);
+    CapturePixel pixel;
+    if (FindPixel(params, pixel)) {
+        RenderMinimalPixel<MinimalMode::TextureDiffuse>(params, pixel);
+    }
 }
 
 [shader("compute")]
 [numthreads(kRenderGroup, 1, 1)]
 void RenderMinimalFull(uniform RenderParams params) {
-    RenderPixel<CameraPattern, CameraResponse<MinimalIntegrator<MinimalMode::Full>>>(params);
+    CapturePixel pixel;
+    if (FindPixel(params, pixel)) {
+        RenderMinimalPixel<MinimalMode::Full>(params, pixel);
+    }
 }
 
 [shader("compute")]

@@ -195,6 +195,74 @@ TEST(RendererTest, MinimalModeLightsEachWorldWithItsOwnDistantLightFirst) {
     });
 }
 
+TEST(RendererTest, MinimalPinholeRaysMatchTheGenericCameraPath) {
+    ForEachDevice([](Device& device) {
+        constexpr uint32_t kWide = 24;
+        constexpr uint32_t kTall = 16;
+        const Ref<Scene> scene = Scene::Create(device);
+        scene->Define<DistantLight>("/Sun", {.orient = LookAlong({1, -1, -2})});
+        scene->Define<Mesh>("/Ground", {.points = {{-6, -6, 0}, {6, -6, 0}, {6, 6, 0}, {-6, 6, 0}},
+                                        .faceVertexIndices = {0, 1, 2, 3},
+                                        .faceVertexCounts = {4}});
+        scene->Define<Sphere>("/Ball", {.translate = {0.5, 0, 1}, .radius = 1});
+        scene->Define<Cube>("/Box", {.translate = {-2, 1, 0.5}, .size = 1});
+        for (const char* path : {"/Pinhole", "/Lens"}) {
+            const Prim camera = scene->Define<Camera>(
+                path, {.translate = {1, -7, 4}, .orient = LookAt({1, -7, 4}, {0, 0, 0.5})});
+            camera.Set(Camera::kHorizontalApertureOffset, 1.5f);
+            camera.Set(Camera::kClippingRange, Float2{2, 40});
+        }
+        scene->Find("/Lens")->Set(LensDistortionAPI::kDistortionModel,
+                                  DistortionModel::BrownConrady);
+        scene->Define<Scope>("/Render");
+        scene->Define<RenderVar>("/Render/Color", {.sourceName = "HdrColor"});
+        scene->Define<RenderVar>("/Render/Depth", {.sourceName = "DistanceToCamera"});
+        scene->Define<RenderVar>("/Render/Normal", {.sourceName = "Normal"});
+        scene->Define<RenderProduct>(
+            "/Render/View", {.camera = {"/Pinhole", "/Lens"},
+                             .resolution = {kWide, kTall},
+                             .orderedVars = {"/Render/Color", "/Render/Depth", "/Render/Normal"}});
+        scene->Find("/Render/View")->Set(MinimalAPI::kMode, MinimalMode::DisplayColor);
+        Renderer renderer(scene);
+        const auto compare = [&]() -> uint32_t {
+            RenderOutput output = renderer.Step(kProducts, 1.0 / 30);
+            output.Wait();
+            const FrameOutput& frame = output["/Render/View"].frames.at(0);
+            const std::vector<float> color = frame.Source("HdrColor").tensor.ToHost<float>();
+            const std::vector<float> depth =
+                frame.Source("DistanceToCamera").tensor.ToHost<float>();
+            const std::vector<float> normal = frame.Source("Normal").tensor.ToHost<float>();
+            const uint32_t pixels = kWide * kTall;
+            uint32_t hits = 0;
+            uint32_t misses = 0;
+            for (uint32_t i = 0; i < pixels; ++i) {
+                const float pinhole = depth[i];
+                const float lens = depth[pixels + i];
+                EXPECT_EQ(std::isinf(pinhole), std::isinf(lens)) << i;
+                if (std::isinf(pinhole) || std::isinf(lens)) {
+                    ++misses;
+                    continue;
+                }
+                ++hits;
+                EXPECT_NEAR(pinhole, lens, 1e-4f * pinhole) << i;
+                for (uint32_t c = 0; c < 3; ++c) {
+                    EXPECT_NEAR(normal[i * 3 + c], normal[(pixels + i) * 3 + c], 1e-3f) << i;
+                    EXPECT_NEAR(color[i * 4 + c], color[(pixels + i) * 4 + c],
+                                1e-3f * std::max(color[i * 4 + c], 1.0f))
+                        << i;
+                }
+            }
+            EXPECT_GT(hits, pixels / 2);
+            return misses;
+        };
+        compare();
+        for (const char* path : {"/Pinhole", "/Lens"}) {
+            scene->Find(path)->Set(Camera::kClippingPlanes, std::vector<Float4>{{1, 0, 0, 0.5f}});
+        }
+        EXPECT_GT(compare(), 0u);
+    });
+}
+
 TEST(RendererTest, MeshesShadeWithSmoothNormalsThatFollowDeformation) {
     ForEachDevice([](Device& device) {
         constexpr uint32_t kSide = 9;
