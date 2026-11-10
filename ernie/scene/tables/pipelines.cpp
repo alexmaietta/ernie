@@ -6,7 +6,7 @@
 #include <format>
 
 #include "ernie/device/queue.h"
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/scene/schema/columns.h"
 #include "ernie/stage/publish/change_set.h"
 #include "ernie/stage/views/attribute.h"

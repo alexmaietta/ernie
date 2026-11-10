@@ -619,8 +619,8 @@ std::vector<RendererImpl::PipelineRun> RendererImpl::PrepareRuns(const ProductPl
                     CompilePipeline(m_scene->GetDevice(), definitions->Find(id), *table.Registry());
             }
             run.compiled = compiled;
-            for (const std::string& entry : compiled->generated.entries) {
-                device::Kernel& kernel = compiled->program->Entry(entry);
+            for (const pipeline::GeneratedKernel& step : compiled->generated.kernels) {
+                device::Kernel& kernel = compiled->program->Entry(step.entry);
                 if (!wait && !kernel.Ready()) {
                     run.compiled = nullptr;
                     break;

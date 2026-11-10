@@ -22,10 +22,10 @@ TEST(GraphTest, OrdersEverySourceBeforeTheNodesReadingIt) {
     const uint32_t noise = graph.Add(12, 2);
     const uint32_t signal = graph.Add(13, 3);
     const uint32_t loose = graph.Add(14, 4);
-    graph.Connect(output, "in", adc, "out");
-    graph.Connect(adc, "in", noise, "out");
-    graph.Connect(adc, "gain", signal, "out");
-    graph.Connect(noise, "in", signal, "out");
+    graph.Connect(output, 0, adc, 0);
+    graph.Connect(adc, 0, noise, 0);
+    graph.Connect(adc, 1, signal, 0);
+    graph.Connect(noise, 0, signal, 0);
     const Ordering ordering = graph.Order();
     ASSERT_TRUE(ordering.cycle.empty());
     ASSERT_EQ(ordering.order.size(), 5u);
@@ -43,10 +43,10 @@ TEST(GraphTest, ReportsTheNodesOfACycle) {
     const uint32_t b = graph.Add(2, 0);
     const uint32_t c = graph.Add(3, 0);
     const uint32_t d = graph.Add(4, 0);
-    graph.Connect(a, "in", b, "out");
-    graph.Connect(b, "in", c, "out");
-    graph.Connect(c, "in", b, "out");
-    graph.Connect(c, "other", d, "out");
+    graph.Connect(a, 0, b, 0);
+    graph.Connect(b, 0, c, 0);
+    graph.Connect(c, 0, b, 0);
+    graph.Connect(c, 1, d, 0);
     const Ordering ordering = graph.Order();
     EXPECT_TRUE(ordering.order.empty());
     std::vector<uint32_t> cycle = ordering.cycle;
@@ -58,9 +58,9 @@ TEST(GraphTest, AnInputTakesOneConnection) {
     Graph graph;
     const uint32_t a = graph.Add(1, 0);
     const uint32_t b = graph.Add(2, 0);
-    graph.Connect(a, "in", b, "out");
-    EXPECT_THROW(graph.Connect(a, "in", b, "other"), Error);
-    EXPECT_THROW(graph.Connect(a, "next", 7, "out"), Error);
+    graph.Connect(a, 0, b, 0);
+    EXPECT_THROW(graph.Connect(a, 0, b, 1), Error);
+    EXPECT_THROW(graph.Connect(a, 1, 7, 0), Error);
 }
 
 }

@@ -74,3 +74,73 @@ void WriteStatPartial(PipelineParams p, PipelineCapture* capture, uint slot, uin
                       CaptureStat stat) {
     WriteStatWords(StatWords(p, capture, slot) + (1 + group) * kStatWords, stat);
 }
+
+CaptureStat SumStatPartials(PipelineParams p, PipelineCapture* capture, uint slot) {
+    CaptureStat sum = CaptureStat.Zero();
+    for (uint group = 0; group < kReduceGroups; ++group) {
+        sum = sum.Add(ReadStatPartial(p, capture, slot, group));
+    }
+    return sum;
+}
+
+bool FindCapture(PipelineParams p, out PipelineCapture* capture) {
+    const uint index = LinearThreadIndex();
+    capture = p.captures;
+    if (index >= p.captureCount) {
+        return false;
+    }
+    capture = p.captures + index;
+    return true;
+}
+
+groupshared float s_reduceStat[kPipelineGroup * kStatWords];
+
+struct ReduceGroup {
+    PipelineCapture* capture;
+    uint part;
+    uint thread;
+    uint first;
+    uint stride;
+    uint count;
+
+    static bool Find(PipelineParams p, out ReduceGroup group) {
+        const uint index = LinearGroupIndex();
+        group = {};
+        if (index / kReduceGroups >= p.captureCount) {
+            return false;
+        }
+        group.capture = p.captures + index / kReduceGroups;
+        group.part = index % kReduceGroups;
+        group.thread = LocalThreadIndex();
+        group.first = group.part * kPipelineGroup + group.thread;
+        group.stride = kReduceGroups * kPipelineGroup;
+        group.count = group.capture->width * group.capture->height;
+        return true;
+    }
+
+    void Store(PipelineParams p, uint slot, CaptureStat sum) {
+        [ForceUnroll]
+        for (uint word = 0; word < kStatWords; ++word) {
+            s_reduceStat[thread * kStatWords + word] = sum.values[word];
+        }
+        GroupMemoryBarrierWithGroupSync();
+        for (uint half = kPipelineGroup / 2; half > 0; half /= 2) {
+            if (thread < half) {
+                [ForceUnroll]
+                for (uint word = 0; word < kStatWords; ++word) {
+                    s_reduceStat[thread * kStatWords + word] +=
+                        s_reduceStat[(thread + half) * kStatWords + word];
+                }
+            }
+            GroupMemoryBarrierWithGroupSync();
+        }
+        if (thread == 0) {
+            CaptureStat partial;
+            [ForceUnroll]
+            for (uint word = 0; word < kStatWords; ++word) {
+                partial.values[word] = s_reduceStat[word];
+            }
+            WriteStatPartial(p, capture, slot, part, partial);
+        }
+    }
+}

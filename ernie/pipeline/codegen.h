@@ -15,13 +15,19 @@ enum class DispatchShape : uint8_t {
     Captures,
 };
 
+struct GeneratedKernel {
+    std::string entry;
+    DispatchShape shape = DispatchShape::Elements;
+};
+
 struct GeneratedPipeline {
     std::string module;
     std::string path;
     std::string source;
-    std::vector<std::string> entries;
-    std::vector<DispatchShape> shapes;
+    std::vector<GeneratedKernel> kernels;
     std::vector<uint32_t> slots;
+
+    std::vector<std::string> Entries() const;
 };
 
 GeneratedPipeline GeneratePipeline(const PipelineDefinition& definition,

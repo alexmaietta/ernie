@@ -11,7 +11,7 @@
 
 #include <gtest/gtest.h>
 
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/render/renderer.h"
 #include "ernie/render/shaders.h"
 #include "ernie/render/standalone.h"
@@ -165,7 +165,7 @@ TEST(PipelineNodeTest, LoadedNodesDescribeTheirKindPortsAndInputs) {
         EXPECT_EQ(offset.inputs[0].type, pipeline::SignalType::Digital);
         ASSERT_EQ(offset.outputs.size(), 1u);
         EXPECT_EQ(offset.outputs[0].name, "digital");
-        EXPECT_EQ(offset.context, 1u);
+        EXPECT_EQ(offset.code.context, 1u);
         ASSERT_EQ(offset.parameters.size(), 4u);
         EXPECT_EQ(offset.parameters[0].name, "amount");
         EXPECT_EQ(offset.parameters[0].fallback, std::vector<float>{5});
@@ -180,7 +180,7 @@ TEST(PipelineNodeTest, LoadedNodesDescribeTheirKindPortsAndInputs) {
         EXPECT_EQ(blur.radius, 1u);
         ASSERT_EQ(blur.inputs.size(), 1u);
         EXPECT_EQ(blur.inputs[0].name, "n");
-        EXPECT_EQ(blur.context, 0u);
+        EXPECT_EQ(blur.code.context, 0u);
 
         EXPECT_EQ(FindPipelineNode("TestDescribeBlur")->kind, "stencil");
         const Prim prim = scene->Define<Shader>("/Offset", {.id = "TestDescribe"});

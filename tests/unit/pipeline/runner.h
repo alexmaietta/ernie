@@ -42,7 +42,7 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
         device.CreateProgram({.modules = {generated.module},
                               .library = &kRenderKernels,
                               .sources = {{generated.path, generated.source}},
-                              .entries = generated.entries,
+                              .entries = generated.Entries(),
                               .label = "test pipeline"});
     const std::vector<SignalLayout> layouts = PropagateLayouts(
         pipeline, registry,
@@ -117,12 +117,12 @@ RunPipeline(device::Device& device, const NodeRegistry& registry, const Pipeline
                                 .elementCount = elements,
                                 .captureCount = frame.captures};
     device::CommandEncoder encoder = device.GetQueue().CreateEncoder();
-    for (uint32_t index = 0; index < generated.entries.size(); ++index) {
-        device::Kernel& kernel = program->Entry(generated.entries[index]);
+    for (const GeneratedKernel& step : generated.kernels) {
+        device::Kernel& kernel = program->Entry(step.entry);
         kernel.Wait();
-        const uint32_t groups = generated.shapes[index] == DispatchShape::Elements
+        const uint32_t groups = step.shape == DispatchShape::Elements
                                     ? device::GroupCount(elements, kPipelineGroup)
-                                : generated.shapes[index] == DispatchShape::ReduceGroups
+                                : step.shape == DispatchShape::ReduceGroups
                                     ? frame.captures * kReduceGroups
                                     : device::GroupCount(frame.captures, kPipelineGroup);
         encoder.Dispatch(kernel, params, {.x = groups});

@@ -71,15 +71,13 @@ NodeRegistry CodegenRegistry() {
                   .inputs = {{"rate", SignalType::ElectronRate}},
                   .outputs = {{"electrons", SignalType::Electrons}},
                   .parameters = {{"factor"}},
-                  .module = "pipeline_test.nodes",
-                  .type = "TestScale"});
+                  .code = {.module = "pipeline_test.nodes", .type = "TestScale"}});
     registry.Add({.id = "Offset",
                   .inputs = {{"electrons", SignalType::Electrons}},
                   .outputs = {{"digital", SignalType::Digital}},
                   .parameters = {{"offset"}},
                   .uniforms = {{"sign", {"plus", "minus"}, "plus"}},
-                  .module = "pipeline_test.nodes",
-                  .type = "TestOffset"});
+                  .code = {.module = "pipeline_test.nodes", .type = "TestOffset"}});
     return registry;
 }
 
@@ -94,14 +92,14 @@ TEST(PipelineCodegenTest, AGeneratedDefinitionCompilesAndRuns) {
             registry);
         const PipelineDefinition definition = BuildDefinition(4, pipeline, registry);
         const GeneratedPipeline generated = GeneratePipeline(definition, registry);
-        ASSERT_EQ(generated.entries, (std::vector<std::string>{"Segment0"}));
+        ASSERT_EQ(generated.Entries(), (std::vector<std::string>{"Segment0"}));
         ASSERT_EQ(generated.slots.size(), 3u);
 
         const Ref<device::Program> program =
             device.CreateProgram({.modules = {generated.module},
                                   .library = &kRenderKernels,
                                   .sources = {{generated.path, generated.source}},
-                                  .entries = generated.entries,
+                                  .entries = generated.Entries(),
                                   .label = "generated pipeline"});
         device::Kernel& kernel = program->Entry("Segment0");
         kernel.Wait();

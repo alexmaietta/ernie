@@ -11,7 +11,7 @@
 #include "ernie/device/slang/reflection.h"
 #include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/render/kernels.h"
 #include "ernie/stage/schema/runtime.h"
 #include "ernie/util/error.h"
@@ -156,14 +156,17 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
     if (!reflection.pipeline.empty()) {
         const std::vector<device::ReflectedPipelineNode>& reflected = reflection.pipeline;
         const auto signal = [&](const std::string& node, const std::string& type) {
-            const auto found = std::ranges::find(pipeline::kSignalTypes, type);
-            if (found == std::end(pipeline::kSignalTypes)) {
-                throw Error(
-                    "{} in {} uses {}, which isn't a pipeline signal; signals are {}", node,
-                    file.string(), type,
-                    Join({std::begin(pipeline::kSignalTypes), std::end(pipeline::kSignalTypes)}));
+            const auto found =
+                std::ranges::find(pipeline::kSignals, type, &pipeline::SignalInfo::slangType);
+            if (found == std::end(pipeline::kSignals)) {
+                std::vector<std::string> types;
+                for (const pipeline::SignalInfo& info : pipeline::kSignals) {
+                    types.emplace_back(info.slangType);
+                }
+                throw Error("{} in {} uses {}, which isn't a pipeline signal; signals are {}", node,
+                            file.string(), type, Join(types));
             }
-            return pipeline::SignalType(found - std::begin(pipeline::kSignalTypes));
+            return pipeline::SignalType(found - std::begin(pipeline::kSignals));
         };
         for (const device::ReflectedPipelineNode& node : reflected) {
             signal(node.name, node.result);
@@ -174,19 +177,19 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
         std::vector<std::string> names;
         for (const device::ReflectedPipelineNode& node : reflected) {
             const pipeline::SignalType result = signal(node.name, node.result);
-            pipeline::NodeDef def{
-                .id = node.name,
-                .kind = node.kind == device::PipelineNodeKind::Stencil ? pipeline::NodeKind::Stencil
-                                                                       : pipeline::NodeKind::Point,
-                .outputs = {{std::string(pipeline::kSignalPortNames[uint32_t(result)]), result}},
-                .radius = node.radius,
-                .module = module,
-                .type = node.name,
-                .file = file.string(),
-                .source = source,
-                .version = digest,
-                .applies = true,
-                .context = node.context};
+            pipeline::NodeDef def{.id = node.name,
+                                  .kind = node.kind == device::PipelineNodeKind::Stencil
+                                              ? pipeline::NodeKind::Stencil
+                                              : pipeline::NodeKind::Point,
+                                  .outputs = {{std::string(pipeline::Signal(result).port), result}},
+                                  .radius = node.radius,
+                                  .code = {.module = module,
+                                           .type = node.name,
+                                           .file = file.string(),
+                                           .source = source,
+                                           .version = digest,
+                                           .applies = true,
+                                           .context = node.context}};
             for (const device::ReflectedPort& port : node.inputs) {
                 def.inputs.push_back({port.name, signal(node.name, port.type)});
             }
@@ -221,7 +224,7 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
             }
             const std::shared_ptr<const pipeline::NodeRegistry> known = pipeline::PipelineNodes();
             const uint32_t found = known->Find(node.name);
-            if (found != pipeline::kNoDef && (*known)[found].file.empty()) {
+            if (found != pipeline::kNoDef && (*known)[found].code.file.empty()) {
                 throw Error("{} in {} has the name of a built-in pipeline node; rename it",
                             node.name, file.string());
             }

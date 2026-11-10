@@ -6,11 +6,12 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "ernie/graph/shape.h"
+#include "ernie/graph/graph.h"
 
 namespace ernie::graph {
 
@@ -76,6 +77,33 @@ template <class Definition> class DefinitionLibrary {
     mutable std::shared_ptr<const Set> m_snapshot;
     mutable uint64_t m_version = 0;
     uint32_t m_next = 0;
+};
+
+template <class T> class Published {
+  public:
+    explicit Published(T initial = T()) : m_value(std::make_shared<const T>(std::move(initial))) {}
+
+    std::shared_ptr<const T> Get() const {
+        const std::lock_guard lock(m_mutex);
+        return m_value;
+    }
+
+    template <class Edit> auto Update(Edit&& edit) {
+        const std::lock_guard lock(m_mutex);
+        auto copy = std::make_shared<T>(*m_value);
+        if constexpr (std::is_void_v<decltype(edit(*copy))>) {
+            edit(*copy);
+            m_value = std::move(copy);
+        } else {
+            auto result = edit(*copy);
+            m_value = std::move(copy);
+            return result;
+        }
+    }
+
+  private:
+    mutable std::mutex m_mutex;
+    std::shared_ptr<const T> m_value;
 };
 
 }

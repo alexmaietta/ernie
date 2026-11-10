@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ernie/graph/published.h"
+#include "ernie/graph/library.h"
 #include "ernie/util/error.h"
 
 namespace ernie {

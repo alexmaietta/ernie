@@ -9,7 +9,7 @@
 #include <span>
 #include <vector>
 
-#include "ernie/graph/shape.h"
+#include "ernie/graph/graph.h"
 #include "ernie/material/definition.h"
 #include "ernie/material/node.h"
 

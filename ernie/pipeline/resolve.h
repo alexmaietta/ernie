@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "ernie/graph/shape.h"
+#include "ernie/graph/graph.h"
 #include "ernie/pipeline/node.h"
 
 namespace ernie::pipeline {
@@ -41,7 +41,7 @@ struct ResolvedNode {
     uint32_t def = kNoDef;
     uint32_t prim = 0;
     std::string path;
-    std::vector<std::string> uniforms;
+    std::vector<uint32_t> uniforms;
     std::vector<float> parameters;
     std::vector<uint32_t> inputs;
     std::vector<uint32_t> outputs;

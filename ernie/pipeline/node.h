@@ -3,14 +3,74 @@
 
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
-#include "ernie/pipeline/signal.h"
-
 namespace ernie::pipeline {
+
+enum class SignalType : uint8_t {
+    ElectronRate,
+    Electrons,
+    Digital,
+    LinearColor,
+    DisplayColor,
+    Radiance,
+    Returns,
+    PointCloud,
+    RadarCube,
+    CaptureStat,
+};
+
+struct SignalInfo {
+    std::string_view name;
+    std::string_view slangType;
+    std::string_view port;
+};
+
+inline constexpr SignalInfo kSignals[] = {
+    {"ElectronRate", "ElectronRate", "electronRate"},
+    {"Electrons", "Electrons", "electrons"},
+    {"Digital", "Digital", "digital"},
+    {"LinearColor", "LinearColor", "color"},
+    {"DisplayColor", "DisplayColor", "display"},
+    {"Radiance", "Radiance", "radiance"},
+    {"Returns", "Returns", "returns"},
+    {"PointCloud", "CloudSignal", "cloud"},
+    {"RadarCube", "RadarCube", "cube"},
+    {"CaptureStat", "CaptureStat", "stat"},
+};
+
+inline const SignalInfo& Signal(SignalType type) {
+    return kSignals[uint32_t(type)];
+}
+
+inline constexpr uint32_t kReturnsChannels = 8;
+
+enum class ElementType : uint8_t {
+    F32,
+    F16,
+    U16,
+    U8,
+};
+
+inline constexpr uint32_t kElementBytes[] = {4, 2, 2, 1};
+
+inline constexpr uint32_t kStatWords = 16;
+inline constexpr uint32_t kReduceGroups = 64;
+inline constexpr uint32_t kStatStorageWords = (1 + kReduceGroups) * kStatWords;
+
+struct SignalLayout {
+    uint32_t channels = 1;
+    uint32_t pattern = 0;
+    bool mosaic = false;
+    ElementType element = ElementType::F32;
+    bool perCapture = false;
+
+    bool operator==(const SignalLayout&) const = default;
+};
 
 enum class NodeKind : uint8_t {
     Source,
@@ -59,6 +119,16 @@ struct UniformDef {
     std::string fallback;
 };
 
+struct NodeCode {
+    std::string module;
+    std::string type;
+    std::string file;
+    std::string source;
+    std::string version;
+    bool applies = false;
+    uint32_t context = kNoContextArgument;
+};
+
 struct NodeDef {
     std::string id;
     NodeKind kind = NodeKind::Point;
@@ -70,13 +140,7 @@ struct NodeDef {
     uint32_t radius = 0;
     uint32_t passes = 1;
     LayoutRule layout = LayoutRule::FirstInput;
-    std::string module;
-    std::string type;
-    std::string file;
-    std::string source;
-    std::string version;
-    bool applies = false;
-    uint32_t context = kNoContextArgument;
+    NodeCode code;
 };
 
 class NodeRegistry {
@@ -99,5 +163,19 @@ class NodeRegistry {
 };
 
 inline constexpr uint32_t kNoDef = ~0u;
+
+inline constexpr const char* kCameraNodes = "ernie.render.kernels.pipeline.nodes.camera";
+inline constexpr const char* kIspNodes = "ernie.render.kernels.pipeline.nodes.isp";
+inline constexpr const char* kLidarNodes = "ernie.render.kernels.pipeline.nodes.lidar";
+inline constexpr const char* kRadarNodes = "ernie.render.kernels.pipeline.nodes.radar";
+inline constexpr uint32_t kCfarRadius = 4;
+
+void RegisterBuiltinNodes(NodeRegistry& registry);
+
+const NodeRegistry& BuiltinNodes();
+
+std::shared_ptr<const NodeRegistry> PipelineNodes();
+
+void RegisterPipelineNode(NodeDef def);
 
 }

@@ -42,8 +42,8 @@ TEST(PipelineResolveTest, OrdersNodesPrunesUnusedOnesAndMapsOutputs) {
         ids.push_back(registry[node.def].id);
     }
     EXPECT_EQ(ids, (std::vector<std::string>{"Signal", "Integrate", "Noise", "Adc"}));
-    EXPECT_EQ(pipeline.nodes[0].uniforms, (std::vector<std::string>{"full", "float"}));
-    EXPECT_EQ(pipeline.nodes[2].uniforms, (std::vector<std::string>{"poisson"}));
+    EXPECT_EQ(pipeline.nodes[0].uniforms, (std::vector<uint32_t>{0, 0}));
+    EXPECT_EQ(pipeline.nodes[2].uniforms, (std::vector<uint32_t>{0}));
     EXPECT_EQ(pipeline.nodes[1].inputs[0], pipeline.nodes[0].outputs[0]);
     ASSERT_EQ(pipeline.outputs.size(), 1u);
     EXPECT_EQ(pipeline.outputs[0].name, "raw");

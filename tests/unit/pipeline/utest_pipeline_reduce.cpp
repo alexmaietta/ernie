@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/scene/scene.h"
 #include "support/devices.h"
 #include "unit/pipeline/registry.h"

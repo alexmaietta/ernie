@@ -24,21 +24,21 @@ CompilePipeline(device::Device& device,
     std::vector<std::pair<std::string, std::string>> files;
     for (const pipeline::ResolvedNode& node : definition->pipeline.nodes) {
         const pipeline::NodeDef& def = registry[node.def];
-        if (def.source.empty()) {
+        if (def.code.source.empty()) {
             continue;
         }
-        const std::string path = ModulePath(def.module);
+        const std::string path = ModulePath(def.code.module);
         if (std::ranges::find(files, path, &std::pair<std::string, std::string>::first) ==
             files.end()) {
-            sources.emplace(path, def.source);
-            files.emplace_back(path, def.file);
+            sources.emplace(path, def.code.source);
+            files.emplace_back(path, def.code.file);
         }
     }
     try {
         compiled->program = device.CreateProgram({.modules = {compiled->generated.module},
                                                   .library = &kRenderKernels,
                                                   .sources = sources,
-                                                  .entries = compiled->generated.entries,
+                                                  .entries = compiled->generated.Entries(),
                                                   .label = "sensor pipeline"});
     } catch (const Error& error) {
         throw Error("{}", MapOrigins(error.what(), files));
@@ -49,10 +49,9 @@ CompilePipeline(device::Device& device,
 
 void RecordPipeline(device::CommandEncoder& encoder, const CompiledPipeline& compiled,
                     const PipelineParams& params, uint32_t captures, uint64_t elements) {
-    const pipeline::GeneratedPipeline& generated = compiled.generated;
-    for (uint32_t index = 0; index < generated.entries.size(); ++index) {
-        device::Kernel& kernel = compiled.program->Entry(generated.entries[index]);
-        const pipeline::DispatchShape shape = generated.shapes[index];
+    for (const pipeline::GeneratedKernel& step : compiled.generated.kernels) {
+        device::Kernel& kernel = compiled.program->Entry(step.entry);
+        const pipeline::DispatchShape shape = step.shape;
         const uint64_t threads = shape == pipeline::DispatchShape::Elements ? elements
                                  : shape == pipeline::DispatchShape::ReduceGroups
                                      ? uint64_t(captures) * kReduceGroups * kPipelineGroup

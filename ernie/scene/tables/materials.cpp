@@ -480,8 +480,7 @@ void MaterialTable::ResolveNode(uint32_t material, uint32_t shader,
         for (uint32_t k = 0; k < reached.size(); ++k) {
             for (uint32_t i = 0; i < reached[k].inputs.size(); ++i) {
                 if (reached[k].inputs[i].kind == BindingKind::Pattern) {
-                    patterns.Connect(k, reached[k].node->inputs[i].name,
-                                     reached[k].inputs[i].source, "result");
+                    patterns.Connect(k, i, reached[k].inputs[i].source, 0);
                 }
             }
         }

@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "ernie/device/program.h"
-#include "ernie/pipeline/builtins.h"
 #include "ernie/pipeline/definition.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/scene/tables/connections.h"
 #include "ernie/scene/tables/pack.h"
 #include "ernie/scene/tables/storage.h"

@@ -5,7 +5,7 @@
 #include <atomic>
 
 #include "ernie/device/queue.h"
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "ernie/pipeline/resolve.h"
 #include "ernie/render/pipelines.h"
 #include "ernie/scene/scene_impl.h"
@@ -94,11 +94,11 @@ std::optional<PipelineNodeInfo> FindPipelineNode(std::string_view id) {
                           .kind = std::string(pipeline::kNodeKindNames[uint32_t(def.kind)])};
     for (const pipeline::PortDef& port : def.inputs) {
         info.inputs.push_back(
-            {port.name, std::string(pipeline::kSignalNames[uint32_t(port.type)]), port.optional});
+            {port.name, std::string(pipeline::Signal(port.type).name), port.optional});
     }
     for (const pipeline::PortDef& port : def.outputs) {
         info.outputs.push_back(
-            {port.name, std::string(pipeline::kSignalNames[uint32_t(port.type)]), port.optional});
+            {port.name, std::string(pipeline::Signal(port.type).name), port.optional});
     }
     return info;
 }

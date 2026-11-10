@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "ernie/pipeline/builtins.h"
+#include "ernie/pipeline/node.h"
 #include "support/devices.h"
 #include "unit/pipeline/registry.h"
 #include "unit/pipeline/runner.h"
@@ -46,8 +46,7 @@ std::vector<float> Draws(device::Device& device, uint32_t capture, uint32_t capt
     registry.Add({.id = "Draws",
                   .outputs = {{"draws", SignalType::Electrons}},
                   .layout = LayoutRule::Color,
-                  .module = "pipeline_test.draws",
-                  .type = "TestDraws"});
+                  .code = {.module = "pipeline_test.draws", .type = "TestDraws"}});
     Frame frame{.width = kSide, .height = kSide, .capture = capture, .captures = captures};
     return RunPipeline(device, registry, Pipeline({Node(1, "Draws")}, {{"draws", 1, "draws"}}), {},
                        {}, frame)

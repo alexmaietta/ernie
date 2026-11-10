@@ -222,8 +222,7 @@ graph::ShapeKey DefinitionKey(const ShadingGraph& shading) {
         for (uint32_t input = 0; input < shading.nodes[node].inputs.size(); ++input) {
             const InputBinding& binding = shading.nodes[node].inputs[input];
             if (binding.kind == BindingKind::Pattern) {
-                graph.Connect(node, shading.nodes[node].node->inputs[input].name, binding.source,
-                              "result");
+                graph.Connect(node, input, binding.source, 0);
             }
         }
     }

@@ -6,8 +6,8 @@
 
 #include <gtest/gtest.h>
 
-#include "ernie/pipeline/builtins.h"
-#include "ernie/pipeline/segments.h"
+#include "ernie/pipeline/definition.h"
+#include "ernie/pipeline/node.h"
 #include "support/devices.h"
 #include "unit/pipeline/registry.h"
 #include "unit/pipeline/runner.h"

@@ -8,7 +8,6 @@
 #include <gtest/gtest.h>
 
 #include "ernie/graph/library.h"
-#include "ernie/graph/published.h"
 
 namespace ernie::graph {
 namespace {
@@ -16,7 +15,7 @@ namespace {
 struct Chain {
     uint32_t firstPrim = 0;
     uint32_t noiseKind = 2;
-    std::string input = "in";
+    uint32_t input = 0;
     uint32_t shot = 0;
 };
 
@@ -25,8 +24,8 @@ ShapeKey ChainShape(const Chain& chain) {
     const uint32_t output = graph.Add(chain.firstPrim, 0);
     const uint32_t noise = graph.Add(chain.firstPrim + 1, chain.noiseKind);
     const uint32_t signal = graph.Add(chain.firstPrim + 2, 3);
-    graph.Connect(output, "in", noise, "out");
-    graph.Connect(noise, chain.input, signal, "rate");
+    graph.Connect(output, 0, noise, 0);
+    graph.Connect(noise, chain.input, signal, 0);
     const Ordering ordering = graph.Order();
     return GraphShape(graph, ordering.order, [&](uint32_t node, ShapeWriter& writer) {
         if (node == noise) {
@@ -39,7 +38,7 @@ TEST(ShapeTest, KeysFollowKindsConnectionsAndUniformsButNotPrims) {
     const ShapeKey key = ChainShape({});
     EXPECT_EQ(ChainShape({.firstPrim = 40}), key);
     EXPECT_NE(ChainShape({.noiseKind = 5}), key);
-    EXPECT_NE(ChainShape({.input = "signal"}), key);
+    EXPECT_NE(ChainShape({.input = 1}), key);
     EXPECT_NE(ChainShape({.shot = 1}), key);
     EXPECT_EQ(ChainShape({.firstPrim = 40}).Hash(), key.Hash());
 }
