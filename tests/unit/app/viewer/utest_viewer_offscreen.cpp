@@ -4,12 +4,14 @@
 
 #include <algorithm>
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "ernie/app/viewer/panels/panels.h"
 #include "ernie/device/device.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/scene.h"
@@ -71,6 +73,23 @@ TEST_F(OffscreenViewerTest, FramesTheWholeSceneWhenItOpens) {
     EXPECT_TRUE(Inside(viewer.WorldToScreen({6, 0, 1}), viewer));
 }
 
+TEST_F(OffscreenViewerTest, RunsFrameHandlersAroundEachFrameUntilRemoved) {
+    Viewer viewer(Row(*s_device), {.width = kWidth, .height = kHeight, .offscreen = true});
+    std::vector<std::string> calls;
+    uint64_t begin = 0;
+    begin = viewer.AddBeginFrameHandler([&] {
+        calls.push_back("begin");
+        if (calls.size() > 2) {
+            viewer.RemoveHandler(begin);
+        }
+    });
+    viewer.AddEndFrameHandler([&] { calls.push_back("end"); });
+    for (int frame = 0; frame < 3; ++frame) {
+        viewer.Frame();
+    }
+    EXPECT_EQ(calls, (std::vector<std::string>{"begin", "end", "begin", "end", "end"}));
+}
+
 #ifdef ERNIE_VIEWER_XR
 TEST_F(OffscreenViewerTest, OffersAnXrPanelThatDrawsUntilStarted) {
     Viewer viewer(Row(*s_device), {.width = kWidth, .height = kHeight, .offscreen = true});
@@ -79,6 +98,26 @@ TEST_F(OffscreenViewerTest, OffersAnXrPanelThatDrawsUntilStarted) {
         viewer.Frame();
     }
     EXPECT_EQ(viewer.Viewports(), (std::vector<std::string>{"Viewport"}));
+}
+
+TEST_F(OffscreenViewerTest, RunsXrInTheFrameLoopAndMirrorsTheLeftEye) {
+    const Ref<Scene> scene = Row(*s_device);
+    Viewer viewer(scene,
+                  {.width = kWidth, .height = kHeight, .offscreen = true, .builtinPanels = false});
+    const std::shared_ptr<XrPanel> xr = AddXrPanel(viewer, scene);
+    viewer.ShowPanel("XR", true);
+    xr->Start();
+    ASSERT_TRUE(xr->Running());
+    ASSERT_TRUE(FrameUntil(viewer, [&] { return viewer.Shown("XR Mirror") != nullptr; }));
+    for (int frame = 0; frame < 10; ++frame) {
+        scene->Find("/Middle")->Set(Xformable::kTranslate, Double3{0, 0, double(frame)});
+        viewer.Frame();
+    }
+    xr->Stop();
+    EXPECT_FALSE(xr->Running());
+    viewer.Frame();
+    EXPECT_EQ(viewer.Viewports(), (std::vector<std::string>{"Viewport"}));
+    EXPECT_FALSE(scene->Find("/__ernie_xr").has_value());
 }
 #endif
 

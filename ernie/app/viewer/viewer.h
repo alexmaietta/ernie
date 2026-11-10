@@ -264,6 +264,8 @@ class ERNIE_VIEWER_API Viewer {
     void ShowBaseGui(bool shown);
     void SetFontSize(float pixels);
 
+    uint64_t AddBeginFrameHandler(std::function<void()> handler);
+    uint64_t AddEndFrameHandler(std::function<void()> handler);
     uint64_t AddKeyHandler(std::function<bool(const KeyEvent&)> handler);
     uint64_t AddMouseHandler(std::function<bool(const MouseEvent&)> handler);
     uint64_t AddOverlayHandler(std::function<bool(const OverlayEvent&)> handler);

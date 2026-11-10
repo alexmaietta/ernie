@@ -435,6 +435,18 @@ NB_MODULE(_viewer, module) {
         .def("show_base_gui", &Viewer::ShowBaseGui, nb::arg("shown") = true)
         .def("set_font_size", &Viewer::SetFontSize, nb::arg("pixels"))
         .def(
+            "add_begin_frame_handler",
+            [](Viewer& viewer, nb::object handler) {
+                return viewer.AddBeginFrameHandler(Locked<void>(std::move(handler)));
+            },
+            nb::arg("handler"))
+        .def(
+            "add_end_frame_handler",
+            [](Viewer& viewer, nb::object handler) {
+                return viewer.AddEndFrameHandler(Locked<void>(std::move(handler)));
+            },
+            nb::arg("handler"))
+        .def(
             "add_key_handler",
             [](Viewer& viewer, nb::object handler) {
                 return viewer.AddKeyHandler(Handler<KeyEvent>(std::move(handler)));

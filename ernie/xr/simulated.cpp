@@ -93,6 +93,10 @@ class SimulatedRuntime final : public Runtime {
     }
 
     void Stop() override {
+        for (const Copying& copying : m_copying) {
+            copying.done.Wait();
+        }
+        m_copying.clear();
         m_presented = {};
         m_presentedDepth = {};
         m_device = {};
@@ -271,8 +275,14 @@ class SimulatedRuntime final : public Runtime {
             !std::ranges::equal(kept.Shape(), shape)) {
             kept = m_device->CreateTensor(source.Type(), shape, label);
         }
-        m_device->Copy(source, kept, ready).Wait();
+        std::erase_if(m_copying, [](const Copying& copying) { return copying.done.Ready(); });
+        m_copying.push_back({m_device->Copy(source, kept, ready), source});
     }
+
+    struct Copying {
+        device::Operation done;
+        device::Tensor source;
+    };
 
     void Advance(const SimulatedInput& input) {
         if (m_state == SessionState::Exiting) {
@@ -330,6 +340,7 @@ class SimulatedRuntime final : public Runtime {
     int64_t m_displayTime = 0;
     device::Tensor m_presented;
     device::Tensor m_presentedDepth;
+    std::vector<Copying> m_copying;
     double m_start = 0;
 };
 

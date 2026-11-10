@@ -459,6 +459,21 @@ class ViewerImpl {
         std::function<bool(const OverlayEvent&)> handle;
     };
 
+    struct FrameHandler {
+        uint64_t id = 0;
+        std::function<void()> run;
+    };
+
+    std::vector<FrameHandler> beginFrameHandlers;
+    std::vector<FrameHandler> endFrameHandlers;
+
+    static void RunFrameHandlers(const std::vector<FrameHandler>& handlers) {
+        const std::vector<FrameHandler> running = handlers;
+        for (const FrameHandler& handler : running) {
+            handler.run();
+        }
+    }
+
     std::vector<KeyHandler> keyHandlers;
     std::vector<MouseHandler> mouseHandlers;
     std::vector<OverlayHandler> overlayHandlers;
@@ -922,6 +937,7 @@ void ViewerImpl::Frame() {
     if (m_window != nullptr) {
         glfwPollEvents();
     }
+    RunFrameHandlers(beginFrameHandlers);
     std::erase_if(m_retiredViewports,
                   [](const RetiredViewport& retired) { return retired.drawn.Ready(); });
     for (const std::function<void()>& deferred : std::exchange(m_deferred, {})) {
@@ -935,6 +951,7 @@ void ViewerImpl::Frame() {
         }
     }
     if (!presenter->Begin()) {
+        RunFrameHandlers(endFrameHandlers);
         return;
     }
     ImGuiIO& io = ImGui::GetIO();
@@ -982,6 +999,7 @@ void ViewerImpl::Frame() {
     if (m_desc.ui) {
         TakeShortcuts();
     }
+    RunFrameHandlers(endFrameHandlers);
     if (const Viewport* active = Active()) {
         const std::string& camera = active->CameraPath();
         m_capture.Update(active->Shown(), active->ShownFrame(),
@@ -1399,6 +1417,16 @@ void Viewer::Frame() {
     m_impl->Frame();
 }
 
+uint64_t Viewer::AddBeginFrameHandler(std::function<void()> handler) {
+    m_impl->beginFrameHandlers.push_back({m_impl->nextHandler, std::move(handler)});
+    return m_impl->nextHandler++;
+}
+
+uint64_t Viewer::AddEndFrameHandler(std::function<void()> handler) {
+    m_impl->endFrameHandlers.push_back({m_impl->nextHandler, std::move(handler)});
+    return m_impl->nextHandler++;
+}
+
 void Viewer::Run() {
     while (Open()) {
         Frame();
@@ -1587,6 +1615,9 @@ void Viewer::RemoveHandler(uint64_t id) {
     std::erase_if(m_impl->keyHandlers, [&](const auto& handler) { return handler.id == id; });
     std::erase_if(m_impl->mouseHandlers, [&](const auto& handler) { return handler.id == id; });
     std::erase_if(m_impl->overlayHandlers, [&](const auto& handler) { return handler.id == id; });
+    std::erase_if(m_impl->beginFrameHandlers,
+                  [&](const auto& handler) { return handler.id == id; });
+    std::erase_if(m_impl->endFrameHandlers, [&](const auto& handler) { return handler.id == id; });
     m_impl->ConnectOverlayEvents();
 }
 

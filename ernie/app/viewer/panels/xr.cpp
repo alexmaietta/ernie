@@ -8,6 +8,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <imgui.h>
@@ -16,13 +17,14 @@
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/rotation.h"
+#include "ernie/util/log.h"
 #include "ernie/xr/rig.h"
 #include "ernie/xr/session.h"
 
 namespace ernie::app {
 namespace {
 
-constexpr const char* kViewport = "XR";
+constexpr const char* kViewport = "XR Mirror";
 constexpr const char* kRigPath = "/__ernie_xr";
 
 struct Desk {
@@ -89,7 +91,7 @@ void MarkSessionPrims(Scene& scene, const Prim& prim) {
     }
 }
 
-class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode> {
+class XrMode : public RenderDelegate, public XrPanel, public std::enable_shared_from_this<XrMode> {
   public:
     XrMode(Viewer& viewer, Ref<Scene> scene) : m_viewer(viewer), m_scene(std::move(scene)) {}
 
@@ -97,11 +99,18 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
         return "XR";
     }
 
-    bool Running() const {
+    std::optional<RenderFrame> Render(const RenderRequest&) override {
+        return std::nullopt;
+    }
+
+    bool Running() const override {
         return m_session != nullptr;
     }
 
-    void Start() {
+    void Start() override {
+        if (Running()) {
+            return;
+        }
         m_error.clear();
         try {
             xr::SessionDesc desc;
@@ -121,20 +130,30 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
             m_renderer = std::make_shared<Renderer>(m_scene);
             m_viewer.AddViewport(
                 {.name = kViewport, .delegate = shared_from_this(), .hud = true, .toolbar = false});
+            m_handlers.push_back(
+                m_viewer.AddBeginFrameHandler([this] { Guarded([this] { Begin(); }); }));
+            m_handlers.push_back(
+                m_viewer.AddEndFrameHandler([this] { Guarded([this] { End(); }); }));
             if (m_backend == xr::Backend::Simulated) {
                 Watch();
             }
         } catch (const std::exception& error) {
+            Log(LogLevel::Error, "XR didn't start: {}", error.what());
             m_error = error.what();
             Stop();
         }
     }
 
-    void Stop() {
+    void Stop() override {
         for (const uint64_t handler : m_handlers) {
             m_viewer.RemoveHandler(handler);
         }
         m_handlers.clear();
+        const std::vector<std::string> viewports = m_viewer.Viewports();
+        if (std::ranges::find(viewports, kViewport) != viewports.end()) {
+            m_viewer.RemoveViewport(kViewport);
+        }
+        m_frame.reset();
         m_renderer.reset();
         m_rig.reset();
         m_session.reset();
@@ -143,31 +162,10 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
         }
     }
 
-    std::optional<RenderFrame> Render(const RenderRequest&) override {
-        if (!m_session) {
-            return std::nullopt;
-        }
-        try {
-            if (!m_session->Running()) {
-                Stop();
-                return std::nullopt;
-            }
-            return Step();
-        } catch (const std::exception& error) {
-            m_error = error.what();
-            Stop();
-            return std::nullopt;
-        }
-    }
-
     void Draw() {
         if (Running()) {
             DrawRunning();
             return;
-        }
-        const std::vector<std::string> viewports = m_viewer.Viewports();
-        if (std::ranges::find(viewports, kViewport) != viewports.end()) {
-            m_viewer.RemoveViewport(kViewport);
         }
         const char* backends[] = {"Simulated", "OpenXR"};
         int backend = m_backend == xr::Backend::Simulated ? 0 : 1;
@@ -194,8 +192,23 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
     }
 
   private:
-    std::optional<RenderFrame> Step() {
-        const xr::Frame frame = m_session->BeginFrame();
+    template <class Work> void Guarded(Work work) {
+        try {
+            work();
+        } catch (const std::exception& error) {
+            Log(LogLevel::Error, "XR stopped: {}", error.what());
+            m_error = error.what();
+            Stop();
+        }
+    }
+
+    void Begin() {
+        if (!m_session->Running()) {
+            Stop();
+            return;
+        }
+        m_frame = m_session->BeginFrame();
+        const xr::Frame& frame = *m_frame;
         m_rig->Update(frame);
         const xr::Controller& right = frame.Controller(xr::Side::Right);
         const xr::Controller& left = frame.Controller(xr::Side::Left);
@@ -212,23 +225,24 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
             m_rig->SnapTurn(frame, turn > 0 ? -1 : 1);
         }
         m_turned = std::abs(turn) > 0.6f;
+    }
+
+    void End() {
+        if (!m_frame) {
+            return;
+        }
+        const xr::Frame frame = *std::exchange(m_frame, std::nullopt);
         xr::RigVisuals visuals = m_visuals;
         visuals.teleport = m_aiming;
         m_rig->Draw(*m_renderer->GetOverlays(), frame, visuals);
         if (!frame.shouldRender) {
             m_session->EndFrame(frame, RenderOutput());
-            return std::nullopt;
+            return;
         }
         RenderOutput output = m_renderer->Step(m_rig->Product(), frame.deltaTime);
         m_session->EndFrame(frame, output);
         const FrameOutput& eyes = output[m_rig->Product()].frames.back();
-        RenderFrame shown;
-        shown.image = eyes.RenderVar(m_rig->ColorVar()).tensor.Select(0);
-        shown.ready = output.Done();
-        if (!eyes.overlay.Empty()) {
-            shown.overlay = eyes.overlay.Select(0);
-        }
-        return shown;
+        m_viewer.Show(eyes.RenderVar(m_rig->ColorVar()).tensor.Select(0), output.Done(), kViewport);
     }
 
     void Watch() {
@@ -303,6 +317,7 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
     std::unique_ptr<xr::Session> m_session;
     std::optional<xr::Rig> m_rig;
     std::shared_ptr<Renderer> m_renderer;
+    std::optional<xr::Frame> m_frame;
     std::vector<uint64_t> m_handlers;
     std::string m_error;
     bool m_aiming = false;
@@ -311,9 +326,10 @@ class XrMode : public RenderDelegate, public std::enable_shared_from_this<XrMode
 
 }
 
-void AddXrPanel(Viewer& viewer, Ref<Scene> scene) {
+std::shared_ptr<XrPanel> AddXrPanel(Viewer& viewer, Ref<Scene> scene) {
     const auto mode = std::make_shared<XrMode>(viewer, std::move(scene));
     viewer.AddPanel("XR", Dock::Right, [mode] { mode->Draw(); }, false);
+    return mode;
 }
 
 }

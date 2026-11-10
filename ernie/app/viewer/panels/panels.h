@@ -42,7 +42,15 @@ Panel CreateStagePanel(Ref<Scene> scene, Selection& selection, Editor& editor, c
 Panel CreatePropertiesPanel(Ref<Scene> scene, Selection& selection, Editor& editor,
                             FileDialog& dialog, const Theme& theme);
 
-void AddXrPanel(Viewer& viewer, Ref<Scene> scene);
+class XrPanel {
+  public:
+    virtual ~XrPanel() = default;
+    virtual void Start() = 0;
+    virtual void Stop() = 0;
+    virtual bool Running() const = 0;
+};
+
+std::shared_ptr<XrPanel> AddXrPanel(Viewer& viewer, Ref<Scene> scene);
 
 void DrawControls(bool& open, const Theme& theme);
 
