@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_object_library(
     ernie_render
-    pipelines.cpp
     ray_cast/ray_cast.cpp
     render_output.cpp
     renderer.cpp
+    sensor_pipeline_runner.cpp
+    sensor_pipelines.cpp
     shaders.cpp
-    standalone.cpp
 )
 target_link_libraries(
     ernie_render
     PUBLIC
         ernie_scene
         ernie_overlay
-        ernie_pipeline
+        ernie_sensor_pipeline
 )
 ernie_embed(
     ernie_render
@@ -31,7 +31,7 @@ ernie_static_library(
     ernie_render_internal
     ernie_render
     ernie_overlay
-    ernie_pipeline_internal
+    ernie_sensor_pipeline_internal
     ernie_scene_internal
     ernie_fonts
     ernie_stb
@@ -41,6 +41,6 @@ ernie_public_files(
     ray_cast/ray_cast.h
     render_output.h
     renderer.h
+    sensor_pipeline_runner.h
     shaders.h
-    standalone.h
 )

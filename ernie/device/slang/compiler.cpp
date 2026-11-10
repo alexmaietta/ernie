@@ -548,10 +548,10 @@ std::string ShortName(slang::TypeReflection* type) {
     return scope == std::string::npos ? name : name.substr(scope + 1);
 }
 
-std::optional<ReflectedPipelineNode> ReflectPipelineNode(slang::IGlobalSession& global,
-                                                         slang::ProgramLayout& layout,
-                                                         slang::DeclReflection* decl,
-                                                         std::string_view label) {
+std::optional<ReflectedSensorPipelineNode> ReflectSensorPipelineNode(slang::IGlobalSession& global,
+                                                                     slang::ProgramLayout& layout,
+                                                                     slang::DeclReflection* decl,
+                                                                     std::string_view label) {
     slang::TypeReflection* type = decl->getType();
     slang::TypeReflection* point = layout.findTypeByName("IPointNode");
     slang::TypeReflection* stencil = layout.findTypeByName("IStencilNode");
@@ -563,9 +563,9 @@ std::optional<ReflectedPipelineNode> ReflectPipelineNode(slang::IGlobalSession& 
     if (!isPoint && !isStencil) {
         return std::nullopt;
     }
-    ReflectedPipelineNode node{.name = decl->getName(),
-                               .kind =
-                                   isStencil ? PipelineNodeKind::Stencil : PipelineNodeKind::Point};
+    ReflectedSensorPipelineNode node{.name = decl->getName(),
+                                     .kind = isStencil ? SensorPipelineNodeKind::Stencil
+                                                       : SensorPipelineNodeKind::Point};
     if (isPoint && isStencil) {
         throw Error("{} in {} is both a point and a stencil node; pick one", node.name, label);
     }
@@ -677,8 +677,8 @@ ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
     ReflectedNodes nodes;
     for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {
         if (decl->getKind() == slang::DeclReflection::Kind::Struct) {
-            if (std::optional<ReflectedPipelineNode> node =
-                    ReflectPipelineNode(global, *layout, decl, label)) {
+            if (std::optional<ReflectedSensorPipelineNode> node =
+                    ReflectSensorPipelineNode(global, *layout, decl, label)) {
                 nodes.pipeline.push_back(std::move(*node));
             } else if (std::optional<ReflectedNode> material = ReflectNode(global, decl, label)) {
                 nodes.material.push_back(std::move(*material));
@@ -692,9 +692,11 @@ ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
     return nodes;
 }
 
-std::vector<ReflectedPipelineNode>
-ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
-                     std::string_view module, std::string_view label) {
+std::vector<ReflectedSensorPipelineNode> ReflectSensorPipelineNodes(Backend backend,
+                                                                    const KernelLibrary* library,
+                                                                    const SourceFiles& sources,
+                                                                    std::string_view module,
+                                                                    std::string_view label) {
     return ReflectNodes(backend, library, sources, module, label).pipeline;
 }
 

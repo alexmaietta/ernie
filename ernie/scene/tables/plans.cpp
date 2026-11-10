@@ -68,15 +68,16 @@ std::shared_ptr<const ProductPlan> ProductPlans::Plan(std::span<const std::strin
         if (product->pipeline != kNoPrim) {
             for (const uint32_t sensor : product->sensors) {
                 const auto found =
-                    std::ranges::find_if(plan->pipelines, [&](const PlannedPipeline& run) {
+                    std::ranges::find_if(plan->pipelines, [&](const PlannedSensorPipeline& run) {
                         const ResolvedProduct& first = *plan->products[run.products.front()];
                         return run.pipeline == product->pipeline && run.sensor == sensor &&
                                first.width == product->width && first.height == product->height;
                     });
-                PlannedPipeline& run = found != plan->pipelines.end()
-                                           ? *found
-                                           : plan->pipelines.emplace_back(
-                                                 PlannedPipeline{product->pipeline, sensor, {}});
+                PlannedSensorPipeline& run =
+                    found != plan->pipelines.end()
+                        ? *found
+                        : plan->pipelines.emplace_back(
+                              PlannedSensorPipeline{product->pipeline, sensor, {}});
                 run.products.push_back(uint32_t(plan->products.size()));
             }
         }

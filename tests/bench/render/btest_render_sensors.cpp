@@ -16,14 +16,14 @@
 #include "ernie/device/queue.h"
 #include "ernie/io/image.h"
 #include "ernie/overlay/overlay.h"
-#include "ernie/pipeline/definition.h"
-#include "ernie/pipeline/node.h"
-#include "ernie/render/pipelines.h"
 #include "ernie/render/renderer.h"
+#include "ernie/render/sensor_pipeline_runner.h"
+#include "ernie/render/sensor_pipelines.h"
 #include "ernie/render/shaders.h"
-#include "ernie/render/standalone.h"
 #include "ernie/scene/rotation.h"
 #include "ernie/scene/scene.h"
+#include "ernie/sensor_pipeline/definition.h"
+#include "ernie/sensor_pipeline/node.h"
 
 namespace ernie {
 namespace {
@@ -283,15 +283,15 @@ void RadarSteps(benchmark::State& state) {
 
 struct Standalone {
     Ref<Scene> scene;
-    std::unique_ptr<Pipeline> pipeline;
-    PipelineRunDesc run;
+    std::unique_ptr<SensorPipelineRunner> pipeline;
+    SensorPipelineRunDesc run;
     double pixels = 0;
 };
 
 Standalone PrepareStandalone(Graph graph, uint32_t height) {
     Standalone setup{Scene::Create(bench::BenchDevice())};
     DefineCameraGraph(*setup.scene, graph);
-    setup.pipeline = std::make_unique<Pipeline>(setup.scene, "/Pipe");
+    setup.pipeline = std::make_unique<SensorPipelineRunner>(setup.scene, "/Pipe");
     const uint32_t width = height * 16 / 9;
     const int64_t channels = graph == Graph::Isp ? 1 : 3;
     std::vector<float> rates(size_t(width) * height * size_t(channels));
@@ -319,7 +319,7 @@ void StandaloneRuns(benchmark::State& state) {
         bench::Cached<Standalone>(std::format("standalone/{}/{}", int(graph), height),
                                   [&] { return PrepareStandalone(graph, height); });
     for (auto _ : state) {
-        const PipelineOutputs outputs = setup.pipeline->Run(setup.run);
+        const SensorPipelineOutputs outputs = setup.pipeline->Run(setup.run);
         outputs.begin()->second.GetDevice().GetQueue().WaitIdle();
     }
     state.counters["Mpx/s"] = benchmark::Counter(double(state.iterations()) * setup.pixels * 1e-6,
@@ -331,7 +331,7 @@ std::filesystem::path WriteNode() {
     const std::filesystem::path file =
         std::filesystem::temp_directory_path() / "ernie_bench_sensor_node.slang";
     std::ofstream(file) << std::format(R"(
-import ernie.pipeline;
+import ernie.sensor_pipeline;
 using namespace ernie;
 
 // {}
@@ -356,7 +356,7 @@ void Compile(benchmark::State& state) {
     const Prim hot =
         Node(*scene, "/Pipe/Hot", "BenchHotPixels", *scene->Find("/Pipe/Noise"), "e", "electrons");
     scene->Find("/Pipe/Adc")->Connect("electrons", hot, "electrons");
-    PipelineRunDesc run;
+    SensorPipelineRunDesc run;
     const int64_t channels = graph == Graph::Isp ? 1 : 3;
     run.inputs.emplace(
         "Signal", bench::BenchDevice().CreateTensor(device::DType::Float32, {1, 4, 4, channels}));
@@ -365,8 +365,8 @@ void Compile(benchmark::State& state) {
         state.PauseTiming();
         LoadShaders(*scene, WriteNode());
         state.ResumeTiming();
-        const Pipeline pipeline(scene, "/Pipe");
-        const PipelineOutputs outputs = pipeline.Run(run);
+        const SensorPipelineRunner pipeline(scene, "/Pipe");
+        const SensorPipelineOutputs outputs = pipeline.Run(run);
         outputs.begin()->second.GetDevice().GetQueue().WaitIdle();
     }
     std::filesystem::remove(std::filesystem::temp_directory_path() /

@@ -6,7 +6,7 @@ set(ernie_python_dir "${ernie_python_root}/ernie")
 set(ernie_python_files
     __init__.py
     __main__.py
-    _pipelines.py
+    _sensor_pipelines.py
     _typed.py
     py.typed
 )
@@ -20,7 +20,7 @@ nanobind_add_module(
     src/importer.cpp
     src/io.cpp
     src/module.cpp
-    src/pipeline.cpp
+    src/sensor_pipeline.cpp
     src/render.cpp
     src/rotation.cpp
     src/scene.cpp

@@ -155,8 +155,8 @@ const SensorKind& FindSensorKind(SchemaId schema) {
     throw Error("A {} isn't a sensor the renderer renders", Info(schema).name);
 }
 
-struct BoundPipeline {
-    std::shared_ptr<const PipelineInstance> instance;
+struct BoundSensorPipeline {
+    std::shared_ptr<const SensorPipelineInstance> instance;
 };
 
 std::vector<PointChannel> CloudChannels(const Prim& prim, const SensorKind& kind, bool& semantic) {
@@ -184,12 +184,13 @@ std::vector<PointChannel> CloudChannels(const Prim& prim, const SensorKind& kind
     return channels;
 }
 
-ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
-                        const BoundPipeline& bound, const std::string& name) {
+ResolvedVar SensorPipelineVar(const Prim& prim, const ResolvedProduct& product,
+                              const SensorKind& kind, const BoundSensorPipeline& bound,
+                              const std::string& name) {
     const bool tap = name == kTapSource;
     const std::string output = tap ? prim.Path() : name;
     const auto found = std::ranges::find(bound.instance->resolved.outputs, output,
-                                         &pipeline::ResolvedOutput::name);
+                                         &sensor_pipeline::ResolvedOutput::name);
     if (found == bound.instance->resolved.outputs.end()) {
         if (tap) {
             throw Error("{} taps no node of {}", prim.Path(), bound.instance->path);
@@ -197,16 +198,16 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const 
         throw Error("{} reads {}, which isn't an output the renderer writes or {} makes",
                     prim.Path(), name, bound.instance->path);
     }
-    const pipeline::SignalLayout& layout = product.layouts[found->value];
+    const sensor_pipeline::SignalLayout& layout = product.layouts[found->value];
     ResolvedVar var{.prim = prim.Index(),
                     .path = prim.Path(),
                     .frame = prim.Get(RenderVar::kFrameOfReference),
                     .type = device::DType::Float32,
                     .output = output,
                     .tap = tap};
-    const pipeline::SignalType type = bound.instance->resolved.values[found->value].type;
-    if (type == pipeline::SignalType::PointCloud ||
-        (type == pipeline::SignalType::Returns &&
+    const sensor_pipeline::SignalType type = bound.instance->resolved.values[found->value].type;
+    if (type == sensor_pipeline::SignalType::PointCloud ||
+        (type == sensor_pipeline::SignalType::Returns &&
          (kind.schema == SchemaId::Lidar || kind.schema == SchemaId::Radar))) {
         if (kind.schema != SchemaId::Lidar && kind.schema != SchemaId::Radar) {
             throw Error("{} reads the point cloud {} makes, and only lidars and radars make them "
@@ -219,7 +220,7 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const 
     }
     var.shape = {int64_t(product.sensors.size())};
     if (layout.perCapture) {
-        var.shape.push_back(pipeline::kStatWords);
+        var.shape.push_back(sensor_pipeline::kStatWords);
         return var;
     }
     var.shape.insert(var.shape.end(), {int64_t(product.height), int64_t(product.width)});
@@ -233,7 +234,7 @@ ResolvedVar PipelineVar(const Prim& prim, const ResolvedProduct& product, const 
 }
 
 ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const SensorKind& kind,
-                       int64_t channels, const BoundPipeline& bound) {
+                       int64_t channels, const BoundSensorPipeline& bound) {
     const std::string name = prim.Get(RenderVar::kSourceName);
     const std::optional<RenderVarSource> builtIn = FindRenderVarSource(name);
     if (!builtIn) {
@@ -244,7 +245,7 @@ ResolvedVar ResolveVar(const Prim& prim, const ResolvedProduct& product, const S
             throw Error("{} reads {}, which isn't an output the renderer writes", prim.Path(),
                         name);
         }
-        return PipelineVar(prim, product, kind, bound, name);
+        return SensorPipelineVar(prim, product, kind, bound, name);
     }
     const RenderVarSource source = *builtIn;
     ResolvedVar var{.prim = prim.Index(),
@@ -455,7 +456,7 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                 }
             }
         }
-        BoundPipeline bound;
+        BoundSensorPipeline bound;
         if (product.pipeline != kNoPrim) {
             if (!IsA(prims.Record(product.pipeline).schema, SchemaId::SensorPipeline)) {
                 throw Error("{} binds {}, which isn't a SensorPipeline", path,
@@ -475,11 +476,11 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
             const bool mosaics = pattern != DetectorPattern::Mono &&
                                  pattern != DetectorPattern::Rgb &&
                                  pattern != DetectorPattern::Bands;
-            product.layouts =
-                pipeline::PropagateLayouts(bound.instance->resolved, *m_pipelines.Registry(),
-                                           {.channels = uint32_t(std::max<int64_t>(channels, 1)),
-                                            .pattern = uint32_t(pattern),
-                                            .mosaics = mosaics});
+            product.layouts = sensor_pipeline::PropagateLayouts(
+                bound.instance->resolved, *m_pipelines.Registry(),
+                {.channels = uint32_t(std::max<int64_t>(channels, 1)),
+                 .pattern = uint32_t(pattern),
+                 .mosaics = mosaics});
         }
         for (const uint32_t var : targets(kRenderProductOrderedVars, SchemaId::RenderVar)) {
             const ResolvedVar& added = product.vars.emplace_back(
@@ -493,13 +494,15 @@ ResolvedProduct ProductTable::Resolve(uint32_t index) const {
                                            var.source == RenderVarSource::ElectronRate;
                                 }) ||
             (bound.instance &&
-             std::ranges::any_of(bound.instance->resolved.values, [](const pipeline::Value& value) {
-                 return value.type == pipeline::SignalType::ElectronRate;
-             }));
-        if (bound.instance &&
-            std::ranges::any_of(bound.instance->resolved.values, [](const pipeline::Value& value) {
-                return value.type == pipeline::SignalType::Returns;
-            })) {
+             std::ranges::any_of(bound.instance->resolved.values,
+                                 [](const sensor_pipeline::Value& value) {
+                                     return value.type == sensor_pipeline::SignalType::ElectronRate;
+                                 }));
+        if (bound.instance && std::ranges::any_of(bound.instance->resolved.values,
+                                                  [](const sensor_pipeline::Value& value) {
+                                                      return value.type ==
+                                                             sensor_pipeline::SignalType::Returns;
+                                                  })) {
             std::optional<FrameOfReference> frame;
             for (const ResolvedVar& var : product.vars) {
                 if (var.output.empty() || var.source != RenderVarSource::PointCloud) {

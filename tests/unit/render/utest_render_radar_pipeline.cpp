@@ -11,7 +11,7 @@
 
 #include "ernie/render/render_output.h"
 #include "ernie/render/renderer.h"
-#include "ernie/render/standalone.h"
+#include "ernie/render/sensor_pipeline_runner.h"
 #include "ernie/scene/scene.h"
 #include "support/devices.h"
 
@@ -204,7 +204,7 @@ TEST(RadarPipelineTest, CfarFindsATargetAndHoldsItsFalseAlarmRateOnNoise) {
         cfar.Connect("returns", returns, "returns");
         cfar.Set("falseAlarmRate", 0.05f);
         pipe.Connect("detected", cfar, "returns");
-        const Pipeline pipeline(scene, "/Pipe");
+        const SensorPipelineRunner pipeline(scene, "/Pipe");
 
         std::mt19937 random(7);
         std::exponential_distribution<float> noise(1);
@@ -215,7 +215,7 @@ TEST(RadarPipelineTest, CfarFindsATargetAndHoldsItsFalseAlarmRateOnNoise) {
             cells[cell * 8 + 2] = noise(random);
         }
         cells[(kTarget * kSide + kTarget) * 8 + 2] = 1000;
-        PipelineRunDesc run;
+        SensorPipelineRunDesc run;
         run.inputs.emplace("Returns",
                            device::Tensor(device.CreateBuffer({.label = "returns"}, cells), 0,
                                           device::DType::Float32, {1, kSide, kSide, 8}));

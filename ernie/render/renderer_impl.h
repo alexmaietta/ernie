@@ -23,11 +23,11 @@
 #include "ernie/material/definition.h"
 #include "ernie/overlay/overlay_impl.h"
 #include "ernie/render/kernels/render/render.h"
-#include "ernie/render/pipelines.h"
 #include "ernie/render/renderer.h"
+#include "ernie/render/sensor_pipelines.h"
 #include "ernie/scene/scene.h"
-#include "ernie/scene/tables/pipelines.h"
 #include "ernie/scene/tables/plans.h"
+#include "ernie/scene/tables/sensor_pipelines.h"
 
 namespace ernie {
 
@@ -79,14 +79,14 @@ class RendererImpl {
         bool outlined = false;
     };
 
-    struct PipelineRun {
-        const PlannedPipeline* planned = nullptr;
-        std::shared_ptr<const PipelineInstance> instance;
-        std::shared_ptr<const CompiledPipeline> compiled;
+    struct SensorPipelineRun {
+        const PlannedSensorPipeline* planned = nullptr;
+        std::shared_ptr<const SensorPipelineInstance> instance;
+        std::shared_ptr<const CompiledSensorPipeline> compiled;
         std::vector<uint32_t> products;
     };
 
-    struct PipelineState {
+    struct SensorPipelineState {
         uint32_t definition = 0;
         uint32_t captures = 0;
         Ref<device::Buffer> state;
@@ -104,10 +104,11 @@ class RendererImpl {
                           const ResolvedProduct& product, const ResolvedVar& var, uint64_t next);
     device::Operation Trace(const ProductPlan& plan, OutputSet& set, const std::set<uint32_t>& due,
                             const std::set<uint32_t>& stale, const Snapshot& snapshot,
-                            std::span<const PipelineRun> runs);
-    std::vector<PipelineRun> PrepareRuns(const ProductPlan& plan, const std::set<uint32_t>& due);
+                            std::span<const SensorPipelineRun> runs);
+    std::vector<SensorPipelineRun> PrepareRuns(const ProductPlan& plan,
+                                               const std::set<uint32_t>& due);
     void RecordRuns(device::CommandEncoder& encoder, const ProductPlan& plan, OutputSet& set,
-                    std::span<const PipelineRun> runs, const Snapshot& snapshot);
+                    std::span<const SensorPipelineRun> runs, const Snapshot& snapshot);
 
     Ref<Scene> m_scene;
     uint64_t m_maxPixelsPerLaunch;
@@ -129,10 +130,11 @@ class RendererImpl {
     uint32_t m_scanCapacity = 0;
     std::list<StepPlan> m_plans;
 
-    std::map<uint32_t, std::shared_ptr<const CompiledPipeline>> m_pipelinePrograms;
+    std::map<uint32_t, std::shared_ptr<const CompiledSensorPipeline>> m_pipelinePrograms;
     std::set<uint32_t> m_pendingPipelines;
     std::set<uint32_t> m_failedPipelines;
-    std::map<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>, PipelineState> m_pipelineStates;
+    std::map<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>, SensorPipelineState>
+        m_pipelineStates;
 
     std::mutex m_stepMutex;
     std::optional<OverlayPass> m_overlayPass;

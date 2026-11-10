@@ -13,12 +13,12 @@ ernie_object_library(
     tables/materials.cpp
     tables/pack.cpp
     tables/meshes.cpp
-    tables/pipelines.cpp
     tables/plans.cpp
     tables/points.cpp
     tables/products.cpp
     tables/regions.cpp
     tables/semantics.cpp
+    tables/sensor_pipelines.cpp
     tables/sensors.cpp
     tables/spectra.cpp
     tables/subsets.cpp
@@ -39,7 +39,7 @@ target_link_libraries(
         ernie_texture
         ernie_material
         ernie_graph
-        ernie_pipeline
+        ernie_sensor_pipeline
         ernie_mikktspace
 )
 ernie_embed(
@@ -67,7 +67,7 @@ ernie_static_library(
     ernie_texture_internal
     ernie_material_internal
     ernie_graph_internal
-    ernie_pipeline_internal
+    ernie_sensor_pipeline_internal
 )
 
 ernie_public_files(

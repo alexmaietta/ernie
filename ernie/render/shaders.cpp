@@ -11,8 +11,8 @@
 #include "ernie/device/slang/reflection.h"
 #include "ernie/material/codegen.h"
 #include "ernie/material/node.h"
-#include "ernie/pipeline/node.h"
 #include "ernie/render/kernels.h"
+#include "ernie/sensor_pipeline/node.h"
 #include "ernie/stage/schema/runtime.h"
 #include "ernie/util/error.h"
 #include "ernie/util/log.h"
@@ -154,42 +154,43 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                     reflection.material.front().name);
     }
     if (!reflection.pipeline.empty()) {
-        const std::vector<device::ReflectedPipelineNode>& reflected = reflection.pipeline;
+        const std::vector<device::ReflectedSensorPipelineNode>& reflected = reflection.pipeline;
         const auto signal = [&](const std::string& node, const std::string& type) {
-            const auto found =
-                std::ranges::find(pipeline::kSignals, type, &pipeline::SignalInfo::slangType);
-            if (found == std::end(pipeline::kSignals)) {
+            const auto found = std::ranges::find(sensor_pipeline::kSignals, type,
+                                                 &sensor_pipeline::SignalInfo::slangType);
+            if (found == std::end(sensor_pipeline::kSignals)) {
                 std::vector<std::string> types;
-                for (const pipeline::SignalInfo& info : pipeline::kSignals) {
+                for (const sensor_pipeline::SignalInfo& info : sensor_pipeline::kSignals) {
                     types.emplace_back(info.slangType);
                 }
                 throw Error("{} in {} uses {}, which isn't a pipeline signal; signals are {}", node,
                             file.string(), type, Join(types));
             }
-            return pipeline::SignalType(found - std::begin(pipeline::kSignals));
+            return sensor_pipeline::SignalType(found - std::begin(sensor_pipeline::kSignals));
         };
-        for (const device::ReflectedPipelineNode& node : reflected) {
+        for (const device::ReflectedSensorPipelineNode& node : reflected) {
             signal(node.name, node.result);
             for (const device::ReflectedPort& port : node.inputs) {
                 signal(node.name, port.type);
             }
         }
         std::vector<std::string> names;
-        for (const device::ReflectedPipelineNode& node : reflected) {
-            const pipeline::SignalType result = signal(node.name, node.result);
-            pipeline::NodeDef def{.id = node.name,
-                                  .kind = node.kind == device::PipelineNodeKind::Stencil
-                                              ? pipeline::NodeKind::Stencil
-                                              : pipeline::NodeKind::Point,
-                                  .outputs = {{std::string(pipeline::Signal(result).port), result}},
-                                  .radius = node.radius,
-                                  .code = {.module = module,
-                                           .type = node.name,
-                                           .file = file.string(),
-                                           .source = source,
-                                           .version = digest,
-                                           .applies = true,
-                                           .context = node.context}};
+        for (const device::ReflectedSensorPipelineNode& node : reflected) {
+            const sensor_pipeline::SignalType result = signal(node.name, node.result);
+            sensor_pipeline::NodeDef def{
+                .id = node.name,
+                .kind = node.kind == device::SensorPipelineNodeKind::Stencil
+                            ? sensor_pipeline::NodeKind::Stencil
+                            : sensor_pipeline::NodeKind::Point,
+                .outputs = {{std::string(sensor_pipeline::Signal(result).port), result}},
+                .radius = node.radius,
+                .code = {.module = module,
+                         .type = node.name,
+                         .file = file.string(),
+                         .source = source,
+                         .version = digest,
+                         .applies = true,
+                         .context = node.context}};
             for (const device::ReflectedPort& port : node.inputs) {
                 def.inputs.push_back({port.name, signal(node.name, port.type)});
             }
@@ -202,14 +203,14 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                 RuntimeColumnDesc column = Column(field);
                 column.group = node.displayName.empty() ? node.name : node.displayName;
                 desc.columns.push_back(std::move(column));
-                pipeline::ParameterDef parameter{.name = field.name};
+                sensor_pipeline::ParameterDef parameter{.name = field.name};
                 switch (field.type) {
                 case device::FieldType::Bool:
-                    parameter.type = pipeline::ParameterType::Bool;
+                    parameter.type = sensor_pipeline::ParameterType::Bool;
                     parameter.fallback = {Read<uint32_t>(field.fallback) != 0 ? 1.0f : 0.0f};
                     break;
                 case device::FieldType::Int:
-                    parameter.type = pipeline::ParameterType::Int;
+                    parameter.type = sensor_pipeline::ParameterType::Int;
                     parameter.fallback = {float(Read<int32_t>(field.fallback))};
                     break;
                 default:
@@ -222,14 +223,15 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                 def.parameters.push_back(std::move(parameter));
                 inputs.push_back(field.name);
             }
-            const std::shared_ptr<const pipeline::NodeRegistry> known = pipeline::PipelineNodes();
+            const std::shared_ptr<const sensor_pipeline::NodeRegistry> known =
+                sensor_pipeline::SensorPipelineNodes();
             const uint32_t found = known->Find(node.name);
-            if (found != pipeline::kNoDef && (*known)[found].code.file.empty()) {
+            if (found != sensor_pipeline::kNoDef && (*known)[found].code.file.empty()) {
                 throw Error("{} in {} has the name of a built-in pipeline node; rename it",
                             node.name, file.string());
             }
             const SchemaId previous = FindSchemaByName(node.name);
-            const bool reloading = found != pipeline::kNoDef && previous != SchemaId::None;
+            const bool reloading = found != sensor_pipeline::kNoDef && previous != SchemaId::None;
             const SchemaId schema = RegisterSchema(desc, reloading);
             if (reloading && previous != schema) {
                 Log(LogLevel::Info,
@@ -237,10 +239,10 @@ std::vector<std::string> LoadShaders(Scene& scene, const std::filesystem::path& 
                     file.string());
                 RetypePrims(scene, previous, schema);
             }
-            pipeline::RegisterPipelineNode(std::move(def));
+            sensor_pipeline::RegisterSensorPipelineNode(std::move(def));
             Log(LogLevel::Debug, "loaded {} pipeline node {} from {} with inputs {}",
-                node.kind == device::PipelineNodeKind::Stencil ? "stencil" : "point", node.name,
-                file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
+                node.kind == device::SensorPipelineNodeKind::Stencil ? "stencil" : "point",
+                node.name, file.string(), inputs.empty() ? std::string("(none)") : Join(inputs));
             names.push_back(node.name);
         }
         LoadedFiles& loaded = Loaded();

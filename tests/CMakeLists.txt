@@ -40,22 +40,22 @@ ernie_test(
 )
 
 ernie_test(
-    ernie_pipeline_tests
+    ernie_sensor_pipeline_tests
     LINK
-        ernie_pipeline_internal
+        ernie_sensor_pipeline_internal
         ernie_render_internal
     SOURCES
-        unit/pipeline/utest_pipeline_codegen.cpp
-        unit/pipeline/utest_pipeline_fusion.cpp
-        unit/pipeline/utest_pipeline_global.cpp
-        unit/pipeline/utest_pipeline_isp.cpp
-        unit/pipeline/utest_pipeline_nodes.cpp
-        unit/pipeline/utest_pipeline_noise.cpp
-        unit/pipeline/utest_pipeline_reduce.cpp
-        unit/pipeline/utest_pipeline_reflection.cpp
-        unit/pipeline/utest_pipeline_resolve.cpp
-        unit/pipeline/utest_pipeline_segments.cpp
-        unit/pipeline/utest_pipeline_standalone.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_codegen.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_fusion.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_global.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_isp.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_nodes.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_noise.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_reduce.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_reflection.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_resolve.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_segments.cpp
+        unit/sensor_pipeline/utest_sensor_pipeline_standalone.cpp
 )
 
 ernie_test(
@@ -134,7 +134,7 @@ ernie_test(
         unit/render/utest_render_radar_pipeline.cpp
         unit/render/utest_render_origin.cpp
         unit/render/utest_render_overlay.cpp
-        unit/render/utest_render_pipelines.cpp
+        unit/render/utest_render_sensor_pipelines.cpp
         unit/render/utest_render_ray_cast.cpp
         unit/render/utest_render_ray_origin.cpp
         unit/render/utest_render_materials.cpp
@@ -177,7 +177,7 @@ ernie_test(
         unit/scene/utest_scene_tangents.cpp
         unit/scene/utest_scene_textures.cpp
         unit/scene/utest_scene_publisher.cpp
-        unit/scene/utest_scene_pipelines.cpp
+        unit/scene/utest_scene_sensor_pipelines.cpp
         unit/scene/utest_scene_products.cpp
         unit/scene/utest_scene_tokens.cpp
         unit/scene/utest_scene_updates.cpp

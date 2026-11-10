@@ -40,7 +40,7 @@ struct ReflectedNode {
     std::vector<ReflectedParameter> parameters;
 };
 
-enum class PipelineNodeKind { Point, Stencil };
+enum class SensorPipelineNodeKind { Point, Stencil };
 
 struct ReflectedPort {
     std::string name;
@@ -49,10 +49,10 @@ struct ReflectedPort {
 
 inline constexpr uint32_t kNoContext = ~0u;
 
-struct ReflectedPipelineNode {
+struct ReflectedSensorPipelineNode {
     std::string name;
     std::string displayName;
-    PipelineNodeKind kind = PipelineNodeKind::Point;
+    SensorPipelineNodeKind kind = SensorPipelineNodeKind::Point;
     uint32_t radius = 0;
     std::vector<ReflectedField> fields;
     std::vector<ReflectedPort> inputs;
@@ -62,16 +62,17 @@ struct ReflectedPipelineNode {
 
 struct ReflectedNodes {
     std::vector<ReflectedNode> material;
-    std::vector<ReflectedPipelineNode> pipeline;
+    std::vector<ReflectedSensorPipelineNode> pipeline;
 };
 
 ERNIE_API ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
                                       const SourceFiles& sources, std::string_view module,
                                       std::string_view label);
 
-ERNIE_API std::vector<ReflectedPipelineNode>
-ReflectPipelineNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,
-                     std::string_view module, std::string_view label);
+ERNIE_API std::vector<ReflectedSensorPipelineNode>
+ReflectSensorPipelineNodes(Backend backend, const KernelLibrary* library,
+                           const SourceFiles& sources, std::string_view module,
+                           std::string_view label);
 
 ERNIE_API std::vector<ReflectedNode>
 ReflectMaterialNodes(Backend backend, const KernelLibrary* library, const SourceFiles& sources,

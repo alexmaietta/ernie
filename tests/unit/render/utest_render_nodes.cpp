@@ -498,7 +498,7 @@ struct TestBad {
 
 TEST(MaterialNodeTest, FilesAreSortedByTheNodesTheyDefineNotByTheirText) {
     const std::filesystem::path mentioned = WriteFile("ernie_render_nodes_mentioned.slang", R"(
-// Unlike a pipeline node, this file doesn't import ernie.pipeline;
+// Unlike a pipeline node, this file doesn't import ernie.sensor_pipeline;
 import ernie.material;
 
 struct TestMentioned {
@@ -507,7 +507,7 @@ struct TestMentioned {
 )");
     const std::filesystem::path mixed = WriteFile("ernie_render_nodes_mixed.slang", R"(
 import ernie.material;
-import ernie.pipeline;
+import ernie.sensor_pipeline;
 
 using namespace ernie;
 

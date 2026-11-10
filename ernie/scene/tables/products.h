@@ -12,7 +12,7 @@
 
 #include "ernie/device/tensor.h"
 #include "ernie/scene/records/products.h"
-#include "ernie/scene/tables/pipelines.h"
+#include "ernie/scene/tables/sensor_pipelines.h"
 #include "ernie/scene/tables/storage.h"
 #include "ernie/scene/tables/table.h"
 #include "ernie/stage/structure/structure.h"
@@ -104,7 +104,7 @@ struct ProductShape {
     Token taxonomy;
     RenderEntry entry = RenderEntry::MinimalData;
     uint32_t pipeline = kNoPrim;
-    std::vector<pipeline::SignalLayout> layouts;
+    std::vector<sensor_pipeline::SignalLayout> layouts;
     bool semantic = false;
     std::string error;
 
@@ -119,7 +119,7 @@ struct ResolvedProduct : ProductShape {
 
 class ProductTable : public RenderTable {
   public:
-    ProductTable(Scene& scene, Structure& structure, const PipelineTable& pipelines)
+    ProductTable(Scene& scene, Structure& structure, const SensorPipelineTable& pipelines)
         : m_scene(scene), m_structure(structure), m_pipelines(pipelines) {}
 
     std::string_view Name() const override {
@@ -144,7 +144,7 @@ class ProductTable : public RenderTable {
 
     Scene& m_scene;
     Structure& m_structure;
-    const PipelineTable& m_pipelines;
+    const SensorPipelineTable& m_pipelines;
     uint64_t m_pipelineVersion = 0;
     mutable std::mutex m_mutex;
     std::map<uint32_t, std::shared_ptr<const ResolvedProduct>> m_products;
