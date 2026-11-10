@@ -43,5 +43,6 @@ struct OriginParams {
 ERNIE_CHECK_SIZE(OriginParams, 56);
 
 static const uint kInstanceGroup = 64;
+static const uint kViewerGroups = 32;
 
 }

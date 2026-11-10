@@ -140,16 +140,16 @@ void WriteInstances(uniform InstanceParams p) {
 [shader("compute")]
 [numthreads(kInstanceGroup, 1, 1)]
 void GatherViewers(uniform OriginParams p) {
-    const uint index = LinearThreadIndex();
-    if (index >= p.productCount) {
+    const uint3 thread = ThreadIndex();
+    if (thread.y >= p.productCount) {
         return;
     }
     AuthoredData* scene = p.scene;
     InstanceLayout* layout = p.layout;
-    const uint product = p.products[index];
+    const uint product = p.products[thread.y];
     const ArrayRef sensors =
         scene->schemas.renderProduct.camera[PrimRow(scene, product, kSlotRenderProduct)];
-    for (uint at = 0; at < sensors.count; ++at) {
+    for (uint at = thread.x; at < sensors.count; at += kViewerGroups * kInstanceGroup) {
         const uint sensor = Ptr<uint>(sensors.address)[at];
         if (sensor < scene->primCount && (scene->prims.flags[sensor] & kPrimAlive) != 0) {
             const uint world = scene->prims.world[sensor];

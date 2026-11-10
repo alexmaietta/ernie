@@ -216,7 +216,7 @@ void InstanceTable::Run(const ChangeSet& changes, TableVersions& versions) {
     origins.tlasCount = tlases;
     if (!m_products.empty()) {
         encoder.Dispatch(Kernels().Entry("GatherViewers"), origins,
-                         {.x = device::GroupCount(origins.productCount, kInstanceGroup)});
+                         {.x = kViewerGroups, .y = origins.productCount});
     }
     encoder.Dispatch(Kernels().Entry("PlaceOrigins"), origins,
                      {.x = device::GroupCount(tlases, kInstanceGroup)});
