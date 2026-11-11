@@ -1041,7 +1041,7 @@ void Viewport::ShowClouds(const RenderOutput& output) {
                                     .pickable = false};
         if (!cloud.points.Empty()) {
             OverlayStyle style = anchored;
-            style.size = cloud.stage ? 4 : 3;
+            style.size = cloud.stage ? 4.0f : 3.0f;
             style.marker = cloud.stage ? MarkerShape::Square : MarkerShape::Circle;
             shown.Add(OverlayMarkers{.points = cloud.points,
                                      .colors = cloud.colors,
