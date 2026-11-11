@@ -4,8 +4,12 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <optional>
+#include <string>
 #include <thread>
+
+#include <fmt/format.h>
 
 #include "ernie/util/log.h"
 
@@ -236,49 +240,76 @@ std::vector<std::array<float, 3>> LinearUplift() {
     return weights;
 }
 
-const SigmoidTable& Sigmoids() {
-    static const SigmoidTable table = [] {
-        const auto start = std::chrono::steady_clock::now();
-        constexpr uint32_t n = kSigmoidResolution;
-        SigmoidTable made;
-        made.scales.resize(n);
-        const auto smoothstep = [](float x) { return x * x * (3 - 2 * x); };
-        for (uint32_t k = 0; k < n; ++k) {
-            made.scales[k] = smoothstep(smoothstep(float(k) / float(n - 1)));
-        }
-        made.coefficients.assign(size_t(3) * n * n * n * 3, 0);
-        std::vector<std::thread> workers;
-        for (uint32_t l = 0; l < 3; ++l) {
-            workers.emplace_back([&made, l] {
-                for (uint32_t y = 0; y < n; ++y) {
-                    for (uint32_t x = 0; x < n; ++x) {
-                        const auto fit = [&](uint32_t zi, std::array<float, 3> c) {
-                            c = FitSigmoid(TableColor(l, made.scales[zi], y, x), c);
-                            std::copy(c.begin(), c.end(),
-                                      made.coefficients.begin() +
-                                          ptrdiff_t(TableIndex(l, zi, y, x)));
-                            return c;
-                        };
-                        const uint32_t middle = n / 5;
-                        std::array<float, 3> c{};
-                        for (uint32_t zi = middle; zi < n; ++zi) {
-                            c = fit(zi, c);
-                        }
-                        c = {};
-                        for (uint32_t zi = middle; zi-- > 0;) {
-                            c = fit(zi, c);
-                        }
+namespace {
+
+SigmoidTable FitSigmoidTable() {
+    const auto start = std::chrono::steady_clock::now();
+    constexpr uint32_t n = kSigmoidResolution;
+    SigmoidTable made;
+    made.scales.resize(n);
+    const auto smoothstep = [](float x) { return x * x * (3 - 2 * x); };
+    for (uint32_t k = 0; k < n; ++k) {
+        made.scales[k] = smoothstep(smoothstep(float(k) / float(n - 1)));
+    }
+    made.coefficients.assign(size_t(3) * n * n * n * 3, 0);
+    std::vector<std::thread> workers;
+    for (uint32_t l = 0; l < 3; ++l) {
+        workers.emplace_back([&made, l] {
+            for (uint32_t y = 0; y < n; ++y) {
+                for (uint32_t x = 0; x < n; ++x) {
+                    const auto fit = [&](uint32_t zi, std::array<float, 3> c) {
+                        c = FitSigmoid(TableColor(l, made.scales[zi], y, x), c);
+                        std::copy(c.begin(), c.end(),
+                                  made.coefficients.begin() + ptrdiff_t(TableIndex(l, zi, y, x)));
+                        return c;
+                    };
+                    const uint32_t middle = n / 5;
+                    std::array<float, 3> c{};
+                    for (uint32_t zi = middle; zi < n; ++zi) {
+                        c = fit(zi, c);
+                    }
+                    c = {};
+                    for (uint32_t zi = middle; zi-- > 0;) {
+                        c = fit(zi, c);
                     }
                 }
-            });
-        }
-        for (std::thread& worker : workers) {
-            worker.join();
-        }
-        Log(LogLevel::Debug, "fitted the {}-cubed RGB sigmoid uplift table in {:.1f} s", n,
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
-        return made;
-    }();
+            }
+        });
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    Log(LogLevel::Debug, "fitted the {}-cubed RGB sigmoid uplift table in {:.1f} s", n,
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+    return made;
+}
+
+}
+
+SigmoidTable CachedSigmoids(const DiskCache& cache) {
+    constexpr size_t n = kSigmoidResolution;
+    constexpr size_t scaleBytes = n * sizeof(float);
+    constexpr size_t coefficientBytes = 3 * n * n * n * 3 * sizeof(float);
+    const std::string key = fmt::format("sigmoid uplift table {}", ERNIE_UPLIFT_DIGEST);
+    if (const std::optional<std::string> bytes = cache.Load(key);
+        bytes && bytes->size() == scaleBytes + coefficientBytes) {
+        SigmoidTable loaded;
+        loaded.scales.resize(n);
+        loaded.coefficients.resize(coefficientBytes / sizeof(float));
+        std::memcpy(loaded.scales.data(), bytes->data(), scaleBytes);
+        std::memcpy(loaded.coefficients.data(), bytes->data() + scaleBytes, coefficientBytes);
+        return loaded;
+    }
+    SigmoidTable made = FitSigmoidTable();
+    std::string bytes(scaleBytes + coefficientBytes, '\0');
+    std::memcpy(bytes.data(), made.scales.data(), scaleBytes);
+    std::memcpy(bytes.data() + scaleBytes, made.coefficients.data(), coefficientBytes);
+    cache.Store(key, bytes);
+    return made;
+}
+
+const SigmoidTable& Sigmoids() {
+    static const SigmoidTable table = CachedSigmoids(DiskCache(UserCacheDirectory() / "uplift"));
     return table;
 }
 }

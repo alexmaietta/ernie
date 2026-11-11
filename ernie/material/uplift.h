@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "ernie/util/disk_cache.h"
+
 namespace ernie {
 
 inline constexpr uint32_t kSigmoidResolution = 32;
@@ -15,6 +17,8 @@ struct SigmoidTable {
     std::vector<float> scales;
     std::vector<float> coefficients;
 };
+
+SigmoidTable CachedSigmoids(const DiskCache& cache);
 
 const SigmoidTable& Sigmoids();
 

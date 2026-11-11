@@ -2,8 +2,11 @@
 #include "ernie/material/uplift.h"
 
 #include <array>
+#include <filesystem>
 
 #include <gtest/gtest.h>
+
+#include "support/support.h"
 
 namespace ernie {
 namespace {
@@ -30,6 +33,16 @@ TEST(UpliftTest, TheTableCoversEveryColour) {
               size_t(3) * kSigmoidResolution * kSigmoidResolution * kSigmoidResolution * 3);
     EXPECT_EQ(table.scales.front(), 0);
     EXPECT_EQ(table.scales.back(), 1);
+}
+
+TEST(UpliftTest, TheCachedTableMatchesTheFittedOne) {
+    const test::TemporaryDirectory directory;
+    const DiskCache cache(directory.Path());
+    const SigmoidTable fitted = CachedSigmoids(cache);
+    EXPECT_FALSE(std::filesystem::is_empty(directory.Path()));
+    const SigmoidTable loaded = CachedSigmoids(cache);
+    EXPECT_EQ(loaded.scales, fitted.scales);
+    EXPECT_EQ(loaded.coefficients, fitted.coefficients);
 }
 
 }
