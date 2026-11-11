@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
-#include <format>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/queue.h"
@@ -25,7 +26,7 @@ struct Tensors {
 };
 
 Tensors& Prepare(int64_t bytes, int64_t copies) {
-    return bench::Cached<Tensors>(std::format("{}/{}", bytes, copies), [&] {
+    return bench::Cached<Tensors>(fmt::format("{}/{}", bytes, copies), [&] {
         Device& device = bench::BenchDevice();
         const int64_t words = bytes / 4;
         std::vector<uint32_t> host(size_t(words * copies));
@@ -131,7 +132,7 @@ const bool kRegistered = [] {
     for (const auto& [layout, name] : {std::pair{Layout::Contiguous, "contiguous"},
                                        std::pair{Layout::EveryOtherRow, "every_other_row"},
                                        std::pair{Layout::Transposed, "transposed"}}) {
-        add(benchmark::RegisterBenchmark(std::format("Device/Tensor/Read/layout:{}", name), Read,
+        add(benchmark::RegisterBenchmark(fmt::format("Device/Tensor/Read/layout:{}", name), Read,
                                          layout));
     }
     add(benchmark::RegisterBenchmark("Device/Tensor/ReadTyped", ReadTyped));

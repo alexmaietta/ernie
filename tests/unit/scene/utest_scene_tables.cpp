@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include <algorithm>
 #include <cstdint>
-#include <format>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/bvh/builder.h"
@@ -136,10 +136,10 @@ TEST(TableTrackingTest, ReadersRunOnlyWhenTheirTablesAreWritten) {
         Fixture f(device);
         std::vector<uint32_t> balls;
         for (uint32_t i = 0; i < 2; ++i) {
-            f.structure.Define(SchemaId::World, std::vector<std::string>{std::format("/Env{}", i)});
+            f.structure.Define(SchemaId::World, std::vector<std::string>{fmt::format("/Env{}", i)});
             balls.push_back(f.structure
                                 .Define(SchemaId::Sphere,
-                                        std::vector<std::string>{std::format("/Env{}/Ball", i)})
+                                        std::vector<std::string>{fmt::format("/Env{}/Ball", i)})
                                 .firstPrim);
         }
         f.Publish();
@@ -191,7 +191,7 @@ TEST(TableTrackingTest, GrowingPastTheTableRebuildsItAndHeldSnapshotsKeepTheOldO
 
         std::vector<std::string> paths;
         for (uint32_t i = 0; i < 5000; ++i) {
-            paths.push_back(std::format("/Many{}", i));
+            paths.push_back(fmt::format("/Many{}", i));
         }
         scene->Define<Sphere>(Span<const std::string>(paths), {.translate = {0, 0, 7}});
         scene->Publish().Wait();
@@ -263,7 +263,7 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
             f.structure.Define(SchemaId::Xform, std::vector<std::string>{"/Group"}).firstPrim;
         std::vector<std::string> pads;
         for (uint32_t i = 0; i < 150; ++i) {
-            pads.push_back(std::format("/Pad{}", i));
+            pads.push_back(fmt::format("/Pad{}", i));
         }
         f.structure.Define(SchemaId::Sphere, pads);
         f.Publish();
@@ -275,7 +275,7 @@ TEST(TableTrackingTest, SmallStructuralEditsUpdateInPlaceWithoutRebuilding) {
         ASSERT_GE(room, 70u);
         std::vector<std::string> paths;
         for (uint32_t i = 0; i < 70; ++i) {
-            paths.push_back(std::format("/Group/Ball{}", i));
+            paths.push_back(fmt::format("/Group/Ball{}", i));
         }
         const uint32_t first = f.structure.Define(SchemaId::Sphere, paths).firstPrim;
         f.One(group, SchemaId::Xformable).Get<Double3>(kXformableTranslate).Set(Double3{0, 3, 0});

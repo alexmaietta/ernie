@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <fmt/format.h>
 #include <vulkan/vulkan_core.h>
 
 #define XR_USE_GRAPHICS_API_VULKAN
@@ -15,7 +16,6 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <format>
 #include <string>
 #include <thread>
 #include <utility>
@@ -576,7 +576,7 @@ class OpenXrRuntime final : public Runtime {
         Check(created, "xrCreateInstance");
         XrInstanceProperties properties{XR_TYPE_INSTANCE_PROPERTIES};
         Check(xrGetInstanceProperties(m_instance, &properties), "xrGetInstanceProperties");
-        m_runtimeName = std::format("{} {}.{}.{}", properties.runtimeName,
+        m_runtimeName = fmt::format("{} {}.{}.{}", properties.runtimeName,
                                     XR_VERSION_MAJOR(properties.runtimeVersion),
                                     XR_VERSION_MINOR(properties.runtimeVersion),
                                     XR_VERSION_PATCH(properties.runtimeVersion));

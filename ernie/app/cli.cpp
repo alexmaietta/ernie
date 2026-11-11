@@ -9,9 +9,10 @@
 #include <deque>
 #include <exception>
 #include <filesystem>
-#include <format>
 #include <optional>
 #include <string_view>
+
+#include <fmt/format.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -97,7 +98,7 @@ void PrintDevices() {
 constexpr double kStep = 1.0 / 60;
 
 std::string WorldPath(uint32_t world) {
-    return world == 0 ? std::string("/World") : std::format("/World_{}", world);
+    return world == 0 ? std::string("/World") : fmt::format("/World_{}", world);
 }
 
 void PrintProfile() {
@@ -119,7 +120,7 @@ Ref<Scene> DefaultScene(device::Device& device, uint32_t worlds, bool waitForKer
                                                     {"Yellow", {0.9f, 0.7f, 0.2f}},
                                                     {"Purple", {0.6f, 0.4f, 0.8f}}};
     for (const auto& [name, color] : looks) {
-        const std::string look = std::format("/World/Looks/{}", name);
+        const std::string look = fmt::format("/World/Looks/{}", name);
         const Prim material = scene->Define<Material>(look);
         const Prim surface = scene->Define<Shader>(look + "/Surface", {.id = "UsdPreviewSurface"});
         surface.Set(UsdPreviewSurface::kDiffuseColor, color);

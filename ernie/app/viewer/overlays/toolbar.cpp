@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/viewer/overlays/toolbar.h"
 
+#include <fmt/format.h>
 #include <imgui_stdlib.h>
 
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstring>
-#include <format>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -235,7 +235,7 @@ void Toolbar::DrawSettingsMenu() {
             if (width == 1280) {
                 ImGui::SeparatorText("Displays");
             }
-            const std::string label = std::format("{} x {}", width, height);
+            const std::string label = fmt::format("{} x {}", width, height);
             if (ImGui::MenuItem(label.c_str(), nullptr,
                                 resolution.custom && resolution.width == width &&
                                     resolution.height == height)) {
@@ -273,7 +273,7 @@ void Toolbar::DrawSettingsMenu() {
     }
     if (ImGui::BeginMenu("Render Scale")) {
         for (const int percent : {25, 50, 75, 100, 125, 150, 200}) {
-            const std::string label = std::format("{}%", percent);
+            const std::string label = fmt::format("{}%", percent);
             if (ImGui::MenuItem(label.c_str(), nullptr,
                                 std::abs(resolution.scale * 100 - float(percent)) < 0.5f)) {
                 resolution.scale = float(percent) / 100;

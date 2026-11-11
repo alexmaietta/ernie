@@ -3,8 +3,9 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <format>
 #include <string_view>
+
+#include <fmt/format.h>
 
 #include "ernie/util/text.h"
 
@@ -34,9 +35,8 @@ std::string Cases(const MaterialDefinitionSet& set, std::string_view standard,
     std::string cases;
     for (const MaterialDefinition& definition : set.Definitions()) {
         const std::string_view call = definition.surface ? surface : standard;
-        cases +=
-            std::format("    }} else if (context.definition == {}) {{\n        {}\n", definition.id,
-                        std::vformat(call, std::make_format_args(definition.type)));
+        cases += fmt::format("    }} else if (context.definition == {}) {{\n        {}\n",
+                             definition.id, fmt::format(fmt::runtime(call), definition.type));
     }
     return cases;
 }
@@ -45,8 +45,8 @@ std::string Dispatch(const MaterialDefinitionSet& set) {
     std::string imports;
     std::string linked;
     for (const MaterialDefinition& definition : set.Definitions()) {
-        imports += std::format("import {};\n", definition.module);
-        linked += std::format(" || definition == {}", definition.id);
+        imports += fmt::format("import {};\n", definition.module);
+        linked += fmt::format(" || definition == {}", definition.id);
     }
     return FillTemplate(
         Embedded(ernie_material_dispatch, ernie_material_dispatch_size),
@@ -65,22 +65,22 @@ std::string Expression(const ShadingGraph& graph, const GraphLayout& layout, uin
     const MaterialNodeInput& declared = graph.nodes[node].node->inputs[input];
     const bool spectral = declared.type == MaterialInputType::Spectral;
     if (binding.kind == BindingKind::Pattern) {
-        return spectral ? std::format("SpectralValue.Rgb(r{})", binding.source)
-                        : std::format("r{}", binding.source);
+        return spectral ? fmt::format("SpectralValue.Rgb(r{})", binding.source)
+                        : fmt::format("r{}", binding.source);
     }
-    const std::string cell = std::format("p.n{}_{}", node, declared.name);
+    const std::string cell = fmt::format("p.n{}_{}", node, declared.name);
     if (binding.kind == BindingKind::Texture) {
         const std::string sampled =
-            std::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]",
+            fmt::format("texels.texels[{0}], texels.Handle({0}), &p.textures[{0}]",
                         layout.textures[node][input]);
         if (declared.type == MaterialInputType::Float) {
-            return std::format("TexturedFloat({}, {})", cell, sampled);
+            return fmt::format("TexturedFloat({}, {})", cell, sampled);
         }
-        const std::string color = std::format("TexturedColor({}, {})", cell, sampled);
-        return spectral ? std::format("SpectralValue.Rgb({})", color) : color;
+        const std::string color = fmt::format("TexturedColor({}, {})", cell, sampled);
+        return spectral ? fmt::format("SpectralValue.Rgb({})", color) : color;
     }
     if (spectral) {
-        return std::format("({0}_spectrum != kNoSpectrum ? SpectralValue.Library({0}_spectrum) : "
+        return fmt::format("({0}_spectrum != kNoSpectrum ? SpectralValue.Library({0}_spectrum) : "
                            "SpectralValue.Rgb({0}.Vector()))",
                            cell);
     }
@@ -112,22 +112,22 @@ std::string Call(const ShadingGraph& graph, const GraphLayout& layout, uint32_t 
             break;
         }
     }
-    return std::format("        const {} r{} = {}({});\n", InputInfo(definition.result).slangType,
+    return fmt::format("        const {} r{} = {}({});\n", InputInfo(definition.result).slangType,
                        node, definition.name, Join(arguments));
 }
 
 std::string ParamsFields(const ShadingGraph& graph, const GraphLayout& layout) {
     std::string fields;
     if (layout.textureCount > 0) {
-        fields += std::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
+        fields += fmt::format("    TextureInput textures[{}];\n    MappingRecord mapping;\n",
                               layout.textureCount);
     }
     for (uint32_t node = 0; node < graph.nodes.size(); ++node) {
         for (const MaterialNodeInput& input : graph.nodes[node].node->inputs) {
             fields +=
-                std::format("    {} n{}_{};\n", InputInfo(input.type).cellType, node, input.name);
+                fmt::format("    {} n{}_{};\n", InputInfo(input.type).cellType, node, input.name);
             if (input.type == MaterialInputType::Spectral) {
-                fields += std::format("    uint n{}_{}_spectrum;\n", node, input.name);
+                fields += fmt::format("    uint n{}_{}_spectrum;\n", node, input.name);
             }
         }
     }
@@ -142,7 +142,7 @@ std::string AddImports(const ShadingGraph& graph, MaterialDefinition& module) {
         if (module.files.contains(file)) {
             continue;
         }
-        imports += std::format("import {};\n", definition.module);
+        imports += fmt::format("import {};\n", definition.module);
         module.files.emplace(file, definition.source);
         module.origins.emplace_back(file, definition.file);
         module.origins.emplace_back(definition.module + ".slang", definition.file);
@@ -155,16 +155,16 @@ std::string Body(const ShadingGraph& graph, const GraphLayout& layout) {
     const MaterialNodeDefinition& top = *graph.nodes[surface].node;
     std::string body;
     if (layout.textureCount > 0) {
-        body += std::format("        const SurfaceTexels<{0}> texels = SampleNodeTextures<{0}>("
+        body += fmt::format("        const SurfaceTexels<{0}> texels = SampleNodeTextures<{0}>("
                             "context, &p.mapping, &p.textures[0]);\n",
                             layout.textureCount);
     }
     for (uint32_t node = 0; node < surface; ++node) {
         body += Call(graph, layout, node);
     }
-    body += std::format("        {} node;\n", top.name);
+    body += fmt::format("        {} node;\n", top.name);
     for (uint32_t input = 0; input < top.inputs.size(); ++input) {
-        body += std::format("        node.{} = {};\n", top.inputs[input].name,
+        body += fmt::format("        node.{} = {};\n", top.inputs[input].name,
                             Expression(graph, layout, surface, input));
     }
     return body;
@@ -223,8 +223,8 @@ MaterialDefinition GenerateMaterialDefinition(uint32_t id, const ShadingGraph& g
     const GraphLayout layout = LayOut(graph);
     const MaterialNodeDefinition& top = *graph.nodes.back().node;
     MaterialDefinition module{.id = id,
-                              .type = std::format("Definition{}", id),
-                              .module = std::format("ernie.material.generated.d{}", id),
+                              .type = fmt::format("Definition{}", id),
+                              .module = fmt::format("ernie.material.generated.d{}", id),
                               .words = layout.bytes / uint32_t(sizeof(uint32_t)),
                               .surface = top.role == MaterialNodeRole::Surface};
     const std::string& type = module.type;
@@ -260,10 +260,10 @@ ClosurePrimitiveSources(std::span<const std::shared_ptr<const ClosurePrimitive>>
     std::string direction;
     for (const std::shared_ptr<const ClosurePrimitive>& primitive : primitives) {
         sources[ModulePath(primitive->module)] = primitive->source;
-        imports += std::format("import {};\n", primitive->module);
-        kinds += std::format("static const uint kLobe{} = {};\n", primitive->name, primitive->kind);
+        imports += fmt::format("import {};\n", primitive->module);
+        kinds += fmt::format("static const uint kLobe{} = {};\n", primitive->name, primitive->kind);
         const auto add = [&](std::string& cases, std::string_view call) {
-            cases += std::format("    case {}:\n        return {}.{};\n", primitive->kind,
+            cases += fmt::format("    case {}:\n        return {}.{};\n", primitive->kind,
                                  primitive->name, call);
         };
         add(glossy, "Glossy()");

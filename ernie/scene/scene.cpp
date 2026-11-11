@@ -6,12 +6,13 @@
 #include <charconv>
 #include <cstdint>
 #include <cstring>
-#include <format>
 #include <initializer_list>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "ernie/device/program.h"
 #include "ernie/scene/scene_impl.h"
@@ -527,7 +528,7 @@ PrimRange Scene::Clone(Prim source, uint32_t count, const CloneDesc& desc) {
     std::vector<std::string> targets;
     targets.reserve(count);
     for (uint64_t copy = first; copy < first + count; ++copy) {
-        targets.push_back(std::format("{}{}{}{}", std::string_view(path).substr(0, slash + 1), stem,
+        targets.push_back(fmt::format("{}{}{}{}", std::string_view(path).substr(0, slash + 1), stem,
                                       separator, copy));
     }
     return Clone(source, targets, desc);

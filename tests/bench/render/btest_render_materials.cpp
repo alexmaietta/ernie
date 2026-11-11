@@ -5,13 +5,14 @@
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <functional>
 #include <map>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/io/image.h"
@@ -58,9 +59,9 @@ std::string Texture() {
 }
 
 std::filesystem::path NodeFile(uint32_t index) {
-    const std::filesystem::path path = Directory() / std::format("bench_node_{}.slang", index);
+    const std::filesystem::path path = Directory() / fmt::format("bench_node_{}.slang", index);
     std::filesystem::create_directories(Directory());
-    std::ofstream(path) << std::format(R"(
+    std::ofstream(path) << fmt::format(R"(
 import ernie.material;
 
 struct BenchNode{0} {{
@@ -112,7 +113,7 @@ void DefineLook(Scene& scene, Look look, const std::string& path, uint32_t index
     }
     const uint32_t node = index % std::max(definitions, 1u);
     const Prim surface =
-        scene.Define<Shader>(path + "/Surface", {.id = std::format("BenchNode{}", node)});
+        scene.Define<Shader>(path + "/Surface", {.id = fmt::format("BenchNode{}", node)});
     surface.Set("tint", Float3{hue, 0.4f, 1 - hue});
     material.Connect("surface", surface, "surface");
     if (look == Look::NodeTextured) {
@@ -134,7 +135,7 @@ Setup Build(device::Device& device, Look look, uint32_t materials, uint32_t defi
     Setup setup{scene};
     scene->Define<Scope>("/Looks");
     for (uint32_t m = 0; m < materials; ++m) {
-        const std::string path = std::format("/Looks/Look_{}", m);
+        const std::string path = fmt::format("/Looks/Look_{}", m);
         DefineLook(*scene, look, path, m, definitions);
         setup.shaders.push_back(path + "/Surface");
     }
@@ -147,9 +148,9 @@ Setup Build(device::Device& device, Look look, uint32_t materials, uint32_t defi
                          .faceVertexIndices = {0, 1, 2, 3},
                          .faceVertexCounts = {4}});
     for (uint32_t i = 0; i < objects; ++i) {
-        const std::string path = std::format("/Box_{}", i);
+        const std::string path = fmt::format("/Box_{}", i);
         scene->Define<Sphere>(path,
-                              {.materialBinding = {std::format("/Looks/Look_{}", i % materials)},
+                              {.materialBinding = {fmt::format("/Looks/Look_{}", i % materials)},
                                .translate = {(double(i % side) - side / 2.0) * 1.1,
                                              (double(i / side) - side / 2.0) * 1.1, 0.5},
                                .radius = 0.45f});
@@ -279,7 +280,7 @@ void Publish(benchmark::State& state, const Edit& edit) {
         return;
     }
     Setup& setup =
-        bench::Cached<Setup>(std::format("publish/{}/{}/{}", materials, thermal, infrared), [&] {
+        bench::Cached<Setup>(fmt::format("publish/{}/{}/{}", materials, thermal, infrared), [&] {
             return Build(bench::BenchDevice(), Look::Preview, materials, 1, thermal, infrared,
                          materials, false);
         });
@@ -318,7 +319,7 @@ void Shade(benchmark::State& state) {
         return;
     }
     Rendered& rendered = bench::Cached<Rendered>(
-        std::format("shade/{}/{}/{}/{}", int(look), definitions, materials, render), [&] {
+        fmt::format("shade/{}/{}/{}/{}", int(look), definitions, materials, render), [&] {
             Setup setup = Build(bench::BenchDevice(), look, materials, definitions, false, false,
                                 256, render);
             const Clock::time_point start = Clock::now();
@@ -362,7 +363,7 @@ const bool kRegistered = [] {
         for (const int64_t materials : {16, 1024, 8192}) {
             for (const int64_t thermal : {0, 1}) {
                 for (const int64_t infrared : {0, 1}) {
-                    benchmark::RegisterBenchmark(std::format("Material/Publish/{}", edit.name),
+                    benchmark::RegisterBenchmark(fmt::format("Material/Publish/{}", edit.name),
                                                  Publish, edit)
                         ->ArgNames({"materials", "thermal", "infrared"})
                         ->Args({materials, thermal, infrared})

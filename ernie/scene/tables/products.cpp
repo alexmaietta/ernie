@@ -3,9 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <format>
 #include <initializer_list>
 #include <optional>
+
+#include <fmt/format.h>
 
 #include "ernie/scene/records/render_tables.h"
 #include "ernie/scene/scene.h"
@@ -576,7 +577,7 @@ void ProductTable::Resolve() {
         if (!same && product.error.empty()) {
             std::string sources;
             for (const ResolvedVar& var : product.vars) {
-                sources += std::format(
+                sources += fmt::format(
                     "{}{}", sources.empty() ? "" : ", ",
                     var.output.empty() ? std::string(kRenderVarSourceTokens[uint32_t(var.source)])
                                        : var.output);
@@ -584,7 +585,7 @@ void ProductTable::Resolve() {
             Log(LogLevel::Debug, "resolved {}: {} at {} x {} writing {}{}",
                 m_scene.ByIndex(prim).Path(), Counted(product.sensors.size(), "sensor"),
                 product.width, product.height, sources.empty() ? "nothing" : sources,
-                product.frameRate > 0 ? std::format(", capturing at {} Hz", product.frameRate)
+                product.frameRate > 0 ? fmt::format(", capturing at {} Hz", product.frameRate)
                                       : "");
         }
         m_records.Set(prims.Row(prim, SchemaId::RenderProduct), product.record);

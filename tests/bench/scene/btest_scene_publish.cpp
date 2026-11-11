@@ -3,11 +3,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <format>
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/device.h"
@@ -81,7 +82,7 @@ Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::
     std::vector<std::string> props;
     for (uint32_t i = 0; i < kProps; ++i) {
         const Prim prop = scene->Define<Sphere>(
-            std::format("/env_0/Prop_{}", i),
+            fmt::format("/env_0/Prop_{}", i),
             {.materialBinding = {"/Looks/Paint"}, .translate = {double(i % 4), double(i / 4), 0}});
         scene->Apply<SemanticsLabelsAPI>(prop, "class", {.semanticsLabels = {"prop"}});
     }
@@ -90,7 +91,7 @@ Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::
     scene->Define<SphereLight>("/env_0/Lamp", {.translate = {0, 0, 3}});
     std::vector<std::string> targets;
     for (uint32_t w = 1; w < worlds; ++w) {
-        targets.push_back(std::format("/env_{}", w));
+        targets.push_back(fmt::format("/env_{}", w));
     }
     if (!targets.empty()) {
         scene->Clone(*scene->Find("/env_0"), targets);
@@ -108,15 +109,15 @@ Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::
     std::vector<std::string> moved;
     std::vector<std::string> sheets;
     for (uint32_t w = 0; w < worlds; ++w) {
-        sheets.push_back(std::format("/env_{}/Sheet", w));
+        sheets.push_back(fmt::format("/env_{}/Sheet", w));
         for (uint32_t i = 0; i < kProps; ++i) {
-            moved.push_back(std::format("/env_{}/Prop_{}", w, i));
+            moved.push_back(fmt::format("/env_{}/Prop_{}", w, i));
         }
     }
     std::vector<std::string> some;
     for (uint32_t w = 0; w < worlds; w += 10) {
         for (uint32_t i = 0; i < kProps; ++i) {
-            some.push_back(std::format("/env_{}/Prop_{}", w, i));
+            some.push_back(fmt::format("/env_{}/Prop_{}", w, i));
         }
     }
     Setup setup{scene,
@@ -126,7 +127,7 @@ Setup Prepare(uint32_t worlds, bool dome, device::Traversal traversal = device::
                 scene->Select(moved).Get<Float3>("displayColor"),
                 scene->Select(sheets).GetArray<Float3>("points")};
     for (uint32_t w = 0; w < worlds; ++w) {
-        setup.spawned.push_back(std::format("/env_{}/Spawned", w));
+        setup.spawned.push_back(fmt::format("/env_{}/Spawned", w));
     }
     setup.points.Set(0, Wave(0.5));
     scene->Publish({.wait = true}).Wait();
@@ -288,7 +289,7 @@ void Publish(benchmark::State& state, const Edit& edit) {
         state.range(2) != 0 ? device::Traversal::Hardware : device::Traversal::Software;
     Setup* found = nullptr;
     try {
-        found = &bench::Cached<Setup>(std::format("publish/{}/{}/{}", worlds, dome, int(traversal)),
+        found = &bench::Cached<Setup>(fmt::format("publish/{}/{}/{}", worlds, dome, int(traversal)),
                                       [&] { return Prepare(worlds, dome, traversal); });
     } catch (const UnsupportedError& error) {
         state.SkipWithMessage(error.what());
@@ -316,11 +317,11 @@ void Publish(benchmark::State& state, const Edit& edit) {
 void Plan(benchmark::State& state) {
     const auto products = uint32_t(state.range(0));
     const bool edited = state.range(1) != 0;
-    Setup& setup = bench::Cached<Setup>(std::format("plan/{}", products), [&] {
+    Setup& setup = bench::Cached<Setup>(fmt::format("plan/{}", products), [&] {
         Setup made = Prepare(products, false);
         for (uint32_t p = 1; p < products; ++p) {
-            made.scene->Define<RenderProduct>(std::format("/Render/View_{}", p),
-                                              {.camera = {std::format("/env_{}/Cam", p)},
+            made.scene->Define<RenderProduct>(fmt::format("/Render/View_{}", p),
+                                              {.camera = {fmt::format("/env_{}/Cam", p)},
                                                .resolution = {64, 64},
                                                .orderedVars = {"/Render/Color"}});
         }
@@ -329,7 +330,7 @@ void Plan(benchmark::State& state) {
     });
     std::vector<std::string> paths = {"/Render/View"};
     for (uint32_t p = 1; p < products; ++p) {
-        paths.push_back(std::format("/Render/View_{}", p));
+        paths.push_back(fmt::format("/Render/View_{}", p));
     }
     ProductPlans& plans = SceneImpl::Get(*setup.scene).GetPlans();
     for (auto _ : state) {
@@ -348,11 +349,11 @@ void Plan(benchmark::State& state) {
 
 void Schedule(benchmark::State& state) {
     const auto products = uint32_t(state.range(0));
-    Setup& setup = bench::Cached<Setup>(std::format("plan/{}", products), [&] {
+    Setup& setup = bench::Cached<Setup>(fmt::format("plan/{}", products), [&] {
         Setup made = Prepare(products, false);
         for (uint32_t p = 1; p < products; ++p) {
-            made.scene->Define<RenderProduct>(std::format("/Render/View_{}", p),
-                                              {.camera = {std::format("/env_{}/Cam", p)},
+            made.scene->Define<RenderProduct>(fmt::format("/Render/View_{}", p),
+                                              {.camera = {fmt::format("/env_{}/Cam", p)},
                                                .resolution = {64, 64},
                                                .orderedVars = {"/Render/Color"}});
         }
@@ -383,7 +384,7 @@ const bool kRegistered = [] {
                                        name != "pose-one"))) {
                         continue;
                     }
-                    benchmark::RegisterBenchmark(std::format("Scene/Publish/{}", edit.name),
+                    benchmark::RegisterBenchmark(fmt::format("Scene/Publish/{}", edit.name),
                                                  Publish, edit)
                         ->ArgNames({"worlds", "dome", "hardware"})
                         ->Args({worlds, dome, hardware})

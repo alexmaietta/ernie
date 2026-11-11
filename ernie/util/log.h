@@ -36,7 +36,7 @@ void Log(LogLevel level, fmt::format_string<Args...> format, Args&&... args) {
 }
 
 inline std::string Counted(uint64_t count, std::string_view noun) {
-    return std::format("{} {}{}", count, noun, count == 1 ? "" : "s");
+    return fmt::format("{} {}{}", count, noun, count == 1 ? "" : "s");
 }
 #endif
 

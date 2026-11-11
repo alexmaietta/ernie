@@ -270,7 +270,7 @@ void DefineLook(Scene& scene, std::string_view at, const Look& look) {
     material.Connect("surface", surface, "surface");
     std::vector<Prim> placements;
     for (size_t index = 0; index < look.placements.size(); ++index) {
-        const std::string name = index == 0 ? "Placement" : std::format("Placement_{}", index + 1);
+        const std::string name = index == 0 ? "Placement" : fmt::format("Placement_{}", index + 1);
         placements.push_back(
             scene.Define<TexturePlacement>(root + "/" + name, look.placements[index]));
     }
@@ -440,12 +440,12 @@ std::vector<std::string> DefineMaterials(ImportPlan& plan, std::string_view path
     if (data.materials.empty()) {
         return looks;
     }
-    const std::string scope = std::format("{}/{}", path, children.Take("Looks", "Looks"));
+    const std::string scope = fmt::format("{}/{}", path, children.Take("Looks", "Looks"));
     plan.Define<Scope>(scope);
     ChildNames names;
     for (const tinyobj::material_t& material : data.materials) {
         context.Report("materials", looks.size(), data.materials.size());
-        const std::string look = std::format("{}/{}", scope, names.Take(material.name, "Material"));
+        const std::string look = fmt::format("{}/{}", scope, names.Take(material.name, "Material"));
         plan.Add(look, [built = SurfaceBuilder(material, look, source, plan).Build()](
                            Scene& scene, std::string_view at) { DefineLook(scene, at, built); });
         Log(LogLevel::Debug, "read OBJ material \"{}\" for {}", material.name, look);

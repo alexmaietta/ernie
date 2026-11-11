@@ -676,11 +676,11 @@ ReflectedNodes ReflectNodes(Backend backend, const KernelLibrary* library,
     slang::IModule* loaded =
         session->loadModule(std::string(module).c_str(), diagnostics.writeRef());
     if (loaded == nullptr) {
-        Fail(std::format("Loading {}", label), label, diagnostics);
+        Fail(fmt::format("Loading {}", label), label, diagnostics);
     }
     slang::ProgramLayout* layout = loaded->getLayout(0, diagnostics.writeRef());
     if (layout == nullptr) {
-        Fail(std::format("Reflecting {}", label), label, diagnostics);
+        Fail(fmt::format("Reflecting {}", label), label, diagnostics);
     }
     ReflectedNodes nodes;
     for (slang::DeclReflection* decl : loaded->getModuleReflection()->getChildren()) {

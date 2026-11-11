@@ -2,11 +2,12 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
-#include <format>
 #include <optional>
 #include <random>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/device.h"
@@ -161,7 +162,7 @@ struct Setup {
 };
 
 std::string Path(const Shape& shape, uint32_t world) {
-    return shape.worlds == 1 ? std::string("/Cloud") : std::format("/env_{}/Cloud", world);
+    return shape.worlds == 1 ? std::string("/Cloud") : fmt::format("/env_{}/Cloud", world);
 }
 
 void DefineCloud(Scene& scene, const Shape& shape, const std::string& path, const Cloud& cloud) {
@@ -190,7 +191,7 @@ void DefineCloud(Scene& scene, const Shape& shape, const std::string& path, cons
     std::vector<std::string> grains;
     grains.reserve(cloud.points.size());
     for (size_t i = 0; i < cloud.points.size(); ++i) {
-        grains.push_back(std::format("{}/Grain_{}", path, i));
+        grains.push_back(fmt::format("{}/Grain_{}", path, i));
     }
     scene.Define<Sphere>(Span<const std::string>(grains), {.displayColor = {0.7f, 0.6f, 0.4f}});
     std::vector<Double3> translates;
@@ -218,7 +219,7 @@ UntypedAttribute Moved(Scene& scene, const Shape& shape, const View& clouds) {
     }
     std::vector<std::string> grains;
     for (uint32_t i = 0; i < shape.points; ++i) {
-        grains.push_back(std::format("{}/Grain_{}", Path(shape, 0), i));
+        grains.push_back(fmt::format("{}/Grain_{}", Path(shape, 0), i));
     }
     return scene.Select(grains).Get<Double3>("translate");
 }
@@ -246,9 +247,9 @@ Setup Prepare(const Shape& shape, device::Traversal traversal) {
     if (shape.worlds > 1) {
         std::vector<std::string> targets;
         for (uint32_t w = 1; w < shape.worlds; ++w) {
-            targets.push_back(std::format("/env_{}", w));
+            targets.push_back(fmt::format("/env_{}", w));
             clouds.push_back(Path(shape, w));
-            views.push_back(std::format("/env_{}/Eye", w));
+            views.push_back(fmt::format("/env_{}/Eye", w));
         }
         scene->Clone(*scene->Find("/env_0"), targets);
     }
@@ -359,7 +360,7 @@ void Run(benchmark::State& state, const Shape& shape, bool hardware) {
     Setup* setup = nullptr;
     try {
         setup = &bench::Cached<Setup>(
-            std::format("{}/{}/{}/{}/{}/{}/{}", Name(shape.family), Name(shape.layout),
+            fmt::format("{}/{}/{}/{}/{}/{}/{}", Name(shape.family), Name(shape.layout),
                         Name(shape.motion), shape.worlds, shape.points, shape.perBox, hardware),
             [&] { return Prepare(shape, traversal); });
     } catch (const UnsupportedError& error) {
@@ -462,7 +463,7 @@ const bool kRegistered = [] {
                 continue;
             }
             benchmark::RegisterBenchmark(
-                std::format("Render/Points/World/{}/motion:{}", Name(layout), Name(motion)), Single,
+                fmt::format("Render/Points/World/{}/motion:{}", Name(layout), Name(motion)), Single,
                 Family::Points, layout, motion)
                 ->ArgsProduct({{1000, 10000, 100000, 1000000, 4000000, 16000000}, hardware})
                 ->ArgNames({"points", "hardware"})
@@ -472,7 +473,7 @@ const bool kRegistered = [] {
     }
     for (const Motion motion : motions) {
         benchmark::internal::Benchmark* registered = benchmark::RegisterBenchmark(
-            std::format("Render/Points/Worlds/box/motion:{}", Name(motion)), Batched, motion);
+            fmt::format("Render/Points/Worlds/box/motion:{}", Name(motion)), Batched, motion);
         registered->ArgNames({"worlds", "points", "hardware"});
         for (const int64_t worlds : {16, 256, 1024, 4096}) {
             for (const int64_t points : {1000, 10000, 50000}) {
@@ -493,7 +494,7 @@ const bool kRegistered = [] {
     for (const auto& [family, counts] : baselines) {
         for (const Motion motion : {Motion::Stationary, Motion::Moving}) {
             benchmark::RegisterBenchmark(
-                std::format("Render/Points/Baseline/{}/motion:{}", Name(family), Name(motion)),
+                fmt::format("Render/Points/Baseline/{}/motion:{}", Name(family), Name(motion)),
                 Single, family, Layout::Box, motion)
                 ->ArgsProduct({counts, hardware})
                 ->ArgNames({"points", "hardware"})
@@ -504,7 +505,7 @@ const bool kRegistered = [] {
     for (const Layout layout : {Layout::Box, Layout::Splash, Layout::Bed}) {
         for (const Motion motion : {Motion::Stationary, Motion::Moving}) {
             benchmark::RegisterBenchmark(
-                std::format("Render/Points/Clusters/{}/motion:{}", Name(layout), Name(motion)),
+                fmt::format("Render/Points/Clusters/{}/motion:{}", Name(layout), Name(motion)),
                 Clustered, layout, motion)
                 ->ArgsProduct({{1}, {100000, 1000000, 4000000}, {1, 2, 4, 8}, hardware})
                 ->ArgsProduct({{1024}, {10000}, {1, 4, 8}, hardware})

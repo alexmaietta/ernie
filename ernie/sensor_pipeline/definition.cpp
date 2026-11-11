@@ -3,7 +3,8 @@
 
 #include <algorithm>
 #include <bit>
-#include <format>
+
+#include <fmt/format.h>
 
 namespace ernie::sensor_pipeline {
 
@@ -148,21 +149,21 @@ std::vector<uint32_t> PackWords(const SensorPipelineDefinition& definition,
 std::string ReadParameter(const ParameterDef& parameter, std::string_view context, uint32_t word) {
     switch (parameter.type) {
     case ParameterType::Int:
-        return std::format("asint({}.ParameterBits({}))", context, word);
+        return fmt::format("asint({}.ParameterBits({}))", context, word);
     case ParameterType::Bool:
-        return std::format("{}.ParameterBits({}) != 0", context, word);
+        return fmt::format("{}.ParameterBits({}) != 0", context, word);
     case ParameterType::Float:
         break;
     }
     if (parameter.words == 1) {
-        return std::format("{}.Parameter({})", context, word);
+        return fmt::format("{}.Parameter({})", context, word);
     }
     std::string components;
     for (uint32_t component = 0; component < parameter.words; ++component) {
-        components += std::format("{}{}.Parameter({})", component == 0 ? "" : ", ", context,
+        components += fmt::format("{}{}.Parameter({})", component == 0 ? "" : ", ", context,
                                   word + component);
     }
-    return std::format("float{}({})", parameter.words, components);
+    return fmt::format("float{}({})", parameter.words, components);
 }
 
 }

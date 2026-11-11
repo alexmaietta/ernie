@@ -170,7 +170,7 @@ void Editor::ApplyApi(SchemaId api, const std::string& instance) {
                 error.what());
         }
     };
-    std::string name = std::format("Apply {}", Info(api).name);
+    std::string name = fmt::format("Apply {}", Info(api).name);
     if (!instance.empty()) {
         name += ":" + instance;
     }

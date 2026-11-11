@@ -3,11 +3,11 @@
 
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <span>
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/device/queue.h"
@@ -321,7 +321,7 @@ TEST(RayCastTest, RecountedPointsHitOnlyTheLivingAcrossCapacityChanges) {
         constexpr uint32_t kRays = 96;
         for (const auto& [traversal, perBox] : kPointLayouts) {
             SCOPED_TRACE(
-                std::format("traversal {} with {} points per box", int(traversal), perBox));
+                fmt::format("traversal {} with {} points per box", int(traversal), perBox));
             const Ref<Scene> scene =
                 Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
             const auto line = [](uint32_t count, float x, float z) {
@@ -413,7 +413,7 @@ TEST(RayCastTest, TranslucentPointsBlockRaysInProportionToTheirOpacity) {
         constexpr uint32_t kRays = 4096;
         for (const auto& [traversal, perBox] : kPointLayouts) {
             SCOPED_TRACE(
-                std::format("traversal {} with {} points per box", int(traversal), perBox));
+                fmt::format("traversal {} with {} points per box", int(traversal), perBox));
             const Ref<Scene> scene =
                 Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
             const Prim veil = scene->Define<Points>(
@@ -473,7 +473,7 @@ TEST(RayCastTest, SmallPointsFarAwayHitAtTheirEdges) {
     ForEachDevice([](Device& device) {
         for (const auto& [traversal, perBox] : kPointLayouts) {
             SCOPED_TRACE(
-                std::format("traversal {} with {} points per box", int(traversal), perBox));
+                fmt::format("traversal {} with {} points per box", int(traversal), perBox));
             const Ref<Scene> scene =
                 Scene::Create(device, {.traversal = traversal, .pointsPerBox = perBox});
             scene->Define<Points>(

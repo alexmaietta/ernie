@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
-#include <format>
 #include <memory>
 #include <numbers>
 #include <optional>
@@ -11,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <imgui.h>
 
 #include "ernie/app/viewer/panels/panels.h"
@@ -297,7 +297,7 @@ class XrMode : public RenderDelegate, public XrPanel, public std::enable_shared_
         ImGui::Checkbox("Play area", &m_visuals.playArea);
         for (const float rate : status.refreshRates) {
             ImGui::SameLine();
-            if (ImGui::SmallButton(std::format("{:.0f} Hz", rate).c_str())) {
+            if (ImGui::SmallButton(fmt::format("{:.0f} Hz", rate).c_str())) {
                 m_session->SetRefreshRate(rate);
             }
         }

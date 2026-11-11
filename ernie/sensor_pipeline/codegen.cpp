@@ -3,9 +3,10 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <format>
 #include <set>
 #include <string_view>
+
+#include <fmt/format.h>
 
 #include "ernie/util/error.h"
 #include "ernie/util/text.h"
@@ -35,7 +36,7 @@ std::string NodeType(const NodeDef& def, const ResolvedNode& node) {
     for (const uint32_t choice : node.uniforms) {
         choices.push_back(std::to_string(choice));
     }
-    return std::format("{}<{}>", def.code.type, Join(choices));
+    return fmt::format("{}<{}>", def.code.type, Join(choices));
 }
 
 std::string_view Embedded(const unsigned char* bytes, std::size_t size) {
@@ -61,9 +62,9 @@ class Generator {
         : m_definition(definition), m_pipeline(definition.pipeline), m_registry(registry),
           m_storedSlot(definition.pipeline.values.size(), kNoValue) {
         m_generated.module =
-            std::format("ernie.sensor_pipeline.generated.definition{}", definition.id);
+            fmt::format("ernie.sensor_pipeline.generated.definition{}", definition.id);
         m_generated.path =
-            std::format("ernie/sensor_pipeline/generated/definition{}.slang", definition.id);
+            fmt::format("ernie/sensor_pipeline/generated/definition{}.slang", definition.id);
         for (const StoredValue& stored : definition.segments.stored) {
             m_storedSlot[stored.value] = uint32_t(m_generated.slots.size());
             m_generated.slots.push_back(stored.value);
@@ -111,7 +112,7 @@ class Generator {
     }
 
     std::string Context(uint32_t node) const {
-        return std::format("PointContext(p, element, {}, {}, {})", node,
+        return fmt::format("PointContext(p, element, {}, {}, {})", node,
                            m_definition.parameterOffsets[node], m_definition.stateOffsets[node]);
     }
 
@@ -146,7 +147,7 @@ class Generator {
 
     void Write(uint32_t value, std::string_view expression) {
         for (const uint32_t slot : OutputSlots(value)) {
-            Emit(std::format("    WriteSignal(p, element, {}, {});\n", slot, expression));
+            Emit(fmt::format("    WriteSignal(p, element, {}, {});\n", slot, expression));
         }
     }
 
@@ -160,7 +161,7 @@ class Generator {
         }
         std::string imports;
         for (const std::string& module : modules) {
-            imports += std::format("import {};\n", module);
+            imports += fmt::format("import {};\n", module);
         }
         m_generated.source =
             FillTemplate(Embedded(ernie_sensor_pipeline_module, ernie_sensor_pipeline_module_size),
@@ -179,7 +180,7 @@ class Generator {
         const std::string type = NodeType(def, resolved);
         const std::vector<uint32_t> slots = OutputSlots(resolved.outputs[0]);
 
-        BeginKernel(std::format("Segment{}Partial", index), DispatchShape::ReduceGroups);
+        BeginKernel(fmt::format("Segment{}Partial", index), DispatchShape::ReduceGroups);
         Emit(FillTemplate(Embedded(ernie_sensor_pipeline_reduce_partial,
                                    ernie_sensor_pipeline_reduce_partial_size),
                           {{"type", type},
@@ -189,12 +190,12 @@ class Generator {
                            {"slot", std::to_string(slots.front())}}));
         EndKernel();
 
-        BeginKernel(std::format("Segment{}Finish", index), DispatchShape::Captures);
-        Emit(std::format(
+        BeginKernel(fmt::format("Segment{}Finish", index), DispatchShape::Captures);
+        Emit(fmt::format(
             "    const CaptureStat total = {}.Finish({}, SumStatPartials(p, capture, {}));\n", type,
             Context(node), slots.front()));
         for (const uint32_t slot : slots) {
-            Emit(std::format("    WriteStat(p, capture, {}, total);\n", slot));
+            Emit(fmt::format("    WriteStat(p, capture, {}, total);\n", slot));
         }
         EndKernel();
     }
@@ -211,8 +212,8 @@ class Generator {
         for (uint32_t pass = 0; pass < def.passes; ++pass) {
             const uint32_t previous = pass == 0 ? input : resolved.scratch[pass - 1];
             const bool last = pass + 1 == def.passes;
-            BeginKernel(std::format("Segment{}Pass{}", index, pass), DispatchShape::Elements);
-            Emit(std::format("    {0} result;\n"
+            BeginKernel(fmt::format("Segment{}Pass{}", index, pass), DispatchShape::Elements);
+            Emit(fmt::format("    {0} result;\n"
                              "    {1}.Evaluate({2}, {3}, Neighborhood<{0}>(p, element, {4}),\n"
                              "        Neighborhood<{0}>(p, element, {5}), result);\n",
                              SlangType(output), NodeType(def, resolved), Context(node), pass,
@@ -223,7 +224,7 @@ class Generator {
     }
 
     void AddFused(uint32_t index) {
-        BeginKernel(std::format("Segment{}", index), DispatchShape::Elements);
+        BeginKernel(fmt::format("Segment{}", index), DispatchShape::Elements);
         std::set<uint32_t> available;
         for (const uint32_t node : m_definition.segments.segments[index].nodes) {
             std::vector<std::string> arguments;
@@ -237,7 +238,7 @@ class Generator {
             }
             for (const uint32_t value : Node(node).outputs) {
                 available.insert(value);
-                Write(value, std::format("v{}", value));
+                Write(value, fmt::format("v{}", value));
             }
         }
         EndKernel();
@@ -251,17 +252,17 @@ class Generator {
         if (value == kNoValue) {
             return taken == SignalType::CaptureStat
                        ? std::string("CaptureStat.Zero()")
-                       : std::format("{}.Make(Channels(0))", Signal(taken).slangType);
+                       : fmt::format("{}.Make(Channels(0))", Signal(taken).slangType);
         }
         if (def.kind == NodeKind::Stencil && port == 0) {
             if (m_storedSlot[value] == kNoValue) {
                 throw Error("{} is a stencil, but its {} isn't stored", resolved.path,
                             def.inputs[port].name);
             }
-            Emit(std::format(
+            Emit(fmt::format(
                 "    const Neighborhood<{0}> n{1} = Neighborhood<{0}>(p, element, {2});\n",
                 SlangType(value), value, m_storedSlot[value]));
-            return std::format("n{}", value);
+            return fmt::format("n{}", value);
         }
         if (!available.contains(value)) {
             if (m_storedSlot[value] == kNoValue) {
@@ -270,23 +271,23 @@ class Generator {
             }
             Emit(
                 taken == SignalType::CaptureStat
-                    ? std::format("    const CaptureStat v{} = ReadStat(p, element.capture, {});\n",
+                    ? fmt::format("    const CaptureStat v{} = ReadStat(p, element.capture, {});\n",
                                   value, m_storedSlot[value])
-                    : std::format("    const {0} v{1} = ReadSignal<{0}>(p, element, {2});\n",
+                    : fmt::format("    const {0} v{1} = ReadSignal<{0}>(p, element, {2});\n",
                                   SlangType(value), value, m_storedSlot[value]));
             available.insert(value);
         }
-        return std::format("v{}", value);
+        return fmt::format("v{}", value);
     }
 
     void Apply(uint32_t node, std::vector<std::string> arguments) {
         const NodeDef& def = Def(node);
-        const std::string context = std::format("context{}", node);
-        Emit(std::format("    const PointContext {} = {};\n", context, Context(node)));
-        Emit(std::format("    {} node{};\n", def.code.type, node));
+        const std::string context = fmt::format("context{}", node);
+        Emit(fmt::format("    const PointContext {} = {};\n", context, Context(node)));
+        Emit(fmt::format("    {} node{};\n", def.code.type, node));
         uint32_t word = 0;
         for (const ParameterDef& parameter : def.parameters) {
-            Emit(std::format("    node{}.{} = {};\n", node, parameter.name,
+            Emit(fmt::format("    node{}.{} = {};\n", node, parameter.name,
                              ReadParameter(parameter, context, word)));
             word += parameter.words;
         }
@@ -295,17 +296,17 @@ class Generator {
             arguments.insert(arguments.begin() + ptrdiff_t(at), context);
         }
         const uint32_t value = Node(node).outputs.front();
-        Emit(std::format("    const {} v{} = node{}.Apply({});\n", SlangType(value), value, node,
+        Emit(fmt::format("    const {} v{} = node{}.Apply({});\n", SlangType(value), value, node,
                          Join(arguments)));
     }
 
     void Evaluate(uint32_t node, std::vector<std::string> arguments) {
         arguments.insert(arguments.begin(), Context(node));
         for (const uint32_t value : Node(node).outputs) {
-            Emit(std::format("    {} v{};\n", SlangType(value), value));
-            arguments.push_back(std::format("v{}", value));
+            Emit(fmt::format("    {} v{};\n", SlangType(value), value));
+            arguments.push_back(fmt::format("v{}", value));
         }
-        Emit(std::format("    {}.Evaluate({});\n", NodeType(Def(node), Node(node)),
+        Emit(fmt::format("    {}.Evaluate({});\n", NodeType(Def(node), Node(node)),
                          Join(arguments)));
     }
 
@@ -323,11 +324,11 @@ class Generator {
                 }
                 const uint32_t value = resolved.inputs[port];
                 arguments.push_back(value == kNoValue ? std::string("CaptureStat.Zero()")
-                                                      : std::format("ReadStat(p, capture, {})",
+                                                      : fmt::format("ReadStat(p, capture, {})",
                                                                     m_storedSlot[value]));
             }
-            BeginKernel(std::format("Segment{}Update{}", index, node), DispatchShape::Captures);
-            Emit(std::format("    {}.Update({});\n", NodeType(def, resolved), Join(arguments)));
+            BeginKernel(fmt::format("Segment{}Update{}", index, node), DispatchShape::Captures);
+            Emit(fmt::format("    {}.Update({});\n", NodeType(def, resolved), Join(arguments)));
             EndKernel();
         }
     }
@@ -338,7 +339,7 @@ class Generator {
         for (uint32_t output = 0; output < m_pipeline.outputs.size(); ++output) {
             const uint32_t value = m_pipeline.outputs[output].value;
             if (Def(m_pipeline.values[value].node).kind == NodeKind::Source) {
-                copies += std::format(
+                copies += fmt::format(
                     "    WriteSignal(p, element, {}, ReadSignal<{}>(p, element, {}));\n",
                     stored + output, SlangType(value), m_storedSlot[value]);
             }

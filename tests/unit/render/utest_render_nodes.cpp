@@ -3,13 +3,13 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <regex>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/io/image.h"
@@ -125,7 +125,7 @@ bool Placeholder(Float3 pixel) {
 
 TEST(MaterialNodeTest, NewMaterialsShowThePlaceholderAndChangedOnesTheirPreviousLook) {
     const std::string unique =
-        std::format("\n// {}\n", std::chrono::steady_clock::now().time_since_epoch().count());
+        fmt::format("\n// {}\n", std::chrono::steady_clock::now().time_since_epoch().count());
     const std::filesystem::path file = WriteFile(
         "ernie_render_nodes_fresh.slang",
         std::regex_replace(std::string(kTint), std::regex("TestTint"), "TestFresh") + unique);
@@ -318,7 +318,7 @@ struct TestOrange {
 }
 
 std::string HotNode(std::string_view color, std::string_view inputs) {
-    return std::format(R"(
+    return fmt::format(R"(
 import ernie.material;
 
 struct TestHot {{

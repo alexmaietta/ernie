@@ -385,7 +385,7 @@ void Materials(benchmark::State& state) {
         scene->Define<Scope>("/Looks");
         for (uint32_t m = 0; m < materials; ++m) {
             const float hue = float(m % 97) / 97;
-            const std::string path = std::format("/Looks/Look_{}", m);
+            const std::string path = fmt::format("/Looks/Look_{}", m);
             const Prim material = scene->Define<Material>(path);
             const Prim surface =
                 scene->Define<Shader>(path + "/Surface", {.id = "UsdPreviewSurface"});

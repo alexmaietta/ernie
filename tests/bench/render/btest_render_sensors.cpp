@@ -5,12 +5,13 @@
 #include <ctime>
 #include <deque>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "bench.h"
 #include "ernie/device/queue.h"
@@ -42,7 +43,7 @@ void Props(Scene& scene) {
     scene.Define<Plane>("/Ground", {.width = 0, .length = 0});
     for (int i = 0; i < 12; ++i) {
         const double angle = i * 0.5236;
-        scene.Define<Cube>(std::format("/Box{}", i),
+        scene.Define<Cube>(fmt::format("/Box{}", i),
                            {.translate = {12 * std::cos(angle), 12 * std::sin(angle), 1},
                             .displayColor = {0.3f + 0.05f * float(i), 0.5f, 0.6f},
                             .size = 2});
@@ -133,7 +134,7 @@ Stepper PrepareCamera(Graph graph, uint32_t cameras, uint32_t height) {
         graph == Graph::None ? "ElectronRate" : DefineCameraGraph(*scene, graph);
     std::vector<std::string> paths;
     for (uint32_t camera = 0; camera < cameras; ++camera) {
-        const std::string path = std::format("/Cam{}", camera);
+        const std::string path = fmt::format("/Cam{}", camera);
         const double angle = camera * 6.2832 / cameras;
         const Double3 eye{4 * std::cos(angle), 4 * std::sin(angle), 1.5};
         const Prim prim = scene->Define<Camera>(
@@ -165,7 +166,7 @@ void CameraSteps(benchmark::State& state) {
     const auto cameras = uint32_t(state.range(1));
     const auto height = uint32_t(state.range(2));
     Stepper& stepper =
-        bench::Cached<Stepper>(std::format("camera/{}/{}/{}", int(graph), cameras, height),
+        bench::Cached<Stepper>(fmt::format("camera/{}/{}/{}", int(graph), cameras, height),
                                [&] { return PrepareCamera(graph, cameras, height); });
     Steps(state, stepper, "Mpx/s");
 }
@@ -195,7 +196,7 @@ void Pipe(Scene& scene, Returns returns, const char* source,
     Prim last = scene.Define<Shader>("/Pipe/Returns", {.id = source});
     if (returns == Returns::Chain) {
         for (const char* id : chain) {
-            last = Node(scene, std::format("/Pipe/{}", id), id, last, "returns", "returns");
+            last = Node(scene, fmt::format("/Pipe/{}", id), id, last, "returns", "returns");
         }
     }
     const Prim cloud = Node(scene, "/Pipe/Cloud", "ToPointCloud", last, "returns", "returns");
@@ -245,7 +246,7 @@ Stepper PrepareLidar(Returns returns, uint32_t beams) {
 void LidarSteps(benchmark::State& state) {
     const auto returns = Returns(state.range(0));
     const auto beams = uint32_t(state.range(1));
-    Stepper& stepper = bench::Cached<Stepper>(std::format("lidar/{}/{}", int(returns), beams),
+    Stepper& stepper = bench::Cached<Stepper>(fmt::format("lidar/{}/{}", int(returns), beams),
                                               [&] { return PrepareLidar(returns, beams); });
     Steps(state, stepper, "Mbeams/s");
 }
@@ -276,7 +277,7 @@ Stepper PrepareRadar(Returns returns, uint32_t columns) {
 void RadarSteps(benchmark::State& state) {
     const auto returns = Returns(state.range(0));
     const auto columns = uint32_t(state.range(1));
-    Stepper& stepper = bench::Cached<Stepper>(std::format("radar/{}/{}", int(returns), columns),
+    Stepper& stepper = bench::Cached<Stepper>(fmt::format("radar/{}/{}", int(returns), columns),
                                               [&] { return PrepareRadar(returns, columns); });
     Steps(state, stepper, "Mrays/s");
 }
@@ -316,7 +317,7 @@ void StandaloneRuns(benchmark::State& state) {
     const auto graph = Graph(state.range(0));
     const auto height = uint32_t(state.range(1));
     Standalone& setup =
-        bench::Cached<Standalone>(std::format("standalone/{}/{}", int(graph), height),
+        bench::Cached<Standalone>(fmt::format("standalone/{}/{}", int(graph), height),
                                   [&] { return PrepareStandalone(graph, height); });
     for (auto _ : state) {
         const SensorPipelineOutputs outputs = setup.pipeline->Run(setup.run);
@@ -330,7 +331,7 @@ std::filesystem::path WriteNode() {
     static std::atomic<uint64_t> version{uint64_t(std::time(nullptr)) << 20};
     const std::filesystem::path file =
         std::filesystem::temp_directory_path() / "ernie_bench_sensor_node.slang";
-    std::ofstream(file) << std::format(R"(
+    std::ofstream(file) << fmt::format(R"(
 import ernie.sensor_pipeline;
 using namespace ernie;
 
@@ -415,7 +416,7 @@ Viewed PrepareViewed(uint32_t beams) {
 void ViewerClouds(benchmark::State& state) {
     const auto clouds = Clouds(state.range(0));
     const auto beams = uint32_t(state.range(1));
-    Viewed& viewed = bench::Cached<Viewed>(std::format("viewed/{}", beams),
+    Viewed& viewed = bench::Cached<Viewed>(fmt::format("viewed/{}", beams),
                                            [&] { return PrepareViewed(beams); });
     Overlays& overlays = *viewed.stepper.renderer.GetOverlays();
     overlays.Remove("clouds");

@@ -62,7 +62,7 @@ const ColumnStore::Entry& ColumnStore::Lookup(SchemaId schema) const {
         const SchemaId added = SchemaId(uint32_t(m_entries.size()));
         Entry entry;
         entry.table = std::make_unique<ColumnTable>(
-            m_heap, std::format("{} data", Info(added).name), SchemaColumns(added));
+            m_heap, fmt::format("{} data", Info(added).name), SchemaColumns(added));
         entry.stamps.assign(Info(added).columnCount, kNoStamp);
         entry.writes.assign(Info(added).columnCount, 0);
         m_entries.push_back(std::move(entry));

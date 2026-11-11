@@ -2,13 +2,13 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include <fmt/format.h>
 #include <gtest/gtest.h>
 
 #include "ernie/render/renderer.h"
@@ -39,7 +39,7 @@ std::filesystem::path WriteFile(std::string_view name, std::string_view text) {
 }
 
 std::string OffsetNode(std::string_view name, std::string_view sign) {
-    return std::format(R"(
+    return fmt::format(R"(
 import ernie.sensor_pipeline;
 
 using namespace ernie;

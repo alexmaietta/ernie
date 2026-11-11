@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <format>
 
 #include "ernie/device/queue.h"
 #include "ernie/scene/schema/columns.h"

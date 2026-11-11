@@ -898,8 +898,8 @@ void Viewport::SyncSensorClouds(std::vector<uint32_t> sensors, const std::vector
         const Prim sensor = m_scene->ByIndex(index);
         const bool radar = sensor.IsA(SchemaId::Radar);
         const std::string product = node == kNoPrim
-                                        ? std::format("{}/Cloud{}", root, index)
-                                        : std::format("{}/Cloud{}Stage{}", root, index, node);
+                                        ? fmt::format("{}/Cloud{}", root, index)
+                                        : fmt::format("{}/Cloud{}Stage{}", root, index, node);
         const auto kept = std::ranges::find(m_sensorClouds, product, &SensorCloud::product);
         if (kept != m_sensorClouds.end()) {
             clouds.push_back(std::move(*kept));
