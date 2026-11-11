@@ -267,6 +267,7 @@ ernie_test(
         ernie_device_internal
         ernie_render_internal
         ernie_io_internal
+        ernie_material_internal
     SOURCES
         unit/device/utest_device_runtime_compilers.cpp
 )

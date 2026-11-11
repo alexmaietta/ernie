@@ -17,6 +17,7 @@
 #include "ernie/device/hip/device.h"
 #include "ernie/device/slang/compiler.h"
 #include "ernie/io/kernels.h"
+#include "ernie/material/codegen.h"
 #include "ernie/overlay/kernels.h"
 #include "ernie/render/kernels.h"
 #include "ernie/scene/kernels.h"
@@ -119,7 +120,8 @@ void CompileEveryKernel(Backend backend, Load load, std::span<const char* const>
         GTEST_SKIP() << error.what();
     }
     const DiskCache cache(UserCacheDirectory());
-    const SourceFiles sources;
+    const SourceFiles sources =
+        material::MaterialDispatchSources(material::MaterialDefinitionSet{});
     const compute::SourceHeader prelude{kPreludeHeader, Traits::Prelude()};
     bool first = true;
     for (const RuntimeProgram& program : RuntimePrograms()) {
