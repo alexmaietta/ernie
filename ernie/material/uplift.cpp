@@ -249,7 +249,7 @@ const SigmoidTable& Sigmoids() {
         made.coefficients.assign(size_t(3) * n * n * n * 3, 0);
         std::vector<std::thread> workers;
         for (uint32_t l = 0; l < 3; ++l) {
-            workers.emplace_back([&made, l, n] {
+            workers.emplace_back([&made, l] {
                 for (uint32_t y = 0; y < n; ++y) {
                     for (uint32_t x = 0; x < n; ++x) {
                         const auto fit = [&](uint32_t zi, std::array<float, 3> c) {
