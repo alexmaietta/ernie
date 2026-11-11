@@ -59,10 +59,12 @@ jobs:
           mkdir -p coverage
           gcovr --root . --filter 'ernie/' --object-directory build-coverage \
             --exclude-unreachable-branches --exclude-throw-branches \
+            --gcov-ignore-parse-errors=suspicious_hits.warn_once_per_file \
             --html-details coverage/index.html --json-summary coverage/summary.json \
             --cobertura coverage/cobertura.xml --print-summary
           gcovr --root . --filter 'ernie/[^/]+/kernels/' --object-directory build-coverage \
             --exclude-unreachable-branches --exclude-throw-branches \
+            --gcov-ignore-parse-errors=suspicious_hits.warn_once_per_file \
             --json-summary coverage/kernel-summary.json
           cp build-coverage/python-coverage.xml coverage/
       - name: Summary
