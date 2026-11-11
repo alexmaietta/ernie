@@ -184,7 +184,7 @@ void UntypedAttribute::Write(Span<const std::byte> cells) {
     Retype(nodes);
 }
 
-void UntypedAttribute::Retype(std::span<const SchemaId> nodes) {
+void UntypedAttribute::Retype(Span<const SchemaId> nodes) {
     if (nodes.empty()) {
         return;
     }

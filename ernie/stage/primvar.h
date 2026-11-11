@@ -2,7 +2,6 @@
 #pragma once
 
 #include <array>
-#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -42,9 +41,13 @@ struct Primvar {
         Primvar primvar{std::move(name), kPrimvarType<T>, interpolation};
         if constexpr (std::is_same_v<T, double> || std::is_same_v<T, Double3>) {
             for (const T& value : values) {
-                for (const double component :
-                     std::bit_cast<std::array<double, sizeof(T) / 8>>(value)) {
-                    primvar.words.push_back(std::bit_cast<uint32_t>(float(component)));
+                std::array<double, sizeof(T) / 8> components;
+                std::memcpy(components.data(), &value, sizeof(T));
+                for (const double component : components) {
+                    const float narrowed = float(component);
+                    uint32_t word;
+                    std::memcpy(&word, &narrowed, sizeof(word));
+                    primvar.words.push_back(word);
                 }
             }
         } else {
