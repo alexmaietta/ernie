@@ -466,8 +466,8 @@ int RunCommand(const Command& command) {
     if (viewer) {
         run = FindViewer();
         if (run == nullptr) {
-            throw Error("This Ernie has no viewer; install the viewer with Ernie's ernie-viewer "
-                        "package or the ernie-renderer wheel, or render with --headless");
+            throw Error("This Ernie has no viewer. Install it with the ernie-viewer package or "
+                        "the ernie-renderer wheel, or render with --headless");
         }
         if (desc.adapter.empty()) {
             desc.backend = device::Backend::Vulkan;
