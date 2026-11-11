@@ -65,10 +65,10 @@ TEST(RenderOriginTest, EachWorldRendersPreciselyNearItsFarAwayCamera) {
         scene->Define<World>("/env_0");
         scene->Define<World>("/env_1");
         DefineCamera(*scene, "/env_0/Cam", {kAu, 0, 0}, {kAu, 1, 0});
-        scene->Define<Sphere>("/env_0/Pebble", {.translate = {kAu, 2, 0}, .radius = 0.01});
+        scene->Define<Sphere>("/env_0/Pebble", {.translate = {kAu, 2, 0}, .radius = 0.01f});
         DefineCamera(*scene, "/env_1/Cam", {-0.5 * kAu, 3e8, 0}, {-0.5 * kAu, 3e8 + 1, 0});
         scene->Define<Sphere>("/env_1/Pebble",
-                              {.translate = {-0.5 * kAu, 3e8 + 1.5, 0}, .radius = 0.1});
+                              {.translate = {-0.5 * kAu, 3e8 + 1.5, 0}, .radius = 0.1f});
         DefineProduct(*scene, {"/env_0/Cam", "/env_1/Cam"}, RenderMode::Minimal);
         Renderer renderer(scene);
         const Frames frames = Render(renderer);
@@ -84,7 +84,7 @@ TEST(RenderOriginTest, FollowsTheCameraAsItMovesAndSwitches) {
         DefineCamera(*scene, "/Other", {-kAu, 0, 5e9}, {-kAu, 1, 5e9});
         scene->Define<Sphere>("/Near", {.translate = {kAu, 2, 0}, .radius = 0.5});
         scene->Define<Sphere>("/Ahead", {.translate = {kAu + 5000, 3, 0}, .radius = 0.5});
-        scene->Define<Sphere>("/Away", {.translate = {-kAu, 1.3, 5e9}, .radius = 0.05});
+        scene->Define<Sphere>("/Away", {.translate = {-kAu, 1.3, 5e9}, .radius = 0.05f});
         DefineProduct(*scene, {"/Cam"}, RenderMode::Minimal);
         Renderer renderer(scene);
         EXPECT_NEAR(Render(renderer).Depth(0), 1.5, 1e-4);
@@ -105,7 +105,7 @@ Frames RenderLitGround(Device& device, double x) {
                                     .faceVertexIndices = {0, 1, 2, 3},
                                     .faceVertexCounts = {4}});
     scene->Define<SphereLight>("/Lamp",
-                               {.translate = {x + 1, 0, 1}, .intensity = 100, .radius = 0.1});
+                               {.translate = {x + 1, 0, 1}, .intensity = 100, .radius = 0.1f});
     DefineProduct(*scene, {"/Cam"}, RenderMode::RealTime);
     Renderer renderer(scene);
     return Render(renderer);
@@ -137,7 +137,7 @@ Shown ShownSite(Device& device, double x, bool composed) {
     scene.Define<World>("/Site");
     scene.Define<Sphere>(site + "/Ball", {.translate = {x + shift, 0, 0}, .radius = 1});
     scene.Define<SphereLight>(
-        site + "/Lamp", {.translate = {x + shift + 1, -2, 1}, .intensity = 100, .radius = 0.1});
+        site + "/Lamp", {.translate = {x + shift + 1, -2, 1}, .intensity = 100, .radius = 0.1f});
     if (composed) {
         shown.composed = scene.ComposeWorld(
             viewer, {.worlds = {scene.Find("/Site")->World()}, .offsets = {{10, 0, 0}}});

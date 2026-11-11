@@ -348,8 +348,8 @@ TEST(RayCastTest, RecountedPointsHitOnlyTheLivingAcrossCapacityChanges) {
             rays.origins = Floats(device, origins, 3);
             rays.directions = Floats(device, directions, 3);
             const std::pair<uint32_t, float> steps[] = {
-                {64, 3}, {40, 3}, {40, 4}, {50, 4}, {64, 3}, {64, 5},
-                {90, 3}, {70, 3}, {70, 4}, {20, 3}, {0, 3},  {33, 6},
+                {64, 3.0f}, {40, 3.0f}, {40, 4.0f}, {50, 4.0f}, {64, 3.0f}, {64, 5.0f},
+                {90, 3.0f}, {70, 3.0f}, {70, 4.0f}, {20, 3.0f}, {0, 3.0f},  {33, 6.0f},
             };
             for (const auto& [count, x] : steps) {
                 SCOPED_TRACE(count);

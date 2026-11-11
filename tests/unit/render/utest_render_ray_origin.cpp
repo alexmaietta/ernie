@@ -82,7 +82,7 @@ void ExpectShortWallShadowsTheGroundBehindIt(bool mesh, RenderMode mode = Render
         const Ref<Scene> scene =
             SunScene(device, {behind.x, 0, 2000}, behind, {elevation, 0, elevation}, mode, 30000);
         DefineGround(*scene, mesh, {distance, 0, 0});
-        scene->Define<Cube>("/Wall", {.translate = {distance, 0, 0.05}, .size = 0.1});
+        scene->Define<Cube>("/Wall", {.translate = {distance, 0, 0.05}, .size = 0.1f});
         Renderer renderer(scene);
         EXPECT_EQ(Render(renderer).Red(kWidth / 2, kHeight / 2), 0);
 
