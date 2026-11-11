@@ -279,7 +279,7 @@ TEST(SensorPipelineIspTest, VignetteDarkensCornersAndDenoiseKeepsEdges) {
         for (uint32_t y = 0; y < kSide; ++y) {
             for (uint32_t x = 0; x < kSide; ++x) {
                 for (uint32_t c = 0; c < 3; ++c) {
-                    edge.rates.push_back(x < kSide / 2 ? 6554 : 52428);
+                    edge.rates.push_back(x < kSide / 2 ? 6554.0f : 52428.0f);
                 }
             }
         }
