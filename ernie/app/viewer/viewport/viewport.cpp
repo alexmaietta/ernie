@@ -1000,19 +1000,19 @@ void Viewport::ShowClouds(const RenderOutput& output) {
                 case CloudColor::Intensity:
                     values = points.channels.at("Intensity");
                     options.colormap = Colormap::Viridis;
-                    options.minimum = 0;
+                    options.minimum = 0.0f;
                     options.maximum = cloud.radar ? 10.0f : 1.0f;
                     break;
                 case CloudColor::Range:
                     values = points.channels.at("Distance");
-                    options.minimum = 0;
+                    options.minimum = 0.0f;
                     options.maximum = cloud.range;
                     break;
                 case CloudColor::Height:
                     values = coordinates;
                     options.channel = 1;
-                    options.minimum = -5;
-                    options.maximum = 5;
+                    options.minimum = -5.0f;
+                    options.maximum = 5.0f;
                     break;
                 default:
                     values = points.channels.at("RadialVelocity");
