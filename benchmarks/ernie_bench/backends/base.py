@@ -21,8 +21,15 @@ OUTPUT_FORMATS = {
 
 
 def linear_from_srgb(encoded: np.ndarray) -> np.ndarray:
-    value = encoded.astype(np.float32) / 255
-    return np.where(value <= 0.04045, value / 12.92, ((value + 0.055) / 1.055) ** 2.4).astype(np.float32)
+    value = encoded.astype(np.float32)
+    value /= 255
+    low = value <= 0.04045
+    dark = value[low] / 12.92
+    value += 0.055
+    value /= 1.055
+    np.power(value, 2.4, out=value)
+    value[low] = dark
+    return value
 
 
 def srgb_from_linear(linear) -> np.ndarray:

@@ -4,9 +4,9 @@ import pytest
 
 from ernie_bench.datasets import build_scene, shapes
 from ernie_bench.datasets.hide_and_seek import CLASSES
-from ernie_bench.config import SceneSpec
+from ernie_bench.config import SceneConfig
 
-SPEC = SceneSpec("hide_and_seek", "hide_and_seek", seed=3)
+SPEC = SceneConfig("hide_and_seek", "hide_and_seek", seed=3)
 
 
 @pytest.mark.parametrize("mesh", [shapes.plane(), shapes.box(), shapes.ramp(), shapes.cylinder()], ids=["plane", "box", "ramp", "cylinder"])
@@ -17,10 +17,19 @@ def test_meshes_wind_counter_clockwise_with_unit_normals(mesh):
     assert np.allclose(np.linalg.norm(mesh.normals, axis=1), 1)
 
 
+@pytest.mark.parametrize("mesh", [shapes.box(), shapes.ramp(), shapes.cylinder()], ids=["box", "ramp", "cylinder"])
+def test_closed_meshes_are_watertight_and_face_outward(mesh):
+    import trimesh
+
+    closed = trimesh.Trimesh(mesh.positions, mesh.indices, process=True)
+    assert closed.is_watertight
+    assert closed.volume > 0
+
+
 def test_scene_is_deterministic_per_seed():
     a = build_scene(SPEC, 8, 2)
     b = build_scene(SPEC, 8, 2)
-    c = build_scene(SceneSpec("hide_and_seek", "hide_and_seek", seed=4), 8, 2)
+    c = build_scene(SceneConfig("hide_and_seek", "hide_and_seek", seed=4), 8, 2)
     assert np.array_equal(a.instances.transform, b.instances.transform)
     assert not np.array_equal(a.instances.transform, c.instances.transform)
 
@@ -71,4 +80,24 @@ def test_cameras_are_rigid_and_ride_their_agents():
 
 def test_unknown_param_is_rejected():
     with pytest.raises(ValueError, match="params"):
-        build_scene(SceneSpec("x", "hide_and_seek", params={"lava": True}), 1, 1)
+        build_scene(SceneConfig("x", "hide_and_seek", params={"lava": True}), 1, 1)
+
+
+def test_cameras_never_enter_walls_or_props():
+    scene = build_scene(SceneConfig("h", "hide_and_seek", seed=0, params={"hiders": 3, "seekers": 3}), 64, 6)
+    moving = {int(index): slot for slot, index in enumerate(scene.motion.instance)}
+    solid = np.flatnonzero(np.isin(scene.instances.semantic, [CLASSES.index("wall"), CLASSES.index("box"), CLASSES.index("ramp")]))
+    for step in range(0, 120, 6):
+        state = scene.state(step / 30)
+        for index in solid:
+            if int(index) in moving:
+                transform = state.transform[moving[int(index)]].copy()
+                transform[:3, :3] = transform[:3, :3] * scene.motion.scale[moving[int(index)]]
+            else:
+                transform = scene.instances.transform[index]
+            mesh = scene.meshes[scene.instances.mesh[index]]
+            cameras = np.flatnonzero(scene.cameras.world == scene.instances.world[index])
+            points = np.column_stack([state.camera_translation[cameras], np.ones(len(cameras))]) @ np.linalg.inv(transform).T
+            pad = 0.05 / np.linalg.norm(transform[:3, :3], axis=0)
+            inside = np.all((points[:, :3] >= mesh.positions.min(0) - pad) & (points[:, :3] <= mesh.positions.max(0) + pad), axis=1)
+            assert not inside.any(), (step, int(index))

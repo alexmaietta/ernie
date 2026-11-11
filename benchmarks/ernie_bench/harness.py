@@ -25,7 +25,7 @@ from ernie_bench.backends.base import OUTPUT_FORMATS, BackendInfo
 from ernie_bench.datasets import build_scene
 from ernie_bench.results import RunWriter, Sample
 from ernie_bench.scene import Scene
-from ernie_bench.config import Capture, Measurement, Profile, SceneSpec, Suite, Workload
+from ernie_bench.config import Capture, Measurement, Profile, SceneConfig, Suite, Workload
 from ernie_bench.stats import describe
 from ernie_bench.system import cuda, load, machine, perf, process, tuning
 from ernie_bench.system.monitor import Monitor
@@ -282,7 +282,7 @@ def environment(name: str, root: Path = ROOT) -> str:
 
 def run_worker(
     name: str,
-    spec: SceneSpec,
+    spec: SceneConfig,
     workload: Workload,
     measurement: Measurement,
     locked: dict,
@@ -451,7 +451,6 @@ def run_suite(
     writer, locked = start_run(suite.name, described, root, log, cpus, nice, realtime, "profile" if profiler else "timing")
     manifest = writer.manifest
     order = random.Random(suite.seed)
-    points = suite.points()
     workers = writer.directory / "workers"
     workers.mkdir()
 
@@ -459,7 +458,7 @@ def run_suite(
         monitor = stack.enter_context(Monitor(suite.measurement.monitor_interval, locked)) if isolation == "inline" else None
         for spec in suite.scenes:
             scene, built_for = None, None
-            for workload in points:
+            for workload in suite.scene_points(spec):
                 if isolation == "inline" and built_for != (workload.worlds, workload.cameras_per_world):
                     built_for = (workload.worlds, workload.cameras_per_world)
                     scene = build_scene(spec, *built_for)

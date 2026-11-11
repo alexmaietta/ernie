@@ -11,11 +11,12 @@ CONFIGS = Path(__file__).resolve().parents[1] / "configs"
 
 
 @dataclass(frozen=True)
-class SceneSpec:
+class SceneConfig:
     name: str
     dataset: str
     seed: int = 0
     params: dict = field(default_factory=dict)
+    cameras_per_world: int | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,7 @@ class Profile:
 class Suite:
     name: str
     backends: tuple[str, ...]
-    scenes: tuple[SceneSpec, ...]
+    scenes: tuple[SceneConfig, ...]
     workload: Workload
     measurement: Measurement = Measurement()
     sweep: dict = field(default_factory=dict)
@@ -132,6 +133,11 @@ class Suite:
             points.append(replace(self.workload, **changes))
         return sorted(points, key=lambda w: (w.worlds, w.cameras_per_world))
 
+    def scene_points(self, spec: SceneConfig) -> list[Workload]:
+        if spec.cameras_per_world is None:
+            return self.points()
+        return list(dict.fromkeys(replace(point, cameras_per_world=spec.cameras_per_world) for point in self.points()))
+
 
 def _toml(path: Path) -> dict:
     try:
@@ -141,19 +147,20 @@ def _toml(path: Path) -> dict:
     return tomllib.loads(Path(path).read_text())
 
 
-def load_scene(path: Path) -> SceneSpec:
+def load_scene(path: Path) -> SceneConfig:
     data = _toml(path)
-    return SceneSpec(
+    return SceneConfig(
         name=Path(path).stem,
         dataset=data["dataset"],
         seed=data.get("seed", 0),
         params=data.get("params", {}),
+        cameras_per_world=data.get("cameras_per_world"),
     )
 
 
-def scene_spec(name: str, configs: Path = CONFIGS) -> SceneSpec:
+def scene_spec(name: str, configs: Path = CONFIGS) -> SceneConfig:
     path = configs / "scenes" / f"{name}.toml"
-    return load_scene(path) if path.exists() else SceneSpec(name, name)
+    return load_scene(path) if path.exists() else SceneConfig(name, name)
 
 
 def load_suite(path: Path) -> Suite:

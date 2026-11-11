@@ -29,7 +29,7 @@ enum class TaskGraphID : uint32_t {
 struct Sim : public madrona::WorldBase {
     struct Config {
         const int32_t* instanceObjects;
-        uint32_t numInstances;
+        const uint32_t* worldOffsets;
         uint32_t numCameras;
         float fovY;
         float nearPlane;

@@ -10,6 +10,7 @@
 #include <madrona/render/asset_processor.hpp>
 #include <madrona/render/render_mgr.hpp>
 
+#include <algorithm>
 #include <cstring>
 
 using namespace madrona;
@@ -70,7 +71,13 @@ static HeapArray<imp::SourceMesh> sourceMeshes(const Geometry& geometry) {
 }
 
 Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* instance_objects,
-                 uint32_t instance_count, uint32_t camera_count) {
+                 const uint32_t* world_offsets, uint32_t camera_count) {
+    const uint32_t instance_count = world_offsets[cfg.worldCount];
+    uint32_t max_instances_per_world = 0;
+    for (uint32_t world = 0; world < cfg.worldCount; world++) {
+        max_instances_per_world =
+            std::max(max_instances_per_world, world_offsets[world + 1] - world_offsets[world]);
+    }
     HeapArray<imp::SourceMesh> meshes = sourceMeshes(geometry);
     HeapArray<imp::SourceMesh> object_meshes(geometry.objectCount);
     HeapArray<imp::SourceObject> objects(geometry.objectCount);
@@ -100,7 +107,7 @@ Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* ins
                                .agentViewHeight = cfg.height,
                                .numWorlds = cfg.worldCount,
                                .maxViewsPerWorld = camera_count,
-                               .maxInstancesPerWorld = instance_count,
+                               .maxInstancesPerWorld = max_instances_per_world,
                                .execMode = ExecMode::CUDA,
                                .voxelCfg = {},
                            });
@@ -112,10 +119,13 @@ Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* ins
     int32_t* instance_objects_gpu = (int32_t*)cu::allocGPU(sizeof(int32_t) * instance_count);
     REQ_CUDA(cudaMemcpy(instance_objects_gpu, instance_objects, sizeof(int32_t) * instance_count,
                         cudaMemcpyHostToDevice));
+    uint32_t* world_offsets_gpu = (uint32_t*)cu::allocGPU(sizeof(uint32_t) * (cfg.worldCount + 1));
+    REQ_CUDA(cudaMemcpy(world_offsets_gpu, world_offsets, sizeof(uint32_t) * (cfg.worldCount + 1),
+                        cudaMemcpyHostToDevice));
 
     Sim::Config sim_cfg{
         .instanceObjects = instance_objects_gpu,
-        .numInstances = instance_count,
+        .worldOffsets = world_offsets_gpu,
         .numCameras = camera_count,
         .fovY = cfg.fovY,
         .nearPlane = cfg.nearPlane,
@@ -125,11 +135,25 @@ Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* ins
 
     Optional<CudaBatchRenderConfig> raytrace_cfg = Optional<CudaBatchRenderConfig>::none();
     if (cfg.useRT) {
+        HeapArray<uint32_t> texels(geometry.objectCount);
+        HeapArray<imp::SourceTexture> textures(geometry.objectCount);
+        for (uint32_t object = 0; object < geometry.objectCount; object++) {
+            const float* color = geometry.objectColors + 3 * object;
+            uint32_t texel = 0xFF000000u;
+            for (uint32_t channel = 0; channel < 3; channel++) {
+                const float value = std::clamp(color[channel], 0.f, 1.f);
+                texel |= uint32_t(value * 255.f + 0.5f) << (8 * channel);
+            }
+            texels[object] = texel;
+            textures[object] = {&texels[object], imp::SourceTextureFormat::R8G8B8A8, 1, 1,
+                                sizeof(uint32_t)};
+            materials[object].textureIdx = int32_t(object);
+        }
         raytrace_cfg = CudaBatchRenderConfig{
             .renderMode = CudaBatchRenderConfig::RenderMode::RGBD,
             .geoBVHData = render::AssetProcessor::makeBVHData(objects),
-            .materialData = render::AssetProcessor::initMaterialData(materials.data(),
-                                                                     materials.size(), nullptr, 0),
+            .materialData = render::AssetProcessor::initMaterialData(
+                materials.data(), materials.size(), textures.data(), textures.size()),
             .renderResolution = cfg.width,
             .nearPlane = cfg.nearPlane,
             .farPlane = cfg.farPlane,
@@ -161,6 +185,7 @@ Manager::Manager(const Config& cfg, const Geometry& geometry, const int32_t* ins
         raytrace_graph = gpu_exec.buildRenderGraph();
     }
     cu::deallocGPU(instance_objects_gpu);
+    cu::deallocGPU(world_offsets_gpu);
 
     MWCudaLaunchGraph render_graph = gpu_exec.buildLaunchGraph(TaskGraphID::Render);
     MWCudaLaunchGraph init_graph = gpu_exec.buildLaunchGraph(TaskGraphID::Init);
@@ -188,7 +213,7 @@ Manager::~Manager() {
 }
 
 void Manager::setInstances(const float* positions, const float* rotations, const float* scales) {
-    size_t count = (size_t)impl_->cfg.worldCount * impl_->instanceCount;
+    size_t count = impl_->instanceCount;
     impl_->copyIn(ExportID::InstancePositions, positions, sizeof(Vector3) * count);
     impl_->copyIn(ExportID::InstanceRotations, rotations, sizeof(Quat) * count);
     impl_->copyIn(ExportID::InstanceScales, scales, sizeof(Diag3x3) * count);

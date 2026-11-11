@@ -8,7 +8,7 @@ from conftest import MEASUREMENT, SINGLE_SHOT, SPEC, TOLERANCE, WORKLOAD, Script
 from ernie_bench import harness
 from ernie_bench.datasets import build_scene
 from ernie_bench.results import read_run
-from ernie_bench.config import Measurement, SceneSpec, Suite, Workload
+from ernie_bench.config import Measurement, SceneConfig, Suite, Workload
 from ernie_bench.system.monitor import Monitor
 
 def test_each_phase_reports_its_own_cost(scene, monkeypatch):

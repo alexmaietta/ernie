@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 import numpy as np
 
@@ -68,6 +69,39 @@ class LissajousMotion:
         return compose(position, yaw, np.ones_like(self.scale))
 
 
+class Motion(Protocol):
+    instance: np.ndarray
+    scale: np.ndarray
+
+    def poses(self, time: float) -> np.ndarray: ...
+
+
+@dataclass
+class OrbitMotion:
+    camera: np.ndarray
+    center: np.ndarray
+    radius: np.ndarray
+    height: np.ndarray
+    bob: np.ndarray
+    phase: np.ndarray
+    rate: float
+    yaw: np.ndarray
+    yaw_rate: float
+    pitch: float
+
+    def poses(self, time: float) -> np.ndarray:
+        angle = self.phase + self.rate * time
+        position = np.column_stack(
+            [self.center[:, 0] + self.radius * np.cos(angle), self.center[:, 1] + self.radius * np.sin(angle), self.height + self.bob * np.sin(angle)]
+        )
+        yaw = self.yaw + self.yaw_rate * time
+        cos, sin = np.cos(self.pitch), np.sin(self.pitch)
+        tilt = np.array([[1, 0, 0], [0, -sin, -cos], [0, cos, -sin]])
+        matrix = compose(position, yaw, np.ones((len(position), 3)))
+        matrix[:, :3, :3] = matrix[:, :3, :3] @ tilt.astype(np.float32)
+        return matrix
+
+
 @dataclass
 class State:
     time: float
@@ -91,8 +125,9 @@ class Scene:
     instances: Instances
     cameras: Cameras
     lights: list[DistantLight]
-    motion: LissajousMotion
+    motion: Motion
     ambient: float = 0.0
+    orbit: OrbitMotion | None = None
     colors: np.ndarray = field(init=False, repr=False)
     members: list[np.ndarray] = field(init=False, repr=False)
     views: list[np.ndarray] = field(init=False, repr=False)
@@ -126,6 +161,8 @@ class Scene:
         camera = self.cameras.local.copy()
         mounted = self._parent_row >= 0
         camera[mounted] = np.einsum("nij,njk->nik", poses[self._parent_row[mounted]], self.cameras.local[mounted])
+        if self.orbit is not None:
+            camera[self.orbit.camera] = self.orbit.poses(time)
         translation, rotation, scale = decompose(transform)
         camera_translation, camera_rotation, _ = decompose(camera)
         return State(time, self.motion.instance, transform, camera, translation, rotation, scale, camera_translation, camera_rotation)

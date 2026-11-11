@@ -8,7 +8,7 @@ import pytest
 from ernie_bench import harness
 from ernie_bench.analysis import summarize_run
 from ernie_bench.results import RunWriter, Sample, read_run
-from ernie_bench.config import Measurement, SceneSpec, Suite, Workload
+from ernie_bench.config import Measurement, SceneConfig, Suite, Workload
 
 WORKLOAD = Workload(worlds=8, cameras_per_world=2, width=32, height=16, outputs=("rgb", "depth"), tier="direct", spp=4)
 
@@ -119,7 +119,7 @@ def test_drift_is_zero_when_stable_and_large_when_still_warming(tmp_path):
 SUITE = Suite(
     "end_to_end",
     ("alpha", "beta"),
-    (SceneSpec("hide_and_seek", "hide_and_seek"),),
+    (SceneConfig("hide_and_seek", "hide_and_seek"),),
     Workload(width=8, height=8),
     Measurement(warmup_min_iterations=3, warmup_min_seconds=0, warmup_max_seconds=0.2, warmup_window=3, warmup_cv=0.2, iterations=10, repeats=3, max_repeats=3),
     {"worlds": [2, 6]},

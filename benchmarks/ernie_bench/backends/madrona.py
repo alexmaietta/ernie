@@ -12,10 +12,10 @@ from ernie_bench.reference import camera_rays
 from ernie_bench.scene import Scene, State, decompose
 from ernie_bench.config import Workload
 
-VERSION = "madrona_benchmark b908c43 + cuda 12.8 headers"
+VERSION = "madrona b908c43 + cuda 12.8 headers + rt depth fix"
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "data" / "madrona-cache" / "native"
-MADRONA = ROOT / "external" / "madrona_benchmark" / "external" / "madrona"
+MADRONA = ROOT / "native" / "madrona" / "build" / "madrona-src"
 RUNTIME_SOURCES = (MADRONA / "src" / "mw" / "device", MADRONA / "include" / "madrona", ROOT / "native" / "madrona" / "src")
 CAMERA_AXES = np.array([-np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)])
 
@@ -55,12 +55,10 @@ class MadronaBackend:
 
         self._module = _madrona_bench
         self._raytrace = raytrace
-        for name, path in kernel_caches(Path(_madrona_bench.__file__), "rt" if raytrace else "rast").items():
-            os.environ.setdefault(name, path)
 
     def info(self) -> BackendInfo:
         deviations = (
-            "white albedo, fixed sun towards (0.5, 0.5, 2) with ambient 0.4, lighting clamped at 1"
+            "base colors as 1x1 textures, fixed sun towards (0.5, 0.5, 2) with ambient 0.4, lighting clamped at 1, shadows only in the direct tier"
             if self._raytrace
             else "samples pixel corners, row 0 is garbage"
         )
@@ -71,12 +69,19 @@ class MadronaBackend:
         return Capabilities(frozenset(tiers), frozenset({"rgb", "depth"}), max_spp=1, square_only=self._raytrace, sm_limit=self._raytrace)
 
     def load(self, scene: Scene, workload: Workload) -> None:
-        layout = [(tuple(scene.instances.mesh[found]), tuple(scene.instances.material[found])) for found in scene.members]
-        if any(entry != layout[0] for entry in layout) or len({len(found) for found in scene.views}) != 1:
-            raise ValueError("madrona builds every world from one layout, but the scene's worlds differ")
+        shadows = self._raytrace and workload.tier == "direct"
+        os.environ["MADRONA_RT_SHADOWS"] = "1" if shadows else "0"
+        mode = ("rt-shadows" if shadows else "rt") if self._raytrace else "rast"
+        for name, path in kernel_caches(Path(self._module.__file__), mode).items():
+            os.environ.setdefault(name, path)
+        if len({len(found) for found in scene.views}) != 1:
+            raise ValueError("madrona needs the same number of cameras in every world")
 
-        pairs = sorted(set(zip(*layout[0])))
-        instance_objects = np.array([pairs.index(pair) for pair in zip(*layout[0])], np.int32)
+        order = np.concatenate(scene.members)
+        keys = np.stack([scene.instances.mesh[order], scene.instances.material[order]], axis=1)
+        pairs, instance_objects = np.unique(keys, axis=0, return_inverse=True)
+        instance_objects = instance_objects.reshape(-1).astype(np.int32)
+        world_offsets = np.cumsum([0] + [len(found) for found in scene.members]).astype(np.uint32)
         vertex_offsets = np.cumsum([0] + [len(mesh.positions) for mesh in scene.meshes[:-1]]).astype(np.uint32)
         triangle_offsets = np.cumsum([0] + [len(mesh.indices) for mesh in scene.meshes[:-1]]).astype(np.uint32)
         direction = -np.asarray(scene.lights[0].direction if scene.lights else (0.0, 0.0, -1.0), np.float32)
@@ -101,6 +106,7 @@ class MadronaBackend:
             np.array([mesh for mesh, _ in pairs], np.int32),
             np.array([scene.materials[material].base_color for _, material in pairs], np.float32),
             instance_objects,
+            world_offsets,
             len(scene.views[0]),
         )
 

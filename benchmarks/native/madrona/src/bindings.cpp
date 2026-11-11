@@ -24,11 +24,16 @@ NB_MODULE(_madrona_bench, m) {
                 bool raytrace, float fov_y, float near_plane, float far_plane,
                 Floats light_direction, Floats vertices, Floats normals, Indices triangles,
                 Indices vertex_offsets, Indices triangle_offsets, Ids object_meshes,
-                Floats object_colors, Ids instance_objects, uint32_t camera_count) {
+                Floats object_colors, Ids instance_objects, Indices world_offsets,
+                uint32_t camera_count) {
                  require(light_direction.size() == 3, "light_direction needs 3 values");
                  require(vertices.size() == normals.size(), "vertices and normals differ in size");
                  require(object_colors.size() == 3 * object_meshes.size(),
                          "object_colors needs 3 values per object");
+                 require(world_offsets.size() == (size_t)world_count + 1,
+                         "world_offsets needs one entry per world plus the end");
+                 require(world_offsets.data()[world_count] == instance_objects.size(),
+                         "world_offsets must end at the instance count");
                  require(!raytrace || width == height,
                          "the madrona ray tracer only renders square images");
                  const float* light = light_direction.data();
@@ -57,11 +62,11 @@ NB_MODULE(_madrona_bench, m) {
                          .objectColors = object_colors.data(),
                          .objectCount = (uint32_t)object_meshes.size(),
                      },
-                     instance_objects.data(), (uint32_t)instance_objects.size(), camera_count);
+                     instance_objects.data(), world_offsets.data(), camera_count);
              })
         .def("set_instances",
              [](Manager& mgr, Floats positions, Floats rotations, Floats scales) {
-                 size_t count = (size_t)mgr.worldCount() * mgr.instanceCount();
+                 size_t count = mgr.instanceCount();
                  require(positions.size() == 3 * count && rotations.size() == 4 * count &&
                              scales.size() == 3 * count,
                          "instance arrays must hold every instance of every world");

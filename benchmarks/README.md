@@ -38,7 +38,7 @@ ernie-bench summary data/results/<time>-smoke
 
 ### Compare
 
-The compare suite needs Newton, Ernie and Madrona. Madrona is built from source and needs Python 3.12 and CUDA 12.8. Set `CUDA_ROOT` if CUDA isn't in `/usr/local/cuda-12.8`.
+The compare suite needs Newton, Ernie and Madrona. Madrona is built from source and needs Python 3.12 and CUDA 12.8. Set `CUDA_ROOT` if CUDA isn't in `/usr/local/cuda-12.8`, and `JOBS` to change the default of 4 build jobs. `scripts/setup-madrona` configures `native/madrona`, which fetches the Madrona engine at a pinned commit into `native/madrona/build/madrona-src` and applies the patches in `native/madrona/patches`. Madrona compiles its kernels from those sources at run time, so keep the build directory in place.
 
 ```bash
 scripts/make-env ernie
@@ -80,12 +80,22 @@ ernie-bench report data/results/<time>-compare -o report.html
 | `compare` | Newton, Ernie CUDA software, Madrona RT | The headline comparison |
 | `compare-full` | Every GPU backend and mode | The full comparison across 16 to 1024 worlds |
 | `quality` | Every backend including Mitsuba | Captures frames for `ernie-bench quality` |
+| `madrona-hide-and-seek` | Ernie, OVRTX, Madrona RT, Newton | A Hide and Seek-style scene from Madrona's renderer paper at 1,024 worlds and 64 to 256 pixels |
+| `madrona-hide-and-seek-video` | Ernie, OVRTX, Madrona RT, Newton | Captures 120 frames of four views from the same scene for side-by-side videos |
 
 Run only some backends from a suite with `--backend`.
 
 ```bash
 ernie-bench run configs/suites/compare-full.toml --backend newton --backend madrona_rt
 ```
+
+## Madrona Hide and Seek
+
+The `madrona_hide_and_seek` scene follows the Hide and Seek benchmark in Rosenzweig, Shacklett et al., "High-Throughput Batch Rendering for Embodied AI" (SIGGRAPH Asia 2024). It is a procedural reconstruction of the scene, not Madrona's own level generator. Each world is a walled arena with three hiders and three seekers, four boxes and two ramps, and every agent carries a 100 degree camera, as `hideseek_headless` renders it. Every backend renders it through the shared scene description.
+
+A scene config can set `cameras_per_world`, which replaces the suite's value for that scene, so the suite renders six views per world.
+
+Madrona's ray tracer ignores material base colors and only multiplies textures, so its backend gives each object a 1×1 texture of its base color. It casts shadow rays only when `MADRONA_RT_SHADOWS=1` is set while its kernels compile, which the backend does for the `direct` tier.
 
 ## Framework
 
@@ -103,7 +113,7 @@ The harness in `ernie_bench/harness.py` builds the scene and runs each point in 
 | --- | --- | --- |
 | `ernie`, `ernie_<api>_<mode>` | Ernie, from the `ernie-renderer` package on PyPI. `api` is `vulkan` or `cuda`, and `mode` is `hardware` or `software`. | `envs/ernie` |
 | `newton` | Newton's tiled camera renderer | `envs/newton` |
-| `madrona_rt`, `madrona_rast` | Madrona's ray tracer and rasteriser, built from `external/madrona_benchmark` with the patches in `native/madrona/patches` | `envs/madrona` |
+| `madrona_rt`, `madrona_rast` | Madrona's ray tracer and rasteriser, built from a pinned Madrona commit with the patches in `native/madrona/patches` | `envs/madrona` |
 | `ovrtx`, `ovrtx_tiled` | NVIDIA OVRTX | `envs/ovrtx` |
 | `mitsuba`, `mitsuba_cpu` | Mitsuba 3 on CUDA or LLVM, used mainly as a quality reference | `envs/mitsuba` |
 | `null` | Does nothing, to measure the harness's own overhead | any |

@@ -11,7 +11,7 @@ from ernie_bench.backends.null import NullBackend
 from ernie_bench.cli import main
 from ernie_bench.harness import run_suite
 from ernie_bench.results import read_run
-from ernie_bench.config import Measurement, SceneSpec, Suite, Workload
+from ernie_bench.config import Measurement, SceneConfig, Suite, Workload
 
 BROKEN = "ernie_bench.backends.null:Missing"
 
@@ -29,7 +29,7 @@ MEASUREMENT = Measurement(
 SUITE = Suite(
     "test",
     ("null", BROKEN),
-    (SceneSpec("hide_and_seek", "hide_and_seek"),),
+    (SceneConfig("hide_and_seek", "hide_and_seek"),),
     Workload(),
     MEASUREMENT,
     {"worlds": [1, 8], "resolution": [[16, 16]]},

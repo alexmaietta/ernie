@@ -42,7 +42,7 @@ class Manager {
     };
 
     MGR_EXPORT Manager(const Config& cfg, const Geometry& geometry, const int32_t* instance_objects,
-                       uint32_t instance_count, uint32_t camera_count);
+                       const uint32_t* world_offsets, uint32_t camera_count);
     MGR_EXPORT ~Manager();
 
     MGR_EXPORT void setInstances(const float* positions, const float* rotations,

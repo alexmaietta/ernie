@@ -21,6 +21,10 @@ for api in (None, "vulkan", "cuda"):
             "ernie_bench.backends.ernie:ErnieBackend",
             {"api": api and api.upper(), "traversal": (mode or "auto").upper(), "sampling": (mode or "auto").upper()},
         )
+BACKENDS["ernie_cuda_software_hwtex"] = (
+    "ernie_bench.backends.ernie:ErnieBackend",
+    {"api": "CUDA", "traversal": "SOFTWARE", "sampling": "HARDWARE"},
+)
 
 
 def known(name: str) -> bool:

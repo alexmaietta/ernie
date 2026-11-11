@@ -1,0 +1,19 @@
+name = "madrona-hide-and-seek"
+backends = ["ernie_vulkan_hardware", "ernie_cuda_software_hwtex", "ovrtx_tiled", "newton", "madrona_rt"]
+scenes = ["madrona_hide_and_seek"]
+workload = "throughput"
+
+[measurement]
+warmup_max_seconds = 5.0
+iterations = 30
+repeats = 3
+max_repeats = 6
+
+[sweep]
+worlds = [1024]
+resolution = [[64, 64], [128, 128], [256, 256]]
+tier = ["direct"]
+
+[capture]
+steps = [0]
+images = [0, 1, 2, 3]

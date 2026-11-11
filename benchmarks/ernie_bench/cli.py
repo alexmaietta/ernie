@@ -210,22 +210,6 @@ def montage(args) -> None:
 THRESHOLDS = {"hit_agreement": 0.98, "depth_agreement": 0.98, "segmentation_agreement": 0.97, "rgb_agreement": 0.95}
 
 
-def paper(args) -> None:
-    from ernie_bench.paper import PaperGrid, run_paper
-
-    grid = PaperGrid(
-        scene=args.scene,
-        worlds=tuple(args.worlds),
-        resolutions=tuple(args.resolution),
-        modes=tuple(args.mode),
-        steps=args.steps,
-        processes=args.processes,
-    )
-    directory = run_paper(grid, args.out, cpus=args.cpus, nice=args.nice, realtime=args.realtime)
-    print(directory)
-    show(directory, False)
-
-
 def quality(args) -> None:
     from ernie_bench.quality import evaluate, summarize
 
@@ -350,15 +334,6 @@ def main(argv: list[str] | None = None) -> None:
     command.add_argument("--fps", type=float, default=30)
     command.add_argument("-o", "--out", type=Path, required=True)
     command.set_defaults(handler=montage)
-
-    command = commands.add_parser("paper", parents=[controls], help="time the madrona_benchmark programs under our controls")
-    command.add_argument("--scene", default="hideseek", choices=["hideseek", "habitat"])
-    command.add_argument("--worlds", type=int, nargs="+", default=[256, 1024, 4096])
-    command.add_argument("--resolution", type=int, nargs="+", default=[64, 128, 256])
-    command.add_argument("--mode", nargs="+", default=["rt", "rast"], choices=["rt", "rast"])
-    command.add_argument("--steps", type=int, default=200)
-    command.add_argument("--processes", type=int, default=3)
-    command.set_defaults(handler=paper)
 
     command = commands.add_parser("quality", help="per-pixel image quality of captured frames against a reference")
     command.add_argument("runs", type=Path, nargs="+")

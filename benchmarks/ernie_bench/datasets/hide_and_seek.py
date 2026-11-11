@@ -7,7 +7,7 @@ import numpy as np
 
 from ernie_bench.datasets import shapes
 from ernie_bench.scene import Cameras, DistantLight, Instances, Material, LissajousMotion, Scene, compose
-from ernie_bench.config import SceneSpec
+from ernie_bench.config import SceneConfig
 
 DEFAULTS = {
     "arena_size": 20.0,
@@ -31,6 +31,9 @@ DEFAULTS = {
     "eye_height": 0.8,
     "eye_forward": 0.3,
 }
+
+AGENT_CLEARANCE = 0.7
+PROP_ATTEMPTS = 256
 
 CLASSES = ("floor", "wall", "box", "ramp", "hider", "seeker")
 FLOOR, WALL, BOX, RAMP, HIDER, SEEKER = range(len(CLASSES))
@@ -71,7 +74,7 @@ def _scattered(rng, mesh, kind, worlds, count, half, scale):
     return Group(mesh, kind, position, rng.uniform(0, 2 * np.pi, (worlds, count)), scale)
 
 
-def build(spec: SceneSpec, worlds: int, cameras_per_world: int) -> Scene:
+def build(spec: SceneConfig, worlds: int, cameras_per_world: int) -> Scene:
     unknown = spec.params.keys() - DEFAULTS.keys()
     if unknown:
         raise ValueError(f"unknown hide_and_seek params {sorted(unknown)}")
@@ -117,16 +120,43 @@ def build(spec: SceneSpec, worlds: int, cameras_per_world: int) -> Scene:
 
     moving = np.flatnonzero(np.isin(instance_kind, [BOX, RAMP, HIDER, SEEKER]))
     agent = np.isin(instance_kind[moving], [HIDER, SEEKER])
+    world = moving // per_world
+    splits = np.column_stack([split_x[world], split_y[world]])
+    offset = position[moving, :2] - splits
+    clear = np.where(offset < 0, -1.0, 1.0) * np.maximum(np.abs(offset), 0.75)
+    position[moving[agent], :2] = np.clip(splits + clear, -half + 0.75, half - 0.75)[agent]
     center = position[moving, :2]
     amplitude = np.where(
         agent[:, None],
         rng.uniform(*p["agent_amplitude"], (len(moving), 2)),
         rng.uniform(*p["prop_amplitude"], (len(moving), 2)),
     )
+    reach = np.minimum(half - 0.75 - np.abs(center), np.where(agent[:, None], np.abs(center - splits) - 0.75, np.inf))
+    amplitude = np.clip(amplitude, 0, reach)
+
+    count = len(moving) // worlds
+    lanes = center.reshape(worlds, count, 2)
+    sway = amplitude.reshape(worlds, count, 2)
+    walkers = agent[:count]
+    low = lanes[:, walkers] - sway[:, walkers] - AGENT_CLEARANCE
+    high = lanes[:, walkers] + sway[:, walkers] + AGENT_CLEARANCE
+    footprint = 0.5 * np.hypot(scale[moving, 0], scale[moving, 1]).reshape(worlds, count)
+    for prop in np.flatnonzero(~walkers):
+        extent = (sway[:, prop] + footprint[:, prop, None])[:, None, None]
+        candidates = rng.uniform(-half + 1, half - 1, (worlds, PROP_ATTEMPTS, 2))
+        blocked = np.any(np.all((candidates[:, :, None] - extent < high[:, None]) & (candidates[:, :, None] + extent > low[:, None]), axis=-1), axis=-1)
+        found = ~blocked.all(axis=1)
+        pick = candidates[np.arange(worlds), np.argmax(~blocked, axis=1)]
+        lanes[:, prop] = np.where(found[:, None], pick, lanes[:, prop])
+        sway[:, prop] = np.where(found[:, None], np.minimum(sway[:, prop], half - 0.75 - np.abs(lanes[:, prop])), 0.0)
+    center = lanes.reshape(-1, 2)
+    amplitude = sway.reshape(-1, 2)
+    position[moving, :2] = center
+
     motion = LissajousMotion(
         instance=moving,
         center=center,
-        amplitude=np.clip(amplitude, 0, half - 0.75 - np.abs(center)),
+        amplitude=amplitude,
         frequency=np.where(
             agent[:, None],
             rng.uniform(*p["agent_frequency"], (len(moving), 2)),

@@ -55,7 +55,8 @@ void Sim::setupTasks(TaskGraphManager& taskgraph_mgr, const Config&) {
 Sim::Sim(Engine& ctx, const Config& cfg, const WorldInit&) : WorldBase(ctx) {
     RenderingSystem::init(ctx, cfg.renderBridge);
 
-    for (CountT i = 0; i < (CountT)cfg.numInstances; i++) {
+    const uint32_t world = (uint32_t)ctx.worldID().idx;
+    for (CountT i = cfg.worldOffsets[world]; i < (CountT)cfg.worldOffsets[world + 1]; i++) {
         Entity instance = ctx.makeRenderableEntity<RenderEntity>();
         ctx.get<Position>(instance) = Vector3::zero();
         ctx.get<Rotation>(instance) = Quat{1, 0, 0, 0};

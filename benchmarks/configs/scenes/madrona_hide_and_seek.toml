@@ -1,0 +1,11 @@
+dataset = "hide_and_seek"
+seed = 0
+cameras_per_world = 6
+
+[params]
+arena_size = 20.0
+hiders = 3
+seekers = 3
+boxes = 4
+ramps = 2
+fov_y = 100.0

@@ -73,6 +73,8 @@ class NewtonBackend:
         config = camera.RenderConfig()
         config.enable_shadows = workload.tier == "direct"
         config.enable_ambient_lighting = scene.ambient > 0
+        config.enable_particles = False
+        config.render_order = camera.RenderOrder.TILED
         self._sensor = camera(self._model, default_render_config=config)
         if scene.lights:
             self._sensor.create_default_light(enable_shadows=workload.tier == "direct", direction=wp.vec3f(*scene.lights[0].direction))
@@ -96,12 +98,13 @@ class NewtonBackend:
         self._views = wp.zeros(views, dtype=wp.transformf, device=self._device)
         self._worlds = wp.array(scene.cameras.world.astype(np.int32), dtype=wp.int32, device=self._device)
         self._moving_bodies = body[scene.motion.instance]
-        self._body_poses = self._state.body_q.numpy()
+        self._body_poses = self._state.body_q.numpy() if len(self._moving_bodies) else None
 
     def update(self, state: State) -> None:
-        self._body_poses[self._moving_bodies, :3] = state.translation
-        self._body_poses[self._moving_bodies, 3:] = state.rotation
-        self._state.body_q.assign(self._body_poses)
+        if self._body_poses is not None:
+            self._body_poses[self._moving_bodies, :3] = state.translation
+            self._body_poses[self._moving_bodies, 3:] = state.rotation
+            self._state.body_q.assign(self._body_poses)
         self._views.assign(np.concatenate([state.camera_translation, state.camera_rotation], axis=1).astype(np.float32))
 
     def render(self) -> None:

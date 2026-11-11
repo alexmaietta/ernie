@@ -9,10 +9,10 @@ from ernie_bench.config import OUTPUTS, TIERS, Workload
 from ernie_bench.system import cuda
 
 PRODUCT = "/Render/Batch"
-SOURCES = {"rgb": "HdrColor", "depth": "DistanceToCamera", "segmentation": "SemanticSegmentation"}
+PROTOTYPES = "/Prototypes"
+SOURCES = {"rgb": "LdrColor", "depth": "DistanceToCamera", "segmentation": "SemanticSegmentation"}
 COLOR_SOURCES = {"unlit": "DiffuseAlbedo"}
-UNIT_SUN_INTENSITY = 50000.0
-LDR_EXPOSURE = np.pi / UNIT_SUN_INTENSITY
+SUN_SOLID_ANGLE = 2 * np.pi * (1 - np.cos(np.radians(SUN_ANGLE) / 2))
 FOCAL_LENGTH = 10.0
 PATH_TRACED_BOUNCES = 4
 SHADING = {
@@ -26,6 +26,10 @@ SHADING = {
 
 def world_path(world: int) -> str:
     return f"/W{world:05d}"
+
+
+def prototype_path(slot: int) -> str:
+    return f"{PROTOTYPES}/P{slot:05d}"
 
 
 class ErnieBackend:
@@ -71,22 +75,29 @@ class ErnieBackend:
             for found, seen in zip(scene.members, scene.views)
         ]
 
+        keys = np.stack([scene.instances.mesh, scene.instances.material, scene.instances.semantic], axis=1)
+        prototypes, prototype = np.unique(keys, axis=0, return_inverse=True)
+        prototype = prototype.reshape(-1)
+        ernie.Scope.define(stage, PROTOTYPES)
+        for slot, (mesh_index, material, semantic) in enumerate(prototypes):
+            mesh = scene.meshes[mesh_index]
+            ernie.Mesh.define(
+                stage,
+                prototype_path(slot),
+                points=mesh.positions,
+                face_vertex_indices=mesh.indices.reshape(-1).astype(np.int32),
+                face_vertex_counts=np.full(len(mesh.indices), 3, np.int32),
+                normals=mesh.normals,
+                normals_interpolation="vertex",
+                display_color=tuple(scene.materials[material].base_color),
+                semantics_labels={TAXONOMY: [scene.classes[semantic]]},
+            )
+
         def define_world(world: int) -> None:
             root = world_path(world)
             ernie.World.define(stage, root)
             for slot, index in enumerate(scene.members[world]):
-                mesh = scene.meshes[scene.instances.mesh[index]]
-                ernie.Mesh.define(
-                    stage,
-                    f"{root}/I{slot:05d}",
-                    points=mesh.positions,
-                    face_vertex_indices=mesh.indices.reshape(-1).astype(np.int32),
-                    face_vertex_counts=np.full(len(mesh.indices), 3, np.int32),
-                    normals=mesh.normals,
-                    normals_interpolation="vertex",
-                    display_color=tuple(scene.colors[index]),
-                    semantics_labels={TAXONOMY: [scene.classes[scene.instances.semantic[index]]]},
-                )
+                ernie.Xform.define(stage, f"{root}/I{slot:05d}", prototype={"prototype": prototype_path(prototype[index])})
             for slot in range(len(scene.views[world])):
                 ernie.Camera.define(stage, f"{root}/C{slot:03d}")
             for slot, light in enumerate(scene.lights):
@@ -95,16 +106,17 @@ class ErnieBackend:
                     f"{root}/L{slot:02d}",
                     orient=quaternions(sun_basis(light.direction)[None])[0],
                     angle=SUN_ANGLE,
-                    intensity=float(UNIT_SUN_INTENSITY * light.irradiance / np.pi),
+                    intensity=float(light.irradiance / SUN_SOLID_ANGLE),
                     color=light.color,
                 )
 
-        if all(entry == layout[0] for entry in layout):
-            define_world(0)
-            stage.clone(stage.find(world_path(0)), [world_path(world) for world in range(1, scene.world_count)])
-        else:
-            for world in range(scene.world_count):
-                define_world(world)
+        groups = {}
+        for world, entry in enumerate(layout):
+            groups.setdefault(entry, []).append(world)
+        for first, *rest in groups.values():
+            define_world(first)
+            if rest:
+                stage.clone(stage.find(world_path(first)), [world_path(world) for world in rest])
 
         instance_paths = np.empty(len(scene.instances), object)
         for world, found in enumerate(scene.members):
@@ -126,8 +138,9 @@ class ErnieBackend:
         lenses.write("horizontalAperture", horizontal.astype(np.float32))
         lenses.write("clippingRange", np.stack([scene.cameras.near, scene.cameras.far], axis=1).astype(np.float32))
 
-        self._moving = stage.select(list(instance_paths[scene.motion.instance]))
-        self._moving.write("scale", scene.motion.scale.astype(np.float32))
+        self._moving = stage.select(list(instance_paths[scene.motion.instance])) if len(scene.motion.instance) else None
+        if self._moving is not None:
+            self._moving.write("scale", scene.motion.scale.astype(np.float32))
         self._lenses = lenses
 
         ernie.Scope.define(stage, "/Render")
@@ -165,11 +178,12 @@ class ErnieBackend:
             stream.close()
             return
         finally:
-            self._renderer.reset(0.0)
+            self._stage.time = 0.0
         self._stream = stream
 
     def update(self, state: State) -> None:
-        self._moving.write_poses(np.hstack([state.translation, state.rotation]))
+        if self._moving is not None:
+            self._moving.write_poses(np.hstack([state.translation, state.rotation]))
         self._lenses.write_poses(np.hstack([state.camera_translation, state.camera_rotation]))
         self._stage.publish()
 
@@ -191,10 +205,8 @@ class ErnieBackend:
             values = frame.source(self._color_source if output == "rgb" else source).numpy()
             if output == "rgb" and values.dtype == np.uint8:
                 frames[output] = linear_from_srgb(values[..., :3])
-            elif output == "rgb" and self._color_source == "DiffuseAlbedo":
-                frames[output] = np.ascontiguousarray(values[..., :3], np.float32)
             elif output == "rgb":
-                frames[output] = np.ascontiguousarray(values[..., :3] * LDR_EXPOSURE, np.float32)
+                frames[output] = np.ascontiguousarray(values[..., :3], np.float32)
             elif output == "depth":
                 depth = values.reshape(*values.shape[:3], 1).astype(np.float32)
                 frames[output] = np.where(hits(depth), depth, np.float32(np.inf))

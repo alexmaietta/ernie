@@ -8,10 +8,10 @@ from ernie_bench import harness
 from ernie_bench.backends import BACKENDS
 from ernie_bench.backends.base import BackendInfo, Capabilities
 from ernie_bench.datasets import build_scene
-from ernie_bench.config import OUTPUTS, TIERS, Measurement, SceneSpec, Workload
+from ernie_bench.config import OUTPUTS, TIERS, Measurement, SceneConfig, Workload
 from ernie_bench.system.monitor import Monitor
 
-SPEC = SceneSpec("hide_and_seek", "hide_and_seek")
+SPEC = SceneConfig("hide_and_seek", "hide_and_seek")
 WORKLOAD = Workload(worlds=4, cameras_per_world=2, width=16, height=16)
 MEASUREMENT = Measurement(
     warmup_min_iterations=3,

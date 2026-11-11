@@ -2,36 +2,18 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BENCHMARK=$ROOT/external/madrona_benchmark
-MADRONA=$BENCHMARK/external/madrona
 CUDA=${CUDA_ROOT:-/usr/local/cuda-12.8}
 PYTHON=${PYTHON:-$ROOT/envs/madrona/.venv/bin/python}
-JOBS=${JOBS:-$(nproc)}
-CMAKE_FLAGS=(
-    -DCMAKE_BUILD_TYPE=Release
-    -DCUDAToolkit_ROOT="$CUDA"
-    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-)
+JOBS=${JOBS:-4}
 
 if [[ ! -x $PYTHON ]]; then
     echo "no python at $PYTHON, run: scripts/make-env madrona --python <python3.12>" >&2
     exit 1
 fi
 
-git -C "$ROOT" submodule update --init --checkout external/madrona_benchmark
-git -C "$BENCHMARK" -c submodule."data/hssd-hab".update=none submodule update --init --recursive
-
-for patch in "$ROOT"/native/madrona/patches/*.patch; do
-    if git -C "$MADRONA" apply --reverse --check "$patch" 2>/dev/null; then
-        echo "already applied $(basename "$patch")"
-    else
-        git -C "$MADRONA" apply "$patch"
-        echo "applied $(basename "$patch")"
-    fi
-done
-
-cmake -S "$BENCHMARK" -B "$BENCHMARK/build" "${CMAKE_FLAGS[@]}"
-cmake --build "$BENCHMARK/build" -j "$JOBS" --target hideseek_headless habitat_headless
-
-cmake -S "$ROOT/native/madrona" -B "$ROOT/native/madrona/build" "${CMAKE_FLAGS[@]}" -DPython_EXECUTABLE="$PYTHON"
+cmake -S "$ROOT/native/madrona" -B "$ROOT/native/madrona/build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCUDAToolkit_ROOT="$CUDA" \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DPython_EXECUTABLE="$PYTHON"
 cmake --build "$ROOT/native/madrona/build" -j "$JOBS" --target _madrona_bench

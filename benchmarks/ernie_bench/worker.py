@@ -12,7 +12,7 @@ from ernie_bench import __version__
 from ernie_bench.datasets import build_scene
 from ernie_bench.harness import PROTOCOL, attempt
 from ernie_bench.results import Sample
-from ernie_bench.config import Capture, Measurement, SceneSpec, Workload
+from ernie_bench.config import Capture, Measurement, SceneConfig, Workload
 from ernie_bench.system.monitor import Monitor
 
 IMPORTED = perf_counter()
@@ -25,7 +25,7 @@ def main(job_path: str) -> None:
     else:
         workload = Workload(**job["workload"])
         measurement = Measurement(**job["measurement"])
-        scene = build_scene(SceneSpec(**job["scene"]), workload.worlds, workload.cameras_per_world)
+        scene = build_scene(SceneConfig(**job["scene"]), workload.worlds, workload.cameras_per_world)
         locked = {int(gpu): clock for gpu, clock in job["locked"].items()}
         with Monitor(measurement.monitor_interval, locked) as monitor:
             capture = Capture(**job["capture"]) if job["capture"] else None

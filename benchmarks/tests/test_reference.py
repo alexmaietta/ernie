@@ -5,7 +5,7 @@ import pytest
 from ernie_bench import reference
 from ernie_bench.datasets import build_scene, shapes
 from ernie_bench.scene import Cameras, DistantLight, Instances, LissajousMotion, Material, Scene, compose, decompose, quaternions
-from ernie_bench.config import SceneSpec
+from ernie_bench.config import SceneConfig
 
 
 def look(position, target, up=(0, 0, 1)):
@@ -87,7 +87,7 @@ def test_decompose_recovers_translation_rotation_and_scale():
 
 
 def test_state_carries_decomposed_poses():
-    scene = build_scene(SceneSpec("h", "hide_and_seek"), 3, 2)
+    scene = build_scene(SceneConfig("h", "hide_and_seek"), 3, 2)
     state = scene.state(0.7)
     assert np.allclose(state.translation, state.transform[:, :3, 3])
     assert np.allclose(state.camera_translation, state.camera[:, :3, 3])

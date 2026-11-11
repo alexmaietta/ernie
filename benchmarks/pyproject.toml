@@ -9,7 +9,7 @@ description = "Benchmark harness comparing Ernie with other renderers"
 license = "BSD-3-Clause"
 authors = [{ name = "Alex Maietta" }]
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "pyarrow>=15", "nvidia-ml-py>=12", "tomli>=2; python_version < '3.11'"]
+dependencies = ["numpy>=1.24", "trimesh>=4", "pyarrow>=15", "nvidia-ml-py>=12", "tomli>=2; python_version < '3.11'"]
 
 [project.optional-dependencies]
 ernie = ["ernie-renderer"]

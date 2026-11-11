@@ -12,7 +12,7 @@ from ernie_bench import reference as analytic
 from ernie_bench.backends.base import hits, srgb_from_linear
 from ernie_bench.datasets import build_scene
 from ernie_bench.media import Captured, captures
-from ernie_bench.config import SceneSpec
+from ernie_bench.config import SceneConfig
 
 GAUSSIAN = np.exp(-0.5 * (np.arange(-5, 6) / 1.5) ** 2)
 GAUSSIAN /= GAUSSIAN.sum()
@@ -110,7 +110,7 @@ def geometry_only(rgb: np.ndarray, depth: np.ndarray) -> np.ndarray:
 def analytic_frames(manifest: dict, member: Captured, image: int) -> dict[str, np.ndarray]:
     specs = {spec["name"]: spec for spec in manifest["suite"]["scenes"]}
     workload = member.workload
-    scene = build_scene(SceneSpec(**specs[member.scene]), workload["worlds"], workload["cameras_per_world"])
+    scene = build_scene(SceneConfig(**specs[member.scene]), workload["worlds"], workload["cameras_per_world"])
     tier = workload["tier"] if "rgb" in member.outputs else None
     rendered = [analytic.render(scene, scene.state(step * workload["dt"]), workload["width"], workload["height"], [image], tier) for step in member.steps]
     depth, classes, rgb = zip(*rendered)
