@@ -15,3 +15,20 @@ FetchContent_Declare(
     URL_HASH SHA256=6725c94c73ba24bb0bcdc3104c4e6d9c2b1460fd8a6e5daf918a9a6217c3f39d
 )
 FetchContent_MakeAvailable(tinyusd)
+
+if(APPLE AND TARGET tinyusd::tinyusd)
+    get_target_property(tinyusd_aliased tinyusd::tinyusd ALIASED_TARGET)
+    if(NOT tinyusd_aliased)
+        set(tinyusd_aliased tinyusd::tinyusd)
+    endif()
+    get_target_property(tinyusd_links ${tinyusd_aliased} INTERFACE_LINK_LIBRARIES)
+    if(tinyusd_links)
+        list(REMOVE_ITEM tinyusd_links System)
+        set_target_properties(
+            ${tinyusd_aliased}
+            PROPERTIES
+                INTERFACE_LINK_LIBRARIES
+                    "${tinyusd_links}"
+        )
+    endif()
+endif()
