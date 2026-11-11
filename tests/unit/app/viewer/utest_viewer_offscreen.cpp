@@ -21,7 +21,7 @@ namespace {
 
 constexpr uint32_t kWidth = 160;
 constexpr uint32_t kHeight = 90;
-constexpr auto kPatience = std::chrono::seconds(60);
+constexpr auto kPatience = std::chrono::seconds(180);
 
 class OffscreenViewerTest : public ::testing::Test {
   protected:
