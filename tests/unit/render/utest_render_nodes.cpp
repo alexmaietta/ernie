@@ -334,9 +334,9 @@ struct TestHot {{
 }
 
 TEST(MaterialNodeTest, ReloadedFilesChangeTheImageAndKeepInputValues) {
-    const std::filesystem::path file =
-        WriteFile("ernie_render_nodes_hot.slang", HotNode("tint", ""));
     ForEachDevice([&](Device& device) {
+        const std::filesystem::path file =
+            WriteFile("ernie_render_nodes_hot.slang", HotNode("tint", ""));
         const Ref<Scene> scene = LookingDown(device, true);
         LoadShaders(*scene, file);
         EXPECT_EQ(LoadShaders(*scene, file), std::vector<std::string>{"TestHot"});
